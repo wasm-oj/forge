@@ -8,6 +8,7 @@ import type {
   RunResult,
   WorkerProgress,
 } from "@/src/core/types";
+import CompilerWorker from "./compiler.worker?worker&inline";
 
 type ProgressListener = (progress: WorkerProgress) => void;
 type StreamListener = (stream: "stdout" | "stderr", chunk: string) => void;
@@ -84,10 +85,7 @@ export class CompilerClient {
   }
 
   private createWorker(): Worker {
-    const worker = new Worker(new URL("./compiler.worker.ts", import.meta.url), {
-      type: "module",
-      name: "localwasi-compiler",
-    });
+    const worker = new CompilerWorker({ name: "localwasi-compiler" });
     worker.addEventListener("message", (event: MessageEvent<CompilerResponse>) => this.handleMessage(event.data));
     worker.addEventListener("error", (event) => {
       const error = new Error(event.message || "The compiler worker crashed.");

@@ -8,6 +8,8 @@ import {
   type Command,
   type Output,
 } from "@wasmer/sdk";
+import wasmerSdkUrl from "@wasmer/sdk?url";
+import wasmerWasmUrl from "@wasmer/sdk/wasm?url";
 import { ensureFailureDiagnostic, parseClangDiagnostics, parsePythonDiagnostics, parseQuickJsDiagnostics } from "@/src/core/diagnostics";
 import {
   CLANG_PACKAGE,
@@ -255,7 +257,11 @@ async function initializeRuntime(requestId: string): Promise<void> {
     throw new Error("Wasmer requires a cross-origin-isolated page. Serve this app with COOP and COEP headers.");
   }
   progress(requestId, "initializing", "Starting Wasmer runtime", 0.2);
-  await init({ log: "warn" });
+  await init({
+    log: "warn",
+    module: new URL(wasmerWasmUrl, scope.location.origin),
+    sdkUrl: new URL(wasmerSdkUrl, scope.location.origin),
+  });
   runtime = Runtime.global(true);
   progress(requestId, "initializing", "Wasmer runtime ready", 1);
 }

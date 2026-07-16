@@ -33,7 +33,6 @@ export default defineConfig(async (): Promise<UserConfig> => {
         config: {
           main: "./worker/index.ts",
           compatibility_flags: ["nodejs_compat"],
-          assets: { binding: "ASSETS", run_worker_first: true },
         },
       }),
     ],
