@@ -56,6 +56,11 @@ static void lw_print_i64(long long value) { printf("%lld", value); }
 static void lw_print_f64(double value) { printf("%g", value); }
 static void lw_print_str(const char *value) { fputs(value, stdout); }
 static void lw_print_bool(bool value) { fputs(value ? "true" : "false", stdout); }
+static int64_t read_int(void) {
+    long long value = 0;
+    if (scanf("%lld", &value) != 1) return 0;
+    return (int64_t)value;
+}
 #define LW_PRINT_VALUE(value) _Generic((value), char*: lw_print_str, const char*: lw_print_str, float: lw_print_f64, double: lw_print_f64, bool: lw_print_bool, default: lw_print_i64)(value)
 '''
 

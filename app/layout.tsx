@@ -11,22 +11,22 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto")?.split(",")[0] ?? (host.startsWith("localhost") ? "http" : "https");
   const metadataBase = new URL(`${protocol}://${host}`);
-  const description = "A private, browser-local multi-language WASI and WASIX compiler powered by Wasmer.";
+  const description = "A private, fully in-browser online judge with 20 original challenges and six Wasmer-powered languages.";
   return {
     metadataBase,
-    title: "LocalWASI Studio",
+    title: "LocalWASI Judge",
     description,
     icons: { icon: "/favicon.svg" },
     openGraph: {
-      title: "LocalWASI Studio",
-      description: "Compile locally. Run anywhere.",
+      title: "LocalWASI Judge",
+      description: "20 challenges. Six languages. Zero code uploads.",
       type: "website",
-      images: [{ url: new URL("/og.png", metadataBase).toString(), width: 1731, height: 909, alt: "LocalWASI Studio — compile locally, run anywhere" }],
+      images: [{ url: new URL("/og.png", metadataBase).toString(), width: 1726, height: 911, alt: "LocalWASI Judge — 20 browser-local programming challenges" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "LocalWASI Studio",
-      description: "Compile locally. Run anywhere.",
+      title: "LocalWASI Judge",
+      description: "20 challenges. Six languages. Zero code uploads.",
       images: [new URL("/og.png", metadataBase).toString()],
     },
   };
@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="zh-Hant">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body>
     </html>
   );

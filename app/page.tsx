@@ -1,7 +1,7 @@
 "use client";
 
-import { Studio } from "@/src/components/studio";
+import { JudgeStudio } from "@/src/components/judge-studio";
 
 export default function Home() {
-  return <Studio />;
+  return <JudgeStudio />;
 }

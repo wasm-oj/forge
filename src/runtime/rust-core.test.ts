@@ -23,6 +23,8 @@ function compile(source: string) {
   return {
     code: result.status,
     stderr: result.stderr,
+    directory,
+    outputPath: output,
     output: readFileSync(output, "utf8"),
     diagnostics: JSON.parse(readFileSync(diagnostics, "utf8")) as Array<{ code: string; line: number }>,
   };
@@ -36,6 +38,21 @@ describe("Rust/WASI core compiler", () => {
     expect(result.output).toContain("int32_t square(int32_t value)");
     expect(result.output).toContain("if (answer > 0)");
     expect(result.output).toContain("LW_PRINT_VALUE(answer)");
+  });
+
+  it("provides deterministic integer stdin for local judge problems", () => {
+    const result = compile(`fn main() {\n    let left: i64 = read_int();\n    let right: i64 = read_int();\n    println!("{}", left + right);\n}\n`);
+    expect(result.code).toBe(0);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.output).toContain("static int64_t read_int(void)");
+    expect(result.output).toContain("int64_t left = read_int()");
+
+    const executable = join(result.directory, "judge-program");
+    const nativeCompile = spawnSync("cc", ["-std=c17", result.outputPath, "-o", executable], { encoding: "utf8" });
+    expect(nativeCompile.status, nativeCompile.stderr).toBe(0);
+    const nativeRun = spawnSync(executable, { input: "7 35\n", encoding: "utf8" });
+    expect(nativeRun.status, nativeRun.stderr).toBe(0);
+    expect(nativeRun.stdout).toBe("42\n");
   });
 
   it("rejects constructs outside the declared profile", () => {

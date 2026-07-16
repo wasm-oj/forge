@@ -4,18 +4,30 @@
 
 ```mermaid
 flowchart LR
-  UI["React + Monaco UI"] -->|"structured-cloned project"| CW["Compiler Web Worker"]
+  UI["Problem catalog + Monaco UI"] -->|"structured-cloned project"| CW["Compiler Web Worker"]
   CW --> WR["Wasmer browser runtime"]
   WR --> TC["WASI/WASIX toolchains"]
   TC --> AR["Wasm module or runtime bundle"]
   AR --> IDB["IndexedDB artifact cache"]
-  AR --> WR
-  WR -->|"stdout, stderr, exit code"| UI
+  AR --> JR["Local judge runner"]
+  JR -->|"one stdin case at a time"| WR
+  WR -->|"stdout, stderr, exit code"| JR
+  JR -->|"verdict + diff"| UI
   REG["Wasmer Registry"] -->|"package binaries only"| CS["Cache Storage"]
   CS --> WR
 ```
 
 The UI never imports a compiler or runtime directly. It sends an immutable project snapshot to a dedicated module Worker. The Worker owns the Wasmer `Runtime`, package handles, mounted `Directory` instances, compiler processes, and generated binaries. Cancelling an operation or changing toolchain/target terminates and recreates that Worker, so guest state and accumulated runtime resources never leak into the next toolchain session.
+
+## Local judging
+
+The catalog is a static, typed set of 20 original problems. Every problem defines its statement, input/output contract, constraints, examples, local time limit, and at least four judge cases. Fixture tests run independent reference solvers against every expected output.
+
+A submission compiles once. The UI then runs the artifact once per case with an immutable `ProjectConfig` whose stdin is replaced by that case. Output comparison normalizes CRLF and trailing whitespace while preserving leading whitespace. The first wrong answer, non-zero exit, timeout, or runtime failure ends the submission. Accepted problem IDs persist in localStorage; per-problem, per-language drafts persist in IndexedDB.
+
+The time limit is enforced by racing each Worker request against a browser timer. On timeout or user cancellation, the Worker is terminated and recreated, so the guest cannot continue consuming resources.
+
+All judge cases necessarily ship to the browser. The UI and README state that this mode is designed for private practice and self-verification rather than cheat-resistant contests.
 
 ## Compilation pipelines
 
@@ -50,7 +62,7 @@ IndexedDB has two object stores:
 - `projects`: autosaved project snapshots keyed by project ID.
 - `artifacts`: content-addressed build products keyed by SHA-256 of canonical files and build configuration.
 
-The artifact store retains the 20 newest builds. Cache Storage holds GET responses from the Wasmer registry/CDN, which includes compiler binaries, runtime modules, sysroots, and standard libraries. Browser persistent-storage permission is requested at startup.
+The artifact store retains the 20 newest builds. Cache Storage holds GET responses from the Wasmer registry/CDN, which includes compiler binaries, runtime modules, sysroots, and standard libraries. Browser persistent-storage permission is requested at startup. Solved-problem IDs use a validated localStorage record separate from build artifacts.
 
 ## Security and privacy boundaries
 
