@@ -61,18 +61,19 @@ export function parsePythonDiagnostics(output: string): Diagnostic[] {
   return diagnostics;
 }
 
-export function parseQuickJsDiagnostics(output: string): Diagnostic[] {
+export function parseTypeScriptDiagnostics(output: string): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const pattern = /(?:SyntaxError|ReferenceError|TypeError):\s*(.+?)(?:\n|$)[\s\S]*?at\s+(?:<anonymous>\s+)?\(([^:()]+):(\d+)(?::(\d+))?\)/g;
+  const pattern = /^(.*?)\((\d+),(\d+)\):\s+(error|warning|message)\s+TS(\d+):\s+(.+)$/gm;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(output)) !== null) {
     diagnostics.push({
-      severity: "error",
-      message: match[1],
-      file: projectPath(match[2]),
-      line: Number(match[3]),
-      column: Number(match[4] ?? 1),
-      source: "quickjs",
+      severity: severity(match[4]),
+      message: match[6],
+      file: projectPath(match[1]),
+      line: Number(match[2]),
+      column: Number(match[3]),
+      source: "typescript",
+      code: `TS${match[5]}`,
     });
   }
   return diagnostics;

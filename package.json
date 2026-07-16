@@ -35,7 +35,6 @@
     "eslint-config-next": "16.2.6",
     "react-server-dom-webpack": "19.2.6",
     "typescript": "5.9.3",
-    "typescript-wasi": "npm:typescript@4.9.5",
     "vinext": "0.0.50",
     "vite": "8.0.13",
     "vitest": "4.0.16",

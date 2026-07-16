@@ -53,7 +53,9 @@ The browser-compatible CPython 3.12/WASIX package (`python/python@=0.2.0`) runs 
 
 ### JavaScript and TypeScript
 
-The pinned TypeScript compiler source is served as a versioned, same-origin toolchain asset and cached by the toolchain service worker. The compiler Worker mounts it into QuickJS and launches QuickJS through Wasmer. TypeScript's `transpileModule` returns ES2020 modules and structured diagnostics without executing user code during the build. JavaScript goes through the same syntax pipeline. Execution mounts the emitted modules and launches QuickJS with module mode.
+The pinned native TypeScript 7.0.2 compiler is built from the official Go source as a WASI module. A small stdin/stdout adapter gives it an in-memory filesystem, so the Worker sends source files as JSON and receives emitted CommonJS modules plus native diagnostics without exposing host storage. JavaScript goes through the same parser, checker, and emit pipeline with `allowJs` and `checkJs` enabled.
+
+Execution uses a pinned QuickJS-ng 0.15.1 module built for WASI. The Worker assembles the emitted files into an in-memory CommonJS loader, injects the configured stdin through the `std` contract, and launches the bundle with Wasmer. Both compressed modules are same-origin, versioned assets cached by the toolchain service worker. Their upstream revisions, SHA-256 digests, and reproducible build command are documented in `public/toolchains/README.md`.
 
 ## Storage
 

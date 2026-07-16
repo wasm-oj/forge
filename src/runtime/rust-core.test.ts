@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 function compilerSource(): string {
   const worker = readFileSync(new URL("./compiler.worker.ts", import.meta.url), "utf8");
-  const match = worker.match(/const RUST_CORE_COMPILER = String\.raw`([\s\S]*?)`;\n\nconst TYPESCRIPT_DRIVER/);
+  const match = worker.match(/const RUST_CORE_COMPILER = String\.raw`([\s\S]*?)`;\n\nconst QUICKJS_TYPES/);
   if (!match) throw new Error("Unable to locate the embedded Rust core compiler.");
   return match[1];
 }

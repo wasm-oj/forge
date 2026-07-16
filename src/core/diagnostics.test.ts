@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseClangDiagnostics, parsePythonDiagnostics, projectPath } from "./diagnostics";
+import { parseClangDiagnostics, parsePythonDiagnostics, parseTypeScriptDiagnostics, projectPath } from "./diagnostics";
 
 describe("diagnostic parsing", () => {
   it("normalizes mounted project paths", () => {
@@ -29,6 +29,19 @@ describe("diagnostic parsing", () => {
       line: 2,
       severity: "error",
       message: "SyntaxError: incomplete input",
+    });
+  });
+
+  it("parses native TypeScript diagnostics", () => {
+    const [diagnostic] = parseTypeScriptDiagnostics(
+      "/project/src/main.ts(3,15): error TS2322: Type 'number' is not assignable to type 'string'.",
+    );
+    expect(diagnostic).toMatchObject({
+      file: "src/main.ts",
+      line: 3,
+      column: 15,
+      severity: "error",
+      code: "TS2322",
     });
   });
 });

@@ -45,8 +45,8 @@ Because the judge is completely local, its test data can be inspected by a deter
 | C++ | Clang++ mode and `wasm-ld` under Wasmer | Standalone WASI or WASIX `.wasm` |
 | Rust | Local Rust/WASI core-profile frontend under CPython/WASI, then Clang | Standalone WASI or WASIX `.wasm` |
 | Python | CPython 3.12/WASIX byte-compilation | Runtime bundle containing bytecode, project modules, and a pinned WASIX runtime contract |
-| JavaScript | TypeScript syntax pipeline under QuickJS/WASI | ES module runtime bundle with a pinned QuickJS/WASI runtime contract |
-| TypeScript | TypeScript 4.9 executed inside QuickJS/WASI | Transpiled ES module runtime bundle with a pinned QuickJS/WASI runtime contract |
+| JavaScript | TypeScript 7.0.2/WASI checking and emit | CommonJS runtime bundle executed by QuickJS-ng 0.15.1/WASI |
+| TypeScript | Native TypeScript 7.0.2 compiler built for WASI | CommonJS runtime bundle executed by QuickJS-ng 0.15.1/WASI |
 
 The Rust frontend is deliberately a dependency-free core profile, not a fake `rustc`. For judge problems it adds a deterministic `read_int()` primitive, and supports functions, primitive numeric and string types, `let`, mutable bindings, ranges, `if`, `while`, returns, arithmetic, and print macros. It rejects Cargo, crates, collections, traits, structs, enums, pattern matching, async, and unsafe code with source diagnostics. A full browser-hosted `rustc` Wasmer package does not currently exist.
 
@@ -76,6 +76,7 @@ npm run build
 - Per-problem language drafts and build artifacts are stored in IndexedDB.
 - Solved-problem progress is stored in localStorage.
 - Compiler packages, standard libraries, and registry payloads are cached with Cache Storage.
+- The versioned TypeScript and QuickJS-ng WASI assets are built reproducibly from pinned upstream revisions and cached with Cache Storage.
 - The first C/C++ build downloads the pinned Clang package and WASI sysroot; later builds reuse the device cache.
 - Registry requests contain only pinned package identifiers. User source, stdin, environment values, diagnostics, and artifacts are never sent.
 - Clearing caches is available under Build settings.

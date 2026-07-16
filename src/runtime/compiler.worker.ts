@@ -10,11 +10,13 @@ import {
 } from "@wasmer/sdk";
 import wasmerSdkUrl from "@wasmer/sdk?url";
 import wasmerWasmUrl from "@wasmer/sdk/wasm?url";
-import { ensureFailureDiagnostic, parseClangDiagnostics, parsePythonDiagnostics, parseQuickJsDiagnostics } from "@/src/core/diagnostics";
+import { ensureFailureDiagnostic, parseClangDiagnostics, parsePythonDiagnostics, parseTypeScriptDiagnostics } from "@/src/core/diagnostics";
 import {
   CLANG_PACKAGE,
   PYTHON_PACKAGE,
+  QUICKJS_ASSET_PATH,
   QUICKJS_PACKAGE,
+  QUICKJS_VERSION,
   TYPESCRIPT_ASSET_PATH,
   TYPESCRIPT_VERSION,
 } from "@/src/core/toolchains";
@@ -35,8 +37,9 @@ import type {
 const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 const encoder = new TextEncoder();
 const packages = new Map<string, Promise<Wasmer>>();
-let typescriptSource: Promise<string> | undefined;
 let runtime: Runtime | undefined;
+let typescriptCompiler: Promise<Wasmer> | undefined;
+let quickJsRuntime: Promise<Wasmer> | undefined;
 
 const RUST_CORE_COMPILER = String.raw`
 import argparse
@@ -192,56 +195,15 @@ with open(args.diagnostics, "w", encoding="utf-8") as handle: json.dump(diagnost
 raise SystemExit(1 if diagnostics else 0)
 `;
 
-const TYPESCRIPT_DRIVER = String.raw`
-import * as std from "std";
-std.loadScript("/project/.localwasi/typescript.js");
-function readText(path) {
-  const handle = std.open(path, "r");
-  if (!handle) throw new Error("Unable to open " + path);
-  try {
-    return handle.readAsString();
-  } finally {
-    handle.close();
-  }
+const QUICKJS_TYPES = String.raw`
+declare module "std" {
+  const std: {
+    err: { puts(value: string): void };
+    in: { readAsString(): string };
+    out: { puts(value: string): void };
+  };
+  export = std;
 }
-const config = JSON.parse(readText("/project/.localwasi/tsconfig.json"));
-const response = { outputs: {}, diagnostics: [] };
-for (const file of config.files) {
-  const source = readText("/project/" + file);
-  const result = ts.transpileModule(source, {
-    fileName: file,
-    reportDiagnostics: true,
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2020,
-      module: ts.ModuleKind.ES2020,
-      strict: config.typescript,
-      allowJs: !config.typescript,
-      checkJs: !config.typescript,
-      sourceMap: false,
-      removeComments: false,
-    },
-  });
-  const outputPath = file.replace(/\.(?:m?ts|m?js)$/, ".js");
-  response.outputs[outputPath] = result.outputText;
-  for (const diagnostic of result.diagnostics || []) {
-    let line = 1, column = 1, endLine = 1, endColumn = 1;
-    if (diagnostic.file && diagnostic.start !== undefined) {
-      const start = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-      const end = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start + (diagnostic.length || 1));
-      line = start.line + 1; column = start.character + 1;
-      endLine = end.line + 1; endColumn = end.character + 1;
-    }
-    response.diagnostics.push({
-      severity: diagnostic.category === ts.DiagnosticCategory.Warning ? "warning" : diagnostic.category === ts.DiagnosticCategory.Message ? "info" : "error",
-      message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
-      file: diagnostic.file ? diagnostic.file.fileName : file,
-      line, column, endLine, endColumn,
-      source: "typescript",
-      code: "TS" + diagnostic.code,
-    });
-  }
-}
-std.out.puts("__LOCALWASI_TSC__" + JSON.stringify(response) + "\n");
 `;
 
 function post(response: CompilerResponse): void {
@@ -292,17 +254,38 @@ function command(pkg: Wasmer, name: string): Command {
   return selected;
 }
 
-async function loadTypescriptSource(): Promise<string> {
-  typescriptSource ??= fetch(TYPESCRIPT_ASSET_PATH).then(async (response) => {
-    if (!response.ok) {
-      throw new Error(`Unable to load the pinned TypeScript ${TYPESCRIPT_VERSION} compiler asset (${response.status}).`);
+async function getTypeScriptCompiler(): Promise<Wasmer> {
+  typescriptCompiler ??= (async () => {
+    const response = await fetch(new URL(TYPESCRIPT_ASSET_PATH, scope.location.origin));
+    if (!response.ok || !response.body) {
+      throw new Error(`Unable to load the pinned TypeScript ${TYPESCRIPT_VERSION} WASI compiler (${response.status}).`);
     }
-    return response.text();
-  });
+    const decompressed = response.body.pipeThrough(new DecompressionStream("gzip"));
+    const bytes = new Uint8Array(await new Response(decompressed).arrayBuffer());
+    return Wasmer.fromWasm(bytes, requireRuntime());
+  })();
   try {
-    return await typescriptSource;
+    return await typescriptCompiler;
   } catch (error) {
-    typescriptSource = undefined;
+    typescriptCompiler = undefined;
+    throw error;
+  }
+}
+
+async function getQuickJsRuntime(): Promise<Wasmer> {
+  quickJsRuntime ??= (async () => {
+    const response = await fetch(new URL(QUICKJS_ASSET_PATH, scope.location.origin));
+    if (!response.ok || !response.body) {
+      throw new Error(`Unable to load the pinned QuickJS-ng ${QUICKJS_VERSION} WASI runtime (${response.status}).`);
+    }
+    const decompressed = response.body.pipeThrough(new DecompressionStream("gzip"));
+    const bytes = new Uint8Array(await new Response(decompressed).arrayBuffer());
+    return Wasmer.fromWasm(bytes, requireRuntime());
+  })();
+  try {
+    return await quickJsRuntime;
+  } catch (error) {
+    quickJsRuntime = undefined;
     throw error;
   }
 }
@@ -689,52 +672,101 @@ async function buildPython(project: Project, cacheKey: string, requestId: string
   return { success: true, diagnostics, artifact, ...outputResult(output), cacheHit: false };
 }
 
-interface TranspileResponse {
-  outputs: Record<string, string>;
-  diagnostics: Diagnostic[];
+function emittedScriptPath(path: string): string {
+  if (path.endsWith(".ts")) return path.slice(0, -3) + ".js";
+  return path;
 }
 
-async function transpileScriptProject(project: Project, requestId: string): Promise<{ response?: TranspileResponse; output: Output }> {
-  const scriptFiles = project.files.filter((file) => /\.(?:m?js|m?ts)$/.test(file.path));
-  const directory = projectDirectory(project.files);
-  await ensureDirectory(directory, "/.localwasi");
-  await directory.writeFile("/.localwasi/typescript.js", await loadTypescriptSource());
-  await directory.writeFile("/.localwasi/tsc.mjs", TYPESCRIPT_DRIVER);
-  await directory.writeFile("/.localwasi/tsconfig.json", JSON.stringify({
-    files: scriptFiles.map((file) => file.path),
-    typescript: project.config.language === "typescript",
-  }));
-  const pkg = await getPackage(QUICKJS_PACKAGE, requestId);
-  const instance = await command(pkg, "qjs").run({
-    args: ["--std", "-m", "/project/.localwasi/tsc.mjs"],
-    cwd: "/project",
-    mount: { "/project": directory },
+function scriptSourceFiles(project: Project): ProjectFile[] {
+  const extension = project.config.language === "typescript" ? ".ts" : ".js";
+  return project.files.filter((file) => file.path.endsWith(extension));
+}
+
+function emittedSourceFiles(project: Project): ProjectFile[] {
+  return scriptSourceFiles(project).filter((file) => !file.path.endsWith(".d.ts"));
+}
+
+interface TypeScriptWasiResponse {
+  status: number;
+  diagnostics: string;
+  files: Record<string, string>;
+}
+
+async function transpileScriptProject(project: Project, requestId: string): Promise<{ files: Record<string, string | Uint8Array>; output: Output; response?: TypeScriptWasiResponse }> {
+  const scriptFiles = scriptSourceFiles(project);
+  const emittedFiles = emittedSourceFiles(project);
+  progress(requestId, "loading-toolchain", `Loading TypeScript ${TYPESCRIPT_VERSION}/WASI`);
+  const compiler = await getTypeScriptCompiler();
+  const entrypoint = compiler.entrypoint;
+  if (!entrypoint) throw new Error("The TypeScript/WASI compiler has no executable entrypoint.");
+  const outputPaths = emittedFiles.map((file) => emittedScriptPath(file.path));
+  const declarationPath = "/project/.localwasi/quickjs.d.ts";
+  const instance = await entrypoint.run({
+    stdin: JSON.stringify({
+      files: {
+        ...Object.fromEntries(project.files.map((file) => [`/project/${file.path}`, file.content])),
+        [declarationPath]: QUICKJS_TYPES,
+      },
+      javascript: project.config.language === "javascript",
+      sources: [declarationPath, ...scriptFiles.map((file) => `/project/${file.path}`)],
+      outputs: outputPaths.map((path) => `/project/build/${path}`),
+    }),
   });
   const output = await instance.wait();
-  const marker = "__LOCALWASI_TSC__";
-  const line = output.stdout.split(/\r?\n/).find((value) => value.startsWith(marker));
-  return { response: line ? JSON.parse(line.slice(marker.length)) as TranspileResponse : undefined, output };
+  let response: TypeScriptWasiResponse | undefined;
+  if (output.ok) {
+    try {
+      response = JSON.parse(output.stdout) as TypeScriptWasiResponse;
+    } catch {
+      response = undefined;
+    }
+  }
+  const files: Record<string, string | Uint8Array> = {};
+  if (response) {
+    for (const outputPath of outputPaths) {
+      const contents = response.files[`/project/build/${outputPath}`];
+      if (contents !== undefined) files[outputPath] = contents;
+    }
+  }
+  return { files, output, response };
 }
 
 async function buildScript(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
   const started = performance.now();
-  progress(requestId, "compiling", project.config.language === "typescript" ? "Transpiling TypeScript inside QuickJS/WASI" : "Checking JavaScript inside QuickJS/WASI", 0.5);
-  const { response, output } = await transpileScriptProject(project, requestId);
-  const diagnostics = response?.diagnostics ?? parseQuickJsDiagnostics(`${output.stderr}\n${output.stdout}`);
-  if (!output.ok || !response || diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+  if (!emittedSourceFiles(project).some((file) => file.path === project.config.entry)) {
+    return {
+      success: false,
+      diagnostics: [{
+        severity: "error",
+        message: `The ${project.config.language === "typescript" ? ".ts" : ".js"} entry file is not a supported executable source.`,
+        file: project.config.entry,
+        line: 1,
+        column: 1,
+        source: "project",
+      }],
+      stdout: "",
+      stderr: "",
+      cacheHit: false,
+    };
+  }
+  progress(requestId, "compiling", `Compiling ${project.config.language === "typescript" ? "TypeScript" : "JavaScript"} with TypeScript/WASI`, 0.5);
+  const { files, output, response } = await transpileScriptProject(project, requestId);
+  const diagnostics = parseTypeScriptDiagnostics(response?.diagnostics ?? "");
+  const expectedOutputs = emittedSourceFiles(project).length;
+  if (!output.ok || !response || response.status !== 0 || Object.keys(files).length !== expectedOutputs || diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
     return {
       success: false,
       diagnostics: ensureFailureDiagnostic(diagnostics, {
         file: project.config.entry,
-        source: "quickjs",
-        message: output.stderr.trim() || "The TypeScript compiler did not produce a result.",
+        source: "typescript",
+        message: output.stderr.trim() || response?.diagnostics.trim() || `TypeScript ${TYPESCRIPT_VERSION} did not return every compiled output.`,
       }),
-      ...outputResult(output),
+      stdout: "",
+      stderr: output.stderr,
       cacheHit: false,
     };
   }
-  const files: Record<string, string | Uint8Array> = { ...response.outputs };
-  const entry = project.config.entry.replace(/\.(?:m?ts|m?js)$/, ".js");
+  const entry = emittedScriptPath(project.config.entry);
   const manifest = runtimeManifest(project, QUICKJS_PACKAGE, "qjs", entry);
   files["localwasi.manifest.json"] = manifest;
   const size = sumFileSize(files);
@@ -748,7 +780,7 @@ async function buildScript(project: Project, cacheKey: string, requestId: string
     files,
     manifest,
   };
-  return { success: true, diagnostics, artifact, ...outputResult(output), cacheHit: false };
+  return { success: true, diagnostics, artifact, stdout: "", stderr: output.stderr, cacheHit: false };
 }
 
 async function buildProject(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
@@ -782,6 +814,48 @@ function artifactDirectory(artifact: RuntimeBundleArtifact): Directory {
   return new Directory(initial);
 }
 
+function quickJsBundle(artifact: RuntimeBundleArtifact, stdin: string): string {
+  const modules = Object.fromEntries(
+    Object.entries(artifact.files)
+      .filter(([path, value]) => path.endsWith(".js") && typeof value === "string"),
+  );
+  return String.raw`
+"use strict";
+const __modules = ${JSON.stringify(modules)};
+const __input = ${JSON.stringify(stdin)};
+const __cache = Object.create(null);
+const __std = {
+  in: { readAsString: () => __input },
+  out: { puts: (value) => __localwasi_write_stdout(String(value)) },
+  err: { puts: (value) => __localwasi_write_stderr(String(value)) },
+};
+function __resolve(request, parent) {
+  if (request === "std") return request;
+  if (!request.startsWith(".")) throw new Error("Unsupported module '" + request + "'.");
+  const parts = parent.split("/");
+  parts.pop();
+  for (const part of request.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") parts.pop(); else parts.push(part);
+  }
+  let resolved = parts.join("/");
+  if (!Object.prototype.hasOwnProperty.call(__modules, resolved) && Object.prototype.hasOwnProperty.call(__modules, resolved + ".js")) resolved += ".js";
+  if (!Object.prototype.hasOwnProperty.call(__modules, resolved)) throw new Error("Module '" + request + "' was not found from '" + parent + "'.");
+  return resolved;
+}
+function __load(id) {
+  if (id === "std") return __std;
+  if (__cache[id]) return __cache[id].exports;
+  const module = { exports: {} };
+  __cache[id] = module;
+  const factory = new Function("require", "module", "exports", __modules[id] + "\n//# sourceURL=/project/" + id);
+  factory((request) => __load(__resolve(request, id)), module, module.exports);
+  return module.exports;
+}
+__load(${JSON.stringify(artifact.entry)});
+`;
+}
+
 async function runArtifact(artifact: BuildArtifact, config: ProjectConfig, requestId: string): Promise<RunResult> {
   const started = performance.now();
   progress(requestId, "running", `Running ${artifact.name} with Wasmer`, 0.2);
@@ -797,22 +871,25 @@ async function runArtifact(artifact: BuildArtifact, config: ProjectConfig, reque
     });
     output = await instance.wait();
   } else {
-    const pkg = await getPackage(artifact.runtimePackage, requestId);
-    const directory = artifactDirectory(artifact);
-    const args = artifact.command === "qjs"
-      ? ["--std", "-m", `/project/${artifact.entry}`, ...config.args]
-      : [`/project/${artifact.entry}`, ...config.args];
-    const instance = await command(pkg, artifact.command).run({
-      args,
-      env: {
-        ...(artifact.command === "python" ? { PYTHONPATH: "/project/src", PYTHONDONTWRITEBYTECODE: "1" } : {}),
-        ...config.env,
-      },
-      stdin: config.stdin,
-      cwd: "/project",
-      mount: { "/project": directory },
-    });
-    output = await instance.wait();
+    if (artifact.command === "qjs") {
+      progress(requestId, "loading-toolchain", `Loading QuickJS-ng ${QUICKJS_VERSION}/WASI`);
+      const executable = await getQuickJsRuntime();
+      const entrypoint = executable.entrypoint;
+      if (!entrypoint) throw new Error("The QuickJS-ng/WASI runtime has no executable entrypoint.");
+      const instance = await entrypoint.run({ args: config.args, env: config.env, stdin: quickJsBundle(artifact, config.stdin) });
+      output = await instance.wait();
+    } else {
+      const pkg = await getPackage(artifact.runtimePackage, requestId);
+      const directory = artifactDirectory(artifact);
+      const instance = await command(pkg, artifact.command).run({
+        args: [`/project/${artifact.entry}`, ...config.args],
+        env: { PYTHONPATH: "/project/src", PYTHONDONTWRITEBYTECODE: "1", ...config.env },
+        stdin: config.stdin,
+        cwd: "/project",
+        mount: { "/project": directory },
+      });
+      output = await instance.wait();
+    }
   }
   if (output.stdout) post({ type: "stream", requestId, stream: "stdout", chunk: output.stdout });
   if (output.stderr) post({ type: "stream", requestId, stream: "stderr", chunk: output.stderr });
@@ -821,6 +898,8 @@ async function runArtifact(artifact: BuildArtifact, config: ProjectConfig, reque
 
 async function clearCaches(): Promise<void> {
   packages.clear();
+  typescriptCompiler = undefined;
+  quickJsRuntime = undefined;
   const names = await caches.keys();
   await Promise.all(names.filter((name) => name.startsWith("localwasi-toolchains-")).map((name) => caches.delete(name)));
 }

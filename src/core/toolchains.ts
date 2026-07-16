@@ -13,9 +13,11 @@ export interface ToolchainDefinition {
 
 export const CLANG_PACKAGE = "clang/clang@0.160000.1";
 export const PYTHON_PACKAGE = "python/python@=0.2.0";
-export const QUICKJS_PACKAGE = "adamz/quickjs@0.20210327.0";
-export const TYPESCRIPT_VERSION = "4.9.5";
-export const TYPESCRIPT_ASSET_PATH = `/toolchains/typescript-${TYPESCRIPT_VERSION}.js`;
+export const QUICKJS_VERSION = "0.15.1";
+export const QUICKJS_PACKAGE = `localwasi/quickjs-ng@${QUICKJS_VERSION}`;
+export const QUICKJS_ASSET_PATH = `/toolchains/quickjs-${QUICKJS_VERSION}.wasm.gz`;
+export const TYPESCRIPT_VERSION = "7.0.2";
+export const TYPESCRIPT_ASSET_PATH = `/toolchains/typescript-${TYPESCRIPT_VERSION}.wasm.gz`;
 
 export const TOOLCHAINS: Record<Language, ToolchainDefinition> = {
   c: {
@@ -57,25 +59,34 @@ export const TOOLCHAINS: Record<Language, ToolchainDefinition> = {
   },
   javascript: {
     language: "javascript",
-    label: "QuickJS",
+    label: "QuickJS-ng",
     artifact: "runtime-bundle",
-    compilerPackages: [QUICKJS_PACKAGE],
+    compilerPackages: [`typescript@${TYPESCRIPT_VERSION}-wasi`, QUICKJS_PACKAGE],
     runtimePackage: QUICKJS_PACKAGE,
     targets: ["wasi", "wasix"],
-    version: "2021-03-27",
-    note: "ES modules bundled with the QuickJS WASI runtime contract.",
+    version: QUICKJS_VERSION,
+    note: "JavaScript checked by TypeScript/WASI, then executed by the bundled QuickJS-ng/WASI runtime.",
   },
   typescript: {
     language: "typescript",
-    label: "TypeScript + QuickJS",
+    label: "TypeScript + QuickJS-ng",
     artifact: "runtime-bundle",
-    compilerPackages: [QUICKJS_PACKAGE],
+    compilerPackages: [`typescript@${TYPESCRIPT_VERSION}-wasi`],
     runtimePackage: QUICKJS_PACKAGE,
     targets: ["wasi", "wasix"],
     version: TYPESCRIPT_VERSION,
-    note: "TypeScript compiler executes inside QuickJS/WASI, then emits an executable runtime bundle.",
+    note: "The native TypeScript compiler and QuickJS-ng runtime both execute as local WASI modules.",
   },
 };
+
+export function toolchainCacheIdentity(language: Language) {
+  const toolchain = TOOLCHAINS[language];
+  return {
+    version: toolchain.version,
+    compilerPackages: toolchain.compilerPackages,
+    runtimePackage: toolchain.runtimePackage,
+  };
+}
 
 export function extensionLanguage(path: string): Language | undefined {
   const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
@@ -89,9 +100,7 @@ export function extensionLanguage(path: string): Language | undefined {
     rs: "rust",
     py: "python",
     js: "javascript",
-    mjs: "javascript",
     ts: "typescript",
-    mts: "typescript",
   } as Record<string, Language | undefined>)[extension];
 }
 

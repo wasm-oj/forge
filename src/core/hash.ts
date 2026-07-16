@@ -1,8 +1,10 @@
 import type { Project } from "./types";
+import { toolchainCacheIdentity } from "./toolchains";
 
 export async function projectCacheKey(project: Project): Promise<string> {
   const canonical = JSON.stringify({
     config: project.config,
+    toolchain: toolchainCacheIdentity(project.config.language),
     files: [...project.files]
       .sort((a, b) => a.path.localeCompare(b.path))
       .map(({ path, language, content }) => ({ path, language, content })),
