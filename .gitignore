@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.vinext/
+.playwright-cli/
+dist/
+.wrangler/
+coverage/
+*.tsbuildinfo
+.DS_Store
