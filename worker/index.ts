@@ -13,9 +13,18 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+const STATIC_FILES = new Set(["/favicon.svg", "/og.png", "/toolchain-cache-sw.js"]);
+
+function isStaticAsset(pathname: string): boolean {
+  return pathname.startsWith("/assets/") || pathname.startsWith("/toolchains/") || STATIC_FILES.has(pathname);
+}
+
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const response = await handler.fetch(request, env, ctx);
+    const pathname = new URL(request.url).pathname;
+    const response = isStaticAsset(pathname)
+      ? await env.ASSETS.fetch(request)
+      : await handler.fetch(request, env, ctx);
     const headers = new Headers(response.headers);
     headers.set("Cross-Origin-Embedder-Policy", "credentialless");
     headers.set("Cross-Origin-Opener-Policy", "same-origin");
