@@ -1,4 +1,4 @@
-import type { Diagnostic, DiagnosticSeverity } from "./types";
+import type { Diagnostic, DiagnosticSeverity } from "./types.ts";
 
 function severity(value: string): DiagnosticSeverity {
   if (value === "warning") return "warning";
@@ -9,7 +9,7 @@ function severity(value: string): DiagnosticSeverity {
 export function projectPath(path: string): string {
   return path
     .replace(/^file:\/\//, "")
-    .replace(/^\/?(?:workspace|project)\//, "")
+    .replace(/^\/?(?:workspace|project|work)\//, "")
     .replace(/^\.\//, "");
 }
 
@@ -79,17 +79,69 @@ export function parseTypeScriptDiagnostics(output: string): Diagnostic[] {
   return diagnostics;
 }
 
+export function parseRustDiagnostics(output: string): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const line of output.split(/\r?\n/)) {
+    if (!line.startsWith("{")) continue;
+    let value: unknown;
+    try {
+      value = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!value || typeof value !== "object") continue;
+    const record = value as Record<string, unknown>;
+    if (record.$message_type !== "diagnostic" || typeof record.message !== "string") continue;
+    const spans = Array.isArray(record.spans) ? record.spans : [];
+    const span = spans.find((candidate) => candidate && typeof candidate === "object" && (candidate as Record<string, unknown>).is_primary === true)
+      ?? spans.find((candidate) => candidate && typeof candidate === "object");
+    const location = span as Record<string, unknown> | undefined;
+    const code = record.code && typeof record.code === "object"
+      ? (record.code as Record<string, unknown>).code
+      : undefined;
+    diagnostics.push({
+      severity: severity(typeof record.level === "string" ? record.level : "error"),
+      message: record.message,
+      file: projectPath(typeof location?.file_name === "string" ? location.file_name : "main.rs"),
+      line: typeof location?.line_start === "number" ? location.line_start : 1,
+      column: typeof location?.column_start === "number" ? location.column_start : 1,
+      endLine: typeof location?.line_end === "number" ? location.line_end : undefined,
+      endColumn: typeof location?.column_end === "number" ? location.column_end : undefined,
+      source: "rustc",
+      code: typeof code === "string" ? code : undefined,
+    });
+  }
+  return diagnostics;
+}
+
+export function parseGoDiagnostics(output: string): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const pattern = /^(.*?\.go):(\d+)(?::(\d+))?:\s*(.+)$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(output)) !== null) {
+    diagnostics.push({
+      severity: "error",
+      message: match[4],
+      file: projectPath(match[1]),
+      line: Number(match[2]),
+      column: Number(match[3] ?? 1),
+      source: "go",
+    });
+  }
+  return diagnostics;
+}
+
 export function ensureFailureDiagnostic(
   diagnostics: Diagnostic[],
-  fallback: { file: string; source: string; message: string },
+  summary: { file: string; source: string; message: string },
 ): Diagnostic[] {
   if (diagnostics.length > 0) return diagnostics;
   return [{
     severity: "error",
-    file: projectPath(fallback.file),
+    file: projectPath(summary.file),
     line: 1,
     column: 1,
-    source: fallback.source,
-    message: fallback.message,
+    source: summary.source,
+    message: summary.message,
   }];
 }

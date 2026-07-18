@@ -27,6 +27,19 @@ button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .48; }
 ::selection { background: #465833; color: #fff; }
 
+.conformance-lab { width: 100vw; height: 100vh; overflow: auto; padding: 32px; background: var(--surface-0); }
+.conformance-lab > header { display: flex; align-items: center; gap: 24px; border-bottom: 1px solid var(--line); padding-bottom: 20px; }
+.conformance-lab > header div span { color: var(--accent); font: 700 11px var(--font-mono), monospace; letter-spacing: .12em; }
+.conformance-lab h1 { margin: 5px 0 0; font-size: 25px; }
+.conformance-lab > header button { margin-left: auto; border: 0; border-radius: 7px; padding: 9px 14px; color: var(--accent-ink); background: var(--accent); font-weight: 700; }
+.conformance-lab > p { max-width: 900px; color: var(--text-soft); line-height: 1.6; }
+.conformance-lab table { width: 100%; margin-top: 24px; border-collapse: collapse; font: 12px var(--font-mono), monospace; }
+.conformance-lab th, .conformance-lab td { padding: 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+.conformance-lab th { color: var(--muted); background: var(--surface-1); }
+.conformance-lab textarea { width: 100%; min-height: 360px; margin-top: 20px; padding: 14px; resize: vertical; border: 1px solid var(--line); background: #0c0b0a; color: var(--text-soft); font: 11px/1.5 var(--font-mono), monospace; }
+.conformance-empty, .conformance-error { margin-top: 30px; padding: 18px; border: 1px solid var(--line); background: var(--surface-1); color: var(--text-soft); }
+.conformance-error { color: var(--danger); white-space: pre-wrap; }
+
 .boot-screen {
   width: 100vw;
   height: 100vh;

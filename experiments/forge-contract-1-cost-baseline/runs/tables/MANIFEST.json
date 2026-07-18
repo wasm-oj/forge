@@ -1,0 +1,22 @@
+{
+  "schema": "wasm-oj-forge-v1/cost-baseline-manifest",
+  "experimentId": "forge-contract-1-cost-baseline",
+  "transformScript": "scripts/transform-cost-baselines.mjs",
+  "transformCommand": "npm run cost-baseline:transform -- experiments/forge-contract-1-cost-baseline/runs/raw/records/2026-07-18T16-51-50.046Z-a139d4e1-2fe9-41f6-98bc-c598539c6caf.json",
+  "sourceRawRecord": "experiments/forge-contract-1-cost-baseline/runs/raw/records/2026-07-18T16-51-50.046Z-a139d4e1-2fe9-41f6-98bc-c598539c6caf.json",
+  "sourceRawSha256": "deab114fa988a7831612da8bdd2cad1440dbf603951d09d5a6796cb6dcfefa25",
+  "specPath": "experiments/forge-contract-1-cost-baseline/SPEC.md",
+  "specSha256": "771910435e259e2c9cb50c3cbe78a2c94981c8aa8d10966101f233910c9ae3ac",
+  "outputs": [
+    {
+      "path": "experiments/forge-contract-1-cost-baseline/runs/tables/cost-baselines.json",
+      "sha256": "ff530884601ba7ee2f40eb949779e1d8b772ac8b6d936180bf1b8b6e80871dcc",
+      "rows": 18
+    },
+    {
+      "path": "src/core/generated/cost-baselines.ts",
+      "sha256": "781090147c131bd1098ff8d1f441e0defd71d6a86586594817f423ae5a9e580d",
+      "rows": 18
+    }
+  ]
+}

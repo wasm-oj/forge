@@ -33,30 +33,34 @@ import {
 } from "lucide-react";
 import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { projectCacheKey } from "@/src/core/hash";
-import { LANGUAGES, type BuildArtifact, type Diagnostic, type Language, type Project, type ProjectConfig, type ProjectFile, type WorkerProgress } from "@/src/core/types";
+import { CompileCoordinator } from "@/src/compiler/coordinator";
+import { projectBuildIdentity, projectCacheKey } from "@/src/core/hash";
+import { isBuiltinLanguage, LANGUAGES, type BuildArtifact, type BuiltinLanguage, type Diagnostic, type Language, type Project, type ProjectFile, type RunConfig, type WorkerProgress } from "@/src/core/types";
 import { extensionLanguage, languageLabel, TOOLCHAINS } from "@/src/core/toolchains";
 import {
   decodeSolvedProgress,
-  evaluateRun,
   JUDGE_PROGRESS_KEY,
-  JudgeTimeoutError,
-  submissionVerdict,
-  type JudgeCaseResult,
-  type JudgeSession,
+  type JudgeUiCaseResult,
+  type JudgeUiSession,
   type SubmissionVerdict,
 } from "@/src/judge/judge";
+import { createJudgeExecutor, JudgeEngine, type JudgeCaseResult, type JudgeCaseVerdict } from "@/src/judge/engine";
+import { FORGE_CONTRACT_VERSION } from "@/src/core/contract";
+import { textMatcher } from "@/src/judge/spec";
+import { normalizeOutput } from "@/src/judge/normalization";
 import { PROBLEMS, problemById, type JudgeProblem, type ProblemDifficulty } from "@/src/judge/problems";
 import { createJudgeProject, judgeProjectId, problemIdFromProject } from "@/src/judge/project";
-import { CompilerClient } from "@/src/runtime/compiler-client";
-import { clearArtifactCache, listProjects, loadArtifact, loadLatestProject, requestPersistentStorage, saveArtifact, saveProject, storageEstimate } from "@/src/storage/database";
-import { clearToolchainResponseCache, registerToolchainCache } from "@/src/storage/service-worker";
+import { BrowserForgeCompiler } from "@/src/runtime/compiler-client";
+import { BrowserForgeRunner } from "@/src/runtime/runner-client";
+import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, loadLatestProject, requestPersistentStorage, saveArtifact, saveProject, storageEstimate } from "@/src/storage/database";
+import { registerToolchainCache } from "@/src/storage/service-worker";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 type BottomTab = "judge" | "diagnostics" | "output" | "console";
 type BusyAction = "build" | "run" | "judge" | "cache" | undefined;
 type DifficultyFilter = "all" | ProblemDifficulty;
+type CompileAheadState = "idle" | "scheduled" | "compiling" | "ready" | "error";
 
 interface LogEntry {
   id: string;
@@ -64,13 +68,14 @@ interface LogEntry {
   text: string;
 }
 
-const MONACO_LANGUAGE: Record<Language, string> = {
+const MONACO_LANGUAGE: Record<BuiltinLanguage, string> = {
   c: "c",
   cpp: "cpp",
   rust: "rust",
   python: "python",
   javascript: "javascript",
   typescript: "typescript",
+  go: "go",
 };
 
 const VALID_PROBLEM_IDS = new Set(PROBLEMS.map((problem) => problem.id));
@@ -90,6 +95,29 @@ function formatBytes(bytes: number): string {
 
 function formatDuration(milliseconds: number): string {
   return milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(2)} s`;
+}
+
+function submissionVerdictFromContract(verdict: JudgeCaseVerdict | "accepted"): JudgeUiCaseResult["verdict"] {
+  if (verdict === "accepted" || verdict === "wrong-answer") return verdict;
+  if (verdict === "instruction-limit" || verdict === "logical-time-limit" || verdict === "wall-time-limit") return "time-limit";
+  return "runtime-error";
+}
+
+function displayJudgeCase(
+  result: JudgeCaseResult,
+  index: number,
+  expected: string,
+): JudgeUiCaseResult {
+  const verdict = submissionVerdictFromContract(result.verdict);
+  return {
+    number: index + 1,
+    verdict,
+    expected: normalizeOutput(expected, "lines"),
+    actual: normalizeOutput(result.run?.stdout ?? "", "lines"),
+    stderr: result.run?.stderr || result.message || "",
+    exitCode: result.run?.code ?? null,
+    durationMs: result.run?.durationMs ?? 0,
+  };
 }
 
 function serializeBundle(artifact: Extract<BuildArtifact, { kind: "runtime-bundle" }>): string {
@@ -121,7 +149,7 @@ function languageIcon(language: Language) {
 }
 
 function languageTone(language: Language): string {
-  return ({ c: "tone-c", cpp: "tone-cpp", rust: "tone-rust", python: "tone-python", javascript: "tone-js", typescript: "tone-ts" })[language];
+  return ({ c: "tone-c", cpp: "tone-cpp", rust: "tone-rust", python: "tone-python", javascript: "tone-js", typescript: "tone-ts" } as Record<string, string>)[language] ?? "tone-js";
 }
 
 function difficultyLabel(difficulty: ProblemDifficulty): string {
@@ -140,25 +168,6 @@ function verdictLabel(verdict: SubmissionVerdict): string {
   })[verdict];
 }
 
-async function runWithTimeLimit(
-  client: CompilerClient,
-  artifact: BuildArtifact,
-  config: ProjectConfig,
-  limitMs: number,
-) {
-  let timer = 0;
-  try {
-    return await Promise.race([
-      client.run(artifact, config),
-      new Promise<never>((_, reject) => {
-        timer = window.setTimeout(() => reject(new JudgeTimeoutError()), limitMs);
-      }),
-    ]);
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
-
 export function JudgeStudio() {
   const initialProblem = PROBLEMS[0];
   const [project, setProject] = useState<Project>(() => createJudgeProject(initialProblem, "c"));
@@ -172,14 +181,18 @@ export function JudgeStudio() {
   const [artifact, setArtifact] = useState<BuildArtifact>();
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [judgeSession, setJudgeSession] = useState<JudgeSession>();
+  const [judgeSession, setJudgeSession] = useState<JudgeUiSession>();
   const [bottomTab, setBottomTab] = useState<BottomTab>("judge");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");
   const [storage, setStorage] = useState({ usage: 0, quota: 0 });
   const [location, setLocation] = useState({ line: 1, column: 1 });
-  const clientRef = useRef<CompilerClient | undefined>(undefined);
+  const [compileAhead, setCompileAhead] = useState<CompileAheadState>("idle");
+  const compilerRef = useRef<BrowserForgeCompiler | undefined>(undefined);
+  const compileCoordinatorRef = useRef<CompileCoordinator | undefined>(undefined);
+  const runnerRef = useRef<BrowserForgeRunner | undefined>(undefined);
+  const projectRef = useRef(project);
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | undefined>(undefined);
   const monacoRef = useRef<typeof Monaco | undefined>(undefined);
   const revealRef = useRef<{ line: number; column: number } | undefined>(undefined);
@@ -191,7 +204,11 @@ export function JudgeStudio() {
     () => project.files.find((file) => file.path === project.activeFile) ?? project.files[0],
     [project],
   );
-  const activeToolchain = TOOLCHAINS[project.config.language];
+  const projectLanguage: BuiltinLanguage = isBuiltinLanguage(project.config.language)
+    ? project.config.language
+    : "c";
+  const activeToolchain = TOOLCHAINS[projectLanguage];
+  const buildIdentity = useMemo(() => projectBuildIdentity(project), [project]);
   const filteredProblems = useMemo(
     () => filter === "all" ? PROBLEMS : PROBLEMS.filter((problem) => problem.difficulty === filter),
     [filter],
@@ -203,10 +220,24 @@ export function JudgeStudio() {
   }, []);
 
   useEffect(() => {
-    const client = new CompilerClient();
-    clientRef.current = client;
-    client.onProgress(setProgress);
-    client.onStream((stream, chunk) => {
+    projectRef.current = project;
+  }, [project]);
+
+  useEffect(() => {
+    const compiler = new BrowserForgeCompiler();
+    const compilation = new CompileCoordinator(compiler, {
+      load: loadArtifact,
+      save: saveArtifact,
+      delete: deleteArtifact,
+      clear: clearArtifactCache,
+    });
+    const runner = new BrowserForgeRunner();
+    compilerRef.current = compiler;
+    compileCoordinatorRef.current = compilation;
+    runnerRef.current = runner;
+    compiler.onProgress(setProgress);
+    runner.onProgress(setProgress);
+    runner.onStream((stream, chunk) => {
       if (!judgingRef.current) addLog(stream, chunk);
     });
     void (async () => {
@@ -222,21 +253,56 @@ export function JudgeStudio() {
         const restored = await loadLatestProject();
         const restoredProblemId = restored ? problemIdFromProject(restored) : undefined;
         const restoredProblem = restoredProblemId ? problemById(restoredProblemId) : undefined;
-        if (restored && restoredProblem && restored.id === judgeProjectId(restoredProblem.id, restored.config.language)) {
+        if (
+          restored
+          && restoredProblem
+          && isBuiltinLanguage(restored.config.language)
+          && restored.id === judgeProjectId(restoredProblem.id, restored.config.language)
+        ) {
           setProject(restored);
           setProblemId(restoredProblem.id);
         }
         setStorage(await storageEstimate());
         setHydrated(true);
-        await client.ready();
+        await Promise.all([compiler.ready(), runner.ready()]);
         setRuntimeReady(true);
       } catch (error) {
         addLog("stderr", error instanceof Error ? error.message : String(error));
         setHydrated(true);
       }
     })();
-    return () => client.dispose();
+    return () => {
+      compilation.dispose();
+      runner.dispose();
+    };
   }, [addLog]);
+
+  useEffect(() => {
+    if (!hydrated || !runtimeReady) return;
+    const compilation = compileCoordinatorRef.current;
+    if (!compilation) return;
+    const snapshot = structuredClone(projectRef.current);
+    let current = true;
+    setCompileAhead("scheduled");
+    const timer = window.setTimeout(() => {
+      setCompileAhead("compiling");
+      void compilation.precompile(snapshot).then((outcome) => {
+        if (!current) return;
+        if (outcome.status === "ready" && outcome.result?.artifact) {
+          setArtifact(outcome.result.artifact);
+          setCompileAhead("ready");
+        } else if (outcome.status === "compile-error" || outcome.status === "failed") {
+          setCompileAhead("error");
+        }
+      });
+    }, 900);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+      compilation.supersedeBackground();
+      setCompileAhead("idle");
+    };
+  }, [buildIdentity, hydrated, runtimeReady]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -270,7 +336,7 @@ export function JudgeStudio() {
               ? monaco.MarkerSeverity.Warning
               : monaco.MarkerSeverity.Info,
         }));
-      monaco.editor.setModelMarkers(model, "localwasi", markers);
+      monaco.editor.setModelMarkers(model, "forge", markers);
     }
   }, [diagnostics]);
 
@@ -289,7 +355,7 @@ export function JudgeStudio() {
   const onEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    monaco.editor.defineTheme("localwasi", {
+    monaco.editor.defineTheme("forge", {
       base: "vs-dark",
       inherit: true,
       rules: [
@@ -310,7 +376,7 @@ export function JudgeStudio() {
         "editorIndentGuide.background1": "#292720",
       },
     });
-    monaco.editor.setTheme("localwasi");
+    monaco.editor.setTheme("forge");
     editor.onDidChangeCursorPosition((event) => setLocation({ line: event.position.lineNumber, column: event.position.column }));
     applyMarkers();
   }, [applyMarkers]);
@@ -318,6 +384,15 @@ export function JudgeStudio() {
   const updateProject = useCallback((updater: (current: Project) => Project) => {
     setProject((current) => ({ ...updater(current), updatedAt: Date.now() }));
     setArtifact(undefined);
+    setJudgeSession(undefined);
+  }, []);
+
+  const updateRunConfig = useCallback((updater: (current: RunConfig) => RunConfig) => {
+    setProject((current) => ({
+      ...current,
+      config: { ...current.config, ...updater(current.config) },
+      updatedAt: Date.now(),
+    }));
     setJudgeSession(undefined);
   }, []);
 
@@ -329,13 +404,14 @@ export function JudgeStudio() {
     }));
   }, [activeFile, updateProject]);
 
-  const openWorkspace = useCallback(async (problem: JudgeProblem, language: Language) => {
+  const openWorkspace = useCallback(async (problem: JudgeProblem, language: BuiltinLanguage) => {
     if (busy) return;
     await saveProject(project);
     const drafts = await listProjects();
     const id = judgeProjectId(problem.id, language);
     const draft = drafts.find((candidate) => candidate.id === id);
-    clientRef.current?.restart();
+    compileCoordinatorRef.current?.restart();
+    runnerRef.current?.restart();
     setRuntimeReady(true);
     setProject(draft ?? createJudgeProject(problem, language));
     setProblemId(problem.id);
@@ -347,40 +423,37 @@ export function JudgeStudio() {
   }, [busy, project]);
 
   const doBuild = useCallback(async (allowCache = true): Promise<BuildArtifact | undefined> => {
-    const client = clientRef.current;
-    if (!client) return undefined;
+    const compilation = compileCoordinatorRef.current;
+    if (!compilation) return undefined;
     setBusy("build");
     setBottomTab("output");
     setDiagnostics([]);
     setLogs([]);
     const started = performance.now();
     try {
-      const cacheKey = await projectCacheKey(project);
-      if (allowCache) {
-        const cached = await loadArtifact(cacheKey);
-        if (cached) {
-          setArtifact(cached);
-          addLog("system", `從本機建置快取載入 ${cached.name} · ${formatBytes(cached.size)}`);
-          setProgress({ phase: "packaging", label: "命中建置快取", progress: 1 });
-          return cached;
-        }
-      }
       addLog("system", `build ${project.name} · ${languageLabel(project.config.language)} → ${project.config.target.toUpperCase()}`);
-      const result = await client.build(project, cacheKey);
+      const result = await compilation.compile(project, { cache: allowCache });
       setDiagnostics(result.diagnostics);
       if (result.stdout) addLog("stdout", result.stdout);
       if (result.stderr) addLog("stderr", result.stderr);
       if (!result.success || !result.artifact) {
+        setCompileAhead("error");
         addLog("system", `建置失敗 · ${Math.round(performance.now() - started)} ms`);
         setBottomTab("diagnostics");
         return undefined;
       }
       setArtifact(result.artifact);
-      await saveArtifact(result.artifact);
+      setCompileAhead("ready");
       setStorage(await storageEstimate());
-      addLog("system", `完成 ${result.artifact.name} · ${formatBytes(result.artifact.size)} · ${Math.round(result.artifact.durationMs)} ms`);
+      if (result.cacheHit) {
+        addLog("system", `從本機建置快取載入 ${result.artifact.name} · ${formatBytes(result.artifact.size)}`);
+        setProgress({ phase: "packaging", label: "命中建置快取", progress: 1 });
+      } else {
+        addLog("system", `完成 ${result.artifact.name} · ${formatBytes(result.artifact.size)} · ${Math.round(result.artifact.durationMs)} ms`);
+      }
       return result.artifact;
     } catch (error) {
+      setCompileAhead("error");
       addLog("stderr", error instanceof Error ? error.message : String(error));
       return undefined;
     } finally {
@@ -389,8 +462,8 @@ export function JudgeStudio() {
   }, [addLog, project]);
 
   const doRunSample = useCallback(async () => {
-    const client = clientRef.current;
-    if (!client) return;
+    const runner = runnerRef.current;
+    if (!runner) return;
     setBusy("run");
     setBottomTab("console");
     setLogs([]);
@@ -406,8 +479,11 @@ export function JudgeStudio() {
         setLogs([]);
       }
       addLog("system", `執行範例輸入 · ${activeProblem.title}`);
-      const result = await client.run(runnable, { ...project.config, stdin: activeProblem.examples[0].input });
-      addLog("system", `process exited ${result.code} · ${Math.round(result.durationMs)} ms`);
+      const result = await runner.run(runnable, { ...project.config, stdin: activeProblem.examples[0].input });
+      const cost = result.metrics.cost === null
+        ? "cost unavailable"
+        : `${result.metrics.cost.toLocaleString()} net weighted ops (${result.metrics.rawCost?.toLocaleString()} raw − ${result.metrics.baselineCost.toLocaleString()} baseline)`;
+      addLog("system", `${result.termination} · exit ${result.code} · ${cost} · ${Math.round(result.durationMs)} ms`);
     } catch (error) {
       addLog("stderr", error instanceof Error ? error.message : String(error));
     } finally {
@@ -416,8 +492,8 @@ export function JudgeStudio() {
   }, [activeProblem, addLog, artifact, doBuild, project]);
 
   const doJudge = useCallback(async () => {
-    const client = clientRef.current;
-    if (!client) return;
+    const runner = runnerRef.current;
+    if (!runner) return;
     cancelledRef.current = false;
     judgingRef.current = true;
     const started = performance.now();
@@ -450,61 +526,58 @@ export function JudgeStudio() {
         }
       }
       setBusy("judge");
-      const cases: JudgeCaseResult[] = [];
-      for (const [index, test] of activeProblem.judgeCases.entries()) {
-        if (cancelledRef.current) break;
-        setProgress({
-          phase: "running",
-          label: `本機測資 ${index + 1} / ${activeProblem.judgeCases.length}`,
-          progress: index / activeProblem.judgeCases.length,
-        });
-        try {
-          const result = await runWithTimeLimit(
-            client,
-            runnable,
-            { ...project.config, stdin: test.input },
-            activeProblem.timeLimitMs,
-          );
-          const evaluated = evaluateRun(index + 1, test.output, result);
-          cases.push(evaluated);
+      const cases: JudgeUiCaseResult[] = [];
+      const judging = new JudgeEngine(createJudgeExecutor({
+        run: (buildArtifact, run) => runner.run(buildArtifact, {
+          ...run,
+          args: [...run.args],
+          env: { ...run.env },
+        }),
+        interact: (contestant, interactor, interaction) => runner.interact(
+          contestant,
+          interactor,
+          interaction,
+        ),
+      }));
+      const result = await judging.judge(runnable, {
+        version: FORGE_CONTRACT_VERSION,
+        failFast: true,
+        cases: activeProblem.judgeCases.map((test, index) => ({
+          kind: "batch" as const,
+          id: `case-${index + 1}`,
+          input: { kind: "inline" as const, value: test.input },
+          matcher: textMatcher(test.output, "lines"),
+          args: project.config.args,
+          env: project.config.env,
+          determinism: project.config.determinism,
+          resources: {
+            ...project.config.resources,
+            instructionBudget: activeProblem.instructionBudget,
+          },
+        })),
+      }, {
+        onCase(contractCase, completed, total) {
+          if (cancelledRef.current) return;
+          const index = completed - 1;
+          const expected = activeProblem.judgeCases[index]?.output ?? "";
+          cases.push(displayJudgeCase(contractCase, index, expected));
+          setProgress({
+            phase: "running",
+            label: `本機測資 ${completed} / ${total}`,
+            progress: completed / total,
+          });
           setJudgeSession({
             problemId: activeProblem.id,
             verdict: "running",
-            completed: cases.length,
-            total: activeProblem.judgeCases.length,
+            completed,
+            total,
             cases: [...cases],
             durationMs: performance.now() - started,
           });
-          if (evaluated.verdict !== "accepted") break;
-        } catch (error) {
-          if (cancelledRef.current) break;
-          if (error instanceof JudgeTimeoutError) {
-            client.cancel();
-            cases.push({
-              number: index + 1,
-              verdict: "time-limit",
-              expected: test.output.trimEnd(),
-              actual: "",
-              stderr: error.message,
-              exitCode: null,
-              durationMs: activeProblem.timeLimitMs,
-            });
-          } else {
-            cases.push({
-              number: index + 1,
-              verdict: "runtime-error",
-              expected: test.output.trimEnd(),
-              actual: "",
-              stderr: error instanceof Error ? error.message : String(error),
-              exitCode: null,
-              durationMs: 0,
-            });
-          }
-          break;
-        }
-      }
-      const verdict = cancelledRef.current ? "cancelled" : submissionVerdict(cases);
-      const finished: JudgeSession = {
+        },
+      });
+      const verdict = cancelledRef.current ? "cancelled" : submissionVerdictFromContract(result.verdict);
+      const finished: JudgeUiSession = {
         problemId: activeProblem.id,
         verdict,
         completed: cases.length,
@@ -525,15 +598,17 @@ export function JudgeStudio() {
   const cancel = useCallback(() => {
     cancelledRef.current = true;
     judgingRef.current = false;
-    clientRef.current?.cancel();
+    compileCoordinatorRef.current?.cancel();
+    runnerRef.current?.cancel();
     setBusy(undefined);
     setJudgeSession((current) => current?.verdict === "running" ? { ...current, verdict: "cancelled" } : current);
-    addLog("system", "已取消操作並重啟編譯 Worker");
+    addLog("system", "已取消操作並重啟 ForgeCompiler／ForgeRunner Workers");
   }, [addLog]);
 
-  const chooseTarget = (target: "wasi" | "wasix") => {
+  const chooseTarget = (target: "wasip1" | "wasix") => {
     if (target === project.config.target) return;
-    clientRef.current?.restart();
+    compileCoordinatorRef.current?.restart();
+    runnerRef.current?.restart();
     updateProject((current) => ({ ...current, config: { ...current.config, target } }));
   };
 
@@ -566,7 +641,17 @@ export function JudgeStudio() {
   const clearCaches = async () => {
     setBusy("cache");
     try {
-      await Promise.all([clientRef.current?.clearToolchainCache(), clearToolchainResponseCache(), clearArtifactCache()]);
+      const compilation = compileCoordinatorRef.current;
+      const runner = runnerRef.current;
+      await Promise.all([
+        compilation?.cancelAndWait(),
+        runner?.cancelAndWait(),
+      ]);
+      await Promise.all([
+        compilerRef.current?.clearToolchainCache(),
+        runner?.clearRuntimeCache(),
+        clearArtifactCache(),
+      ]);
       setArtifact(undefined);
       setStorage(await storageEstimate());
       addLog("system", "已清除本機工具鏈回應與建置產物");
@@ -582,9 +667,9 @@ export function JudgeStudio() {
   return (
     <main className="studio-shell judge-shell">
       <header className="topbar">
-        <div className="brand" aria-label="LocalWASI Judge">
+        <div className="brand" aria-label="WASM OJ Forge">
           <span className="brand-mark"><Target size={17} strokeWidth={2.4} /></span>
-          <span className="brand-name">LocalWASI</span>
+          <span className="brand-name">FORGE</span>
           <span className="brand-edition">judge</span>
         </div>
 
@@ -599,7 +684,7 @@ export function JudgeStudio() {
             <span className={`language-dot ${languageTone(project.config.language)}`} />
             <select
               value={project.config.language}
-              onChange={(event) => void openWorkspace(activeProblem, event.target.value as Language)}
+              onChange={(event) => void openWorkspace(activeProblem, event.target.value as BuiltinLanguage)}
               aria-label="解題語言"
               disabled={Boolean(busy)}
             >
@@ -608,7 +693,7 @@ export function JudgeStudio() {
             <ChevronDown size={12} />
           </label>
           <label className="compact-select">
-            <select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasi" | "wasix")} aria-label="編譯目標" disabled={Boolean(busy)}>
+            <select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")} aria-label="編譯目標" disabled={Boolean(busy)}>
               {activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}
             </select>
             <ChevronDown size={12} />
@@ -643,7 +728,7 @@ export function JudgeStudio() {
             {filteredProblems.map((problem) => (
               <button
                 className={`problem-row ${problem.id === activeProblem.id ? "active" : ""}`}
-                onClick={() => void openWorkspace(problem, project.config.language)}
+                onClick={() => void openWorkspace(problem, projectLanguage)}
                 disabled={Boolean(busy)}
                 key={problem.id}
               >
@@ -670,7 +755,7 @@ export function JudgeStudio() {
           <p className="problem-summary">{activeProblem.summary}</p>
           <div className="problem-metrics">
             <span><Gauge size={13} />{difficultyLabel(activeProblem.difficulty)}</span>
-            <span><Clock3 size={13} />本機上限 {activeProblem.timeLimitMs / 1000}s / case</span>
+            <span><Zap size={13} />Net weighted-cost budget {activeProblem.instructionBudget.toLocaleString()} / case</span>
             <span><Box size={13} />{activeProblem.judgeCases.length} cases</span>
           </div>
           <section className="statement-section">
@@ -731,11 +816,11 @@ export function JudgeStudio() {
             {activeFile && (
               <MonacoEditor
                 path={`file:///${activeFile.path}`}
-                language={MONACO_LANGUAGE[activeFile.language]}
+                language={isBuiltinLanguage(activeFile.language) ? MONACO_LANGUAGE[activeFile.language] : "plaintext"}
                 value={activeFile.content}
                 onChange={updateActiveFile}
                 onMount={onEditorMount}
-                theme="localwasi"
+                theme="forge"
                 options={{
                   automaticLayout: true,
                   fontFamily: "var(--font-mono), monospace",
@@ -765,7 +850,11 @@ export function JudgeStudio() {
               <button className={bottomTab === "console" ? "active" : ""} onClick={() => setBottomTab("console")}>Console</button>
               <div className="panel-status">
                 {busy && <><span className="spinner" />{progress.label}</>}
-                {!busy && artifact && <><Check size={13} />{formatBytes(artifact.size)}</>}
+                {!busy && compileAhead === "scheduled" && <>背景編譯已排程</>}
+                {!busy && compileAhead === "compiling" && <><span className="spinner" />背景預編譯</>}
+                {!busy && compileAhead === "error" && <><TriangleAlert size={13} />等待修正</>}
+                {!busy && compileAhead === "ready" && artifact && <><Check size={13} />預編譯完成 · {formatBytes(artifact.size)}</>}
+                {!busy && compileAhead === "idle" && artifact && <><Check size={13} />{formatBytes(artifact.size)}</>}
               </div>
               {artifact && <button className="bare-button panel-download" onClick={() => downloadArtifact(artifact)} aria-label="下載產物"><Download size={14} /></button>}
             </div>
@@ -845,13 +934,36 @@ export function JudgeStudio() {
             </div>
             <label className="form-field"><span>Entry file</span><select value={project.config.entry} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, entry: event.target.value } }))}>{project.files.map((file) => <option key={file.path}>{file.path}</option>)}</select></label>
             <div className="form-grid">
-              <label className="form-field"><span>Target ABI</span><select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasi" | "wasix")}>{activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}</select></label>
+              <label className="form-field"><span>Target ABI</span><select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")}>{activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}</select></label>
               <label className="form-field"><span>Profile</span><select value={project.config.optimization} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, optimization: event.target.value as "debug" | "release" } }))}><option value="debug">Debug · -O0</option><option value="release">Release · -O2</option></select></label>
             </div>
-            <label className="form-field"><span>自訂 Run stdin</span><textarea value={project.config.stdin} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, stdin: event.target.value } }))} rows={5} /></label>
-            {project.config.language === "rust" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Rust/WASI core profile</strong> 在 Judge 中提供 <code>read_int()</code>，並支援函式、整數、bindings、loops、條件與 print macros；不包含 Cargo、crate、collection 或完整標準函式庫。</p></div>}
+            <label className="form-field"><span>自訂 Run stdin</span><textarea value={project.config.stdin} onChange={(event) => updateRunConfig((current) => ({ ...current, stdin: event.target.value }))} rows={5} /></label>
+            <div className="form-grid">
+              <label className="form-field"><span>Net weighted instruction budget</span><input type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1000000" value={project.config.resources.instructionBudget} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, instructionBudget: Number(event.target.value) } }))} /></label>
+              <label className="form-field"><span>Logical time budget (ms)</span><input type="number" min="1" max="9007199254" step="100" value={project.config.resources.logicalTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, logicalTimeLimitMs: Number(event.target.value) } }))} /></label>
+            </div>
+            <div className="form-grid">
+              <label className="form-field"><span>Emergency wall deadline (ms)</span><input type="number" min="1" max="600000" step="100" value={project.config.resources.wallTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, wallTimeLimitMs: Number(event.target.value) } }))} /></label>
+            </div>
+            <div className="form-grid">
+              <label className="form-field"><span>Linear memory (MiB)</span><input type="number" min="1" max="4096" step="1" value={project.config.resources.memoryLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, memoryLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+              <label className="form-field"><span>Captured output (MiB)</span><input type="number" min="0.0625" max="64" step="0.0625" value={project.config.resources.outputLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, outputLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+            </div>
+            <div className="form-grid">
+              <label className="form-field"><span>Writable VFS (MiB)</span><input type="number" min="0.0625" max="512" step="0.0625" value={project.config.resources.filesystemWriteLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemWriteLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+              <label className="form-field"><span>Writable VFS entries</span><input type="number" min="1" max="65536" step="1" value={project.config.resources.filesystemEntryLimit} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemEntryLimit: Number(event.target.value) } }))} /></label>
+            </div>
+            <div className="profile-notice"><Gauge size={15} /><p><strong>Deterministic resource policy</strong> weighted instruction、logical time、linear memory、captured output 與 VFS live-storage 上限由 portable runtime 強制執行；wall deadline 由 host 終止 Worker，僅作為緊急安全上限。</p></div>
+            <div className="form-grid">
+              <label className="form-field"><span>Random seed</span><input type="number" min="0" max="4294967295" step="1" value={project.config.determinism.randomSeed} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, randomSeed: Number(event.target.value) } }))} /></label>
+              <label className="form-field"><span>Clock step (ns)</span><input type="number" min="1" max="1000000000" step="1" value={project.config.determinism.clockStepNs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, clockStepNs: Number(event.target.value) } }))} /></label>
+            </div>
+            <label className="form-field"><span>Realtime epoch (Unix ms)</span><input type="number" min="0" max="18446744073000" step="1" value={project.config.determinism.realtimeEpochMs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, realtimeEpochMs: Number(event.target.value) } }))} /></label>
+            <div className="profile-notice"><Clock3 size={15} /><p><strong>Deterministic execution</strong> 固定 entropy、realtime 與 monotonic clock；sleep 與 clock poll 只會快轉虛擬時間，不等待 host。相同 artifact、stdin、args、env 與設定會得到相同的 exit code、stdout 和 stderr。實際執行時間不屬於 deterministic transcript。</p></div>
+            {project.config.language === "rust" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Real Rust toolchain</strong> 使用來源可追溯的 <code>rustc 1.91.1-dev</code> WebC 與相符的 standard library，在 Wasmer 內直接產生 WASI P1；Cargo 可使用 Forge 統一 lock/cache API，但目前 editor 尚未把解析後的 crate 掛載進 rustc build。</p></div>}
+            {project.config.language === "go" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Standard Go / wasip1</strong> 使用標準 <code>Go 1.26.5</code> compiler、linker 與相符的 349-package standard library，全程在 Wasmer 內產生 WASI P1；Go modules 可使用 Forge 統一 lock/cache API。</p></div>}
             <div className="local-judge-note drawer-judge-note"><LockKeyhole size={15} /><p><strong>不防作弊</strong>完全本機的測資一定能被檢視；這是刻意的隱私與教學取捨。</p></div>
-            <div className="cache-section"><div><strong>本機快取</strong><span>{formatBytes(storage.usage)} / {storage.quota ? formatBytes(storage.quota) : "browser quota"}</span></div><button onClick={() => void clearCaches()} disabled={busy === "cache"}><RotateCcw size={13} /> 清除快取</button></div>
+            <div className="cache-section"><div><strong>本機快取</strong><span>{formatBytes(storage.usage)} / {storage.quota ? formatBytes(storage.quota) : "browser quota"}</span></div><button onClick={() => void clearCaches()} disabled={Boolean(busy)}><RotateCcw size={13} /> 清除快取</button></div>
             <div className="drawer-footer"><ShieldCheck size={14} /><span>只下載工具鏈套件；提交程式碼、stdin、測資與產物不會上傳。</span></div>
           </aside>
         </div>

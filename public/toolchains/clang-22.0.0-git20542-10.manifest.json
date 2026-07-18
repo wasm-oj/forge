@@ -1,0 +1,20 @@
+{
+  "commands": [
+    "clang",
+    "clang++",
+    "wasm-ld"
+  ],
+  "coreSha256": "24fbed474c7b5b4968fd73fc4827440b93fb351c1b6264516130300eff3e7bf5",
+  "filesystemMount": "/usr",
+  "output": {
+    "compressedBytes": 27000264,
+    "compressedSha256": "7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a",
+    "path": "clang-22.0.0-git20542-10.webc.gz.bin",
+    "sha256": "21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224",
+    "uncompressedBytes": 103666690
+  },
+  "resourcesSha256": "79eef0c336fe55cf03ff8f5b42b784c8168f929a3603138b2c6301f4601e4c86",
+  "schema": "wasm-oj-forge-v1/clang-toolchain",
+  "sourceSha256": "6230ea1afa9691fa065935cf68c01642ff9b31c183fe8ac64cdfda025df06009",
+  "version": "22.0.0-git20542-10"
+}

@@ -1,0 +1,21 @@
+[package]
+name = "package-rust-webc"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+ciborium = "0.2.2"
+filetime = "0.2.26"
+flate2 = "1.1.5"
+indexmap = "2.12.1"
+serde_json = "1.0.149"
+sha2 = "0.10.9"
+tar = "0.4.44"
+tempfile = "3.23.0"
+url = "2.5.7"
+walrus = "0.26.4"
+webc = "11.0.0"
+
+[patch.crates-io]
+shared-buffer = { path = "../../vendor/shared-buffer" }

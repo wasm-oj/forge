@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "quickjs-libc.h"
@@ -22,6 +23,35 @@ static JSValue write_stdout(JSContext *context, JSValueConst this_value, int arg
 static JSValue write_stderr(JSContext *context, JSValueConst this_value, int argc, JSValueConst *argv) {
     (void)this_value;
     return write_stream(context, stderr, argc, argv);
+}
+
+static unsigned long long deterministic_env_u64(const char *name) {
+    const char *value = getenv(name);
+    if (value == NULL || *value == '\0') return 0;
+    char *end = NULL;
+    unsigned long long parsed = strtoull(value, &end, 10);
+    return end != NULL && *end == '\0' ? parsed : 0;
+}
+
+static JSValue deterministic_seed(JSContext *context, JSValueConst this_value, int argc, JSValueConst *argv) {
+    (void)this_value;
+    (void)argc;
+    (void)argv;
+    return JS_NewUint32(context, (uint32_t)deterministic_env_u64("FORGE_RANDOM_SEED"));
+}
+
+static JSValue deterministic_epoch_ms(JSContext *context, JSValueConst this_value, int argc, JSValueConst *argv) {
+    (void)this_value;
+    (void)argc;
+    (void)argv;
+    return JS_NewInt64(context, (int64_t)deterministic_env_u64("FORGE_REALTIME_EPOCH_MS"));
+}
+
+static JSValue deterministic_step_ns(JSContext *context, JSValueConst this_value, int argc, JSValueConst *argv) {
+    (void)this_value;
+    (void)argc;
+    (void)argv;
+    return JS_NewUint32(context, (uint32_t)deterministic_env_u64("FORGE_CLOCK_STEP_NS"));
 }
 
 static char *read_stdin(size_t *length) {
@@ -78,8 +108,11 @@ int main(int argc, char **argv) {
     }
     js_std_add_helpers(context, argc, argv);
     JSValue global = JS_GetGlobalObject(context);
-    JS_SetPropertyStr(context, global, "__localwasi_write_stdout", JS_NewCFunction(context, write_stdout, "__localwasi_write_stdout", 1));
-    JS_SetPropertyStr(context, global, "__localwasi_write_stderr", JS_NewCFunction(context, write_stderr, "__localwasi_write_stderr", 1));
+    JS_SetPropertyStr(context, global, "__forge_write_stdout", JS_NewCFunction(context, write_stdout, "__forge_write_stdout", 1));
+    JS_SetPropertyStr(context, global, "__forge_write_stderr", JS_NewCFunction(context, write_stderr, "__forge_write_stderr", 1));
+    JS_SetPropertyStr(context, global, "__forge_determinism_seed", JS_NewCFunction(context, deterministic_seed, "__forge_determinism_seed", 0));
+    JS_SetPropertyStr(context, global, "__forge_determinism_epoch_ms", JS_NewCFunction(context, deterministic_epoch_ms, "__forge_determinism_epoch_ms", 0));
+    JS_SetPropertyStr(context, global, "__forge_determinism_step_ns", JS_NewCFunction(context, deterministic_step_ns, "__forge_determinism_step_ns", 0));
     JS_FreeValue(context, global);
 
     JSValue result = JS_Eval(context, source, source_length, "/project/bundle.js", JS_EVAL_TYPE_GLOBAL);

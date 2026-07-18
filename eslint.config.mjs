@@ -10,7 +10,9 @@ export default defineConfig([
     ".vinext/**",
     ".playwright-cli/**",
     "dist/**",
+    "lib/**",
     "public/toolchains/**",
+    "src/runner/generated/**",
     "next-env.d.ts",
   ]),
 ]);

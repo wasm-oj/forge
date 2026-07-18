@@ -3,7 +3,10 @@ node_modules/
 .vinext/
 .playwright-cli/
 dist/
+lib/
 .wrangler/
 coverage/
+.forge-library-build-*/
+**/target/
 *.tsbuildinfo
 .DS_Store

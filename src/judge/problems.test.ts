@@ -13,7 +13,7 @@ describe("problem catalog", () => {
         input: problem.examples[0].input,
         output: problem.examples[0].output,
       });
-      expect(problem.timeLimitMs).toBeGreaterThan(0);
+      expect(problem.instructionBudget).toBeGreaterThan(0);
     }
   });
 });

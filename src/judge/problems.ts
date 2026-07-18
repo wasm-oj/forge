@@ -22,10 +22,10 @@ export interface JudgeProblem {
   constraints: string[];
   examples: ProblemExample[];
   judgeCases: JudgeCase[];
-  timeLimitMs: number;
+  instructionBudget: number;
 }
 
-const LOCAL_TIME_LIMIT_MS = 8_000;
+const LOCAL_INSTRUCTION_BUDGET = 10_000_000_000;
 
 export const PROBLEMS: JudgeProblem[] = [
   {
@@ -35,7 +35,7 @@ export const PROBLEMS: JudgeProblem[] = [
     difficulty: "easy",
     category: "基本輸入輸出",
     summary: "讀入兩個整數並輸出它們的總和。",
-    description: ["這是 LocalWASI Judge 的起點。從標準輸入讀取兩個整數 a 與 b，計算 a + b。", "答案可能超過 32 位元有號整數，請使用 64 位元整數。"],
+    description: ["這是 WASM OJ Forge 的起點。從標準輸入讀取兩個整數 a 與 b，計算 a + b。", "答案可能超過 32 位元有號整數，請使用 64 位元整數。"],
     input: "一行包含兩個整數 a、b，以空白分隔。",
     output: "輸出一個整數，表示 a + b。",
     constraints: ["-10⁹ ≤ a, b ≤ 10⁹"],
@@ -46,7 +46,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "0 0\n", output: "0\n" },
       { input: "1000000000 1000000000\n", output: "2000000000\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "temperature-span",
@@ -66,7 +66,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "-10 -3 -20\n", output: "17\n" },
       { input: "100 -100 25\n", output: "200\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "seconds-clock",
@@ -86,7 +86,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "3599\n", output: "0 59 59\n" },
       { input: "359999\n", output: "99 59 59\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "leap-year",
@@ -107,7 +107,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "2023\n", output: "NO\n" },
       { input: "2400\n", output: "YES\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "range-sum",
@@ -128,7 +128,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "123456\n", output: "7620753696\n" },
       { input: "1000000000\n", output: "500000000500000000\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "factorial-zeros",
@@ -149,7 +149,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "100\n", output: "24\n" },
       { input: "1000000000\n", output: "249999998\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "greatest-common-divisor",
@@ -169,7 +169,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "270 192\n", output: "6\n" },
       { input: "1000000000000 250000000000\n", output: "250000000000\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "least-common-multiple",
@@ -189,7 +189,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "1 999999937\n", output: "999999937\n" },
       { input: "1000000000 999999999\n", output: "999999999000000000\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "prime-gate",
@@ -210,7 +210,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "221\n", output: "NO\n" },
       { input: "2147483647\n", output: "YES\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "reverse-number",
@@ -231,7 +231,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "1000000000000000000\n", output: "1\n" },
       { input: "9081726354\n", output: "4536271809\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "digit-sum",
@@ -252,7 +252,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "1000000000000000000\n", output: "1\n" },
       { input: "9081726354\n", output: "45\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "collatz-steps",
@@ -273,7 +273,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "27\n", output: "111\n" },
       { input: "1000000\n", output: "152\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "fibonacci-mod",
@@ -294,7 +294,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "50\n", output: "586268941\n" },
       { input: "1000000000\n", output: "21\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "modular-power",
@@ -314,7 +314,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "3 45 100\n", output: "43\n" },
       { input: "123456789 987654321 1000000007\n", output: "652541198\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "stream-maximum",
@@ -334,7 +334,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "6\n4 4 4 4 4 4\n", output: "4 1\n" },
       { input: "7\n-10 -5 -8 -5 -3 -3 -9\n", output: "-3 5\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "energy-ledger",
@@ -354,7 +354,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "4\n-1 -1 -1 -1\n", output: "-4 -4\n" },
       { input: "1\n0\n", output: "0 0\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "increasing-run",
@@ -374,7 +374,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "6\n6 5 4 3 2 1\n", output: "1\n" },
       { input: "7\n-3 -2 -1 0 2 2 3\n", output: "5\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "single-trade",
@@ -394,7 +394,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "1\n9\n", output: "0\n" },
       { input: "7\n2 4 1 10 3 12 0\n", output: "11\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "majority-signal",
@@ -414,7 +414,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "9\n1 1 2 2 2 2 2 1 2\n", output: "2\n" },
       { input: "5\n0 0 0 1 2\n", output: "0\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
   {
     id: "maximum-subarray",
@@ -435,7 +435,7 @@ export const PROBLEMS: JudgeProblem[] = [
       { input: "6\n-1 -2 -3 -4 -5 -6\n", output: "-1\n" },
       { input: "8\n5 -2 3 -10 7 8 -1 4\n", output: "18\n" },
     ],
-    timeLimitMs: LOCAL_TIME_LIMIT_MS,
+    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
   },
 ];
 

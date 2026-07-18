@@ -1,0 +1,203 @@
+{
+  "build": {
+    "configure": [
+      "Tools/wasm/wasi configure-build-python",
+      "Tools/wasm/wasi make-build-python",
+      "Tools/wasm/wasi configure-host --without-ensurepip --disable-test-modules",
+      "Tools/wasm/wasi make-host"
+    ],
+    "configureEnvironment": {
+      "py_cv_module__socket": "n/a"
+    },
+    "disabledModules": [
+      "_socket"
+    ],
+    "hostRunner": "Wasmer",
+    "sourceDateEpoch": 1781085833,
+    "strip": "llvm-strip --strip-debug"
+  },
+  "compiler": {
+    "command": "python",
+    "imports": [
+      "wasi_snapshot_preview1.args_get",
+      "wasi_snapshot_preview1.args_sizes_get",
+      "wasi_snapshot_preview1.clock_res_get",
+      "wasi_snapshot_preview1.clock_time_get",
+      "wasi_snapshot_preview1.environ_get",
+      "wasi_snapshot_preview1.environ_sizes_get",
+      "wasi_snapshot_preview1.fd_advise",
+      "wasi_snapshot_preview1.fd_close",
+      "wasi_snapshot_preview1.fd_datasync",
+      "wasi_snapshot_preview1.fd_fdstat_get",
+      "wasi_snapshot_preview1.fd_fdstat_set_flags",
+      "wasi_snapshot_preview1.fd_filestat_get",
+      "wasi_snapshot_preview1.fd_filestat_set_size",
+      "wasi_snapshot_preview1.fd_filestat_set_times",
+      "wasi_snapshot_preview1.fd_pread",
+      "wasi_snapshot_preview1.fd_prestat_dir_name",
+      "wasi_snapshot_preview1.fd_prestat_get",
+      "wasi_snapshot_preview1.fd_pwrite",
+      "wasi_snapshot_preview1.fd_read",
+      "wasi_snapshot_preview1.fd_readdir",
+      "wasi_snapshot_preview1.fd_seek",
+      "wasi_snapshot_preview1.fd_sync",
+      "wasi_snapshot_preview1.fd_tell",
+      "wasi_snapshot_preview1.fd_write",
+      "wasi_snapshot_preview1.path_create_directory",
+      "wasi_snapshot_preview1.path_filestat_get",
+      "wasi_snapshot_preview1.path_filestat_set_times",
+      "wasi_snapshot_preview1.path_link",
+      "wasi_snapshot_preview1.path_open",
+      "wasi_snapshot_preview1.path_readlink",
+      "wasi_snapshot_preview1.path_remove_directory",
+      "wasi_snapshot_preview1.path_rename",
+      "wasi_snapshot_preview1.path_symlink",
+      "wasi_snapshot_preview1.path_unlink_file",
+      "wasi_snapshot_preview1.poll_oneoff",
+      "wasi_snapshot_preview1.proc_exit",
+      "wasi_snapshot_preview1.random_get",
+      "wasi_snapshot_preview1.sched_yield"
+    ],
+    "sha256": "f104b9da093f806451d7bba3f7eca41033842a5ec88ac256689e6e3cc1f1e2e1"
+  },
+  "filesystemMount": "/usr/local",
+  "licenses": [
+    {
+      "component": "CPython 3.14.6",
+      "expression": "PSF-2.0",
+      "path": "/usr/local/share/licenses/python-3.14.6/LICENSE",
+      "sha256": "b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231"
+    },
+    {
+      "component": "Expat 2.8.1",
+      "expression": "MIT",
+      "path": "/usr/local/share/licenses/python-3.14.6/EXPAT-MIT.txt",
+      "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87"
+    },
+    {
+      "component": "HACL* 8ba599b2f6c9701b3dc961db895b0856a2210f76",
+      "expression": "MIT",
+      "path": "/usr/local/share/licenses/python-3.14.6/HACL-STAR-MIT.txt",
+      "sha256": "328a079d376d3e1e966317c647906004d38d42b7624531456b90ae1b710ddc0c"
+    },
+    {
+      "component": "libmpdec 2.5.1",
+      "expression": "BSD-2-Clause",
+      "path": "/usr/local/share/licenses/python-3.14.6/LIBMPDEC-BSD-2-CLAUSE.txt",
+      "sha256": "669512af7219f58be03a398766d7c9da11a3b3df9d3f05cb74c5ceca25c8da3b"
+    },
+    {
+      "component": "WASI SDK 24.0 / LLVM compiler-rt 26a1d6601d727a96f4301d0d8647b5a42760ae0c",
+      "expression": "Apache-2.0 WITH LLVM-exception",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/WASI-SDK-APACHE-2.0-LLVM-EXCEPTION.txt",
+      "sha256": "268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5"
+    },
+    {
+      "component": "LLVM compiler-rt 26a1d6601d727a96f4301d0d8647b5a42760ae0c",
+      "expression": "Apache-2.0 WITH LLVM-exception AND LicenseRef-LLVM-compiler-rt-third-party",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/COMPILER-RT-LICENSE.txt",
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d"
+    },
+    {
+      "component": "wasi-libc b9ef79d7dbd47c6c5bafdae760823467c2f60b70",
+      "expression": "Apache-2.0 WITH LLVM-exception",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/WASI-LIBC-NOTICE.txt",
+      "sha256": "673f577e363e80e0058bd78214683f045d1d0c63930969a87f01a1d87d7cf1d6"
+    },
+    {
+      "component": "wasi-libc b9ef79d7dbd47c6c5bafdae760823467c2f60b70 Apache alternative",
+      "expression": "Apache-2.0",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/WASI-LIBC-APACHE-2.0.txt",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+    },
+    {
+      "component": "wasi-libc b9ef79d7dbd47c6c5bafdae760823467c2f60b70 MIT alternative",
+      "expression": "MIT",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/WASI-LIBC-MIT.txt",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+      "component": "wasi-libc cloudlibc-derived portions",
+      "expression": "BSD-2-Clause",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/CLOUDLIBC-BSD-2-CLAUSE.txt",
+      "sha256": "c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0"
+    },
+    {
+      "component": "dlmalloc 2.8.6",
+      "expression": "CC0-1.0",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/DLMALLOC-CC0-NOTICE.txt",
+      "sha256": "5f7892f12d4d3eef88c379564dd1580e99d918e1128cabe1ec2cc3057727b6a2"
+    },
+    {
+      "component": "wasi-libc emmalloc source alternative (not linked by this build)",
+      "expression": "MIT OR NCSA",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/EMMALLOC-NOTICE.txt",
+      "sha256": "b33ff4cd6bfb1eb7e600546b5b2c95f25145ef2fecd72d6976a5263996a5594f"
+    },
+    {
+      "component": "wasi-libc musl-derived portions",
+      "expression": "MIT",
+      "path": "/usr/local/share/licenses/python-3.14.6/toolchain/MUSL-MIT.txt",
+      "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af"
+    }
+  ],
+  "output": {
+    "compressedBytes": 5188705,
+    "compressedSha256": "f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5",
+    "path": "python-3.14.6-wasip1.webc.gz.bin",
+    "sha256": "67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86",
+    "uncompressedBytes": 21065948
+  },
+  "runtimeFiles": {
+    "archiveBytes": 10652546,
+    "archiveSha256": "8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba",
+    "cacheKey": "wasm-oj-forge-v1:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip",
+    "format": "FORGEFS1",
+    "guestPath": "/cpython/lib/python314.zip"
+  },
+  "schema": "wasm-oj-forge-v1/python-toolchain",
+  "source": {
+    "archiveSha256": "143b1dddefaec3bd2e21e3b839b34a2b7fb9842272883c576420d605e9f30c63",
+    "spdx": {
+      "packagedPath": "/usr/local/share/sbom/python-3.14.6.spdx.json",
+      "sha256": "1f5d394856783fa77e1f1db280f84eabf693bffc1fb06a747f7116de9f99f3bd",
+      "url": "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz.spdx.json"
+    },
+    "url": "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz"
+  },
+  "stdlib": {
+    "bytes": 10494371,
+    "excludedRoots": [
+      "__pycache__",
+      "__phello__",
+      "ensurepip",
+      "idlelib",
+      "site-packages",
+      "test",
+      "tkinter",
+      "turtledemo",
+      "venv"
+    ],
+    "excludedSuffixes": [
+      ".pyc",
+      ".pyo"
+    ],
+    "files": 559,
+    "mount": "/usr/local/lib/python3.14"
+  },
+  "sysconfig": {
+    "buildRoot": "/usr/src/cpython-3.14.6/cross-build/wasm32-wasip1",
+    "sourceRoot": "/usr/src/cpython-3.14.6",
+    "wasiSdkRoot": "/opt/wasi-sdk-24.0"
+  },
+  "target": "wasm32-wasip1",
+  "version": "3.14.6",
+  "wasiSdk": {
+    "archiveSha256": "aeae999396d5f5caa5ce419f52e83c35869d5fd21d40af80acba2c80f51b0b3a",
+    "llvmRevision": "26a1d6601d727a96f4301d0d8647b5a42760ae0c",
+    "revision": "d2bea01edcc46f731156a817f710cdd9fc9c1c19",
+    "url": "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-arm64-macos.tar.gz",
+    "version": "24.0",
+    "wasiLibcRevision": "b9ef79d7dbd47c6c5bafdae760823467c2f60b70"
+  }
+}

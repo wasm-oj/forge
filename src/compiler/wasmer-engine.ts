@@ -1,0 +1,405 @@
+import {
+  Runtime,
+  Wasmer,
+  type Output,
+} from "@wasmer/sdk";
+import { FORGE_CONTRACT_VERSION } from "../core/contract.ts";
+import {
+  canonicalRuntimeBundleFiles,
+  createRuntimeBundleManifest,
+} from "../core/artifact-validation.ts";
+import { canonicalProjectFiles } from "../core/project-files.ts";
+import { costProfileId } from "../core/cost-profile.ts";
+import { ensureFailureDiagnostic, parseTypeScriptDiagnostics } from "../core/diagnostics.ts";
+import {
+  PYTHON_PACKAGE,
+  GO_VERSION,
+  QUICKJS_PACKAGE,
+  RUST_VERSION,
+  TYPESCRIPT_ASSET_PATH,
+  TYPESCRIPT_VERSION,
+  toolchainPackageIdentities,
+} from "../core/toolchains.ts";
+import { LanguageDriverRegistry } from "./language-driver.ts";
+import type {
+  BuildResult,
+  CompilerTraceEvent,
+  CompilerTraceOperation,
+  Project,
+  ProjectFile,
+  RuntimeBundleArtifact,
+  WasmArtifact,
+  WorkerPhase,
+} from "../core/types.ts";
+import {
+  PYTHON_DETERMINISTIC_RUNNER,
+  PYTHON_RUNNER_PATH,
+} from "../runtime/determinism.ts";
+import type {
+  RustCompileRequest,
+  RustCompileResult,
+} from "./rust-toolchain.ts";
+import type { PythonFrontendRequest, PythonFrontendResult } from "./python-toolchain.ts";
+import type { GoCompileRequest, GoCompileResult } from "./go-toolchain.ts";
+import { buildClangWithSdkDirect } from "./sdk-direct-clang.ts";
+const encoder = new TextEncoder();
+let typescriptCompilerBytes: Promise<Uint8Array> | undefined;
+
+export interface WasmerCompilerHost {
+  getRuntime(): Runtime;
+  loadToolchainAsset(path: string): Promise<Uint8Array>;
+  loadToolchainFile(path: string): Promise<Uint8Array>;
+  compileRust(request: RustCompileRequest): Promise<RustCompileResult>;
+  compilePython(request: PythonFrontendRequest): Promise<PythonFrontendResult>;
+  compileGo(request: GoCompileRequest): Promise<GoCompileResult>;
+  progress(requestId: string, phase: WorkerPhase, label: string, value?: number): void;
+  trace(requestId: string, operation: CompilerTraceOperation, state: CompilerTraceEvent["state"]): void;
+}
+
+let host: WasmerCompilerHost | undefined;
+
+
+const QUICKJS_TYPES = String.raw`
+declare module "std" {
+  const std: {
+    err: { puts(value: string): void };
+    in: { readAsString(): string };
+    out: { puts(value: string): void };
+  };
+  export = std;
+}
+`;
+
+export function configureWasmerCompilerHost(nextHost: WasmerCompilerHost): void {
+  host = nextHost;
+}
+
+function progress(requestId: string, phase: WorkerPhase, label: string, value?: number): void {
+  requireHost().progress(requestId, phase, label, value);
+}
+
+function requireHost(): WasmerCompilerHost {
+  if (!host) throw new Error("Wasmer compiler host is not configured.");
+  return host;
+}
+
+function requireRuntime(): Runtime {
+  return requireHost().getRuntime();
+}
+
+async function getTypeScriptCompiler(): Promise<Wasmer> {
+  typescriptCompilerBytes ??= requireHost().loadToolchainAsset(TYPESCRIPT_ASSET_PATH);
+  try {
+    return Wasmer.fromWasm(await typescriptCompilerBytes, requireRuntime());
+  } catch (error) {
+    typescriptCompilerBytes = undefined;
+    throw error;
+  }
+}
+
+function createArtifactBase(project: Project, cacheKey: string, started: number, size: number, toolchains: string[]) {
+  return {
+    forgeContract: FORGE_CONTRACT_VERSION,
+    id: crypto.randomUUID(),
+    projectId: project.id,
+    cacheKey,
+    name: `${project.name}.${project.config.target === "wasip1" ? "wasm" : "wasix.wasm"}`,
+    language: project.config.language,
+    target: project.config.target,
+    optimization: project.config.optimization,
+    createdAt: Date.now(),
+    durationMs: performance.now() - started,
+    size,
+    toolchains,
+    costProfile: costProfileId(
+      project.config.language,
+      project.config.target,
+      project.config.optimization,
+    ),
+  } as const;
+}
+
+async function buildRust(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
+  const started = performance.now();
+  progress(requestId, "compiling", `Compiling with rustc ${RUST_VERSION}`, 0.2);
+  const compiled = await requireHost().compileRust({
+    entry: project.config.entry,
+    files: project.files,
+    optimization: project.config.optimization,
+  });
+  if (!compiled.success || !compiled.wasm) {
+    return {
+      success: false,
+      diagnostics: ensureFailureDiagnostic(compiled.diagnostics, {
+        file: project.config.entry,
+        source: "rustc",
+        message: compiled.stderr.trim() || "rustc failed without a diagnostic.",
+      }),
+      stdout: compiled.stdout,
+      stderr: compiled.stderr,
+      cacheHit: false,
+    };
+  }
+
+  const bytes = compiled.wasm;
+  const artifact: WasmArtifact = {
+    kind: "wasm",
+    ...createArtifactBase(project, cacheKey, started, bytes.byteLength, toolchainPackageIdentities("rust")),
+    bytes,
+  };
+  return {
+    success: true,
+    diagnostics: compiled.diagnostics,
+    artifact,
+    stdout: compiled.stdout,
+    stderr: compiled.stderr,
+    cacheHit: false,
+  };
+}
+
+function sumFileSize(files: Record<string, string | Uint8Array>): number {
+  return Object.values(files).reduce((total, file) => total + (typeof file === "string" ? encoder.encode(file).byteLength : file.byteLength), 0);
+}
+
+async function buildPython(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
+  const started = performance.now();
+  const pythonFiles = project.files.filter((file) => file.path.endsWith(".py"));
+  progress(requestId, "compiling", `Byte-compiling ${pythonFiles.length} Python file${pythonFiles.length === 1 ? "" : "s"}`, 0.55);
+  const frontend = await requireHost().compilePython({ files: project.files });
+  if (!frontend.success) {
+    return {
+      success: false,
+      diagnostics: ensureFailureDiagnostic(frontend.diagnostics, {
+        file: project.config.entry,
+        source: "python",
+        message: frontend.stderr.trim() || "Python byte-compilation failed without a diagnostic.",
+      }),
+      stdout: frontend.stdout,
+      stderr: frontend.stderr,
+      cacheHit: false,
+    };
+  }
+  const files: Record<string, string | Uint8Array> = Object.fromEntries(project.files.map((file) => [file.path, file.content]));
+  files[PYTHON_RUNNER_PATH] = PYTHON_DETERMINISTIC_RUNNER;
+  for (const file of pythonFiles) {
+    const compiledPath = `build/${file.path.replace(/\.py$/, ".pyc")}`;
+    const bytecode = frontend.bytecode[compiledPath];
+    if (!bytecode) throw new Error(`Python stage omitted '${compiledPath}'.`);
+    files[compiledPath] = bytecode;
+  }
+  const entry = `build/${project.config.entry.replace(/\.py$/, ".pyc")}`;
+  const manifest = createRuntimeBundleManifest(project, PYTHON_PACKAGE, "python", entry);
+  files["forge.manifest.json"] = manifest;
+  const bundleFiles = canonicalRuntimeBundleFiles(files);
+  const size = sumFileSize(bundleFiles);
+  const artifact: RuntimeBundleArtifact = {
+    kind: "runtime-bundle",
+    ...createArtifactBase(project, cacheKey, started, size, toolchainPackageIdentities("python")),
+    name: `${project.name}.python-${project.config.target}.json`,
+    runtimePackage: PYTHON_PACKAGE,
+    command: "python",
+    entry,
+    files: bundleFiles,
+    manifest,
+  };
+  return { success: true, diagnostics: frontend.diagnostics, artifact, stdout: frontend.stdout, stderr: frontend.stderr, cacheHit: false };
+}
+
+async function buildGo(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
+  const started = performance.now();
+  progress(requestId, "compiling", `Compiling with Go ${GO_VERSION}`, 0.3);
+  const compiled = await requireHost().compileGo({
+    entry: project.config.entry,
+    files: project.files,
+    optimization: project.config.optimization,
+  });
+  if (!compiled.success || !compiled.wasm) {
+    return {
+      success: false,
+      diagnostics: ensureFailureDiagnostic(compiled.diagnostics, {
+        file: project.config.entry,
+        source: "go",
+        message: compiled.stderr.trim() || "Go compilation failed without a diagnostic.",
+      }),
+      stdout: compiled.stdout,
+      stderr: compiled.stderr,
+      cacheHit: false,
+    };
+  }
+  const artifact: WasmArtifact = {
+    kind: "wasm",
+    ...createArtifactBase(project, cacheKey, started, compiled.wasm.byteLength, toolchainPackageIdentities("go")),
+    bytes: compiled.wasm,
+  };
+  return {
+    success: true,
+    diagnostics: compiled.diagnostics,
+    artifact,
+    stdout: compiled.stdout,
+    stderr: compiled.stderr,
+    cacheHit: false,
+  };
+}
+
+function emittedScriptPath(path: string): string {
+  if (path.endsWith(".ts")) return path.slice(0, -3) + ".js";
+  return path;
+}
+
+function scriptSourceFiles(project: Project): ProjectFile[] {
+  const extension = project.config.language === "typescript" ? ".ts" : ".js";
+  return project.files.filter((file) => file.path.endsWith(extension));
+}
+
+function emittedSourceFiles(project: Project): ProjectFile[] {
+  return scriptSourceFiles(project).filter((file) => !file.path.endsWith(".d.ts"));
+}
+
+interface TypeScriptWasiResponse {
+  status: number;
+  diagnostics: string;
+  files: Record<string, string>;
+}
+
+async function transpileScriptProject(project: Project, requestId: string): Promise<{ files: Record<string, string | Uint8Array>; output: Output; response?: TypeScriptWasiResponse }> {
+  const scriptFiles = scriptSourceFiles(project);
+  const emittedFiles = emittedSourceFiles(project);
+  progress(requestId, "loading-toolchain", `Loading TypeScript ${TYPESCRIPT_VERSION}/WASI`);
+  const compiler = await getTypeScriptCompiler();
+  const entrypoint = compiler.entrypoint;
+  if (!entrypoint) throw new Error("The TypeScript/WASI compiler has no executable entrypoint.");
+  const outputPaths = emittedFiles.map((file) => emittedScriptPath(file.path));
+  const declarationPath = "/project/.forge/quickjs.d.ts";
+  const instance = await entrypoint.run({
+    stdin: JSON.stringify({
+      files: {
+        ...Object.fromEntries(project.files.map((file) => [`/project/${file.path}`, file.content])),
+        [declarationPath]: QUICKJS_TYPES,
+      },
+      javascript: project.config.language === "javascript",
+      sources: [declarationPath, ...scriptFiles.map((file) => `/project/${file.path}`)],
+      outputs: outputPaths.map((path) => `/project/build/${path}`),
+    }),
+  });
+  const output = await instance.wait();
+  let response: TypeScriptWasiResponse | undefined;
+  if (output.ok) {
+    try {
+      response = JSON.parse(output.stdout) as TypeScriptWasiResponse;
+    } catch {
+      response = undefined;
+    }
+  }
+  const files: Record<string, string | Uint8Array> = {};
+  if (response) {
+    for (const outputPath of outputPaths) {
+      const contents = response.files[`/project/build/${outputPath}`];
+      if (contents !== undefined) files[outputPath] = contents;
+    }
+  }
+  return { files, output, response };
+}
+
+async function buildScript(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
+  const started = performance.now();
+  if (!emittedSourceFiles(project).some((file) => file.path === project.config.entry)) {
+    return {
+      success: false,
+      diagnostics: [{
+        severity: "error",
+        message: `The ${project.config.language === "typescript" ? ".ts" : ".js"} entry file is not a supported executable source.`,
+        file: project.config.entry,
+        line: 1,
+        column: 1,
+        source: "project",
+      }],
+      stdout: "",
+      stderr: "",
+      cacheHit: false,
+    };
+  }
+  progress(requestId, "compiling", `Compiling ${project.config.language === "typescript" ? "TypeScript" : "JavaScript"} with TypeScript/WASI`, 0.5);
+  const { files, output, response } = await transpileScriptProject(project, requestId);
+  const diagnostics = parseTypeScriptDiagnostics(response?.diagnostics ?? "");
+  const expectedOutputs = emittedSourceFiles(project).length;
+  if (!output.ok || !response || response.status !== 0 || Object.keys(files).length !== expectedOutputs || diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+    return {
+      success: false,
+      diagnostics: ensureFailureDiagnostic(diagnostics, {
+        file: project.config.entry,
+        source: "typescript",
+        message: output.stderr.trim() || response?.diagnostics.trim() || `TypeScript ${TYPESCRIPT_VERSION} did not return every compiled output.`,
+      }),
+      stdout: "",
+      stderr: output.stderr,
+      cacheHit: false,
+    };
+  }
+  const entry = emittedScriptPath(project.config.entry);
+  const manifest = createRuntimeBundleManifest(project, QUICKJS_PACKAGE, "qjs", entry);
+  files["forge.manifest.json"] = manifest;
+  const bundleFiles = canonicalRuntimeBundleFiles(files);
+  const size = sumFileSize(bundleFiles);
+  const artifact: RuntimeBundleArtifact = {
+    kind: "runtime-bundle",
+    ...createArtifactBase(project, cacheKey, started, size, toolchainPackageIdentities(project.config.language)),
+    name: `${project.name}.${project.config.language === "typescript" ? "typescript" : "javascript"}-${project.config.target}.json`,
+    runtimePackage: QUICKJS_PACKAGE,
+    command: "qjs",
+    entry,
+    files: bundleFiles,
+    manifest,
+  };
+  return { success: true, diagnostics, artifact, stdout: "", stderr: output.stderr, cacheHit: false };
+}
+
+export async function buildProject(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
+  const canonicalProject = { ...project, files: canonicalProjectFiles(project.files) };
+  progress(requestId, "checking", "Validating project configuration", 0.05);
+  if (!canonicalProject.files.some((file) => file.path === canonicalProject.config.entry)) {
+    return {
+      success: false,
+      diagnostics: [{ severity: "error", message: "Configured entry file does not exist.", file: canonicalProject.config.entry, line: 1, column: 1, source: "project" }],
+      stdout: "",
+      stderr: "",
+      cacheHit: false,
+    };
+  }
+  if (canonicalProject.config.language === "c" || canonicalProject.config.language === "cpp") {
+    const activeHost = requireHost();
+    return buildClangWithSdkDirect(canonicalProject, cacheKey, requestId, {
+      runtime: activeHost.getRuntime(),
+      loadToolchainAsset: activeHost.loadToolchainAsset,
+      loadToolchainFile: activeHost.loadToolchainFile,
+      progress: activeHost.progress,
+      trace: activeHost.trace,
+    });
+  }
+  return languageDrivers.driver(canonicalProject.config.language).build({ project: canonicalProject, cacheKey, requestId });
+}
+
+const languageDrivers = new LanguageDriverRegistry();
+languageDrivers.register({
+  id: "rustc",
+  languages: ["rust"],
+  build: ({ project, cacheKey, requestId }) => buildRust(project, cacheKey, requestId),
+});
+languageDrivers.register({
+  id: "cpython",
+  languages: ["python"],
+  build: ({ project, cacheKey, requestId }) => buildPython(project, cacheKey, requestId),
+});
+languageDrivers.register({
+  id: "typescript",
+  languages: ["javascript", "typescript"],
+  build: ({ project, cacheKey, requestId }) => buildScript(project, cacheKey, requestId),
+});
+languageDrivers.register({
+  id: "go",
+  languages: ["go"],
+  build: ({ project, cacheKey, requestId }) => buildGo(project, cacheKey, requestId),
+});
+
+export function clearCompilerHostCaches(): void {
+  typescriptCompilerBytes = undefined;
+}

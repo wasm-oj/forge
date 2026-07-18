@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": true,
+    "incremental": false,
+    "stripInternal": true,
+    "rootDir": ".",
+    "plugins": [],
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "src/sdk/core.ts",
+    "src/sdk/browser.ts",
+    "src/server/index.ts"
+  ],
+  "exclude": ["src/**/*.test.ts", "src/server/*.integration.test.ts"]
+}

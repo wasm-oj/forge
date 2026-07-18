@@ -1,0 +1,65 @@
+[package]
+name = "wasm-oj-forge-runtime-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT"
+description = "Portable deterministic, metered WASI/WASIX runner for WASM OJ Forge."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "forge-runner"
+path = "src/bin/forge-runner.rs"
+required-features = ["native"]
+
+[[bin]]
+name = "forge-compiler"
+path = "src/bin/forge-compiler.rs"
+required-features = ["native"]
+
+[features]
+default = ["native"]
+native = ["wasmer/sys-default", "wasmer-wasix/sys-default"]
+web = [
+  "wasmer/js-default",
+  "wasmer-wasix/js-default",
+  "dep:js-sys",
+  "dep:console_error_panic_hook",
+  "dep:serde-wasm-bindgen",
+  "dep:wasm-bindgen",
+  "dep:wasm-bindgen-futures",
+]
+
+[dependencies]
+base64 = "=0.22.1"
+futures = "=0.3.32"
+radix-wasm-instrument = "1.0.0"
+meter-wasmparser = { package = "wasmparser", version = "0.107.0" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_bytes = "0.11.19"
+serde_json = "1.0.149"
+thiserror = "2.0.17"
+wasm-encoder = { version = "0.245.1", features = ["wasmparser"] }
+wasmparser = "0.245.1"
+wasmer = { version = "=7.2.0", default-features = false }
+wasmer-types = "=7.2.0"
+wasmer-wasix = { version = "=0.702.0", default-features = false }
+virtual-fs = { version = "=0.702.0", default-features = false, features = ["tracking"] }
+webc = "=12.0.0"
+tokio = { version = "1.49.0", default-features = false, features = ["io-util", "rt"] }
+js-sys = { version = "=0.3.103", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
+wasm-bindgen = { version = "=0.2.126", optional = true }
+wasm-bindgen-futures = { version = "=0.4.76", optional = true }
+
+[dev-dependencies]
+flate2 = "1"
+wat = "1.245.0"
+
+[patch.crates-io]
+shared-buffer = { path = "../../vendor/shared-buffer" }
+virtual-fs = { path = "../../vendor/virtual-fs" }

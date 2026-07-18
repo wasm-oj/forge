@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WASM OJ Forge runtime-core dependency licenses</title>
+  <style>
+    body { box-sizing: border-box; margin: 2rem auto; max-width: 72rem; padding: 0 1rem; font: 15px/1.5 system-ui, sans-serif; }
+    h1, h2 { line-height: 1.2; }
+    section { border-top: 1px solid #bbb; margin-top: 2rem; padding-top: 1rem; }
+    pre { overflow-wrap: anywhere; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>WASM OJ Forge runtime-core dependency licenses</h1>
+  <p>
+    Generated from the locked <code>crates/runtime-core</code> dependency graph
+    for <code>wasm32-unknown-unknown</code> with only the <code>web</code> feature.
+  </p>
+  {{#each licenses}}
+  <section>
+    <h2>{{name}} ({{id}})</h2>
+    <p>Used by:</p>
+    <ul>
+      {{#each used_by}}
+      <li>
+        <a href="https://crates.io/crates/{{crate.name}}/{{crate.version}}"><code>{{crate.name}} {{crate.version}}</code></a>
+      </li>
+      {{/each}}
+    </ul>
+    <pre>{{text}}</pre>
+  </section>
+  {{/each}}
+</body>
+</html>

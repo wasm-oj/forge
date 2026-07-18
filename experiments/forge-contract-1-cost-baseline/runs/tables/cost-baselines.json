@@ -1,0 +1,364 @@
+{
+  "schema": "wasm-oj-forge-v1/cost-baseline-table",
+  "experimentId": "forge-contract-1-cost-baseline",
+  "sourceRunId": "2026-07-18T16-51-50.046Z-a139d4e1-2fe9-41f6-98bc-c598539c6caf",
+  "sourceRawRecord": "experiments/forge-contract-1-cost-baseline/runs/raw/records/2026-07-18T16-51-50.046Z-a139d4e1-2fe9-41f6-98bc-c598539c6caf.json",
+  "sourceRawSha256": "deab114fa988a7831612da8bdd2cad1440dbf603951d09d5a6796cb6dcfefa25",
+  "specSha256": "771910435e259e2c9cb50c3cbe78a2c94981c8aa8d10966101f233910c9ae3ac",
+  "sourceTree": {
+    "algorithm": "forge-source-tree-sha256",
+    "sha256": "78a5848af7e017ecf7e639afcc9c913def28e1a0a784e77693f51838f4f7b50e",
+    "files": 351
+  },
+  "costModel": "weighted",
+  "forgeContract": 1,
+  "rowGrain": "one row per language-target-optimization cost profile",
+  "rows": [
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:c:wasip1:debug:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "language": "c",
+      "target": "wasip1",
+      "optimization": "debug",
+      "baselineCostPoints": 153,
+      "artifactDigest": "23efa5b4e277b0b14cf579ea69991ace614d2ae342a526dbffefd29ddcac37bc",
+      "artifactBytes": 3057,
+      "toolchains": [
+        "wasm-oj/clang@22.0.0-git20542-10"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "language": "c",
+      "target": "wasip1",
+      "optimization": "release",
+      "baselineCostPoints": 146,
+      "artifactDigest": "e7b81181d7f8420eccb8a45483318d167176db44a6170dfa186b9aa9b4665c35",
+      "artifactBytes": 1018,
+      "toolchains": [
+        "wasm-oj/clang@22.0.0-git20542-10"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:c:wasix:debug:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "language": "c",
+      "target": "wasix",
+      "optimization": "debug",
+      "baselineCostPoints": 153,
+      "artifactDigest": "2ca00e499d9aae435f797a457fdaf7fdbd3e7b665a8825b3853794c88eb9ccde",
+      "artifactBytes": 3057,
+      "toolchains": [
+        "wasm-oj/clang@22.0.0-git20542-10"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:c:wasix:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "language": "c",
+      "target": "wasix",
+      "optimization": "release",
+      "baselineCostPoints": 146,
+      "artifactDigest": "24df6c7a15c56ec218ce3a1879d22707bf92986374cbd96c2f9ba1e5f396832d",
+      "artifactBytes": 1018,
+      "toolchains": [
+        "wasm-oj/clang@22.0.0-git20542-10"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:debug:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "language": "cpp",
+      "target": "wasip1",
+      "optimization": "debug",
+      "baselineCostPoints": 153,
+      "artifactDigest": "8975586e389d835dc1b3951e522df5d48433c0be6e46e755a718dda97753f404",
+      "artifactBytes": 3165,
+      "toolchains": [
+        "wasm-oj/clang@22.0.0-git20542-10"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "language": "cpp",
+      "target": "wasip1",
+      "optimization": "release",
+      "baselineCostPoints": 146,
+      "artifactDigest": "74131400da4393cba46be7a6b8a2fe6550f81a6b8c19ce4ca1eb3d4701772964",
+      "artifactBytes": 1018,
+      "toolchains": [
+        "wasm-oj/clang@22.0.0-git20542-10"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:cpp:wasix:debug:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "language": "cpp",
+      "target": "wasix",
+      "optimization": "debug",
+      "baselineCostPoints": 153,
+      "artifactDigest": "f0822c1dec92d90fe33b5890281d32e170261f5b666fcb7be25bedf93ac0898c",
+      "artifactBytes": 3165,
+      "toolchains": [
+        "wasm-oj/clang@22.0.0-git20542-10"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:cpp:wasix:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "language": "cpp",
+      "target": "wasix",
+      "optimization": "release",
+      "baselineCostPoints": 146,
+      "artifactDigest": "b6a3c862635bcaa9f04821505636d29daa014bc01d0b7af6c1176354aa8627e0",
+      "artifactBytes": 1018,
+      "toolchains": [
+        "wasm-oj/clang@22.0.0-git20542-10"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:rust:wasip1:debug:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+      "language": "rust",
+      "target": "wasip1",
+      "optimization": "debug",
+      "baselineCostPoints": 9528,
+      "artifactDigest": "9c77fcc73e81b0cab32359d985b84c17ccabd2b8a79d54465eb8266ad5c48a36",
+      "artifactBytes": 122582,
+      "toolchains": [
+        "rustc@1.91.1-dev#sha256:765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+      "language": "rust",
+      "target": "wasip1",
+      "optimization": "release",
+      "baselineCostPoints": 9482,
+      "artifactDigest": "a842df238fb81ac539ed5b0e4431ae5985504c847003d2f0854b1f94d6538d03",
+      "artifactBytes": 115943,
+      "toolchains": [
+        "rustc@1.91.1-dev#sha256:765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:python:wasip1:debug:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+      "language": "python",
+      "target": "wasip1",
+      "optimization": "debug",
+      "baselineCostPoints": 2419834009,
+      "artifactDigest": "0b1a9c340e5f46a90f8af7139dad4874f46260b35489956cba4b4e4dbdaeac4c",
+      "artifactBytes": 1739,
+      "toolchains": [
+        "wasm-oj/cpython@3.14.6#sha256:67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+      "language": "python",
+      "target": "wasip1",
+      "optimization": "release",
+      "baselineCostPoints": 2419834009,
+      "artifactDigest": "a54764180b7a3e6f950c22d74e6f3fe61e64d6cddf703997d3d4e8d5f01290bf",
+      "artifactBytes": 1741,
+      "toolchains": [
+        "wasm-oj/cpython@3.14.6#sha256:67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:debug:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "language": "javascript",
+      "target": "wasip1",
+      "optimization": "debug",
+      "baselineCostPoints": 9584985,
+      "artifactDigest": "6fe1c5fc8b0e32ad03a11804aa30a0d54a4e077bc4e2e45f35c268ac5fa39bd7",
+      "artifactBytes": 393,
+      "toolchains": [
+        "typescript@7.0.2-wasi",
+        "wasm-oj/quickjs-ng@0.15.1"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "language": "javascript",
+      "target": "wasip1",
+      "optimization": "release",
+      "baselineCostPoints": 9584985,
+      "artifactDigest": "e4f14527776db5d51e86afe7f5c5da5febbc2bfbf9291cebb2ebba704b3fd74a",
+      "artifactBytes": 395,
+      "toolchains": [
+        "typescript@7.0.2-wasi",
+        "wasm-oj/quickjs-ng@0.15.1"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:debug:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "language": "typescript",
+      "target": "wasip1",
+      "optimization": "debug",
+      "baselineCostPoints": 9584985,
+      "artifactDigest": "38524580b62f0bd76a34c70a93c8009d947d815b21fc11dbde2b28e11d9bdad2",
+      "artifactBytes": 393,
+      "toolchains": [
+        "typescript@7.0.2-wasi",
+        "wasm-oj/quickjs-ng@0.15.1"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "language": "typescript",
+      "target": "wasip1",
+      "optimization": "release",
+      "baselineCostPoints": 9584985,
+      "artifactDigest": "0d0d817e6a4bda127062f4c7ab93b0c4d71920c0a5256361112cb7a980d42705",
+      "artifactBytes": 395,
+      "toolchains": [
+        "typescript@7.0.2-wasi",
+        "wasm-oj/quickjs-ng@0.15.1"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:go:wasip1:debug:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+      "language": "go",
+      "target": "wasip1",
+      "optimization": "debug",
+      "baselineCostPoints": 1707121,
+      "artifactDigest": "aa244922423c588b639f858257da89b0854dd82c80d20445a314206cbcd859b5",
+      "artifactBytes": 1848535,
+      "toolchains": [
+        "go@1.26.5#sha256:c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    },
+    {
+      "profile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+      "language": "go",
+      "target": "wasip1",
+      "optimization": "release",
+      "baselineCostPoints": 1707121,
+      "artifactDigest": "9bfadf88c19d5d2bfcc9affe0c58682e0c0cd94a1da025a2aa0ab51f67227317",
+      "artifactBytes": 1813393,
+      "toolchains": [
+        "go@1.26.5#sha256:c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b"
+      ],
+      "validatedSeeds": [
+        0,
+        1,
+        42,
+        1592594996,
+        4294967295
+      ]
+    }
+  ]
+}
