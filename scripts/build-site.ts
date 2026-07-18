@@ -12,6 +12,7 @@ const publicToolchainRoot = path.join(publicRoot, "toolchains");
 const distRoot = path.join(root, "dist");
 const clientRoot = path.join(distRoot, "client");
 const providerFileLimit = 25 * 1024 * 1024;
+const providerWorkerLimit = 10 * 1024 * 1024;
 const chunkByteLength = 16 * 1024 * 1024;
 const manifestName = "forge-sites-chunks.json";
 const generatedNames: string[] = [];
@@ -84,6 +85,7 @@ async function runVinextBuild(): Promise<void> {
 
 async function finalizeSitesOutput(assets: readonly ChunkedAssetRecord[]): Promise<void> {
   for (const asset of assets) await rm(path.join(clientRoot, asset.path.slice(1)));
+  await removeDuplicatedBrowserWasmFromServer();
   const manifest = JSON.parse(await readFile(path.join(clientRoot, "toolchains", manifestName), "utf8"));
   if (manifest.schema !== `${FORGE_CONTRACT_ID}/sites-toolchain-chunks`
     || JSON.stringify(manifest.assets) !== JSON.stringify(assets)) {
@@ -107,7 +109,32 @@ async function finalizeSitesOutput(assets: readonly ChunkedAssetRecord[]): Promi
       throw new Error(`Sites output '${relative}' is ${size} bytes and exceeds the ${providerFileLimit}-byte provider limit.`);
     }
   }
+  const serverBytes = await directoryBytes(path.join(distRoot, "server"));
+  if (serverBytes > providerWorkerLimit) {
+    throw new Error(`Sites Worker modules total ${serverBytes} bytes and exceed the ${providerWorkerLimit}-byte provider limit.`);
+  }
   process.stdout.write(`Prepared ${assets.length} chunked Sites toolchains in ${assets.reduce((total, item) => total + item.chunks.length, 0)} verified parts.\n`);
+}
+
+async function removeDuplicatedBrowserWasmFromServer(): Promise<void> {
+  const serverRoots = [path.join(distRoot, "server/assets"), path.join(distRoot, "server/ssr/assets")];
+  for (const directory of serverRoots) {
+    const wasmNames = (await readdir(directory)).filter((name) => name.endsWith(".wasm"));
+    for (const name of wasmNames) {
+      if (!/^(?:runtime-core_bg|wasmer_js_bg)-[A-Za-z0-9_-]+\.wasm$/.test(name)) {
+        throw new Error(`Sites build emitted unexpected server Wasm module '${name}'.`);
+      }
+      const [serverBytes, clientBytes] = await Promise.all([
+        readFile(path.join(directory, name)),
+        readFile(path.join(clientRoot, "assets", name)),
+      ]);
+      if (serverBytes.byteLength !== clientBytes.byteLength
+        || sha256(serverBytes) !== sha256(clientBytes)) {
+        throw new Error(`Server Wasm module '${name}' is not identical to its browser-static copy.`);
+      }
+      await rm(path.join(directory, name));
+    }
+  }
 }
 
 async function cleanupStaging(): Promise<void> {
@@ -127,6 +154,15 @@ async function recursiveFiles(directory: string, prefix = ""): Promise<string[]>
     else if (entry.isFile()) result.push(relative);
   }
   return result;
+}
+
+async function directoryBytes(directory: string): Promise<number> {
+  let total = 0;
+  for (const relative of await recursiveFiles(directory)) {
+    total += (await stat(path.join(directory, relative))).size;
+    if (!Number.isSafeInteger(total)) throw new Error("Sites Worker module size exceeds the safe integer range.");
+  }
+  return total;
 }
 
 function concatenate(parts: readonly Uint8Array[], byteLength: number): Uint8Array {
