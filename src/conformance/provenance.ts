@@ -27,17 +27,18 @@ interface SourceEntry {
  * directories are excluded so writing a record cannot change its own digest.
  */
 export async function sourceTreeProvenance(root = process.cwd()): Promise<SourceTreeProvenance> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-    { cwd: root, encoding: "buffer", maxBuffer: 32 * 1024 * 1024 },
-  );
-  const files = Buffer.from(stdout)
-    .toString("utf8")
-    .split("\0")
-    .filter((value) => value && !EVIDENCE_RUN.test(value) && !GENERATED_EVIDENCE.has(value))
+  const [tracked, untracked] = await Promise.all([
+    gitBytes(root, ["ls-files", "--cached", "--stage", "-z"]),
+    gitBytes(root, ["ls-files", "--others", "--exclude-standard", "-z"]),
+  ]);
+  const trackedModes = trackedFileModes(tracked);
+  const files = [...new Set([
+    ...trackedModes.keys(),
+    ...nulPaths(untracked),
+  ])]
+    .filter((value) => !EVIDENCE_RUN.test(value) && !GENERATED_EVIDENCE.has(value))
     .sort(compareUtf8);
-  const entries = await Promise.all(files.map((relative) => sourceEntry(root, relative)));
+  const entries = await Promise.all(files.map((relative) => sourceEntry(root, relative, trackedModes.get(relative))));
   const manifest = entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n";
   return {
     algorithm: "forge-source-tree-sha256",
@@ -46,11 +47,13 @@ export async function sourceTreeProvenance(root = process.cwd()): Promise<Source
   };
 }
 
-async function sourceEntry(root: string, relative: string): Promise<SourceEntry> {
+async function sourceEntry(root: string, relative: string, trackedMode?: string): Promise<SourceEntry> {
   const absolute = path.join(root, relative);
   try {
     const stats = await lstat(absolute);
-    const executable = (stats.mode & 0o111) !== 0;
+    const executable = trackedMode === undefined
+      ? (stats.mode & 0o111) !== 0
+      : trackedMode === "100755";
     if (stats.isSymbolicLink()) {
       const target = Buffer.from(await readlink(absolute));
       return {
@@ -80,6 +83,29 @@ async function sourceEntry(root: string, relative: string): Promise<SourceEntry>
       sha256: createHash("sha256").update("").digest("hex"),
     };
   }
+}
+
+async function gitBytes(root: string, arguments_: string[]): Promise<Buffer> {
+  const { stdout } = await execFileAsync("git", arguments_, {
+    cwd: root,
+    encoding: "buffer",
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  return Buffer.from(stdout);
+}
+
+function nulPaths(bytes: Buffer): string[] {
+  return bytes.toString("utf8").split("\0").filter(Boolean);
+}
+
+function trackedFileModes(bytes: Buffer): Map<string, string> {
+  const modes = new Map<string, string>();
+  for (const entry of nulPaths(bytes)) {
+    const match = /^(100644|100755|120000) [0-9a-f]{40,64} 0\t(.+)$/.exec(entry);
+    if (!match) throw new Error(`Unexpected Git index entry '${entry}'.`);
+    modes.set(match[2]!, match[1]!);
+  }
+  return modes;
 }
 
 function compareUtf8(left: string, right: string): number {
