@@ -17,6 +17,21 @@
         },
         {
           "kind": "file",
+          "path": "public/toolchains/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin",
+          "sha256": "b41560aef9e8573b850fc3406e44d12365e3e4b58dc19eefba863d3b98f9ef1e"
+        },
+        {
+          "kind": "file",
+          "path": "public/toolchains/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin",
+          "sha256": "93adf037d41cf0dc5d7367946462f5eb00363206b5566fc2b3a71214b1261e63"
+        },
+        {
+          "kind": "file",
+          "path": "public/toolchains/clang-22.0.0-git20542-10.libcxx-pch.json",
+          "sha256": "37c9b502fe6e3afa8f9aafb5d94dabb892b9f98a240f43093e8d7e36a58993e7"
+        },
+        {
+          "kind": "file",
           "path": "public/toolchains/clang-22.0.0-git20542-10.manifest.json",
           "sha256": "681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd"
         },
@@ -73,6 +88,28 @@
         {
           "path": "licenses/cpython-libmpdec-2.5.1-BSD-2-Clause.txt",
           "sha256": "669512af7219f58be03a398766d7c9da11a3b3df9d3f05cb74c5ceca25c8da3b"
+        }
+      ]
+    },
+    {
+      "id": "fflate",
+      "name": "fflate",
+      "version": "0.8.3",
+      "source": {
+        "url": "https://github.com/101arrowz/fflate",
+        "revision": "v0.8.3"
+      },
+      "distributions": [
+        {
+          "kind": "npm",
+          "package": "fflate@0.8.3",
+          "integrity": "sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA=="
+        }
+      ],
+      "licenseFiles": [
+        {
+          "path": "licenses/fflate-MIT.txt",
+          "sha256": "766daa9b2ab0ab2698c769f334a6d72c42437b0a7d0d0dfd5c13c64b3120117b"
         }
       ]
     },

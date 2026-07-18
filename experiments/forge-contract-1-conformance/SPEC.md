@@ -12,7 +12,8 @@ deterministic transcripts including virtual-clock metrics and termination.
 The default panel contains the declared C, C++, Rust, Python, JavaScript,
 TypeScript, and standard Go profiles plus deterministic filesystem, multi-file,
 transactional VFS-quota, and denied WASIX capability probes. Each case builds
-twice and runs three times. The opt-in full panel adds the header-heavy C++ case.
+twice and runs three times. The opt-in full panel adds the header-heavy C++ case
+whose canonical header selects the digest-pinned debug/release libc++ PCH.
 
 Contract 1 includes dedicated clock probes to establish that:
 

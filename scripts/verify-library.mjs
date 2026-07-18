@@ -24,6 +24,9 @@ const browserWasmSources = new Map([
 const canonicalToolchainFiles = [
   "public/toolchains/README.md",
   "public/toolchains/clang-22.0.0-git20542-10.cc1-pins.json",
+  "public/toolchains/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin",
+  "public/toolchains/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin",
+  "public/toolchains/clang-22.0.0-git20542-10.libcxx-pch.json",
   "public/toolchains/clang-22.0.0-git20542-10.manifest.json",
   "public/toolchains/clang-22.0.0-git20542-10.webc.gz.bin",
   "public/toolchains/go-1.26.5-wasip1.manifest.json",

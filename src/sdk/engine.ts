@@ -19,6 +19,14 @@ import { createJudgeExecutor, JudgeEngine, type JudgeEngineOptions, type JudgeRe
 import type { JudgeSpec } from "../judge/spec";
 import { createSdkProject, type CompileInput } from "./project";
 import type { CompileOptions, ExecuteResult, InteractiveOptions, RunOptions } from "./types";
+import {
+  replayForgeBundle,
+  type ForgeReplayBundle,
+  type ForgeReplayOptions,
+  type ForgeReplayResult,
+} from "../replay/bundle";
+import { assertValidProject } from "../core/project-validation";
+import type { Project } from "../core/types";
 
 export type { ForgeArtifactStore } from "../compiler/coordinator";
 
@@ -96,6 +104,20 @@ export class ForgeEngine {
     return this.compilation.compile(project, {
       cache: this.artifactStore !== undefined && (options.cache ?? true),
     });
+  }
+
+  /** Compile an already-normalized Project without reconstructing its library identity. */
+  compileProject(project: Project, options: CompileOptions = {}): Promise<BuildResult> {
+    this.assertAvailable();
+    assertValidProject(project);
+    return this.compilation.compile(structuredClone(project), {
+      cache: this.artifactStore !== undefined && (options.cache ?? true),
+    });
+  }
+
+  replay(bundle: ForgeReplayBundle, options?: ForgeReplayOptions): Promise<ForgeReplayResult> {
+    this.assertAvailable();
+    return replayForgeBundle(this, bundle, options);
   }
 
   /** Compile during idle time; a matching foreground compile joins this exact request. */

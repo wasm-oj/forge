@@ -78,18 +78,18 @@ Browser Rust and Go requests are serialized through persistent language stages p
 
 The standard Go compiler path is `GOOS=wasip1 GOARCH=wasm`. The pinned Go WebC exposes the official `compile` and `link` commands and a deterministic standard-library archive built from the same Go 1.26.5 distribution. Forge rejects Go/WASIX instead of silently compiling another ABI. Compiler and linker execute under Wasmer on browser and server hosts; no host `go` executable participates in a user build.
 
-For C++ a single project file whose basename is `forge.pch.hpp` opts into precompiled-header compilation. The cache is an explicit source/header/package/PCH/object/link-result dependency graph. Every clean cc1 result records the compiler-emitted dependency set, and every lookup rehashes those inputs. Link-result identity includes exact object bytes and the pinned toolchain. Browser graph archives are stored in IndexedDB with SHA-256 verification and restored into replacement compiler Workers; `clearCache()` removes this archive together with the toolchain and artifact caches. A translation unit that emitted a warning is not cached because Forge cannot recreate its diagnostic stream without rerunning cc1.
+For C++ a single project file whose basename is `forge.pch.hpp` opts into precompiled-header compilation. Exact `FORGE_LIBCXX_PCH_HEADER` contents select one of the reproducibly generated, manifest-pinned debug/release PCH assets; a custom header is compiled locally as before. The admitted asset is accepted only after compressed and expanded SHA-256 checks, and its source, Clang WebC, pin manifest, profile, and original virtual path are fixed. The cache is an explicit source/header/package/PCH/object/link-result dependency graph. Every clean cc1 result records the compiler-emitted dependency set, and every lookup rehashes those inputs. Link-result identity includes exact object bytes and the pinned toolchain. Browser graph archives are stored in IndexedDB with SHA-256 verification and restored into replacement compiler Workers; `clearCache()` removes this archive together with the toolchain and artifact caches. A translation unit that emitted a warning is not cached because Forge cannot recreate its diagnostic stream without rerunning cc1.
 
 ## Dependency and lockfile contract
 
-`ForgeDependencyManager` presents one API over Cargo crates, npm packages, PyPI distributions, Go modules, and C/C++ libraries. A `DependencyManifest` contains normalized requirements plus ecosystem-tagged native `manifest`, `lockfile`, or `source` files. One registered `ForgeDependencyResolver` owns each ecosystem; this keeps registry and package-manager policy out of Forge core while giving every resolver the same result contract.
+`ForgeDependencyManager` presents one API over Cargo crates, npm packages, PyPI distributions, Go modules, and C/C++ libraries. A `DependencyManifest` contains normalized requirements plus ecosystem-tagged native `manifest`, `lockfile`, or `source` files. `createDefaultDependencyResolvers()` supplies five concrete adapters: Cargo.lock v3/v4 with crates.io SHA-256, package-lock v2/v3 with SRI, exact `requirements.txt` entries with SHA-256 and a portable wheel-or-sdist selection, go.mod/go.sum with the official Go `h1` directory hash, and `forge-cpp.lock.json` with explicit HTTPS archives and graph edges. The registry endpoints used to construct Cargo, PyPI, and Go requests, plus fetch, size limits, and concurrency, are injectable. npm fetches the exact `resolved` URLs bound by package-lock integrity instead of rewriting them through a second registry policy. Every root version is exact; unsupported sources, ranges, redirects, insecure URLs, local Go replacements, and platform-only Python wheels fail closed instead of invoking an unverified resolver path.
 
 Resolution produces one canonical `DependencyLock` containing ecosystem-qualified package IDs, exact versions, source identities, dependency edges, features, and SHA-256 payload integrity. Its `manifestSha256` binds the lock to the complete canonical cross-ecosystem request. Cycles are permitted because valid npm graphs may contain them. Scoped npm names are valid package names. Conflicting package records, missing or extra payloads, digest failures, dangling edges, and non-canonical locks fail closed.
 
 `IndexedDbDependencyCache`, `FileSystemDependencyCache`, and `MemoryDependencyCache` implement the same content-addressed cache interface. Offline bundles contain the canonical lock and exactly one verified payload for every distinct digest. `resolve(..., { offline: true, previousLock })` never invokes a resolver; it requires a manifest-matching lock and verifies every cached payload first. This gives browser and server hosts the same lock and offline-import semantics without claiming that Forge core itself owns registry credentials or network policy.
 
 ```ts
-const manager = new ForgeDependencyManager(cache, [cargoResolver, npmResolver]);
+const manager = createDefaultDependencyManager(cache, { fetch });
 const manifest = {
   requirements: [
     { ecosystem: "cargo", name: "serde", requirement: "=1.0.228" },
@@ -103,8 +103,19 @@ const manifest = {
   }],
 } as const;
 const lock = await manager.resolve(manifest);
+const packagePayloads = await manager.materialize(lock);
 const offlineBundle = await manager.exportOffline(lock);
 ```
+
+## Replay contract
+
+`ForgeReplayBundle` captures a normalized project, stable artifact, optional verified dependency offline bundle, one exact run or self-contained judge operation, and the deterministic result transcript. Artifact IDs, build durations, creation times, and project update times are normalized; wall duration is deliberately excluded from expected execution. Artifact bytes, collected files, checker/interactor artifacts, and dependency archives become deduplicated SHA-256 blobs in the canonical `FORGRPL1` transport. The manifest has one sorted tagged representation, so object insertion order, binary aliasing, or JSON whitespace cannot create alternate encodings.
+
+`decodeForgeReplayBundle()` verifies bounds, every blob digest and reference, canonical JSON, exact active schemas, project/artifact contracts, and transcript digests before returning executable data. Judge provider inputs must first be materialized as inline values, and only built-in matchers—including the sandboxed Wasm checker—are self-contained. `ForgeEngine.replay()` recompiles with cache disabled by default, compares the stable artifact digest, executes the rebuilt artifact, and returns precise mismatch paths. Passing `{ recompile: false }` provides artifact-only replay on a runner host.
+
+## Browser storage coordinator
+
+`createDefaultBrowserStorageCoordinator()` registers the artifact, dependency, incremental graph, runtime-files, and toolchain stores under one `ForgeStorageCoordinator`. All admission, maintenance, and clearing decisions hold a named exclusive Web Lock, making quota decisions cross-tab safe. Each backend publishes logical byte length and last-access metadata; maintenance satisfies both a configurable logical budget and reserved browser quota headroom, evicting lower-retention LRU entries first. Toolchains are retained above runtime files, dependencies, artifacts, and rebuildable graph outputs. Cache Storage responses without valid Forge size/time metadata are removed rather than guessed. The Judge application uses this coordinator for persistence requests, post-build maintenance, estimates, and cache clearing.
 
 Leaving a retained C/C++, Rust, or Go family, or crossing a bounded stage budget, performs the acknowledged quiescence sequence before another family or generation builds. Cancellation, restart, request timeout, toolchain-cache clearing, disposal, and infrastructure failure hard-terminate the complete compiler Worker tree, including persistent language stages and Wasmer SDK secondary workers. A missing, malformed, failed, or timed-out graceful-shutdown acknowledgement fails closed; Forge never treats an unconfirmed teardown as reusable state.
 

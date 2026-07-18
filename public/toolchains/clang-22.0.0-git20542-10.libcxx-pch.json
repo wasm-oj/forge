@@ -1,0 +1,24 @@
+{
+  "schema": "wasm-oj-forge-v1/clang-libcxx-pch",
+  "version": "22.0.0-git20542-10",
+  "clangPackageSha256": "21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224",
+  "clangPinsSha256": "4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029",
+  "header": "#pragma once\n#include <algorithm>\n#include <array>\n#include <bitset>\n#include <cassert>\n#include <cctype>\n#include <cerrno>\n#include <cfloat>\n#include <charconv>\n#include <chrono>\n#include <climits>\n#include <cmath>\n#include <compare>\n#include <concepts>\n#include <cstddef>\n#include <cstdint>\n#include <cstdio>\n#include <cstdlib>\n#include <cstring>\n#include <deque>\n#include <exception>\n#include <functional>\n#include <iomanip>\n#include <ios>\n#include <iostream>\n#include <iterator>\n#include <limits>\n#include <map>\n#include <memory>\n#include <numeric>\n#include <optional>\n#include <queue>\n#include <random>\n#include <ranges>\n#include <set>\n#include <span>\n#include <sstream>\n#include <stack>\n#include <string>\n#include <string_view>\n#include <tuple>\n#include <type_traits>\n#include <unordered_map>\n#include <unordered_set>\n#include <utility>\n#include <variant>\n#include <vector>\n",
+  "headerSha256": "0c9f3330d80264798a5b13c67602d9d33c7dc1515383700081b1eee2302e103b",
+  "profiles": {
+    "cpp-debug": {
+      "path": "clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin",
+      "byteLength": 23287404,
+      "sha256": "600547a70a79cae6f996f383927402a426e79b3136cf8c2b7d061903f5ac020f",
+      "compressedByteLength": 13871065,
+      "compressedSha256": "b41560aef9e8573b850fc3406e44d12365e3e4b58dc19eefba863d3b98f9ef1e"
+    },
+    "cpp-release": {
+      "path": "clang-22.0.0-git20542-10.cpp-release.pch.gz.bin",
+      "byteLength": 23287264,
+      "sha256": "2bd21eb72d1854692b6ec64a15a84e652772c5ce13a72413b70145662347f011",
+      "compressedByteLength": 13870896,
+      "compressedSha256": "93adf037d41cf0dc5d7367946462f5eb00363206b5566fc2b3a71214b1261e63"
+    }
+  }
+}

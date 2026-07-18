@@ -1,4 +1,5 @@
 import type { BuildResult, Project } from "../core/types";
+import { isToolchainLibcxxPchHeader } from "./libcxx-pch";
 
 /**
  * Keeps Clang 22 output-ready processes below the observed SDK executor limit.
@@ -19,8 +20,10 @@ export function maximumOutputReadyClangStages(project: Project): number {
   const sourcePattern = project.config.language === "cpp" ? /\.(?:cc|cpp|cxx)$/ : /\.c$/;
   const sources = new Set(project.files.filter((file) => sourcePattern.test(file.path)).map((file) => file.path));
   sources.add(project.config.entry);
-  const pch = project.config.language === "cpp"
-    && project.files.some((file) => file.path.split("/").at(-1) === "forge.pch.hpp") ? 1 : 0;
+  const pchFile = project.config.language === "cpp"
+    ? project.files.find((file) => file.path.split("/").at(-1) === "forge.pch.hpp")
+    : undefined;
+  const pch = pchFile && !isToolchainLibcxxPchHeader(pchFile.content) ? 1 : 0;
   return sources.size + pch + 2;
 }
 

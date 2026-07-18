@@ -8,6 +8,8 @@ import { gunzipSync } from "node:zlib";
 import { FORGE_SCHEMAS } from "../src/core/contract.ts";
 import {
   CLANG_CC1_PINS_ASSET_PATH,
+  CLANG_LIBCXX_PCH,
+  CLANG_LIBCXX_PCH_MANIFEST_ASSET_PATH,
   CLANG_VERSION,
   GO_PACKAGE_ASSET_PATH,
   GO_PACKAGE_MANIFEST_ASSET_PATH,
@@ -27,6 +29,10 @@ import {
   RUST_PACKAGE_SHA256,
   RUST_VERSION,
 } from "../src/core/toolchains.ts";
+import {
+  decodeLibcxxPchManifest,
+  FORGE_LIBCXX_PCH_HEADER,
+} from "../src/compiler/libcxx-pch.ts";
 import {
   RUST_DETERMINISTIC_REPLACEMENTS,
   RUST_TARGET_TRIPLE,
@@ -197,6 +203,30 @@ const expectedPlaceholders = {
 if (JSON.stringify(pins.placeholders) !== JSON.stringify(expectedPlaceholders)) {
   throw new Error("Clang pins contain non-canonical placeholders.");
 }
+
+const libcxxPchManifestBytes = await readFile(
+  path.join(directory, path.basename(CLANG_LIBCXX_PCH_MANIFEST_ASSET_PATH)),
+);
+const libcxxPchManifest = await decodeLibcxxPchManifest(new Uint8Array(libcxxPchManifestBytes));
+if (libcxxPchManifest.header !== FORGE_LIBCXX_PCH_HEADER) {
+  throw new Error("Clang libc++ PCH manifest does not contain the canonical opt-in header.");
+}
+for (const profile of ["cpp-debug", "cpp-release"]) {
+  const declared = CLANG_LIBCXX_PCH[profile];
+  const manifestAsset = libcxxPchManifest.profiles[profile];
+  if (`/toolchains/${manifestAsset.path}` !== declared.path
+    || manifestAsset.sha256 !== declared.sha256
+    || manifestAsset.compressedSha256 !== declared.compressedSha256) {
+    throw new Error(`Clang libc++ PCH '${profile}' manifest differs from its public contract.`);
+  }
+  const compressed = await readFile(path.join(directory, path.basename(declared.path)));
+  const pch = gunzipSync(compressed);
+  if (pch.byteLength !== manifestAsset.byteLength
+    || createHash("sha256").update(pch).digest("hex") !== manifestAsset.sha256) {
+    throw new Error(`Clang libc++ PCH '${profile}' failed expanded integrity verification.`);
+  }
+}
+process.stdout.write("verified deterministic Clang libc++ PCH profiles and canonical opt-in header\n");
 
 const rustManifestBytes = await readFile(
   path.join(directory, path.basename(RUST_PACKAGE_MANIFEST_ASSET_PATH)),

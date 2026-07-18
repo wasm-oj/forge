@@ -17,10 +17,17 @@ import { costProfileId } from "../core/cost-profile.ts";
 import { ensureFailureDiagnostic, parseClangDiagnostics } from "../core/diagnostics.ts";
 import {
   CLANG_CC1_PINS_ASSET_PATH,
+  CLANG_LIBCXX_PCH_MANIFEST_ASSET_PATH,
   CLANG_PACKAGE_ASSET_PATH,
   CLANG_PACKAGE_SHA256,
   toolchainPackageIdentities,
 } from "../core/toolchains.ts";
+import {
+  decodeLibcxxPchManifest,
+  isToolchainLibcxxPchHeader,
+  type LibcxxPchManifest,
+  type LibcxxPchProfile,
+} from "./libcxx-pch.ts";
 import { sha256Hex } from "../core/hash.ts";
 import type { BuildGraphInput } from "./incremental-build-graph.ts";
 import type { IncrementalBuildGraphArchive } from "./incremental-build-graph.ts";
@@ -55,6 +62,8 @@ interface LoadedToolchain {
 }
 
 let loadedToolchain: Promise<LoadedToolchain> | undefined;
+let loadedLibcxxPchManifest: Promise<LibcxxPchManifest> | undefined;
+const loadedLibcxxPch = new Map<LibcxxPchProfile, Promise<Uint8Array>>();
 const objectCache = new ClangObjectCache(64 * 1024 * 1024);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -141,43 +150,59 @@ export async function buildClangWithSdkDirect(
   const pchHeader = isCpp ? findPrecompiledHeader(project) : undefined;
   const pchPath = "/project/build/forge.pch";
   let pchInput: BuildGraphInput | undefined;
+  let admittedPch = false;
   if (pchHeader) {
     const headerBytes = projectFiles.get(pchHeader)!;
-    const baseKey = await objectCache.unitManifestKey(pins, configKey, pchHeader, headerBytes);
-    const pchManifestKey = await sha256Hex(JSON.stringify({ baseKey, mode: "c++-header" }));
-    let pch = await objectCache.lookupPch(pchManifestKey, projectFiles);
-    if (pch) {
+    let pch: Uint8Array;
+    if (isToolchainLibcxxPchHeader(decoder.decode(headerBytes))) {
+      admittedPch = true;
+      const reservedHeader = "forge.libcxx.hpp";
+      if (projectFiles.has(reservedHeader)) {
+        throw new Error(`C++ projects using Forge's admitted libc++ PCH may not define reserved path '${reservedHeader}'.`);
+      }
+      projectFiles.set(reservedHeader, headerBytes);
+      await directory.writeFile(`/${reservedHeader}`, headerBytes);
+      pch = await loadLibcxxPch(configKey as LibcxxPchProfile, requestId, host);
       pchHits += 1;
       await directory.writeFile(pchPath.slice("/project".length), pch);
     } else {
-      pchMisses += 1;
-      const dependencyPath = "/project/build/forge.pch.d";
-      const args = instantiateClangPch(config.cc1, pins.placeholders, pchHeader, pchPath);
-      args.push("-dependency-file", dependencyPath, "-MT", pchPath);
-      const output = await runPchStage(
-        compiler,
-        args,
-        directory,
-        host,
-        requestId,
-        pchPath,
-        dependencyPath,
-      );
-      structuredDiagnostics.push(...output.diagnostics);
-      stdout += output.stdout;
-      stderr += output.stderr;
-      if (!output.pch || !output.dependency) {
-        return failedBuild(project, stdout, stderr, 1, "clang", structuredDiagnostics);
+      const baseKey = await objectCache.unitManifestKey(pins, configKey, pchHeader, headerBytes);
+      const pchManifestKey = await sha256Hex(JSON.stringify({ baseKey, mode: "c++-header" }));
+      const cached = await objectCache.lookupPch(pchManifestKey, projectFiles);
+      if (cached) {
+        pch = cached;
+        pchHits += 1;
+        await directory.writeFile(pchPath.slice("/project".length), pch);
+      } else {
+        pchMisses += 1;
+        const dependencyPath = "/project/build/forge.pch.d";
+        const args = instantiateClangPch(config.cc1, pins.placeholders, pchHeader, pchPath);
+        args.push("-dependency-file", dependencyPath, "-MT", pchPath);
+        const output = await runPchStage(
+          compiler,
+          args,
+          directory,
+          host,
+          requestId,
+          pchPath,
+          dependencyPath,
+        );
+        structuredDiagnostics.push(...output.diagnostics);
+        stdout += output.stdout;
+        stderr += output.stderr;
+        if (!output.pch || !output.dependency) {
+          return failedBuild(project, stdout, stderr, 1, "clang", structuredDiagnostics);
+        }
+        pch = output.pch;
+        if (await objectCache.storePch(
+          pchManifestKey,
+          parseClangDependencyFile(output.dependency),
+          projectFiles,
+          pch,
+        )) pchStores += 1;
       }
-      pch = output.pch;
-      if (await objectCache.storePch(
-        pchManifestKey,
-        parseClangDependencyFile(output.dependency),
-        projectFiles,
-        pch,
-      )) pchStores += 1;
     }
-    pchInput = { kind: "pch", identity: `pch:${pchHeader}`, bytes: pch };
+    pchInput = { kind: "pch", identity: `pch:${pchHeader}`, digest: await sha256Hex(pch) };
   }
 
   host.progress(requestId, "compiling", `Compiling ${units.length} translation units with SDK-direct cc1`, 0.35);
@@ -197,7 +222,7 @@ export async function buildClangWithSdkDirect(
     const baseManifestKey = await objectCache.unitManifestKey(pins, configKey, source, sourceBytes);
     const unitPchInput = source !== DETERMINISTIC_NATIVE_SOURCE_PATH ? pchInput : undefined;
     const manifestKey = unitPchInput
-      ? await sha256Hex(JSON.stringify({ baseManifestKey, pch: await sha256Hex(unitPchInput.bytes!) }))
+      ? await sha256Hex(JSON.stringify({ baseManifestKey, pch: unitPchInput.digest }))
       : baseManifestKey;
     const additionalInputs = unitPchInput ? [unitPchInput] : [];
     const cached = await objectCache.lookup(manifestKey, projectFiles, additionalInputs);
@@ -209,7 +234,15 @@ export async function buildClangWithSdkDirect(
       continue;
     }
     const args = instantiateClangCc1(config.cc1, pins.placeholders, source, objectPath);
-    if (unitPchInput) args.splice(args.length - 1, 0, "-include-pch", pchPath);
+    if (unitPchInput) {
+      args.splice(
+        args.length - 1,
+        0,
+        "-include-pch",
+        pchPath,
+        ...(admittedPch ? ["-fno-validate-pch"] : []),
+      );
+    }
     args.push("-dependency-file", dependencyPath, "-MT", objectPath);
     const output = await runClangStage(
       compiler,
@@ -331,6 +364,8 @@ export async function buildClangWithSdkDirect(
 
 export async function clearSdkDirectClangCaches(): Promise<void> {
   await disposeSdkDirectClangToolchain();
+  loadedLibcxxPchManifest = undefined;
+  loadedLibcxxPch.clear();
   objectCache.clear();
 }
 
@@ -397,6 +432,34 @@ function requireCommand(pkg: Wasmer, name: string): Command {
   const selected = pkg.commands[name];
   if (!selected) throw new Error(`The SDK-direct Clang package does not expose '${name}'.`);
   return selected;
+}
+
+async function loadLibcxxPch(
+  profile: LibcxxPchProfile,
+  requestId: string,
+  host: SdkDirectClangHost,
+): Promise<Uint8Array> {
+  loadedLibcxxPchManifest ??= host.loadToolchainFile(CLANG_LIBCXX_PCH_MANIFEST_ASSET_PATH)
+    .then(decodeLibcxxPchManifest);
+  let pending = loadedLibcxxPch.get(profile);
+  if (!pending) {
+    pending = loadedLibcxxPchManifest.then(async (manifest) => {
+      const asset = manifest.profiles[profile];
+      host.progress(requestId, "loading-toolchain", `Loading admitted libc++ PCH (${profile})`, 0.25);
+      const bytes = await host.loadToolchainAsset(`/toolchains/${asset.path}`);
+      if (bytes.byteLength !== asset.byteLength || await sha256Hex(bytes) !== asset.sha256) {
+        throw new Error(`Pinned libc++ PCH '${profile}' failed decompressed integrity verification.`);
+      }
+      return bytes;
+    });
+    loadedLibcxxPch.set(profile, pending);
+  }
+  try {
+    return await pending;
+  } catch (error) {
+    loadedLibcxxPch.delete(profile);
+    throw error;
+  }
 }
 
 function findPrecompiledHeader(project: Project): string | undefined {

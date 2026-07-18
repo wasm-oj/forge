@@ -37,6 +37,7 @@ describe("ForgeDependencyManager", () => {
       }],
     };
     const lock = await manager.resolve(manifest);
+    expect([...await manager.materialize(lock)]).toEqual([["cargo:serde@1.0.228", payload]]);
     expect(await manager.resolve(manifest, { offline: true, previousLock: lock })).toEqual(lock);
     const bundle = await manager.exportOffline(lock);
     const offline = new ForgeDependencyManager(new MemoryDependencyCache());

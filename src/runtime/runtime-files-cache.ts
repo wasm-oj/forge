@@ -58,7 +58,9 @@ async function restoreRuntimeFiles(
 
   try {
     const archive = new Uint8Array(await cached.arrayBuffer());
-    return await verifyAndDecodeRuntimeFiles(archive, request.expectedSha256);
+    const files = await verifyAndDecodeRuntimeFiles(archive, request.expectedSha256);
+    await persistRuntimeFiles(cache, request, archive, reportIssue);
+    return files;
   } catch (error) {
     reportIssue("Ignoring an invalid runtime-files cache archive; exporting a fresh archive.", error);
     try {
@@ -83,6 +85,8 @@ async function persistRuntimeFiles(
         headers: {
           "Content-Type": "application/vnd.wasm-oj.forge.runtime-files",
           "X-WASM-OJ-Forge-Cache-Key": request.cacheKey,
+          "X-WASM-OJ-Forge-Byte-Length": String(archive.byteLength),
+          "X-WASM-OJ-Forge-Cached-At": String(Date.now()),
         },
       }),
     );

@@ -33,6 +33,7 @@ async function serviceWorkerHarness(): Promise<WorkerHarness> {
     URL,
     Request,
     Response,
+    Headers,
     Uint8Array,
     crypto: webcrypto,
     fetch,

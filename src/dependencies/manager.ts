@@ -7,6 +7,7 @@ import {
   createDependencyLock,
   dependencyManifestSha256,
 } from "./lock.ts";
+import { createDefaultDependencyResolvers, type DependencyResolverOptions } from "./resolvers.ts";
 import type {
   DependencyEcosystem,
   DependencyLock,
@@ -125,6 +126,16 @@ export class ForgeDependencyManager {
     }
   }
 
+  /** Returns package-ID keyed payloads after re-verifying the content-addressed cache. */
+  async materialize(lock: DependencyLock): Promise<ReadonlyMap<string, Uint8Array>> {
+    await this.verifyCached(lock);
+    const payloads = new Map<string, Uint8Array>();
+    for (const item of lock.packages) {
+      payloads.set(item.id, (await this.cache.load(item.integritySha256))!);
+    }
+    return payloads;
+  }
+
   async exportOffline(lock: DependencyLock): Promise<DependencyOfflineBundle> {
     await this.verifyCached(lock);
     const payloads: Record<string, Uint8Array> = {};
@@ -159,6 +170,13 @@ export class ForgeDependencyManager {
     for (const [digest, payload] of verified) await this.cache.save(digest, payload);
     return structuredClone(bundle.lock);
   }
+}
+
+export function createDefaultDependencyManager(
+  cache: ForgeDependencyCache,
+  options: DependencyResolverOptions = {},
+): ForgeDependencyManager {
+  return new ForgeDependencyManager(cache, createDefaultDependencyResolvers(options));
 }
 
 function validateManifest(manifest: DependencyManifest): void {

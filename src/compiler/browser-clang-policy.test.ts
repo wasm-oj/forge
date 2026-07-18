@@ -7,6 +7,7 @@ import {
   observedOutputReadyClangStages,
   usesOutputReadyClang,
 } from "./browser-clang-policy";
+import { FORGE_LIBCXX_PCH_HEADER } from "./libcxx-pch";
 
 describe("browser Clang policy", () => {
   it("selects C and C++ projects for both supported runtime targets", () => {
@@ -64,5 +65,15 @@ describe("browser Clang policy", () => {
       },
     });
     expect(maximumOutputReadyClangStages(pchProject)).toBe(4);
+
+    const admittedPchProject = createSdkProject({
+      language: "cpp",
+      entry: "src/main.cpp",
+      files: {
+        "src/forge.pch.hpp": FORGE_LIBCXX_PCH_HEADER,
+        "src/main.cpp": "int main(){}",
+      },
+    });
+    expect(maximumOutputReadyClangStages(admittedPchProject)).toBe(3);
   });
 });

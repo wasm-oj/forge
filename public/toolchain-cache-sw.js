@@ -24,7 +24,7 @@ async function loadVerifiedToolchain(request, url, expectedSha256) {
     cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);
     if (cached) {
-      const actual = await responseSha256(cached.clone());
+      const { digest: actual } = await responseSha256(cached.clone());
       if (actual === expectedSha256) {
         return { response: cached, persistence: Promise.resolve() };
       }
@@ -38,7 +38,7 @@ async function loadVerifiedToolchain(request, url, expectedSha256) {
 
   const response = await fetch(request);
   if (!response.ok) return { response, persistence: Promise.resolve() };
-  const actual = await responseSha256(response.clone());
+  const { digest: actual, byteLength } = await responseSha256(response.clone());
   if (actual !== expectedSha256) {
     return {
       response: new Response(
@@ -50,7 +50,7 @@ async function loadVerifiedToolchain(request, url, expectedSha256) {
   }
 
   if (!cache) return { response, persistence: Promise.resolve() };
-  const cacheable = response.clone();
+  const cacheable = withStorageMetadata(response.clone(), byteLength);
   const persistence = (async () => {
     await cache.put(request, cacheable);
     const keys = await cache.keys();
@@ -67,6 +67,21 @@ async function loadVerifiedToolchain(request, url, expectedSha256) {
 }
 
 async function responseSha256(response) {
-  const digest = await crypto.subtle.digest("SHA-256", await response.arrayBuffer());
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const bytes = await response.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return {
+    byteLength: bytes.byteLength,
+    digest: Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join(""),
+  };
+}
+
+function withStorageMetadata(response, byteLength) {
+  const headers = new Headers(response.headers);
+  headers.set("X-WASM-OJ-Forge-Byte-Length", String(byteLength));
+  headers.set("X-WASM-OJ-Forge-Cached-At", String(Date.now()));
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

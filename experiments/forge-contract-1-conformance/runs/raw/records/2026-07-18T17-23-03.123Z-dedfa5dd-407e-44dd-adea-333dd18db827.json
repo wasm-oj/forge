@@ -1,0 +1,52 @@
+{
+  "schema": "wasm-oj-forge-v1/conformance-evidence",
+  "experimentId": "forge-contract-1-conformance",
+  "runId": "2026-07-18T17-23-03.123Z-dedfa5dd-407e-44dd-adea-333dd18db827",
+  "collectedAt": "2026-07-18T17:23:03.124Z",
+  "forgeContract": 1,
+  "suite": "default",
+  "specPath": "experiments/forge-contract-1-conformance/SPEC.md",
+  "specSha256": "2bc6076de3f8a1e126f49332c3b7025a512c1336bcbdb9d648c16047e401eb5f",
+  "executionCommand": "npm run conformance:server",
+  "gitHead": "ae6db727fbd9c4cbe76f4fa056a6fa2b6ab9adeb",
+  "worktreeStatus": "M package-lock.json\n M package.json\n M public/toolchain-cache-sw.js\n M scripts/package-clang-toolchain.mjs\n M scripts/verify-toolchains.mjs\n M src/compiler/browser-clang-policy.test.ts\n M src/compiler/browser-clang-policy.ts\n M src/compiler/indexeddb-build-graph-cache.ts\n M src/compiler/sdk-direct-clang.ts\n M src/components/judge-studio.tsx\n M src/conformance/cases.ts\n M src/core/contract.ts\n M src/core/toolchains.ts\n M src/dependencies/indexeddb-cache.ts\n M src/dependencies/manager.test.ts\n M src/dependencies/manager.ts\n M src/runtime/runtime-files-cache.ts\n M src/sdk/browser.ts\n M src/sdk/core.ts\n M src/storage/database.ts\n M src/storage/toolchain-service-worker.test.ts\n?? public/toolchains/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin\n?? public/toolchains/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin\n?? public/toolchains/clang-22.0.0-git20542-10.libcxx-pch.json\n?? scripts/build-clang-libcxx-pch.ts\n?? src/compiler/libcxx-pch.test.ts\n?? src/compiler/libcxx-pch.ts\n?? src/dependencies/resolvers.test.ts\n?? src/dependencies/resolvers.ts\n?? src/storage/coordinator.test.ts\n?? src/storage/coordinator.ts\n?? src/storage/types.ts",
+  "sourceTree": {
+    "algorithm": "forge-source-tree-sha256",
+    "sha256": "4e0ea13fb024f264aa85a1c8ae41bbb274d866f44e283982ed3031ae0fcd898b",
+    "files": 362
+  },
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v24.2.0",
+    "cpu": "Apple M5 Pro"
+  },
+  "snapshot": {
+    "schema": "wasm-oj-forge-v1/conformance",
+    "host": "server-native",
+    "repetitions": 1,
+    "caseIds": [
+      "cpp-stdlib-wasip1"
+    ],
+    "samples": [
+      {
+        "host": "server-native",
+        "caseId": "cpp-stdlib-wasip1",
+        "caseLabel": "C++ stdlib / wasip1",
+        "success": false,
+        "firstUncachedCompileMs": 1071.338125,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "file": "src/main.cpp",
+            "line": 1,
+            "column": 1,
+            "source": "clang",
+            "message": "fatal error: file '/project/forge.libcxx.hpp' has been modified since the precompiled header '/project/build/forge.pch' was built: mtime changed (was 946684800, now 1784395382)\nnote: please rebuild precompiled file '/project/build/forge.pch'\n1 error generated."
+          }
+        ],
+        "error": "fatal error: file '/project/forge.libcxx.hpp' has been modified since the precompiled header '/project/build/forge.pch' was built: mtime changed (was 946684800, now 1784395382)\nnote: please rebuild precompiled file '/project/build/forge.pch'\n1 error generated.\n"
+      }
+    ]
+  }
+}

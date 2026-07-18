@@ -1,4 +1,5 @@
 import type { ConformanceCase } from "./matrix.ts";
+import { FORGE_LIBCXX_PCH_HEADER } from "../compiler/libcxx-pch.ts";
 
 export const DEFAULT_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze([
   {
@@ -419,7 +420,7 @@ export const CPP_STDLIB_CONFORMANCE_CASE: ConformanceCase = deepFreeze({
     target: "wasip1",
     entry: "src/main.cpp",
     files: {
-      "src/forge.pch.hpp": "#include <array>\n#include <cstdio>\n",
+      "src/forge.pch.hpp": FORGE_LIBCXX_PCH_HEADER,
       "src/main.cpp": "int main(){ constexpr std::array<int,3> v{10,20,12}; int s=0; for(int x:v)s+=x; std::printf(\"%d\\n\",s); }\n",
     },
   },

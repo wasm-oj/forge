@@ -32,6 +32,9 @@ const definitions = [
     },
     files: [
       "public/toolchains/clang-22.0.0-git20542-10.cc1-pins.json",
+      "public/toolchains/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin",
+      "public/toolchains/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin",
+      "public/toolchains/clang-22.0.0-git20542-10.libcxx-pch.json",
       "public/toolchains/clang-22.0.0-git20542-10.manifest.json",
       "public/toolchains/clang-22.0.0-git20542-10.webc.gz.bin",
     ],
@@ -55,6 +58,17 @@ const definitions = [
       "licenses/cpython-hacl-star-8ba599b-MIT.txt",
       "licenses/cpython-libmpdec-2.5.1-BSD-2-Clause.txt",
     ],
+  },
+  {
+    id: "fflate",
+    name: "fflate",
+    version: "0.8.3",
+    source: {
+      url: "https://github.com/101arrowz/fflate",
+      revision: "v0.8.3",
+    },
+    npm: "fflate@0.8.3",
+    licenses: ["licenses/fflate-MIT.txt"],
   },
   {
     id: "go-compiler-toolchain",

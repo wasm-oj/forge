@@ -12,6 +12,17 @@ listed file to a SHA-256 digest and rejects unlisted toolchain or license files.
 
 ## JavaScript runtime dependency
 
+### fflate
+
+- Component: `fflate` 0.8.3
+- Source revision: `101arrowz/fflate@v0.8.3`
+- Source: <https://github.com/101arrowz/fflate/tree/v0.8.3>
+- License: MIT
+- License material: `licenses/fflate-MIT.txt`
+
+Forge uses fflate to verify the canonical Go module `h1:` hash over module
+ZIP entries in the browser dependency adapter.
+
 ### Wasmer JavaScript SDK
 
 - Component: `@wasmer/sdk` 0.10.0
@@ -147,9 +158,10 @@ and linker-resource SHA-256 digests. These transformations and the generated
 WebC do not relicense Rust or any third-party component identified by the exact
 Rust COPYRIGHT reports and YoWASP source closure carried here.
 
-### Clang, LLD, libc++, and WASI libc
+### Clang, LLD, libc++, PCH, and WASI libc
 
-- Distributed asset: `clang-22.0.0-git20542-10.webc.gz.bin`
+- Distributed assets: `clang-22.0.0-git20542-10.webc.gz.bin`, the matching
+  debug/release libc++ PCH payloads, and their admission manifest
 - Clang source artifact: `@yowasp/clang@22.0.0-git20542-10`, npm archive
   SHA-256 `6230ea1afa9691fa065935cf68c01642ff9b31c183fe8ac64cdfda025df06009`
 - YoWASP source revision: `YoWASP/clang@944dd7c774954180e621cc8e12984023a7f8bcbe`

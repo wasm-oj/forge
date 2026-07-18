@@ -72,8 +72,12 @@ compatibility.
 The default panel contains all 21 execution cases shown above: the nine
 language/target profiles plus deterministic filesystem, multi-file I/O,
 write-time VFS quota, denied capability, and language-level virtual-clock
-probes. The opt-in full panel adds the header-heavy C++ standard-library and
-PCH case.
+probes. The opt-in full panel adds the header-heavy C++ standard-library case.
+The new canonical header path now selects the toolchain-admitted release PCH;
+a real native Wasmer smoke on the current source compiled it in about 4.1
+seconds and executed successfully. That targeted attempt is retained as
+append-only raw evidence, but it is not merged into the 21-case browser/server
+matrix above until a new full two-host publication is collected.
 
 Python has the largest fixed runtime cost, but normalization removes only its
 measured empty-program startup. Parsing/loading the submission, deterministic

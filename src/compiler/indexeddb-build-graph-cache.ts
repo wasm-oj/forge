@@ -1,11 +1,14 @@
 import { FORGE_STORAGE } from "../core/contract.ts";
 import type { IncrementalBuildGraphArchive } from "./incremental-build-graph.ts";
+import type { ForgeStorageEntry, ForgeStorageParticipant } from "../storage/types.ts";
 
 const STORE = "archives";
 const CLANG_KEY = "clang";
 
 interface BuildGraphRecord {
+  byteLength: number;
   id: typeof CLANG_KEY;
+  lastAccessedAt: number;
   archive: IncrementalBuildGraphArchive;
 }
 
@@ -17,11 +20,18 @@ export async function loadClangBuildGraphArchive(): Promise<IncrementalBuildGrap
     await transactionDone(transaction);
     if (value === undefined) return undefined;
     if (!value || typeof value !== "object" || Array.isArray(value)
-      || Object.keys(value).sort().join(",") !== "archive,id"
+      || Object.keys(value).sort().join(",") !== "archive,byteLength,id,lastAccessedAt"
       || (value as BuildGraphRecord).id !== CLANG_KEY) {
       throw new Error("Persisted Clang build graph record has an invalid shape.");
     }
-    return structuredClone((value as BuildGraphRecord).archive);
+    const record = value as BuildGraphRecord;
+    if (!Number.isSafeInteger(record.byteLength) || record.byteLength < 0
+      || !Number.isSafeInteger(record.lastAccessedAt) || record.lastAccessedAt < 0) {
+      throw new Error("Persisted Clang build graph record has invalid storage metadata.");
+    }
+    const archive = structuredClone(record.archive);
+    await touchBuildGraph();
+    return archive;
   } finally {
     database.close();
   }
@@ -31,7 +41,12 @@ export async function saveClangBuildGraphArchive(archive: IncrementalBuildGraphA
   const database = await openDatabase();
   try {
     const transaction = database.transaction(STORE, "readwrite");
-    transaction.objectStore(STORE).put({ id: CLANG_KEY, archive: structuredClone(archive) } satisfies BuildGraphRecord);
+    transaction.objectStore(STORE).put({
+      id: CLANG_KEY,
+      archive: structuredClone(archive),
+      byteLength: archiveByteLength(archive),
+      lastAccessedAt: Date.now(),
+    } satisfies BuildGraphRecord);
     await transactionDone(transaction);
   } finally {
     database.close();
@@ -49,6 +64,40 @@ export function clearClangBuildGraphCache(): Promise<void> {
       reject(new Error("Incremental build cache deletion is blocked by another open tab."));
     }, { once: true });
   });
+}
+
+export async function listClangBuildGraphStorageEntries(): Promise<ForgeStorageEntry[]> {
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction(STORE, "readonly");
+    const value = await requestResult(transaction.objectStore(STORE).get(CLANG_KEY) as IDBRequest<unknown>);
+    await transactionDone(transaction);
+    if (value === undefined) return [];
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("Persisted Clang build graph record has an invalid shape.");
+    }
+    const record = value as BuildGraphRecord;
+    if (record.id !== CLANG_KEY || !Number.isSafeInteger(record.byteLength) || record.byteLength < 0
+      || !Number.isSafeInteger(record.lastAccessedAt) || record.lastAccessedAt < 0) {
+      throw new Error("Persisted Clang build graph record has invalid storage metadata.");
+    }
+    return [{ key: CLANG_KEY, byteLength: record.byteLength, lastAccessedAt: record.lastAccessedAt }];
+  } finally {
+    database.close();
+  }
+}
+
+export function clangBuildGraphStorageParticipant(): ForgeStorageParticipant {
+  return {
+    id: "incremental-build-graph",
+    retentionPriority: 10,
+    list: listClangBuildGraphStorageEntries,
+    delete: async (key) => {
+      if (key !== CLANG_KEY) throw new Error(`Unknown build graph storage key '${key}'.`);
+      await clearClangBuildGraphCache();
+    },
+    clear: clearClangBuildGraphCache,
+  };
 }
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -82,4 +131,31 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
     transaction.addEventListener("abort", () => reject(transaction.error ?? new Error("IndexedDB transaction aborted.")), { once: true });
     transaction.addEventListener("error", () => reject(transaction.error ?? new Error("IndexedDB transaction failed.")), { once: true });
   });
+}
+
+async function touchBuildGraph(): Promise<void> {
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction(STORE, "readwrite");
+    const store = transaction.objectStore(STORE);
+    const value = await requestResult(store.get(CLANG_KEY) as IDBRequest<unknown>);
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      store.put({ ...(value as BuildGraphRecord), lastAccessedAt: Date.now() } satisfies BuildGraphRecord);
+    }
+    await transactionDone(transaction);
+  } finally {
+    database.close();
+  }
+}
+
+function archiveByteLength(archive: IncrementalBuildGraphArchive): number {
+  const digests = new Set<string>();
+  let total = 0;
+  for (const entry of archive.entries) {
+    if (digests.has(entry.outputDigest)) continue;
+    digests.add(entry.outputDigest);
+    total += entry.output.byteLength;
+    if (!Number.isSafeInteger(total)) throw new Error("Incremental build graph byte length exceeds the safe integer range.");
+  }
+  return total;
 }

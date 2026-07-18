@@ -52,7 +52,8 @@ import { PROBLEMS, problemById, type JudgeProblem, type ProblemDifficulty } from
 import { createJudgeProject, judgeProjectId, problemIdFromProject } from "@/src/judge/project";
 import { BrowserForgeCompiler } from "@/src/runtime/compiler-client";
 import { BrowserForgeRunner } from "@/src/runtime/runner-client";
-import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, loadLatestProject, requestPersistentStorage, saveArtifact, saveProject, storageEstimate } from "@/src/storage/database";
+import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, loadLatestProject, saveArtifact, saveProject } from "@/src/storage/database";
+import { createDefaultBrowserStorageCoordinator, type ForgeStorageCoordinator } from "@/src/storage/coordinator";
 import { registerToolchainCache } from "@/src/storage/service-worker";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -192,6 +193,7 @@ export function JudgeStudio() {
   const compilerRef = useRef<BrowserForgeCompiler | undefined>(undefined);
   const compileCoordinatorRef = useRef<CompileCoordinator | undefined>(undefined);
   const runnerRef = useRef<BrowserForgeRunner | undefined>(undefined);
+  const storageCoordinatorRef = useRef<ForgeStorageCoordinator | undefined>(undefined);
   const projectRef = useRef(project);
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | undefined>(undefined);
   const monacoRef = useRef<typeof Monaco | undefined>(undefined);
@@ -232,9 +234,11 @@ export function JudgeStudio() {
       clear: clearArtifactCache,
     });
     const runner = new BrowserForgeRunner();
+    const storageCoordinator = createDefaultBrowserStorageCoordinator();
     compilerRef.current = compiler;
     compileCoordinatorRef.current = compilation;
     runnerRef.current = runner;
+    storageCoordinatorRef.current = storageCoordinator;
     compiler.onProgress(setProgress);
     runner.onProgress(setProgress);
     runner.onStream((stream, chunk) => {
@@ -243,7 +247,7 @@ export function JudgeStudio() {
     void (async () => {
       try {
         await registerToolchainCache();
-        await requestPersistentStorage();
+        await storageCoordinator.requestPersistence();
         try {
           setSolved(decodeSolvedProgress(localStorage.getItem(JUDGE_PROGRESS_KEY), VALID_PROBLEM_IDS));
         } catch (error) {
@@ -262,7 +266,8 @@ export function JudgeStudio() {
           setProject(restored);
           setProblemId(restoredProblem.id);
         }
-        setStorage(await storageEstimate());
+        const storageReport = await storageCoordinator.estimate();
+        setStorage({ usage: storageReport.usage, quota: storageReport.quota });
         setHydrated(true);
         await Promise.all([compiler.ready(), runner.ready()]);
         setRuntimeReady(true);
@@ -444,7 +449,8 @@ export function JudgeStudio() {
       }
       setArtifact(result.artifact);
       setCompileAhead("ready");
-      setStorage(await storageEstimate());
+      const storageReport = await storageCoordinatorRef.current?.maintain();
+      if (storageReport) setStorage({ usage: storageReport.after.usage, quota: storageReport.after.quota });
       if (result.cacheHit) {
         addLog("system", `從本機建置快取載入 ${result.artifact.name} · ${formatBytes(result.artifact.size)}`);
         setProgress({ phase: "packaging", label: "命中建置快取", progress: 1 });
@@ -650,10 +656,11 @@ export function JudgeStudio() {
       await Promise.all([
         compilerRef.current?.clearToolchainCache(),
         runner?.clearRuntimeCache(),
-        clearArtifactCache(),
       ]);
+      await storageCoordinatorRef.current?.clear();
       setArtifact(undefined);
-      setStorage(await storageEstimate());
+      const storageReport = await storageCoordinatorRef.current?.estimate();
+      if (storageReport) setStorage({ usage: storageReport.usage, quota: storageReport.quota });
       addLog("system", "已清除本機工具鏈回應與建置產物");
     } finally {
       setBusy(undefined);

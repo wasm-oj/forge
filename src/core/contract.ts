@@ -11,6 +11,7 @@ export const FORGE_CONTRACT_ID = `wasm-oj-forge-v${FORGE_CONTRACT_VERSION}` as c
 
 export const FORGE_SCHEMAS = Object.freeze({
   clangPins: `${FORGE_CONTRACT_ID}/clang-pins`,
+  clangLibcxxPch: `${FORGE_CONTRACT_ID}/clang-libcxx-pch`,
   clangToolchain: `${FORGE_CONTRACT_ID}/clang-toolchain`,
   compileBatch: `${FORGE_CONTRACT_ID}/compile-batch`,
   compileTrace: `${FORGE_CONTRACT_ID}/compile-trace`,
@@ -20,6 +21,7 @@ export const FORGE_SCHEMAS = Object.freeze({
   costBaselineManifest: `${FORGE_CONTRACT_ID}/cost-baseline-manifest`,
   costBaselineRaw: `${FORGE_CONTRACT_ID}/cost-baseline-raw`,
   costBaselineTable: `${FORGE_CONTRACT_ID}/cost-baseline-table`,
+  cppDependencyLock: `${FORGE_CONTRACT_ID}/cpp-dependency-lock`,
   dependencyLock: `${FORGE_CONTRACT_ID}/dependency-lock`,
   dependencyOfflineBundle: `${FORGE_CONTRACT_ID}/dependency-offline-bundle`,
   incrementalBuildGraph: `${FORGE_CONTRACT_ID}/incremental-build-graph`,
@@ -27,6 +29,7 @@ export const FORGE_SCHEMAS = Object.freeze({
   goToolchain: `${FORGE_CONTRACT_ID}/go-toolchain`,
   objectCache: `${FORGE_CONTRACT_ID}/object-cache`,
   pythonToolchain: `${FORGE_CONTRACT_ID}/python-toolchain`,
+  replayBundle: `${FORGE_CONTRACT_ID}/replay-bundle`,
   rustToolchain: `${FORGE_CONTRACT_ID}/rust-toolchain`,
   runRequest: `${FORGE_CONTRACT_ID}/run-request`,
   runtimeBundle: `${FORGE_CONTRACT_ID}/runtime-bundle`,

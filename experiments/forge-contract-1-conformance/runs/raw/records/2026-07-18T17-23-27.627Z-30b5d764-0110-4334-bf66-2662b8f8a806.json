@@ -1,0 +1,43 @@
+{
+  "schema": "wasm-oj-forge-v1/conformance-evidence",
+  "experimentId": "forge-contract-1-conformance",
+  "runId": "2026-07-18T17-23-27.627Z-30b5d764-0110-4334-bf66-2662b8f8a806",
+  "collectedAt": "2026-07-18T17:23:27.628Z",
+  "forgeContract": 1,
+  "suite": "default",
+  "specPath": "experiments/forge-contract-1-conformance/SPEC.md",
+  "specSha256": "2bc6076de3f8a1e126f49332c3b7025a512c1336bcbdb9d648c16047e401eb5f",
+  "executionCommand": "npm run conformance:server",
+  "gitHead": "ae6db727fbd9c4cbe76f4fa056a6fa2b6ab9adeb",
+  "worktreeStatus": "M package-lock.json\n M package.json\n M public/toolchain-cache-sw.js\n M scripts/package-clang-toolchain.mjs\n M scripts/verify-toolchains.mjs\n M src/compiler/browser-clang-policy.test.ts\n M src/compiler/browser-clang-policy.ts\n M src/compiler/indexeddb-build-graph-cache.ts\n M src/compiler/sdk-direct-clang.ts\n M src/components/judge-studio.tsx\n M src/conformance/cases.ts\n M src/core/contract.ts\n M src/core/toolchains.ts\n M src/dependencies/indexeddb-cache.ts\n M src/dependencies/manager.test.ts\n M src/dependencies/manager.ts\n M src/runtime/runtime-files-cache.ts\n M src/sdk/browser.ts\n M src/sdk/core.ts\n M src/storage/database.ts\n M src/storage/toolchain-service-worker.test.ts\n?? experiments/forge-contract-1-conformance/runs/\n?? public/toolchains/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin\n?? public/toolchains/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin\n?? public/toolchains/clang-22.0.0-git20542-10.libcxx-pch.json\n?? scripts/build-clang-libcxx-pch.ts\n?? src/compiler/libcxx-pch.test.ts\n?? src/compiler/libcxx-pch.ts\n?? src/dependencies/resolvers.test.ts\n?? src/dependencies/resolvers.ts\n?? src/storage/coordinator.test.ts\n?? src/storage/coordinator.ts\n?? src/storage/types.ts",
+  "sourceTree": {
+    "algorithm": "forge-source-tree-sha256",
+    "sha256": "b049d741574f9720eaeeb1a91b07a258528f94372052b05cc946b02248d52382",
+    "files": 362
+  },
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v24.2.0",
+    "cpu": "Apple M5 Pro"
+  },
+  "snapshot": {
+    "schema": "wasm-oj-forge-v1/conformance",
+    "host": "server-native",
+    "repetitions": 1,
+    "caseIds": [
+      "cpp-stdlib-wasip1"
+    ],
+    "samples": [
+      {
+        "host": "server-native",
+        "caseId": "cpp-stdlib-wasip1",
+        "caseLabel": "C++ stdlib / wasip1",
+        "success": false,
+        "firstUncachedCompileMs": 4123.5996669999995,
+        "diagnostics": [],
+        "error": "No calibrated cost baseline is registered for 'wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd.37c9b502fe6e3afa8f9aafb5d94dabb892b9f98a240f43093e8d7e36a58993e7.b41560aef9e8573b850fc3406e44d12365e3e4b58dc19eefba863d3b98f9ef1e.600547a70a79cae6f996f383927402a426e79b3136cf8c2b7d061903f5ac020f.93adf037d41cf0dc5d7367946462f5eb00363206b5566fc2b3a71214b1261e63.2bd21eb72d1854692b6ec64a15a84e652772c5ce13a72413b70145662347f011:weighted'."
+      }
+    ]
+  }
+}

@@ -1,12 +1,15 @@
 import { FORGE_STORAGE } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 import type { ForgeDependencyCache } from "./types.ts";
+import type { ForgeStorageEntry, ForgeStorageParticipant } from "../storage/types.ts";
 
 const STORE = "payloads";
 const SHA256 = /^[0-9a-f]{64}$/;
 
 interface DependencyPayloadRecord {
+  byteLength: number;
   digest: string;
+  lastAccessedAt: number;
   payload: Uint8Array;
 }
 
@@ -26,6 +29,7 @@ export class IndexedDbDependencyCache implements ForgeDependencyCache {
       await this.delete(integritySha256);
       throw new Error(`Cached dependency '${integritySha256}' failed integrity verification.`);
     }
+    await this.touch(integritySha256);
     return value.payload.slice();
   }
 
@@ -36,7 +40,12 @@ export class IndexedDbDependencyCache implements ForgeDependencyCache {
     }
     const database = await this.open();
     const transaction = database.transaction(STORE, "readwrite");
-    transaction.objectStore(STORE).put({ digest: integritySha256, payload: payload.slice() } satisfies DependencyPayloadRecord);
+    transaction.objectStore(STORE).put({
+      byteLength: payload.byteLength,
+      digest: integritySha256,
+      lastAccessedAt: Date.now(),
+      payload: payload.slice(),
+    } satisfies DependencyPayloadRecord);
     await transactionDone(transaction);
   }
 
@@ -53,6 +62,27 @@ export class IndexedDbDependencyCache implements ForgeDependencyCache {
     const transaction = database.transaction(STORE, "readwrite");
     transaction.objectStore(STORE).clear();
     await transactionDone(transaction);
+  }
+
+  async listStorageEntries(): Promise<ForgeStorageEntry[]> {
+    const database = await this.open();
+    const transaction = database.transaction(STORE, "readonly");
+    const values = await requestResult(transaction.objectStore(STORE).getAll() as IDBRequest<unknown[]>);
+    await transactionDone(transaction);
+    return values.map((value) => {
+      if (!isRecord(value)) throw new Error("Dependency cache contains an invalid storage record.");
+      return { key: value.digest, byteLength: value.byteLength, lastAccessedAt: value.lastAccessedAt };
+    });
+  }
+
+  storageParticipant(): ForgeStorageParticipant {
+    return {
+      id: "dependencies",
+      retentionPriority: 40,
+      list: () => this.listStorageEntries(),
+      delete: (key) => this.delete(key),
+      clear: () => this.clear(),
+    };
   }
 
   close(): void {
@@ -76,6 +106,18 @@ export class IndexedDbDependencyCache implements ForgeDependencyCache {
     void this.database.catch(() => { this.database = undefined; });
     return this.database;
   }
+
+  private async touch(integritySha256: string): Promise<void> {
+    const database = await this.open();
+    const transaction = database.transaction(STORE, "readwrite");
+    const store = transaction.objectStore(STORE);
+    const value = await requestResult(store.get(integritySha256) as IDBRequest<unknown>);
+    if (value !== undefined) {
+      if (!isRecord(value)) throw new Error("Dependency cache contains an invalid storage record.");
+      store.put({ ...value, lastAccessedAt: Date.now() } satisfies DependencyPayloadRecord);
+    }
+    await transactionDone(transaction);
+  }
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -95,7 +137,13 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 
 function isRecord(value: unknown): value is DependencyPayloadRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    && Object.keys(value).sort().join(",") === "digest,payload";
+    && Object.keys(value).sort().join(",") === "byteLength,digest,lastAccessedAt,payload"
+    && typeof (value as DependencyPayloadRecord).digest === "string"
+    && (value as DependencyPayloadRecord).payload instanceof Uint8Array
+    && Number.isSafeInteger((value as DependencyPayloadRecord).byteLength)
+    && (value as DependencyPayloadRecord).byteLength === (value as DependencyPayloadRecord).payload.byteLength
+    && Number.isSafeInteger((value as DependencyPayloadRecord).lastAccessedAt)
+    && (value as DependencyPayloadRecord).lastAccessedAt >= 0;
 }
 
 function requireDigest(value: string): void {

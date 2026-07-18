@@ -1,8 +1,10 @@
-import { artifactPayloadSha256 } from "../core/artifact-payload";
+import { artifactPayloadSha256, canonicalArtifactPayloadBytes } from "../core/artifact-payload";
+import { sha256Hex } from "../core/hash";
 import { assertValidBuildArtifact } from "../core/artifact-validation";
 import { FORGE_STORAGE } from "../core/contract";
 import type { BuildArtifact, Project } from "../core/types";
 import { assertValidProject } from "../core/project-validation";
+import type { ForgeStorageEntry, ForgeStorageParticipant } from "./types";
 
 const PROJECTS = "projects";
 const ARTIFACTS = "artifacts";
@@ -10,8 +12,10 @@ const SHA256_HEX = /^[0-9a-f]{64}$/u;
 
 interface PersistedArtifactRecord {
   artifact: BuildArtifact;
+  byteLength: number;
   cacheKey: string;
   createdAt: number;
+  lastAccessedAt: number;
   payloadSha256: string;
 }
 
@@ -152,11 +156,14 @@ function scanValidProjects(store: IDBObjectStore): Promise<Project[]> {
 export async function saveArtifact(artifact: BuildArtifact): Promise<void> {
   const snapshot = structuredClone(artifact);
   assertValidBuildArtifact(snapshot);
+  const payload = canonicalArtifactPayloadBytes(snapshot);
   const record: PersistedArtifactRecord = {
     artifact: snapshot,
+    byteLength: payload.byteLength,
     cacheKey: snapshot.cacheKey,
     createdAt: snapshot.createdAt,
-    payloadSha256: await artifactPayloadSha256(snapshot),
+    lastAccessedAt: Date.now(),
+    payloadSha256: await sha256Hex(payload),
   };
   const database = await openDatabase();
   const transaction = database.transaction(ARTIFACTS, "readwrite");
@@ -185,6 +192,7 @@ export async function loadArtifact(cacheKey: string): Promise<BuildArtifact | un
     await evictInvalidArtifact(cacheKey, new Error("Artifact payload SHA-256 does not match its stored digest."));
     return undefined;
   }
+  await touchArtifact(cacheKey);
   return record.artifact;
 }
 
@@ -217,6 +225,27 @@ export async function clearArtifactCache(): Promise<void> {
   await transactionDone(transaction);
 }
 
+export async function listArtifactStorageEntries(): Promise<ForgeStorageEntry[]> {
+  const database = await openDatabase();
+  const transaction = database.transaction(ARTIFACTS, "readonly");
+  const stored = await requestResult(transaction.objectStore(ARTIFACTS).getAll() as IDBRequest<unknown[]>);
+  await transactionDone(transaction);
+  return stored.map((value) => {
+    const record = assertPersistedArtifactRecord(value);
+    return { key: record.cacheKey, byteLength: record.byteLength, lastAccessedAt: record.lastAccessedAt };
+  });
+}
+
+export function artifactStorageParticipant(): ForgeStorageParticipant {
+  return {
+    id: "artifacts",
+    retentionPriority: 20,
+    list: listArtifactStorageEntries,
+    delete: deleteArtifact,
+    clear: clearArtifactCache,
+  };
+}
+
 export async function storageEstimate(): Promise<{ usage: number; quota: number }> {
   const estimate = await navigator.storage.estimate();
   return { usage: estimate.usage ?? 0, quota: estimate.quota ?? 0 };
@@ -226,20 +255,24 @@ export async function requestPersistentStorage(): Promise<boolean> {
   return navigator.storage.persist();
 }
 
-function assertPersistedArtifactRecord(value: unknown, requestedCacheKey: string): PersistedArtifactRecord {
+function assertPersistedArtifactRecord(value: unknown, requestedCacheKey?: string): PersistedArtifactRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Persisted artifact record must be an object.");
   }
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record).sort();
-  if (JSON.stringify(keys) !== JSON.stringify(["artifact", "cacheKey", "createdAt", "payloadSha256"])) {
+  if (JSON.stringify(keys) !== JSON.stringify(["artifact", "byteLength", "cacheKey", "createdAt", "lastAccessedAt", "payloadSha256"])) {
     throw new Error("Persisted artifact record has an invalid shape.");
   }
-  if (record.cacheKey !== requestedCacheKey) {
+  if (requestedCacheKey !== undefined && record.cacheKey !== requestedCacheKey) {
     throw new Error("Persisted artifact record cache key does not match its IndexedDB key.");
   }
   if (typeof record.payloadSha256 !== "string" || !SHA256_HEX.test(record.payloadSha256)) {
     throw new Error("Persisted artifact payload digest must be a lowercase SHA-256 hexadecimal string.");
+  }
+  if (!Number.isSafeInteger(record.byteLength) || (record.byteLength as number) < 0
+    || !Number.isSafeInteger(record.lastAccessedAt) || (record.lastAccessedAt as number) < 0) {
+    throw new Error("Persisted artifact storage metadata is invalid.");
   }
 
   const artifact = record.artifact as BuildArtifact;
@@ -248,6 +281,18 @@ function assertPersistedArtifactRecord(value: unknown, requestedCacheKey: string
     throw new Error("Persisted artifact index fields do not match the artifact metadata.");
   }
   return record as unknown as PersistedArtifactRecord;
+}
+
+async function touchArtifact(cacheKey: string): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(ARTIFACTS, "readwrite");
+  const store = transaction.objectStore(ARTIFACTS);
+  const value = await requestResult(store.get(cacheKey) as IDBRequest<unknown>);
+  if (value !== undefined) {
+    const record = assertPersistedArtifactRecord(value, cacheKey);
+    store.put({ ...record, lastAccessedAt: Date.now() } satisfies PersistedArtifactRecord);
+  }
+  await transactionDone(transaction);
 }
 
 async function evictInvalidArtifact(cacheKey: string, reason: unknown): Promise<void> {

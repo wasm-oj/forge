@@ -52,6 +52,16 @@ export { createForgeEngine, ForgeEngine } from "./engine";
 export type { JudgeProjectResult, ForgeEngineOptions } from "./engine";
 export type { ForgeArtifactStore, PrecompileOutcome, PrecompileStatus } from "../compiler/coordinator";
 export type { ForgeCompiler } from "../compiler/compiler";
+export {
+  decodeLibcxxPchManifest,
+  FORGE_LIBCXX_PCH_HEADER,
+  isToolchainLibcxxPchHeader,
+} from "../compiler/libcxx-pch";
+export type {
+  LibcxxPchAsset,
+  LibcxxPchManifest,
+  LibcxxPchProfile,
+} from "../compiler/libcxx-pch";
 export { ForgeCompilerRegistry } from "../compiler/compiler-registry";
 export type { ForgeCompilerRegistration } from "../compiler/compiler-registry";
 export type { ForgeRunner } from "../runner/runner";
@@ -113,7 +123,25 @@ export type {
 } from "../judge/spec";
 export { normalizeOutput } from "../judge/normalization";
 export type { OutputNormalization } from "../judge/normalization";
-export { ForgeDependencyManager, MemoryDependencyCache } from "../dependencies/manager";
+export {
+  createDefaultDependencyManager,
+  ForgeDependencyManager,
+  MemoryDependencyCache,
+} from "../dependencies/manager";
+export {
+  CargoLockDependencyResolver,
+  CppLockDependencyResolver,
+  createDefaultDependencyResolvers,
+  GoLockDependencyResolver,
+  goModuleZipHash,
+  NpmLockDependencyResolver,
+  PyPiLockDependencyResolver,
+} from "../dependencies/resolvers";
+export type {
+  CppDependencyLockSource,
+  DependencyFetch,
+  DependencyResolverOptions,
+} from "../dependencies/resolvers";
 export {
   assertValidDependencyLock,
   createDependencyLock,
@@ -134,6 +162,28 @@ export type {
   ResolveDependencyOptions,
   ResolvedDependencyGraph,
 } from "../dependencies/types";
+export {
+  assertValidForgeReplayBundle,
+  createForgeReplayBundle,
+  decodeForgeReplayBundle,
+  encodeForgeReplayBundle,
+  forgeReplayBundleSha256,
+  judgeTranscript,
+  replayForgeBundle,
+} from "../replay/bundle";
+export type {
+  ForgeReplayBundle,
+  ForgeReplayBundleInput,
+  ForgeReplayDecodeOptions,
+  ForgeReplayHost,
+  ForgeReplayJudgeCaseTranscript,
+  ForgeReplayJudgeOperation,
+  ForgeReplayJudgeTranscript,
+  ForgeReplayOperation,
+  ForgeReplayOptions,
+  ForgeReplayResult,
+  ForgeReplayRunOperation,
+} from "../replay/bundle";
 export {
   compareConformanceSnapshots,
   deterministicTranscript,
