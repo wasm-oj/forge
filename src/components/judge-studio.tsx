@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { OnMount } from "@monaco-editor/react";
+import type { BeforeMount, OnMount } from "@monaco-editor/react";
 import {
   Award,
   Box,
@@ -55,6 +55,7 @@ import { BrowserForgeRunner } from "@/src/runtime/runner-client";
 import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, loadLatestProject, saveArtifact, saveProject } from "@/src/storage/database";
 import { createDefaultBrowserStorageCoordinator, type ForgeStorageCoordinator } from "@/src/storage/coordinator";
 import { registerToolchainCache } from "@/src/storage/service-worker";
+import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -356,6 +357,10 @@ export function JudgeStudio() {
     editor.focus();
     revealRef.current = undefined;
   }, [project.activeFile]);
+
+  const beforeEditorMount: BeforeMount = useCallback((monaco) => {
+    configureForgeLanguageServices(monaco);
+  }, []);
 
   const onEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
@@ -826,6 +831,7 @@ export function JudgeStudio() {
                 language={isBuiltinLanguage(activeFile.language) ? MONACO_LANGUAGE[activeFile.language] : "plaintext"}
                 value={activeFile.content}
                 onChange={updateActiveFile}
+                beforeMount={beforeEditorMount}
                 onMount={onEditorMount}
                 theme="forge"
                 options={{

@@ -11,6 +11,7 @@ import {
 import { canonicalProjectFiles } from "../core/project-files.ts";
 import { costProfileId } from "../core/cost-profile.ts";
 import { ensureFailureDiagnostic, parseTypeScriptDiagnostics } from "../core/diagnostics.ts";
+import { QUICKJS_STD_MODULE_DECLARATION } from "../core/quickjs-runtime.ts";
 import {
   PYTHON_PACKAGE,
   GO_VERSION,
@@ -57,18 +58,6 @@ export interface WasmerCompilerHost {
 }
 
 let host: WasmerCompilerHost | undefined;
-
-
-const QUICKJS_TYPES = String.raw`
-declare module "std" {
-  const std: {
-    err: { puts(value: string): void };
-    in: { readAsString(): string };
-    out: { puts(value: string): void };
-  };
-  export = std;
-}
-`;
 
 export function configureWasmerCompilerHost(nextHost: WasmerCompilerHost): void {
   host = nextHost;
@@ -274,7 +263,7 @@ async function transpileScriptProject(project: Project, requestId: string): Prom
     stdin: JSON.stringify({
       files: {
         ...Object.fromEntries(project.files.map((file) => [`/project/${file.path}`, file.content])),
-        [declarationPath]: QUICKJS_TYPES,
+        [declarationPath]: QUICKJS_STD_MODULE_DECLARATION,
       },
       javascript: project.config.language === "javascript",
       sources: [declarationPath, ...scriptFiles.map((file) => `/project/${file.path}`)],
