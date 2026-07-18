@@ -5,6 +5,8 @@ node_modules/
 dist/
 lib/
 .wrangler/
+public/toolchains/forge-sites-chunks.json
+public/toolchains/*.forge-chunk-*
 coverage/
 .forge-library-build-*/
 **/target/

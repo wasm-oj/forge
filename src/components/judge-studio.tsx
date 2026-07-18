@@ -246,7 +246,7 @@ export function JudgeStudio() {
     });
     void (async () => {
       try {
-        await registerToolchainCache();
+        await registerToolchainCache({ chunkManifestUrl: "/toolchains/forge-sites-chunks.json" });
         await storageCoordinator.requestPersistence();
         try {
           setSolved(decodeSolvedProgress(localStorage.getItem(JUDGE_PROGRESS_KEY), VALID_PROBLEM_IDS));

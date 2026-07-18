@@ -3,6 +3,8 @@ export interface ToolchainCacheRegistrationOptions {
   scriptUrl?: string | URL;
   /** Service-worker scope covering the configured Forge toolchain asset base URL. */
   scope?: string;
+  /** Build-generated, same-origin chunk manifest used only by size-limited static deployments. */
+  chunkManifestUrl?: string | URL;
 }
 
 export async function registerToolchainCache(
@@ -16,7 +18,38 @@ export async function registerToolchainCache(
   }
   const registration = await navigator.serviceWorker.register(scriptUrl, { scope });
   await waitForActiveWorker(registration);
+  if (options.chunkManifestUrl !== undefined) {
+    await configureChunkManifest(registration, options.chunkManifestUrl);
+  }
   return registration;
+}
+
+async function configureChunkManifest(
+  registration: ServiceWorkerRegistration,
+  manifestUrl: string | URL,
+): Promise<void> {
+  const url = new URL(manifestUrl, location.href);
+  if (url.origin !== location.origin || url.search || url.hash
+    || url.pathname !== "/toolchains/forge-sites-chunks.json") {
+    throw new Error("Forge toolchain chunk manifest must use the canonical same-origin deployment path.");
+  }
+  const worker = registration.active;
+  if (!worker) throw new Error("Forge toolchain cache service worker is not active after registration.");
+  const channel = new MessageChannel();
+  const response = new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Forge toolchain chunk configuration timed out.")), 5_000);
+    channel.port1.onmessage = (event: MessageEvent<unknown>) => {
+      clearTimeout(timeout);
+      channel.port1.close();
+      if (event.data && typeof event.data === "object" && "ok" in event.data && event.data.ok === true) resolve();
+      else reject(new Error("Forge toolchain cache service worker rejected its chunk manifest configuration."));
+    };
+  });
+  worker.postMessage(
+    { type: "configure-toolchain-chunks", path: url.pathname },
+    [channel.port2],
+  );
+  await response;
 }
 
 function waitForActiveWorker(registration: ServiceWorkerRegistration): Promise<void> {

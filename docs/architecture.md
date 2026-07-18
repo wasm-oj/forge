@@ -167,6 +167,7 @@ The judge editor debounces build-identity changes for 900 ms and then calls the 
 - No guest socket, network, process-spawn, or thread-spawn implementation is exposed. Supported denied imports trap before guest code can use them; unsupported imports fail module validation.
 - Toolchain packages are content-pinned. A missing file or digest mismatch fails the build explicitly.
 - Packed deployments must preserve every emitted compiler, runner, Python-stage, Rust-stage, and Wasmer secondary-worker asset at the URL referenced by its parent bundle. Removing or relocating a nested Worker is a deployment error, not a supported fallback.
+- Sites builds apply a transport-only content-addressed chunk manifest to pinned toolchain files above the provider's 25 MiB per-file limit. Before vinext indexes public assets, the build stages deterministic 16 MiB parts and their manifest; it removes the staging files afterward and removes only the oversized monolithic copies from `dist`. The Sites UI explicitly configures the service worker with that canonical manifest path. The service worker verifies every part and the reconstructed whole against the original toolchain digest before caching or returning it; library and server packages retain the canonical monolithic files and identities.
 
 ## Worker protocol
 

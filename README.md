@@ -174,6 +174,12 @@ await registerToolchainCache({
 The default options match a host that places the exported file at
 `/toolchain-cache-sw.js`. The registration helper waits for that registration's
 own worker to activate; it does not wait on an unrelated global scope.
+Size-limited static deployments may additionally pass
+`chunkManifestUrl: "/toolchains/forge-sites-chunks.json"` after generating that
+canonical manifest and its content-addressed parts. This mode is explicit: npm
+consumers serving the canonical monolithic assets do not probe for, or silently
+fall back through, a second transport. Every configured chunk and the
+reconstructed asset are SHA-256 verified before use.
 `prepack` performs both build and verification, including real registration of
 the service-worker asset from the packed tarball.
 

@@ -17,7 +17,7 @@ interface WorkerHarness {
   warnings: ReturnType<typeof vi.fn>;
 }
 
-async function serviceWorkerHarness(): Promise<WorkerHarness> {
+async function serviceWorkerHarness(options: { chunkManifestPath?: string } = {}): Promise<WorkerHarness> {
   const listeners = new Map<string, (event: Record<string, unknown>) => void>();
   const claim = vi.fn(async () => undefined);
   const cache = {
@@ -34,6 +34,7 @@ async function serviceWorkerHarness(): Promise<WorkerHarness> {
     Request,
     Response,
     Headers,
+    TextDecoder,
     Uint8Array,
     crypto: webcrypto,
     fetch,
@@ -50,6 +51,14 @@ async function serviceWorkerHarness(): Promise<WorkerHarness> {
       },
     },
   });
+  if (options.chunkManifestPath) {
+    const accepted = vi.fn();
+    listeners.get("message")?.({
+      data: { type: "configure-toolchain-chunks", path: options.chunkManifestPath },
+      ports: [{ postMessage: accepted }],
+    });
+    expect(accepted).toHaveBeenCalledWith({ ok: true });
+  }
   return { listeners, claim, cache, fetch, warnings };
 }
 
@@ -156,6 +165,75 @@ describe("toolchain cache service worker", () => {
     const rejected = await response!;
     expect(rejected.status).toBe(502);
     expect(await rejected.text()).toContain("digest mismatch");
+    expect(harness.cache.put).not.toHaveBeenCalled();
+  });
+
+  it("assembles a build-configured chunk transport and verifies every part", async () => {
+    const manifestPath = "/toolchains/forge-sites-chunks.json";
+    const harness = await serviceWorkerHarness({ chunkManifestPath: manifestPath });
+    const parts = [new TextEncoder().encode("verified "), new TextEncoder().encode("toolchain")];
+    const body = Buffer.concat(parts);
+    const sha256 = createHash("sha256").update(body).digest("hex");
+    const chunks = parts.map((part, index) => ({
+      path: `/toolchains/compiler.bin.forge-chunk-${String(index).padStart(3, "0")}`,
+      byteLength: part.byteLength,
+      sha256: createHash("sha256").update(part).digest("hex"),
+    }));
+    harness.fetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      if (url.pathname === manifestPath) {
+        return new Response(JSON.stringify({
+          schema: "wasm-oj-forge-v1/sites-toolchain-chunks",
+          assets: [{ path: "/toolchains/compiler.bin", byteLength: body.byteLength, sha256, chunks }],
+        }));
+      }
+      const index = chunks.findIndex((chunk) => chunk.path === url.pathname);
+      if (index >= 0) return new Response(parts[index]);
+      throw new Error(`Unexpected network request '${url.pathname}'.`);
+    });
+    let response: Promise<Response> | undefined;
+    harness.listeners.get("fetch")?.({
+      request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${sha256}`),
+      respondWith(promise: Promise<Response>) { response = promise; },
+      waitUntil() {},
+    });
+
+    expect(await (await response!).text()).toBe("verified toolchain");
+    expect(harness.cache.put).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed when a deployment chunk does not match its manifest", async () => {
+    const manifestPath = "/toolchains/forge-sites-chunks.json";
+    const harness = await serviceWorkerHarness({ chunkManifestPath: manifestPath });
+    const expected = createHash("sha256").update("expected").digest("hex");
+    const chunkSha256 = createHash("sha256").update("expected").digest("hex");
+    harness.fetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      if (url.pathname === manifestPath) {
+        return new Response(JSON.stringify({
+          schema: "wasm-oj-forge-v1/sites-toolchain-chunks",
+          assets: [{
+            path: "/toolchains/compiler.bin",
+            byteLength: 8,
+            sha256: expected,
+            chunks: [{
+              path: "/toolchains/compiler.bin.forge-chunk-000",
+              byteLength: 8,
+              sha256: chunkSha256,
+            }],
+          }],
+        }));
+      }
+      return new Response("tampered");
+    });
+    let response: Promise<Response> | undefined;
+    harness.listeners.get("fetch")?.({
+      request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${expected}`),
+      respondWith(promise: Promise<Response>) { response = promise; },
+      waitUntil() {},
+    });
+
+    expect((await response!).status).toBe(502);
     expect(harness.cache.put).not.toHaveBeenCalled();
   });
 });
