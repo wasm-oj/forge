@@ -1,5 +1,12 @@
 export type ModuleWorkerOptions = Omit<WorkerOptions, "type">;
 
+export interface ModuleWorkerBootstrap {
+  /** Same-origin blob URL that imports the emitted module Worker entry. */
+  readonly url: string;
+  /** Release the blob URL after every Worker that needs it has been constructed. */
+  revoke(): void;
+}
+
 interface ModuleWorkerGlobal {
   __wasmOjForgeModuleWorkerBaseUrl?: unknown;
 }
@@ -17,6 +24,19 @@ export function createModuleWorker(
   scriptUrl: string | URL,
   options: ModuleWorkerOptions = {},
 ): Worker {
+  const bootstrap = createModuleWorkerBootstrap(scriptUrl);
+  try {
+    return new Worker(bootstrap.url, { ...options, type: "module" });
+  } finally {
+    bootstrap.revoke();
+  }
+}
+
+/**
+ * Creates a reusable blob bootstrap for APIs such as the Wasmer SDK that own
+ * Worker construction and may defer it until a command is instantiated.
+ */
+export function createModuleWorkerBootstrap(scriptUrl: string | URL): ModuleWorkerBootstrap {
   const baseUrl = moduleWorkerBaseUrl();
   const absoluteScriptUrl = resolveModuleWorkerUrl(scriptUrl);
   const bootstrap = new Blob(
@@ -31,11 +51,15 @@ export function createModuleWorker(
     { type: "text/javascript" },
   );
   const bootstrapUrl = URL.createObjectURL(bootstrap);
-  try {
-    return new Worker(bootstrapUrl, { ...options, type: "module" });
-  } finally {
-    URL.revokeObjectURL(bootstrapUrl);
-  }
+  let active = true;
+  return {
+    url: bootstrapUrl,
+    revoke() {
+      if (!active) return;
+      active = false;
+      URL.revokeObjectURL(bootstrapUrl);
+    },
+  };
 }
 
 export function moduleWorkerBaseUrl(): URL {

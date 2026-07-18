@@ -47,7 +47,12 @@ import GoStageWorkerUrl from "./go-stage.worker?worker&url";
 import type { GoCompileRequest, GoCompileResult, GoStageRequest } from "@/src/compiler/go-toolchain";
 import { GO_COMPILE_TIMEOUT_MS } from "@/src/compiler/go-toolchain";
 import { PersistentIsolatedStage, runIsolatedStage } from "./isolated-stage";
-import { createModuleWorker, moduleWorkerBaseUrl } from "./module-worker";
+import {
+  createModuleWorker,
+  createModuleWorkerBootstrap,
+  type ModuleWorkerBootstrap,
+  moduleWorkerBaseUrl,
+} from "./module-worker";
 import wasmerThreadWorkerUrl from "./wasmer-thread.worker?worker&url";
 
 const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
@@ -55,6 +60,7 @@ const workerBaseUrl = moduleWorkerBaseUrl();
 let toolchainAssetBaseUrl = new URL("/toolchains/", workerBaseUrl);
 let runtime: Runtime | undefined;
 let runtimeInitialization: Promise<void> | undefined;
+let wasmerThreadWorkerBootstrap: ModuleWorkerBootstrap | undefined;
 let rustStage: PersistentIsolatedStage<RustcStageRequest, RustCompileResult> | undefined;
 let goStage: PersistentIsolatedStage<GoStageRequest, GoCompileResult> | undefined;
 let quiescing = false;
@@ -200,12 +206,20 @@ async function ensureOuterRuntime(requestId: string): Promise<void> {
   if (runtime) return;
   runtimeInitialization ??= (async () => {
     progress(requestId, "initializing", "Starting Wasmer compiler runtime", 0.1);
-    await init({
-      log: "warn",
-      module: new URL(wasmerWasmUrl, workerBaseUrl),
-      workerUrl: new URL(wasmerThreadWorkerUrl, workerBaseUrl),
-    });
-    runtime = new Runtime({ registry: null });
+    const bootstrap = createModuleWorkerBootstrap(new URL(wasmerThreadWorkerUrl, workerBaseUrl));
+    wasmerThreadWorkerBootstrap = bootstrap;
+    try {
+      await init({
+        log: "warn",
+        module: new URL(wasmerWasmUrl, workerBaseUrl),
+        workerUrl: bootstrap.url,
+      });
+      runtime = new Runtime({ registry: null });
+    } catch (error) {
+      if (wasmerThreadWorkerBootstrap === bootstrap) wasmerThreadWorkerBootstrap = undefined;
+      bootstrap.revoke();
+      throw error;
+    }
     progress(requestId, "initializing", "Wasmer compiler runtime ready", 0.2);
   })();
   try {
@@ -249,6 +263,8 @@ async function quiesce(): Promise<void> {
       runtime?.free();
       runtime = undefined;
       runtimeInitialization = undefined;
+      wasmerThreadWorkerBootstrap?.revoke();
+      wasmerThreadWorkerBootstrap = undefined;
     }
   }
 }

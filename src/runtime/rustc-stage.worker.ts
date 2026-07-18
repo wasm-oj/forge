@@ -18,7 +18,11 @@ import { parseRustDiagnostics } from "../core/diagnostics";
 import { sha256Hex } from "../core/hash";
 import { contentAddressedToolchainAssetUrl } from "../core/toolchains";
 import { MountedOutputStabilityObserver } from "./mounted-output-stability";
-import { moduleWorkerBaseUrl } from "./module-worker";
+import {
+  createModuleWorkerBootstrap,
+  type ModuleWorkerBootstrap,
+  moduleWorkerBaseUrl,
+} from "./module-worker";
 import { OwnedWorkerRegistry, type WorkerConstructorHost } from "./owned-worker-registry";
 import wasmerThreadWorkerUrl from "./wasmer-thread.worker?worker&url";
 
@@ -30,6 +34,7 @@ let requestTail = Promise.resolve();
 let toolchain: Promise<RustStageToolchain> | undefined;
 let toolchainBaseUrl: string | undefined;
 let ownedWasmerWorkers: OwnedWorkerRegistry | undefined;
+let wasmerThreadWorkerBootstrap: ModuleWorkerBootstrap | undefined;
 
 scope.addEventListener("message", (event: MessageEvent<RustcStageRequest>) => {
   requestTail = requestTail.then(
@@ -135,6 +140,7 @@ async function shutdownToolchain(): Promise<void> {
   toolchainBaseUrl = undefined;
   if (!pending) {
     terminateOwnedWasmerWorkers();
+    disposeWasmerThreadWorkerBootstrap();
     return;
   }
   let loaded: RustStageToolchain;
@@ -142,6 +148,7 @@ async function shutdownToolchain(): Promise<void> {
     loaded = await pending;
   } catch (error) {
     terminateOwnedWasmerWorkers();
+    disposeWasmerThreadWorkerBootstrap();
     throw error;
   }
   // Browser termination of a parent Worker does not run Rust Drop for SDK
@@ -161,6 +168,7 @@ async function shutdownToolchain(): Promise<void> {
         loaded.pkg.free();
       } finally {
         loaded.runtime.free();
+        disposeWasmerThreadWorkerBootstrap();
       }
     }
   }
@@ -180,14 +188,17 @@ async function initializeToolchain(baseUrl: URL): Promise<RustStageToolchain> {
   const workerRegistry = new OwnedWorkerRegistry(globalThis as unknown as WorkerConstructorHost);
   workerRegistry.install();
   ownedWasmerWorkers = workerRegistry;
+  const bootstrap = createModuleWorkerBootstrap(new URL(wasmerThreadWorkerUrl, workerBaseUrl));
+  wasmerThreadWorkerBootstrap = bootstrap;
   try {
     await init({
       log: "warn",
       module: new URL(wasmerWasmUrl, workerBaseUrl),
-      workerUrl: new URL(wasmerThreadWorkerUrl, workerBaseUrl),
+      workerUrl: bootstrap.url,
     });
   } catch (error) {
     terminateOwnedWasmerWorkers();
+    disposeWasmerThreadWorkerBootstrap();
     throw error;
   }
   let runtime: Runtime;
@@ -195,6 +206,7 @@ async function initializeToolchain(baseUrl: URL): Promise<RustStageToolchain> {
     runtime = new Runtime({ registry: null });
   } catch (error) {
     terminateOwnedWasmerWorkers();
+    disposeWasmerThreadWorkerBootstrap();
     throw error;
   }
   let pkg: Wasmer | undefined;
@@ -217,6 +229,7 @@ async function initializeToolchain(baseUrl: URL): Promise<RustStageToolchain> {
     pkg?.free();
     runtime.free();
     terminateOwnedWasmerWorkers();
+    disposeWasmerThreadWorkerBootstrap();
     throw error;
   }
 }
@@ -225,6 +238,11 @@ function terminateOwnedWasmerWorkers(): void {
   const registry = ownedWasmerWorkers;
   ownedWasmerWorkers = undefined;
   registry?.terminateAll();
+}
+
+function disposeWasmerThreadWorkerBootstrap(): void {
+  wasmerThreadWorkerBootstrap?.revoke();
+  wasmerThreadWorkerBootstrap = undefined;
 }
 
 interface StageObservation {

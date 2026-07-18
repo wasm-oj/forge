@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createModuleWorker, moduleWorkerBaseUrl } from "./module-worker";
+import {
+  createModuleWorker,
+  createModuleWorkerBootstrap,
+  moduleWorkerBaseUrl,
+} from "./module-worker";
 
 interface WorkerConstruction {
   url: string | URL;
@@ -62,6 +66,22 @@ describe("module Worker bootstrap", () => {
 
     expect(() => createModuleWorker("https://cdn.example/runner.worker.js"))
       .toThrow("constructor failed");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://forge.example/bootstrap");
+  });
+
+  it("keeps a reusable bootstrap alive until its owner explicitly revokes it", async () => {
+    const bootstrap = createModuleWorkerBootstrap("/assets/wasmer-thread.worker.js");
+
+    expect(bootstrap.url).toBe("blob:https://forge.example/bootstrap");
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    const source = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0];
+    expect(await (source as Blob).text()).toContain(
+      'await import("https://forge.example/assets/wasmer-thread.worker.js")',
+    );
+
+    bootstrap.revoke();
+    bootstrap.revoke();
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://forge.example/bootstrap");
   });
 

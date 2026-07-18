@@ -52,7 +52,11 @@ import initRuntimeCore, {
   run_forge as runForgeCore,
 } from "@/src/runner/generated/runtime-core.js";
 import runtimeCoreWasmUrl from "@/src/runner/generated/runtime-core_bg.wasm?url";
-import { moduleWorkerBaseUrl } from "./module-worker";
+import {
+  createModuleWorkerBootstrap,
+  type ModuleWorkerBootstrap,
+  moduleWorkerBaseUrl,
+} from "./module-worker";
 import wasmerThreadWorkerUrl from "./wasmer-thread.worker?worker&url";
 
 const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
@@ -61,6 +65,7 @@ const decoder = new TextDecoder();
 const packages = new PackageHandleCache<string, WasmerPackageHandle>();
 const packageFileSystems = new Map<string, Promise<Record<string, Uint8Array>>>();
 let sdkRuntime: Runtime | undefined;
+let wasmerThreadWorkerBootstrap: ModuleWorkerBootstrap | undefined;
 let runtimeDrivers: RuntimeDriverRegistry | undefined;
 let quickJsBytes: Promise<Uint8Array> | undefined;
 let toolchainAssetBaseUrl = new URL("/toolchains/", workerBaseUrl);
@@ -139,12 +144,20 @@ async function initializeRuntime(
   progress(requestId, "initializing", "Starting deterministic Wasmer runner", 0.1);
   await initRuntimeCore({ module_or_path: new URL(runtimeCoreWasmUrl, workerBaseUrl) });
   progress(requestId, "initializing", "Starting Wasmer package resolver", 0.55);
-  await init({
-    log: "warn",
-    module: new URL(wasmerWasmUrl, workerBaseUrl),
-    workerUrl: new URL(wasmerThreadWorkerUrl, workerBaseUrl),
-  });
-  sdkRuntime = new Runtime({ registry: null });
+  const bootstrap = createModuleWorkerBootstrap(new URL(wasmerThreadWorkerUrl, workerBaseUrl));
+  wasmerThreadWorkerBootstrap = bootstrap;
+  try {
+      await init({
+        log: "warn",
+        module: new URL(wasmerWasmUrl, workerBaseUrl),
+        workerUrl: bootstrap.url,
+      });
+      sdkRuntime = new Runtime({ registry: null });
+    } catch (error) {
+      if (wasmerThreadWorkerBootstrap === bootstrap) wasmerThreadWorkerBootstrap = undefined;
+      bootstrap.revoke();
+      throw error;
+    }
   runtimeDrivers = createDefaultRuntimeDrivers(
     createExtendedCostBaselineRegistry(additionalCostBaselines),
   );

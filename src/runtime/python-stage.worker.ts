@@ -17,7 +17,7 @@ import {
   PYTHON_PACKAGE_ASSET_PATH,
   PYTHON_PACKAGE_SHA256,
 } from "../core/toolchains";
-import { moduleWorkerBaseUrl } from "./module-worker";
+import { createModuleWorkerBootstrap, moduleWorkerBaseUrl } from "./module-worker";
 import wasmerThreadWorkerUrl from "./wasmer-thread.worker?worker&url";
 
 const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
@@ -42,48 +42,53 @@ scope.addEventListener("message", (event: MessageEvent<PythonStageRequest>) => {
 
 async function compile(message: PythonStageRequest): Promise<PythonFrontendResult> {
   if (message.type !== "compile") throw new Error("The Python stage received an invalid request.");
-  await init({
-    log: "warn",
-    module: new URL(wasmerWasmUrl, workerBaseUrl),
-    workerUrl: new URL(wasmerThreadWorkerUrl, workerBaseUrl),
-  });
-  const runtime = new Runtime({ registry: null });
-  const packageBytes = await loadPythonPackage(message.assetBaseUrl);
-  const pkg = await Wasmer.fromFile(packageBytes, runtime);
-  const command = pkg.commands.python;
-  if (!command) throw new Error(`Package '${PYTHON_PACKAGE}' does not expose python.`);
-  const request = message.request;
-  const pythonFiles = request.files.filter((file) => file.path.endsWith(".py"));
-  const project = new Directory(Object.fromEntries(request.files.map((file) => [`/${file.path}`, file.content])));
-  await project.createDir("/build");
-  const instance = await command.run({
-    args: ["-c", compileScript(pythonFiles.map((file) => file.path))],
-    cwd: "/project",
-    env: {
-      PYTHONHOME: "/usr/local",
-      PYTHONHASHSEED: "0",
-      PYTHONDONTWRITEBYTECODE: "1",
-    },
-    mount: { "/project": project },
-  });
-  void instance;
-  const completion = await waitForCompletion(project);
-  const bytecode: Record<string, Uint8Array> = {};
-  if (completion.success) {
-    for (const file of pythonFiles) {
-      const compiledPath = `build/${file.path.replace(/\.py$/, ".pyc")}`;
-      const compiled = await project.readFile(`/${compiledPath}`);
-      if (compiled.byteLength <= 16) throw new Error(`Python produced an incomplete '${compiledPath}'.`);
-      bytecode[compiledPath] = compiled;
+  const bootstrap = createModuleWorkerBootstrap(new URL(wasmerThreadWorkerUrl, workerBaseUrl));
+  try {
+    await init({
+      log: "warn",
+      module: new URL(wasmerWasmUrl, workerBaseUrl),
+      workerUrl: bootstrap.url,
+    });
+    const runtime = new Runtime({ registry: null });
+    const packageBytes = await loadPythonPackage(message.assetBaseUrl);
+    const pkg = await Wasmer.fromFile(packageBytes, runtime);
+    const command = pkg.commands.python;
+    if (!command) throw new Error(`Package '${PYTHON_PACKAGE}' does not expose python.`);
+    const request = message.request;
+    const pythonFiles = request.files.filter((file) => file.path.endsWith(".py"));
+    const project = new Directory(Object.fromEntries(request.files.map((file) => [`/${file.path}`, file.content])));
+    await project.createDir("/build");
+    const instance = await command.run({
+      args: ["-c", compileScript(pythonFiles.map((file) => file.path))],
+      cwd: "/project",
+      env: {
+        PYTHONHOME: "/usr/local",
+        PYTHONHASHSEED: "0",
+        PYTHONDONTWRITEBYTECODE: "1",
+      },
+      mount: { "/project": project },
+    });
+    void instance;
+    const completion = await waitForCompletion(project);
+    const bytecode: Record<string, Uint8Array> = {};
+    if (completion.success) {
+      for (const file of pythonFiles) {
+        const compiledPath = `build/${file.path.replace(/\.py$/, ".pyc")}`;
+        const compiled = await project.readFile(`/${compiledPath}`);
+        if (compiled.byteLength <= 16) throw new Error(`Python produced an incomplete '${compiledPath}'.`);
+        bytecode[compiledPath] = compiled;
+      }
     }
+    return {
+      success: completion.success,
+      bytecode,
+      stdout: "",
+      stderr: completion.stderr,
+      diagnostics: parsePythonDiagnostics(completion.stderr),
+    };
+  } finally {
+    bootstrap.revoke();
   }
-  return {
-    success: completion.success,
-    bytecode,
-    stdout: "",
-    stderr: completion.stderr,
-    diagnostics: parsePythonDiagnostics(completion.stderr),
-  };
 }
 
 async function loadPythonPackage(assetBaseUrl: string): Promise<Uint8Array> {
