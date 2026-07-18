@@ -58,6 +58,9 @@ import { registerToolchainCache } from "@/src/storage/service-worker";
 import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+const SITES_CHUNK_MANIFEST_URL = process.env.NODE_ENV === "production"
+  ? "/toolchains/forge-sites-chunks.json"
+  : undefined;
 
 type BottomTab = "judge" | "diagnostics" | "output" | "console";
 type BusyAction = "build" | "run" | "judge" | "cache" | undefined;
@@ -227,28 +230,33 @@ export function JudgeStudio() {
   }, [project]);
 
   useEffect(() => {
-    const compiler = new BrowserForgeCompiler();
-    const compilation = new CompileCoordinator(compiler, {
-      load: loadArtifact,
-      save: saveArtifact,
-      delete: deleteArtifact,
-      clear: clearArtifactCache,
-    });
-    const runner = new BrowserForgeRunner();
     const storageCoordinator = createDefaultBrowserStorageCoordinator();
-    compilerRef.current = compiler;
-    compileCoordinatorRef.current = compilation;
-    runnerRef.current = runner;
     storageCoordinatorRef.current = storageCoordinator;
-    compiler.onProgress(setProgress);
-    runner.onProgress(setProgress);
-    runner.onStream((stream, chunk) => {
-      if (!judgingRef.current) addLog(stream, chunk);
-    });
+    let compilation: CompileCoordinator | undefined;
+    let runner: BrowserForgeRunner | undefined;
+    let disposed = false;
     void (async () => {
       try {
-        await registerToolchainCache({ chunkManifestUrl: "/toolchains/forge-sites-chunks.json" });
+        await registerToolchainCache({ chunkManifestUrl: SITES_CHUNK_MANIFEST_URL });
+        if (disposed) return;
+        const compiler = new BrowserForgeCompiler();
+        compilation = new CompileCoordinator(compiler, {
+          load: loadArtifact,
+          save: saveArtifact,
+          delete: deleteArtifact,
+          clear: clearArtifactCache,
+        });
+        runner = new BrowserForgeRunner();
+        compilerRef.current = compiler;
+        compileCoordinatorRef.current = compilation;
+        runnerRef.current = runner;
+        compiler.onProgress(setProgress);
+        runner.onProgress(setProgress);
+        runner.onStream((stream, chunk) => {
+          if (!judgingRef.current) addLog(stream, chunk);
+        });
         await storageCoordinator.requestPersistence();
+        if (disposed) return;
         try {
           setSolved(decodeSolvedProgress(localStorage.getItem(JUDGE_PROGRESS_KEY), VALID_PROBLEM_IDS));
         } catch (error) {
@@ -256,6 +264,7 @@ export function JudgeStudio() {
           addLog("stderr", error instanceof Error ? error.message : String(error));
         }
         const restored = await loadLatestProject();
+        if (disposed) return;
         const restoredProblemId = restored ? problemIdFromProject(restored) : undefined;
         const restoredProblem = restoredProblemId ? problemById(restoredProblemId) : undefined;
         if (
@@ -268,18 +277,22 @@ export function JudgeStudio() {
           setProblemId(restoredProblem.id);
         }
         const storageReport = await storageCoordinator.estimate();
+        if (disposed) return;
         setStorage({ usage: storageReport.usage, quota: storageReport.quota });
         setHydrated(true);
         await Promise.all([compiler.ready(), runner.ready()]);
+        if (disposed) return;
         setRuntimeReady(true);
       } catch (error) {
+        if (disposed) return;
         addLog("stderr", error instanceof Error ? error.message : String(error));
         setHydrated(true);
       }
     })();
     return () => {
-      compilation.dispose();
-      runner.dispose();
+      disposed = true;
+      compilation?.dispose();
+      runner?.dispose();
     };
   }, [addLog]);
 

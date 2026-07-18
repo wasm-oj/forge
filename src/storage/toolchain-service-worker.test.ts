@@ -15,13 +15,21 @@ interface WorkerHarness {
   };
   fetch: ReturnType<typeof vi.fn>;
   warnings: ReturnType<typeof vi.fn>;
+  configure(path: string | null): Promise<unknown>;
 }
 
-async function serviceWorkerHarness(options: { chunkManifestPath?: string } = {}): Promise<WorkerHarness> {
+const persistedManifestUrl = "https://forge.test/__forge__/sites-toolchain-chunks";
+
+async function serviceWorkerHarness(options: { persistedManifest?: string } = {}): Promise<WorkerHarness> {
   const listeners = new Map<string, (event: Record<string, unknown>) => void>();
   const claim = vi.fn(async () => undefined);
   const cache = {
-    match: vi.fn(async () => undefined),
+    match: vi.fn(async (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : new URL(input.toString(), "https://forge.test").href;
+      return url === persistedManifestUrl && options.persistedManifest !== undefined
+        ? new Response(options.persistedManifest)
+        : undefined;
+    }),
     put: vi.fn(async () => undefined),
     keys: vi.fn(async () => []),
     delete: vi.fn(async () => true),
@@ -34,6 +42,7 @@ async function serviceWorkerHarness(options: { chunkManifestPath?: string } = {}
     Request,
     Response,
     Headers,
+    ReadableStream,
     TextDecoder,
     Uint8Array,
     crypto: webcrypto,
@@ -51,15 +60,25 @@ async function serviceWorkerHarness(options: { chunkManifestPath?: string } = {}
       },
     },
   });
-  if (options.chunkManifestPath) {
-    const accepted = vi.fn();
+  const configure = async (path: string | null): Promise<unknown> => {
+    let answer: unknown;
+    let lifetime: Promise<unknown> | undefined;
     listeners.get("message")?.({
-      data: { type: "configure-toolchain-chunks", path: options.chunkManifestPath },
-      ports: [{ postMessage: accepted }],
+      data: { type: "configure-toolchain-chunks", path },
+      ports: [{ postMessage(value: unknown) { answer = value; } }],
+      waitUntil(promise: Promise<unknown>) { lifetime = promise; },
     });
-    expect(accepted).toHaveBeenCalledWith({ ok: true });
-  }
-  return { listeners, claim, cache, fetch, warnings };
+    await lifetime;
+    return answer;
+  };
+  return { listeners, claim, cache, fetch, warnings, configure };
+}
+
+function acceptingWorker(state: ServiceWorkerState = "activated") {
+  const postMessage = vi.fn((_message: unknown, transfer: Transferable[]) => {
+    (transfer[0] as MessagePort).postMessage({ ok: true });
+  });
+  return { state, postMessage };
 }
 
 describe("toolchain cache service worker", () => {
@@ -68,8 +87,9 @@ describe("toolchain cache service worker", () => {
   });
 
   it("registers the exported worker at a consumer-configured URL and scope", async () => {
+    const worker = acceptingWorker();
     const registration = {
-      active: { state: "activated" },
+      active: worker,
       installing: null,
       waiting: null,
     } as unknown as ServiceWorkerRegistration;
@@ -82,19 +102,27 @@ describe("toolchain cache service worker", () => {
     })).resolves.toBe(registration);
     expect(register).toHaveBeenCalledWith(
       "/assets/forge-toolchains.js",
-      { scope: "/judge/" },
+      { scope: "/judge/", updateViaCache: "none" },
+    );
+    expect(worker.postMessage).toHaveBeenCalledWith(
+      { type: "configure-toolchain-chunks", path: null },
+      [expect.any(MessagePort)],
     );
   });
 
   it("waits for its own registration instead of an unrelated ready scope", async () => {
     let state: ServiceWorkerState = "installing";
     let stateChange: (() => void) | undefined;
+    const postMessage = vi.fn((_message: unknown, transfer: Transferable[]) => {
+      (transfer[0] as MessagePort).postMessage({ ok: true });
+    });
     const worker = {
       get state() { return state; },
       addEventListener(type: string, listener: () => void) {
         if (type === "statechange") stateChange = listener;
       },
       removeEventListener: vi.fn(),
+      postMessage,
     } as unknown as ServiceWorker;
     const registration = {
       active: null,
@@ -114,6 +142,40 @@ describe("toolchain cache service worker", () => {
     state = "activated";
     stateChange?.();
     await expect(pending).resolves.toBe(registration);
+  });
+
+  it("configures an updating worker instead of the stale active worker", async () => {
+    let state: ServiceWorkerState = "installing";
+    let stateChange: (() => void) | undefined;
+    const oldWorker = acceptingWorker();
+    const postMessage = vi.fn((_message: unknown, transfer: Transferable[]) => {
+      (transfer[0] as MessagePort).postMessage({ ok: true });
+    });
+    const installingWorker = {
+      get state() { return state; },
+      addEventListener(type: string, listener: () => void) {
+        if (type === "statechange") stateChange = listener;
+      },
+      removeEventListener: vi.fn(),
+      postMessage,
+    } as unknown as ServiceWorker;
+    const registration = {
+      active: oldWorker,
+      installing: installingWorker,
+      waiting: null,
+    } as unknown as ServiceWorkerRegistration;
+    vi.stubGlobal("navigator", {
+      serviceWorker: { register: vi.fn(async () => registration) },
+    });
+
+    const pending = registerToolchainCache();
+    await Promise.resolve();
+    expect(oldWorker.postMessage).not.toHaveBeenCalled();
+    state = "activated";
+    stateChange?.();
+    await pending;
+
+    expect(postMessage).toHaveBeenCalledOnce();
   });
 
   it("claims clients without carrying an old-contract cache migration path", async () => {
@@ -170,7 +232,7 @@ describe("toolchain cache service worker", () => {
 
   it("assembles a build-configured chunk transport and verifies every part", async () => {
     const manifestPath = "/toolchains/forge-sites-chunks.json";
-    const harness = await serviceWorkerHarness({ chunkManifestPath: manifestPath });
+    const harness = await serviceWorkerHarness();
     const parts = [new TextEncoder().encode("verified "), new TextEncoder().encode("toolchain")];
     const body = Buffer.concat(parts);
     const sha256 = createHash("sha256").update(body).digest("hex");
@@ -191,6 +253,9 @@ describe("toolchain cache service worker", () => {
       if (index >= 0) return new Response(parts[index]);
       throw new Error(`Unexpected network request '${url.pathname}'.`);
     });
+    await expect(harness.configure(manifestPath)).resolves.toEqual({ ok: true });
+    expect(harness.claim).toHaveBeenCalledOnce();
+    harness.cache.put.mockClear();
     let response: Promise<Response> | undefined;
     harness.listeners.get("fetch")?.({
       request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${sha256}`),
@@ -199,12 +264,12 @@ describe("toolchain cache service worker", () => {
     });
 
     expect(await (await response!).text()).toBe("verified toolchain");
-    expect(harness.cache.put).toHaveBeenCalledOnce();
+    expect(harness.cache.put).toHaveBeenCalledTimes(parts.length);
   });
 
   it("fails closed when a deployment chunk does not match its manifest", async () => {
     const manifestPath = "/toolchains/forge-sites-chunks.json";
-    const harness = await serviceWorkerHarness({ chunkManifestPath: manifestPath });
+    const harness = await serviceWorkerHarness();
     const expected = createHash("sha256").update("expected").digest("hex");
     const chunkSha256 = createHash("sha256").update("expected").digest("hex");
     harness.fetch.mockImplementation(async (input: RequestInfo | URL) => {
@@ -226,6 +291,8 @@ describe("toolchain cache service worker", () => {
       }
       return new Response("tampered");
     });
+    await expect(harness.configure(manifestPath)).resolves.toEqual({ ok: true });
+    harness.cache.put.mockClear();
     let response: Promise<Response> | undefined;
     harness.listeners.get("fetch")?.({
       request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${expected}`),
@@ -233,7 +300,38 @@ describe("toolchain cache service worker", () => {
       waitUntil() {},
     });
 
-    expect((await response!).status).toBe(502);
+    await expect((await response!).text()).rejects.toThrow("failed integrity verification");
     expect(harness.cache.put).not.toHaveBeenCalled();
+  });
+
+  it("restores the verified chunk manifest after the worker process restarts", async () => {
+    const body = "persistent transport";
+    const sha256 = createHash("sha256").update(body).digest("hex");
+    const chunkSha256 = createHash("sha256").update(body).digest("hex");
+    const manifest = JSON.stringify({
+      schema: "wasm-oj-forge-v1/sites-toolchain-chunks",
+      assets: [{
+        path: "/toolchains/compiler.bin",
+        byteLength: body.length,
+        sha256,
+        chunks: [{
+          path: "/toolchains/compiler.bin.forge-chunk-000",
+          byteLength: body.length,
+          sha256: chunkSha256,
+        }],
+      }],
+    });
+    const harness = await serviceWorkerHarness({ persistedManifest: manifest });
+    harness.fetch.mockResolvedValue(new Response(body));
+    let response: Promise<Response> | undefined;
+
+    harness.listeners.get("fetch")?.({
+      request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${sha256}`),
+      respondWith(promise: Promise<Response>) { response = promise; },
+      waitUntil() {},
+    });
+
+    expect(await (await response!).text()).toBe(body);
+    expect(harness.cache.match).toHaveBeenCalledWith(expect.objectContaining({ url: persistedManifestUrl }));
   });
 });

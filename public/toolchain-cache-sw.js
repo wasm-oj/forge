@@ -1,24 +1,32 @@
 const CACHE_NAME = "wasm-oj-forge-v1:toolchains";
+const TRANSPORT_CONFIGURATION_CACHE_NAME = "wasm-oj-forge-v1:toolchain-transport";
 const SHA256 = /^[a-f0-9]{64}$/;
 const CHUNK_MANIFEST_SCHEMA = "wasm-oj-forge-v1/sites-toolchain-chunks";
 const MAX_CHUNK_MANIFEST_BYTES = 1024 * 1024;
 const MAX_CHUNKED_ASSET_BYTES = 512 * 1024 * 1024;
 const MAX_CHUNKS_PER_ASSET = 64;
 const MAX_CHUNK_BYTES = 25 * 1024 * 1024;
-let deploymentChunkManifestPath;
+const CHUNK_MANIFEST_CACHE_KEY = "/__forge__/sites-toolchain-chunks";
 let deploymentChunkManifest;
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
 self.addEventListener("message", (event) => {
-  if (!event.data || event.data.type !== "configure-toolchain-chunks" || event.data.path !== "/toolchains/forge-sites-chunks.json") {
+  if (!event.data || event.data.type !== "configure-toolchain-chunks"
+    || (event.data.path !== null && event.data.path !== "/toolchains/forge-sites-chunks.json")) {
     event.ports[0]?.postMessage({ ok: false });
     return;
   }
-  deploymentChunkManifestPath = event.data.path;
-  deploymentChunkManifest = undefined;
-  event.ports[0]?.postMessage({ ok: true });
+  const operation = configureDeploymentChunkManifest(event.data.path)
+    .then(
+      () => event.ports[0]?.postMessage({ ok: true }),
+      (error) => {
+        console.warn("Forge toolchain chunk configuration failed.", error);
+        event.ports[0]?.postMessage({ ok: false });
+      },
+    );
+  event.waitUntil(operation);
 });
 
 self.addEventListener("fetch", (event) => {
@@ -56,6 +64,9 @@ async function loadVerifiedToolchain(request, url, expectedSha256) {
   const network = await fetchDeploymentAsset(request, url, expectedSha256);
   const response = network.response;
   if (!response.ok) return { response, persistence: Promise.resolve() };
+  if (network.chunked) {
+    return { response, persistence: Promise.resolve() };
+  }
   const { digest: actual, byteLength } = network.verification
     ?? await responseSha256(response.clone());
   if (actual !== expectedSha256) {
@@ -86,58 +97,129 @@ async function loadVerifiedToolchain(request, url, expectedSha256) {
 }
 
 async function fetchDeploymentAsset(request, url, expectedSha256) {
-  if (deploymentChunkManifestPath === undefined) {
-    return { response: await fetch(request) };
-  }
   const manifest = await loadDeploymentChunkManifest();
-  const asset = manifest.get(url.pathname);
+  const asset = manifest?.get(url.pathname);
   if (!asset) return { response: await fetch(request) };
   if (asset.sha256 !== expectedSha256) {
     return {
       response: failureResponse(`Chunk manifest digest for '${url.pathname}' does not match the pinned request.`),
     };
   }
-  const bytes = new Uint8Array(asset.byteLength);
-  let offset = 0;
-  for (const chunk of asset.chunks) {
-    const chunkUrl = new URL(chunk.path, self.location.origin);
-    chunkUrl.searchParams.set("sha256", chunk.sha256);
-    const response = await fetch(chunkUrl);
-    if (!response.ok) {
-      return { response: failureResponse(`Unable to load pinned toolchain chunk '${chunk.path}' (${response.status}).`) };
-    }
-    const chunkBytes = new Uint8Array(await response.arrayBuffer());
-    const actual = await bytesSha256(chunkBytes);
-    if (chunkBytes.byteLength !== chunk.byteLength || actual !== chunk.sha256) {
-      return { response: failureResponse(`Pinned toolchain chunk '${chunk.path}' failed integrity verification.`) };
-    }
-    bytes.set(chunkBytes, offset);
-    offset += chunkBytes.byteLength;
-  }
-  const digest = await bytesSha256(bytes);
+  let index = 0;
+  const body = new ReadableStream({
+    async pull(controller) {
+      if (index >= asset.chunks.length) {
+        controller.close();
+        return;
+      }
+      try {
+        controller.enqueue(await loadVerifiedChunk(asset.chunks[index]));
+        index += 1;
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+  });
   return {
-    response: new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } }),
-    verification: { digest, byteLength: bytes.byteLength },
+    response: new Response(body, {
+      headers: {
+        "Content-Length": String(asset.byteLength),
+        "Content-Type": "application/octet-stream",
+      },
+    }),
+    chunked: true,
   };
+}
+
+async function loadVerifiedChunk(chunk) {
+  const chunkUrl = new URL(chunk.path, self.location.origin);
+  chunkUrl.searchParams.set("sha256", chunk.sha256);
+  const request = new Request(chunkUrl);
+  let cache;
+  let response;
+  let cacheHit = false;
+  try {
+    cache = await caches.open(CACHE_NAME);
+    response = await cache.match(request);
+    cacheHit = response !== undefined;
+  } catch (error) {
+    console.warn(`Forge toolchain chunk cache read failed for '${chunk.path}'.`, error);
+  }
+  if (!response) {
+    response = await fetch(request);
+    if (!response.ok) {
+      throw new Error(`Unable to load pinned toolchain chunk '${chunk.path}' (${response.status}).`);
+    }
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const actual = await bytesSha256(bytes);
+  if (bytes.byteLength !== chunk.byteLength || actual !== chunk.sha256) {
+    if (cache) await cache.delete(request);
+    throw new Error(`Pinned toolchain chunk '${chunk.path}' failed integrity verification.`);
+  }
+  if (cache && !cacheHit) {
+    try {
+      await cache.put(request, withStorageMetadata(new Response(bytes), bytes.byteLength));
+    } catch (error) {
+      console.warn(`Forge toolchain chunk cache write failed for '${chunk.path}'.`, error);
+    }
+  }
+  return bytes;
 }
 
 async function loadDeploymentChunkManifest() {
   deploymentChunkManifest ??= (async () => {
-    const response = await fetch(new URL(deploymentChunkManifestPath, self.location.origin), { cache: "no-cache" });
-    if (!response.ok) throw new Error(`Unable to load Forge deployment chunk manifest (${response.status}).`);
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength === 0 || bytes.byteLength > MAX_CHUNK_MANIFEST_BYTES) {
-      throw new Error("Forge deployment chunk manifest exceeds its byte limit.");
-    }
-    let value;
-    try {
-      value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    } catch (error) {
-      throw new Error("Forge deployment chunk manifest is not valid UTF-8 JSON.", { cause: error });
-    }
-    return validateDeploymentChunkManifest(value);
+    const cache = await caches.open(TRANSPORT_CONFIGURATION_CACHE_NAME);
+    const response = await cache.match(chunkManifestCacheRequest());
+    if (!response) return undefined;
+    return (await decodeDeploymentChunkManifest(response)).manifest;
   })();
   return deploymentChunkManifest;
+}
+
+async function configureDeploymentChunkManifest(path) {
+  const cache = await caches.open(TRANSPORT_CONFIGURATION_CACHE_NAME);
+  const cacheRequest = chunkManifestCacheRequest();
+  deploymentChunkManifest = undefined;
+  if (path === null) {
+    await cache.delete(cacheRequest);
+  } else {
+    const response = await fetch(new URL(path, self.location.origin), { cache: "no-cache" });
+    if (!response.ok) throw new Error(`Unable to load Forge deployment chunk manifest (${response.status}).`);
+    const decoded = await decodeDeploymentChunkManifest(response);
+    await deleteAssembledAssetCacheEntries(decoded.manifest);
+    await cache.put(cacheRequest, new Response(decoded.bytes, {
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    }));
+    deploymentChunkManifest = Promise.resolve(decoded.manifest);
+  }
+  await self.clients.claim();
+}
+
+async function deleteAssembledAssetCacheEntries(manifest) {
+  const cache = await caches.open(CACHE_NAME);
+  const keys = await cache.keys();
+  await Promise.all(keys
+    .filter((request) => manifest.has(new URL(request.url).pathname))
+    .map((request) => cache.delete(request)));
+}
+
+async function decodeDeploymentChunkManifest(response) {
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_CHUNK_MANIFEST_BYTES) {
+    throw new Error("Forge deployment chunk manifest exceeds its byte limit.");
+  }
+  let value;
+  try {
+    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch (error) {
+    throw new Error("Forge deployment chunk manifest is not valid UTF-8 JSON.", { cause: error });
+  }
+  return { bytes, manifest: validateDeploymentChunkManifest(value) };
+}
+
+function chunkManifestCacheRequest() {
+  return new Request(new URL(CHUNK_MANIFEST_CACHE_KEY, self.location.origin));
 }
 
 function validateDeploymentChunkManifest(value) {

@@ -178,8 +178,10 @@ Size-limited static deployments may additionally pass
 `chunkManifestUrl: "/toolchains/forge-sites-chunks.json"` after generating that
 canonical manifest and its content-addressed parts. This mode is explicit: npm
 consumers serving the canonical monolithic assets do not probe for, or silently
-fall back through, a second transport. Every configured chunk and the
-reconstructed asset are SHA-256 verified before use.
+fall back through, a second transport. The service worker verifies each chunk's
+declared length and SHA-256 before streaming it, and the compiler worker verifies
+the reconstructed compressed asset against its pinned SHA-256 before
+decompression or use.
 `prepack` performs both build and verification, including real registration of
 the service-worker asset from the packed tarball.
 
