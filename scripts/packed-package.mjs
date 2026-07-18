@@ -29,13 +29,13 @@ function checkedManifestPath(value) {
     || path.posix.isAbsolute(value)
     || value.split("/").some((segment) => segment === "" || segment === "." || segment === "..")
   ) {
-    throw new Error(`npm pack returned an unsafe package path '${String(value)}'.`);
+    throw new Error(`pnpm pack returned an unsafe package path '${String(value)}'.`);
   }
   return value;
 }
 
-/** Creates and extracts the exact npm tarball without running package lifecycle scripts. */
-export async function unpackNpmPackage(repositoryRoot, temporaryPrefix) {
+/** Creates and extracts the exact publish tarball without running package lifecycle scripts. */
+export async function unpackPublishPackage(repositoryRoot, temporaryPrefix) {
   const temporary = await mkdtemp(path.join(os.tmpdir(), temporaryPrefix));
   try {
     const packDestination = path.join(temporary, "tarball");
@@ -45,27 +45,27 @@ export async function unpackNpmPackage(repositoryRoot, temporaryPrefix) {
       mkdir(packageRoot, { recursive: true }),
     ]);
 
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+    const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
     const { stdout } = await run(
-      npm,
-      ["pack", "--json", "--ignore-scripts", "--dry-run=false", "--pack-destination", packDestination],
+      pnpm,
+      ["--config.ignore-scripts=true", "pack", "--json", "--pack-destination", packDestination],
       { cwd: repositoryRoot, maxBuffer: 16 * 1024 * 1024 },
     );
     const result = JSON.parse(stdout);
     if (
-      !Array.isArray(result)
-      || result.length !== 1
-      || typeof result[0]?.filename !== "string"
-      || !Array.isArray(result[0]?.files)
+      result === null
+      || typeof result !== "object"
+      || Array.isArray(result)
+      || typeof result.filename !== "string"
+      || !Array.isArray(result.files)
     ) {
-      throw new Error("npm pack returned an unexpected manifest.");
+      throw new Error("pnpm pack returned an unexpected manifest.");
     }
 
-    const filename = path.basename(result[0].filename);
-    if (filename !== result[0].filename) {
-      throw new Error(`npm pack returned an unsafe tarball filename '${result[0].filename}'.`);
+    const tarball = path.resolve(result.filename);
+    if (path.dirname(tarball) !== path.resolve(packDestination)) {
+      throw new Error(`pnpm pack returned a tarball outside its destination: '${result.filename}'.`);
     }
-    const tarball = path.join(packDestination, filename);
     await access(tarball);
     await run("tar", [
       "--extract",
@@ -75,13 +75,13 @@ export async function unpackNpmPackage(repositoryRoot, temporaryPrefix) {
       "--strip-components=1",
     ], { maxBuffer: 4 * 1024 * 1024 });
 
-    const manifestFiles = new Set(result[0].files.map(({ path: packedPath }) => checkedManifestPath(packedPath)));
+    const manifestFiles = new Set(result.files.map(({ path: packedPath }) => checkedManifestPath(packedPath)));
     const extractedFiles = new Set(await filesBelow(packageRoot));
     const missing = [...manifestFiles].filter((file) => !extractedFiles.has(file));
     const unexpected = [...extractedFiles].filter((file) => !manifestFiles.has(file));
     if (missing.length > 0 || unexpected.length > 0) {
       throw new Error(
-        "Extracted npm tarball differs from its manifest."
+        "Extracted publish tarball differs from its manifest."
         + `${missing.length > 0 ? ` Missing: ${missing.sort().join(", ")}.` : ""}`
         + `${unexpected.length > 0 ? ` Unexpected: ${unexpected.sort().join(", ")}.` : ""}`,
       );
@@ -90,7 +90,7 @@ export async function unpackNpmPackage(repositoryRoot, temporaryPrefix) {
     return {
       packageRoot,
       packedFiles: manifestFiles,
-      packResult: result[0],
+      packResult: result,
       cleanup: () => rm(temporary, { recursive: true, force: true }),
     };
   } catch (error) {

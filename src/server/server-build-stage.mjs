@@ -1,10 +1,16 @@
 import { writeFileSync } from "node:fs";
-import { serialize } from "node:v8";
+import { deserialize, serialize } from "node:v8";
 import { buildServerProjectInProcess } from "./server-compiler.ts";
+import { readBoundedRegularFile } from "./bounded-transport.ts";
+
+const SERVER_BUILD_REQUEST_LIMIT_BYTES = 768 * 1024 * 1024;
 
 try {
   const responsePath = requiredResponsePath();
-  const encoded = JSON.parse(await readStdin());
+  const encoded = deserialize(await readBoundedRegularFile(
+    requiredRequestPath(),
+    SERVER_BUILD_REQUEST_LIMIT_BYTES,
+  ));
   const result = await buildServerProjectInProcess(
     {
       compilerExecutable: encoded.compilerExecutable,
@@ -30,8 +36,8 @@ function requiredResponsePath() {
   return value;
 }
 
-async function readStdin() {
-  const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
-  return Buffer.concat(chunks).toString("utf8");
+function requiredRequestPath() {
+  const value = process.env.FORGE_BUILD_REQUEST;
+  if (!value) throw new Error("FORGE_BUILD_REQUEST is required.");
+  return value;
 }

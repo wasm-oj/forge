@@ -134,7 +134,7 @@ async function main() {
       suite === "full" ? "FORGE_CONFORMANCE_SUITE=full" : "",
       requestedCases.length > 0 ? `FORGE_CONFORMANCE_CASES=${requestedCases.join(",")}` : "",
       repetitions === 3 ? "" : `FORGE_CONFORMANCE_REPETITIONS=${repetitions}`,
-      urlArgument ? `npm run conformance:browser -- ${urlArgument}` : "npm run conformance:browser",
+      urlArgument ? `pnpm run conformance:browser ${urlArgument}` : "pnpm run conformance:browser",
     ].filter(Boolean).join(" "),
     gitHead: git("rev-parse", "HEAD"),
     worktreeStatus: git("status", "--short"),
@@ -215,7 +215,8 @@ function isLoopbackHostname(hostname) {
 
 function startServer() {
   return new Promise((resolve, reject) => {
-    const child = spawn("npm", ["run", "dev"], {
+    const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+    const child = spawn(pnpm, ["run", "dev"], {
       cwd: process.cwd(),
       env: { ...process.env, NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],

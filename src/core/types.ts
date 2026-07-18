@@ -1,4 +1,5 @@
 import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "./contract.ts";
+import type { DependencyBuildBundle } from "../dependencies/build.ts";
 
 export const LANGUAGES = Object.freeze([
   "c",
@@ -127,6 +128,8 @@ export interface Project {
   config: ProjectConfig;
   activeFile: string;
   updatedAt: number;
+  /** Verified archive-independent dependency input, if this project uses packages. */
+  dependencies?: DependencyBuildBundle;
 }
 
 export type DiagnosticSeverity = "error" | "warning" | "info";
@@ -159,6 +162,8 @@ export interface ArtifactMetadata {
   toolchains: string[];
   /** Trusted empty-program cost profile selected by the compiler contract. */
   costProfile: string;
+  /** Canonical dependency lock used for this build. */
+  dependencyLockSha256?: string;
 }
 
 export interface WasmArtifact extends ArtifactMetadata {
@@ -252,6 +257,18 @@ export interface WorkerProgress {
   progress?: number;
 }
 
+/** Content-pinned host extension loaded inside the browser runner Worker. */
+export interface BrowserRuntimeDriverPlugin {
+  /** Stable host-selected identity; the constructed RuntimeDriver must use the same ID. */
+  id: string;
+  /** Same-origin URL of one self-contained ESM module. */
+  moduleUrl: string;
+  /** Lowercase SHA-256 of the exact ESM source bytes. */
+  sha256: string;
+  /** Named factory export. Defaults to `createRuntimeDriver`. */
+  exportName?: string;
+}
+
 export type CompilerTraceOperation =
   | "workerInitialize"
   | "toolchainFetch"
@@ -293,6 +310,7 @@ export type RunnerRequest =
     requestId: string;
     assetBaseUrl?: string;
     additionalCostBaselines?: Readonly<Record<string, number>>;
+    runtimeDriverPlugins?: readonly BrowserRuntimeDriverPlugin[];
   }
   | { type: "run"; requestId: string; artifact: BuildArtifact; config: RunConfig }
   | {

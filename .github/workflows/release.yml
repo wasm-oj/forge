@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out the release tag and LFS assets
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          lfs: true
+          persist-credentials: false
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
+        with:
+          version: 10.21.0
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+      - name: Verify LFS object integrity
+        run: git lfs fsck
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run the complete release gate
+        run: pnpm run ci:verify
+      - name: Pack and verify the exact release artifact
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/forge-release"
+          mkdir -p "$release_dir"
+          pnpm pack --pack-destination "$release_dir"
+          mapfile -t tarballs < <(find "$release_dir" -maxdepth 1 -type f -name '*.tgz' -print)
+          test "${#tarballs[@]}" -eq 1
+          pnpm run release:verify "$GITHUB_REF_NAME" "${tarballs[0]}"
+          echo "tarball=${tarballs[0]}" >> "$GITHUB_OUTPUT"
+          echo "checksum=${tarballs[0]}.sha256" >> "$GITHUB_OUTPUT"
+      - name: Attest the release artifact
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-path: ${{ steps.package.outputs.tarball }}
+      - name: Create or update the draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARBALL: ${{ steps.package.outputs.tarball }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$TARBALL" "$CHECKSUM" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$TARBALL" "$CHECKSUM" \
+              --draft --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+          fi
+      - name: Publish the verified tarball to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
+          TARBALL: ${{ steps.package.outputs.tarball }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_spec="$(node -p "const p=require('./package.json'); p.name+'@'+p.version")"
+          registry_dir="$RUNNER_TEMP/forge-registry"
+          mkdir -p "$registry_dir"
+          if pnpm view "$package_spec" version >/dev/null 2>&1; then
+            pnpm pack "$package_spec" --pack-destination "$registry_dir"
+            mapfile -t published < <(find "$registry_dir" -maxdepth 1 -type f -name '*.tgz' -print)
+            test "${#published[@]}" -eq 1
+            cmp --silent "$TARBALL" "${published[0]}"
+          else
+            pnpm publish "$TARBALL" --access public --no-git-checks
+          fi
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest

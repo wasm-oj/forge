@@ -143,8 +143,8 @@ describe.skipIf(!enabled)("empty-program raw cost calibration", () => {
       specPath: path.relative(process.cwd(), SPEC_PATH),
       specSha256: sha256(spec),
       executionCommand: panel === "smoke"
-        ? "FORGE_COST_BASELINE_PANEL=smoke npm run cost-baseline:calibrate"
-        : "npm run cost-baseline:calibrate",
+        ? "FORGE_COST_BASELINE_PANEL=smoke pnpm run cost-baseline:calibrate"
+        : "pnpm run cost-baseline:calibrate",
       gitHead: git("rev-parse", "HEAD"),
       worktreeStatus: git("status", "--short"),
       sourceTree: await sourceTreeProvenance(),

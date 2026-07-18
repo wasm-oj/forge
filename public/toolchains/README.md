@@ -22,11 +22,11 @@ The `.gz.bin` suffix is intentional. It prevents static hosts from treating the 
 The small TypeScript and QuickJS adapters provide deterministic stdin/stdout protocols so the toolchain does not depend on host filesystem access. Rebuild or refresh assets with:
 
 ```sh
-npm run toolchain:browser:prepare -- /absolute/path/to/wasi-sdk-24.0-arm64-macos.tar.gz
-npm run toolchain:rust:prepare -- /absolute/path/to/rust.tar.br
-npm run toolchain:go:prepare
-npm run toolchain:python:prepare -- /absolute/path/to/Python-3.14.6.tar.xz /absolute/path/to/Python-3.14.6.tar.xz.spdx.json /absolute/path/to/wasi-sdk-24.0-arm64-macos.tar.gz
-npm run toolchain:clang:prepare
+pnpm run toolchain:browser:prepare /absolute/path/to/wasi-sdk-24.0-arm64-macos.tar.gz
+pnpm run toolchain:rust:prepare /absolute/path/to/rust.tar.br
+pnpm run toolchain:go:prepare
+pnpm run toolchain:python:prepare /absolute/path/to/Python-3.14.6.tar.xz /absolute/path/to/Python-3.14.6.tar.xz.spdx.json /absolute/path/to/wasi-sdk-24.0-arm64-macos.tar.gz
+pnpm run toolchain:clang:prepare
 ```
 
 Expected SHA-256 digests:
@@ -48,7 +48,7 @@ ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161  python-3.14.6-
 
 The C/C++ `wasip1` and `wasix` Forge profiles both consume this one WASI P1 manifest. `wasix` changes artifact, cache, cost-calibration, and runtime-profile identity; it does not select another Clang target, linker command, or runtime implementation. The runner validates the module's actual imports.
 
-`npm run toolchain:browser:prepare -- /absolute/path/to/wasi-sdk-24.0-arm64-macos.tar.gz`
+`pnpm run toolchain:browser:prepare /absolute/path/to/wasi-sdk-24.0-arm64-macos.tar.gz`
 requires the official arm64 macOS WASI SDK 24.0 release archive. It verifies the
 archive SHA-256 `aeae9993…b0b3a`, the exact Clang, LLD, strip tool, crt1,
 wasi-libc, emulated-signal, libm, and compiler-rt inputs, then builds QuickJS-ng
@@ -56,7 +56,7 @@ at the pinned commit. The script strips debug sections, verifies the expanded
 Wasm SHA-256 `21fcf23a…bc2c2e`, creates deterministic gzip, and publishes both
 browser assets atomically.
 
-`npm run toolchain:python:prepare -- …` verifies the official CPython source
+`pnpm run toolchain:python:prepare …` verifies the official CPython source
 archive, its archive-bound SPDX document, and WASI SDK archive before building
 the native bootstrap interpreter and `wasm32-wasip1` interpreter from scratch.
 It requires `_socket` to be absent, canonicalizes and reads back packaged
@@ -65,9 +65,9 @@ then executes the package through Wasmer. That smoke reproduces the 10,652,546-
 byte `FORGEFS1` standard-library archive with SHA-256
 `8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba`.
 
-`npm run toolchain:clang:prepare` downloads the fixed npm archive, verifies its archive, compiler-core, and resources digests, rebuilds the WebC deterministically, asks the packaged driver for its exact job expansion, freezes the resulting cc1/link argv, and verifies every output digest. Runtime compilation uses only these verified bytes and fails explicitly if an asset or digest does not match.
+`pnpm run toolchain:clang:prepare` downloads the fixed npm archive, verifies its archive, compiler-core, and resources digests, rebuilds the WebC deterministically, asks the packaged driver for its exact job expansion, freezes the resulting cc1/link argv, and verifies every output digest. Runtime compilation uses only these verified bytes and fails explicitly if an asset or digest does not match.
 
-`npm run toolchain:rust:prepare -- /absolute/path/to/rust.tar.br` verifies the
+`pnpm run toolchain:rust:prepare /absolute/path/to/rust.tar.br` verifies the
 exact artifact from the pinned upstream Actions run, downloads and verifies the
 pinned YoWASP linker archive, and reconstructs one WebC from the rustc and LLVM
 atoms plus their matching sysroot/resource volumes. It normalizes filesystem
@@ -76,7 +76,7 @@ provenance-manifest digests, and atomically replaces both published assets. The
 source build repository pins Rust and LLVM submodules and contains the applied
 patches and complete source-traceable build workflow used for the rustc artifact.
 
-`npm run toolchain:go:prepare` verifies the official Go 1.26.5 distribution for
+`pnpm run toolchain:go:prepare` verifies the official Go 1.26.5 distribution for
 the current packaging host and records the official source-distribution URL and
 SHA-256 as stable provenance. It invokes the standard Go build to obtain the
 `wasip1/wasm` compiler, linker, and complete standard library, then packages and

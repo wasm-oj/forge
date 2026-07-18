@@ -13,8 +13,10 @@ import {
   decodeGoToolchainManifest,
   deterministicGoCompilerEnvironment,
   goCompileArguments,
+  goCompileDependencyArguments,
   goImportConfig,
   goLinkArguments,
+  reachableGoDependencies,
 } from "../compiler/go-toolchain.ts";
 
 const COMPILER_MEMORY_LIMIT_BYTES = 512 * 1024 * 1024;
@@ -37,11 +39,25 @@ try {
     `/work/${file.path}`,
     file.content,
   ]));
+  const dependencySourceFiles = Object.fromEntries((encoded.request.dependencyFiles ?? []).map((file) => [
+    `/work/${file.path}`,
+    file.content,
+  ]));
+  const dependencies = reachableGoDependencies(
+    encoded.request.files,
+    encoded.request.dependencies ?? [],
+    manifest.packages,
+  );
+  const importPackages = [
+    ...manifest.packages,
+    ...dependencies.map((item) => ({ importPath: item.importPath, archivePath: item.archivePath })),
+  ];
   const sharedFilesBase64 = Object.fromEntries(Object.entries({
     ...decodeGoStandardLibrary(standardLibrary, manifest.packages),
     ...sourceFiles,
-    "/work/importcfg": goImportConfig(manifest.packages, false),
-    "/work/importcfg.link": goImportConfig(manifest.packages, true),
+    ...dependencySourceFiles,
+    "/work/importcfg": goImportConfig(importPackages, false),
+    "/work/importcfg.link": goImportConfig(importPackages, true),
   }).map(([guestPath, contents]) => [
     guestPath,
     Buffer.from(contents).toString("base64"),
@@ -59,6 +75,12 @@ try {
     memoryLimitBytes: COMPILER_MEMORY_LIMIT_BYTES,
     sharedFilesBase64,
     requests: [
+      ...dependencies.map((dependency) => ({
+        ...common,
+        command: "go-compile",
+        args: goCompileDependencyArguments(dependency, encoded.request.optimization),
+        outputPaths: [dependency.archivePath],
+      })),
       {
         ...common,
         command: "go-compile",
@@ -76,10 +98,12 @@ try {
   const results = pipeline.responses.flatMap((response) => response.result ? [response.result] : []);
   const stdout = results.map((result) => Buffer.from(result.stdoutBase64, "base64").toString("utf8")).join("");
   const stderr = results.map((result) => Buffer.from(result.stderrBase64, "base64").toString("utf8")).join("");
-  const linked = results.at(1);
+  const linked = results.at(-1);
   const wasmBase64 = linked?.code === 0 ? linked.outputFilesBase64?.[GO_OUTPUT_PATH] : undefined;
   writeResult({
-    success: results.length === 2 && results.every((result) => result.code === 0) && typeof wasmBase64 === "string",
+    success: results.length === dependencies.length + 2
+      && results.every((result) => result.code === 0)
+      && typeof wasmBase64 === "string",
     wasmBase64,
     stdout,
     stderr,

@@ -6,9 +6,10 @@ import {
   COMPONENT_MANIFEST_PATH,
   COMPONENT_MANIFEST_SCHEMA,
 } from "./third-party-components.mjs";
+import { readPnpmLock, requireLockedPackage } from "./pnpm-lock.mjs";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const lockfile = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8"));
+const lockfile = await readPnpmLock(root);
 const runtimeLockSha256 = await fileSha256("crates/runtime-core/Cargo.lock");
 
 const commonWasiLibcLicenses = [
@@ -58,6 +59,17 @@ const definitions = [
       "licenses/cpython-hacl-star-8ba599b-MIT.txt",
       "licenses/cpython-libmpdec-2.5.1-BSD-2-Clause.txt",
     ],
+  },
+  {
+    id: "es-module-lexer",
+    name: "es-module-lexer",
+    version: "2.3.1",
+    source: {
+      url: "https://github.com/guybedford/es-module-lexer",
+      revision: "2b2e6209bac5c06c6ba457f9730014613e1128fb",
+    },
+    npm: "es-module-lexer@2.3.1",
+    licenses: ["licenses/es-module-lexer-MIT.txt"],
   },
   {
     id: "fflate",
@@ -235,10 +247,7 @@ for (const definition of definitions) {
   if (definition.npm) {
     const separator = definition.npm.lastIndexOf("@");
     const packageName = definition.npm.slice(0, separator);
-    const locked = lockfile.packages?.[`node_modules/${packageName}`];
-    if (locked?.version !== definition.npm.slice(separator + 1) || typeof locked.integrity !== "string") {
-      throw new Error(`package-lock.json does not contain '${definition.npm}'.`);
-    }
+    const locked = requireLockedPackage(lockfile, packageName, definition.npm.slice(separator + 1));
     distributions.push({ kind: "npm", package: definition.npm, integrity: locked.integrity });
   }
   distributions.sort((left, right) => compareCodePoints(identity(left), identity(right)));

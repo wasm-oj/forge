@@ -4,10 +4,12 @@
 
 ```mermaid
 flowchart LR
-  UI["Problem catalog + Monaco UI"] -->|"structured-cloned project"| CW["ForgeCompiler Web Worker"]
+  UI["Problem catalog + host application"] --> OS["Submission operation scheduler"]
+  OS -->|"structured-cloned project"| CW["ForgeCompiler Web Worker"]
   CW --> CE["Built-in compiler engine"]
   SC["ServerForgeCompiler"] --> CE
   CE --> WR["Wasmer JS runtimes"]
+  DM["Locked + verified dependency file trees"] --> CE
   CW --> RS["Browser serialized persistent Rust stage"]
   RS --> WR
   CW -.-> SW["Browser custom SDK secondary Workers"]
@@ -16,6 +18,7 @@ flowchart LR
   TC --> AR["Wasm module or runtime bundle"]
   AR --> IDB["IndexedDB artifact cache"]
   AR --> RR["Shared runtime drivers"]
+  BP["Pinned browser runtime plug-ins"] --> RR
   RR --> BW["Browser runtime-core Wasm Worker"]
   RR --> NP["Native runtime-core process"]
   BW -.-> SW
@@ -24,6 +27,7 @@ flowchart LR
   BW -->|"Wasmer 7 / WASIX"] RC["Metered disposable instance"]
   NP -->|"Wasmer 7 / WASIX"] RC
   RC -->|"stdout, stderr, exit, metrics"| JR["Judge / library caller"]
+  JR --> OS
   JR -->|"verdict + diff"| UI
   PIN["Digest-pinned same-origin assets"] --> CS["Cache Storage"]
   CS --> WR
@@ -131,20 +135,20 @@ The runner reserves `FORGE_RANDOM_SEED`, `FORGE_REALTIME_EPOCH_MS`, `FORGE_CLOCK
 
 `ForgeEngine` depends only on the `ForgeCompiler`, `ForgeRunner`, and optional `ForgeArtifactStore` interfaces. Browser and server hosts implement those interfaces independently of the judge UI. A downstream language implements `ForgeCompiler` and registers its language with `ForgeCompilerRegistry`. The registry routes both `cacheIdentity(project)` and `build(project, cacheKey)`, owns each shared compiler lifecycle once, forwards progress, rejects ambiguous language ownership, and seals registration on first use. The compiler's cache identity must be stable and must change with every compiler or toolchain input that can affect output.
 
-Execution is selected from artifact metadata through `RuntimeDriverRegistry`. A downstream compiler emitting standalone Wasm can use the built-in runtime driver after registering its calibrated cost profile; a new runtime-bundle format also requires a runtime driver. `ServerForgeRunner` accepts a custom registry. `BrowserForgeRunner` can transfer additional cost baselines into its Worker, but arbitrary driver functions cannot cross `postMessage`; a new browser runtime driver must be included in the Worker build. Judge orchestration and resource enforcement remain unchanged.
+Execution is selected from artifact metadata through `RuntimeDriverRegistry`. A downstream compiler emitting standalone Wasm can use the built-in runtime driver after registering its calibrated cost profile; a new runtime-bundle format also requires a runtime driver. `ServerForgeRunner` accepts a custom registry. Browser hosts provide declarative same-origin, SHA-256-pinned `runtimeDriverPlugins`; the runner Worker verifies and constructs each self-contained ESM driver before registry lookup. Arbitrary functions never cross `postMessage`, transitive imports are forbidden, and plug-ins run with trusted host—not guest—authority. Judge orchestration and native resource enforcement remain unchanged.
 
 Batch filesystem inputs are explicit `RunConfig.files` entries mounted into a fresh guest filesystem. Only normalized absolute `outputPaths` are collected; stdout, stderr, and those collected bytes share the captured-output boundary, while all guest file mutation is independently governed at write time by live VFS byte and inode quotas. `RunResult.files` carries defensive byte copies across both Worker and native JSON transports. Judge input providers may resolve each mounted file independently; exact file-set matching detects missing and unexpected outputs.
 
 Special checkers and interactive judges reuse `ForgeRunner` rather than introducing a privileged runtime. A Wasm checker is an ordinary standalone artifact with mounted `/checker` files and normal deterministic/resource enforcement. Interactive execution prepares two streaming-capable artifacts, assigns distinct metering stores and budgets, connects bounded in-memory pipes in both directions, and starts both Wasmer processes concurrently. The runtime captures both protocol streams and both stderr streams. Secret case files exist only in the interactor filesystem. Contestant cost is reported for scoring; interactor cost remains observable on its process result but is not charged to the submission.
 
-Dependency resolution is a separate host-neutral graph contract. Ecosystem resolvers for Cargo, npm, PyPI, Go modules, and C/C++ libraries consume tagged native manifest/lock/source files and return exact package records plus canonical payloads. Forge validates payload SHA-256, merges graphs, binds the canonical lock to a complete manifest digest, and stores content through browser IndexedDB or a symlink-resistant server filesystem cache. Offline resolution never invokes a resolver and succeeds only when the supplied lock matches the manifest and every cached payload verifies.
+Dependency resolution is a separate host-neutral graph contract. Ecosystem resolvers for Cargo, npm, PyPI, Go modules, and C/C++ libraries consume tagged native manifest/lock/source files and return exact package records plus canonical payloads. Forge validates payload SHA-256, merges graphs, binds the canonical lock to a complete manifest digest, and stores content through browser IndexedDB or a symlink-resistant server filesystem cache. Offline resolution never invokes a resolver and succeeds only when the supplied lock matches the manifest and every cached payload verifies. Before compilation, ecosystem build adapters safely extract bounded canonical file trees and bind the lock plus each tree digest into `Project`, compiler inputs, incremental object/package/link nodes, artifact metadata, and replay. Each compiler admits only its portable source subset and rejects build scripts, native extensions, or mismatched ecosystems.
 
 Every standalone module and runtime bundle carries the exact Forge contract in
 `ArtifactMetadata`. Runtime preparation validates it before driver selection or
 cost-budget resolution, so a persisted or externally supplied artifact from a
 different contract fails closed.
 
-Every `ServerForgeCompiler.build()` creates a fresh Node child containing its own Wasmer JavaScript runtime and returns one V8-serialized response through a private, one-shot temporary file. The file is created exclusively, read only after the child exits, and removed with its private directory. Multiple `ServerForgeCompiler` library instances can therefore coexist without sharing scheduler state, and cancellation kills the active compiler child. `ServerForgeRunner` uses the same hard process boundary when a runtime driver needs a pinned package command or filesystem export: a one-shot Node/Wasmer child owns every SDK `Runtime`, package, and command handle, then returns a bounded V8 response through a private file. The parent retains only digest-verified private byte copies and decoded files. Runtime preparation has a 120-second control deadline; only after it succeeds does the runner start the native `forge-runner` child and its separate guest wall-time deadline. Cancellation kills either child, and `cancelAndWait()` reaches logical quiescence before cache deletion can begin.
+Every `ServerForgeCompiler.build()` creates a fresh Node child containing its own Wasmer JavaScript runtime and returns one V8-serialized response through a private, one-shot temporary file. The file is created exclusively, read only after the child exits, and removed with its private directory. Multiple `ServerForgeCompiler` library instances can therefore coexist without sharing scheduler state, and cancellation kills the active compiler child. Browser Workers and server children share one language-aware control deadline: 60 seconds for the SDK-direct C/C++ stages, 120 seconds for Python/JavaScript/TypeScript, and 190 seconds for the pinned Rust and Go pipelines. These are emergency ceilings, not compile-speed targets; the outer host enforces them because a synchronous SDK-to-Wasm call can block the inner JavaScript event loop and its timers. `ServerForgeRunner` uses the same hard process boundary when a runtime driver needs a pinned package command or filesystem export: a one-shot Node/Wasmer child owns every SDK `Runtime`, package, and command handle, then returns a bounded V8 response through a private file. The parent retains only digest-verified private byte copies and decoded files. Browser and server runtime preparation share a 120-second control deadline, extended to 300 seconds only for CPython's one-time verified filesystem export; only after preparation succeeds does execution use the separate guest wall-time deadline. Cancellation kills either child, and `cancelAndWait()` reaches logical quiescence before cache deletion can begin.
 
 ## Storage
 
@@ -166,7 +170,7 @@ The judge editor debounces build-identity changes for 900 ms and then calls the 
 - Browser compilation and runtime setup issue static GET requests only to the configured `assetBaseUrl` (same-origin `/toolchains/` by default). These requests contain no source, stdin, environment, diagnostics, or artifact data; server hosts read their configured local toolchain directory.
 - No guest socket, network, process-spawn, or thread-spawn implementation is exposed. Supported denied imports trap before guest code can use them; unsupported imports fail module validation.
 - Toolchain packages are content-pinned. A missing file or digest mismatch fails the build explicitly.
-- Packed deployments must preserve every emitted compiler, runner, Python-stage, Rust-stage, and Wasmer secondary-worker asset at the URL referenced by its parent bundle. Removing or relocating a nested Worker is a deployment error, not a supported fallback.
+- Packed deployments must preserve every emitted compiler, runner, Python-stage, Rust-stage, Go-stage, and Wasmer secondary-worker asset at the URL referenced by its parent bundle. Removing or relocating a nested Worker is a deployment error, not a supported fallback.
 - Sites builds apply a transport-only content-addressed chunk manifest to pinned toolchain files above the provider's 25 MiB per-file limit. Before vinext indexes public assets, the build stages deterministic 16 MiB parts and their manifest; it removes the staging files afterward and removes only the oversized monolithic copies from `dist`. Vinext also emits browser Wasm into both client and SSR/server trees; the Sites build verifies those bytes are identical, retains the client-static copy, and removes the two server duplicates so the Worker remains below its 10 MiB upload limit. The Sites UI explicitly configures the service worker with the canonical chunk manifest path. The service worker validates and persists that manifest, then verifies every part's declared length and SHA-256 before caching or streaming it. The compiler worker verifies the reconstructed compressed asset against the original pinned toolchain digest before decompression or execution; library and server packages retain the canonical monolithic files and identities.
 
 ## Worker protocol

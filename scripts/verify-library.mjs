@@ -7,7 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
-import { unpackNpmPackage } from "./packed-package.mjs";
+import { unpackPublishPackage } from "./packed-package.mjs";
 import {
   COMPONENT_MANIFEST_PATH,
   readThirdPartyComponents,
@@ -270,7 +270,7 @@ const sourceComponents = await readThirdPartyComponents(root);
 const documentationFiles = await packageDocumentationFiles();
 const runtimeSourceFiles = await packageRuntimeSourceFiles();
 const sourceServiceWorker = await readFile(path.join(root, serviceWorkerFile));
-const packed = await unpackNpmPackage(root, "forge-package-verification-");
+const packed = await unpackPublishPackage(root, "forge-package-verification-");
 try {
   const { packageRoot, packedFiles } = packed;
   const packageJson = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
@@ -288,7 +288,10 @@ try {
     ...runtimeSourceFiles,
     "LICENSE",
     "README.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
     "THIRD_PARTY_NOTICES.md",
+    "pnpm-lock.yaml",
     ...documentationFiles,
     ...packedLicenseFiles,
     ...canonicalToolchainFiles,
@@ -425,8 +428,11 @@ try {
   const exactSurface = new Set([
     "package.json",
     "README.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
+    "pnpm-lock.yaml",
     ...documentationFiles,
     ...packedLicenseFiles,
     ...canonicalToolchainFiles,
@@ -442,6 +448,8 @@ try {
     packedFiles,
     [
       "README.md",
+      "CHANGELOG.md",
+      "SECURITY.md",
       "THIRD_PARTY_NOTICES.md",
       "crates/runtime-core/README.md",
       "public/toolchains/README.md",
@@ -467,8 +475,14 @@ try {
   if (packageJson.license !== "MIT" || typeof packageJson.description !== "string") {
     throw new Error("The Forge library package must declare its MIT license and description.");
   }
-  if (packageJson.publishConfig?.access !== "public") {
-    throw new Error("The scoped Forge library package must publish with public access.");
+  if (
+    packageJson.publishConfig?.access !== "public"
+    || packageJson.publishConfig?.registry !== "https://registry.npmjs.org/"
+    || packageJson.repository?.url !== "git+https://github.com/wasm-oj/forge.git"
+    || packageJson.homepage !== "https://github.com/wasm-oj/forge#readme"
+    || packageJson.bugs?.url !== "https://github.com/wasm-oj/forge/issues"
+  ) {
+    throw new Error("The scoped Forge library package must bind its public registry and wasm-oj/forge provenance metadata.");
   }
   if (packageJson.dependencies?.["@wasmer/sdk"] !== "0.10.0") {
     throw new Error("The Forge library package must pin the verified @wasmer/sdk 0.10.0 release.");
@@ -530,17 +544,13 @@ try {
     }
   }
 
-  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  await run(npm, [
+  const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  await run(pnpm, [
     "install",
-    "--dry-run=false",
+    "--prod",
     "--ignore-scripts",
-    "--no-package-lock",
-    "--no-save",
-    "--omit=dev",
+    "--lockfile=false",
     "--prefer-offline",
-    "--no-audit",
-    "--no-fund",
   ], {
     cwd: packageRoot,
     env: { ...process.env, NO_COLOR: "1" },
@@ -847,11 +857,10 @@ async function verifyPackedBrowserRuntime(packageRoot, workersByRole, browserWas
 
 async function buildPackedNativeRuntime(packageRoot) {
   const targetDirectory = path.join(root, "crates/runtime-core/target");
-  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  await run(npm, [
+  const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  await run(pnpm, [
     "run",
     "runtime:build-native",
-    "--",
     "--target-dir", targetDirectory,
   ], {
     cwd: packageRoot,

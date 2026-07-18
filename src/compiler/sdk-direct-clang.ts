@@ -45,6 +45,7 @@ import {
   DETERMINISTIC_NATIVE_SOURCE_PATH,
 } from "../runtime/determinism.ts";
 import { MountedOutputStabilityObserver } from "../runtime/mounted-output-stability.ts";
+import { cppDependencyInput } from "./dependency-input.ts";
 
 export interface SdkDirectClangHost {
   runtime: Runtime;
@@ -119,6 +120,8 @@ export async function buildClangWithSdkDirect(
   const projectFiles = new Map<string, Uint8Array>(
     project.files.map((file) => [file.path, encoder.encode(file.content)]),
   );
+  const dependencies = cppDependencyInput(project);
+  for (const [path, bytes] of dependencies.files) projectFiles.set(path, bytes);
   projectFiles.set(DETERMINISTIC_NATIVE_SOURCE_PATH, encoder.encode(DETERMINISTIC_NATIVE_RUNTIME));
   const directory = new Directory(Object.fromEntries(
     [...projectFiles].map(([path, bytes]) => [`/${path}`, bytes]),
@@ -132,7 +135,7 @@ export async function buildClangWithSdkDirect(
   const extensions = isCpp ? /\.(?:cc|cpp|cxx)$/ : /\.c$/;
   const sources = project.files.filter((file) => extensions.test(file.path)).map((file) => file.path);
   if (!sources.includes(project.config.entry)) sources.unshift(project.config.entry);
-  const units = [...sources, DETERMINISTIC_NATIVE_SOURCE_PATH];
+  const units = [...sources, ...dependencies.sources, DETERMINISTIC_NATIVE_SOURCE_PATH];
   let stdout = "";
   let stderr = "";
   const objectPaths: string[] = [];
@@ -177,6 +180,7 @@ export async function buildClangWithSdkDirect(
         pchMisses += 1;
         const dependencyPath = "/project/build/forge.pch.d";
         const args = instantiateClangPch(config.cc1, pins.placeholders, pchHeader, pchPath);
+        args.splice(args.length - 1, 0, ...dependencies.includeDirectories.flatMap((directory) => ["-I", directory]));
         args.push("-dependency-file", dependencyPath, "-MT", pchPath);
         const output = await runPchStage(
           compiler,
@@ -234,6 +238,7 @@ export async function buildClangWithSdkDirect(
       continue;
     }
     const args = instantiateClangCc1(config.cc1, pins.placeholders, source, objectPath);
+    args.splice(args.length - 1, 0, ...dependencies.includeDirectories.flatMap((directory) => ["-I", directory]));
     if (unitPchInput) {
       args.splice(
         args.length - 1,
@@ -342,6 +347,7 @@ export async function buildClangWithSdkDirect(
     size: bytes.byteLength,
     toolchains: toolchainPackageIdentities(project.config.language),
     costProfile: costProfileId(project.config.language, project.config.target, project.config.optimization),
+    ...(project.dependencies === undefined ? {} : { dependencyLockSha256: project.dependencies.lockSha256 }),
     bytes,
   };
     return {

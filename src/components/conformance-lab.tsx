@@ -72,7 +72,7 @@ export function ConformanceLab() {
         <div><span>FORGE</span><h1>Conformance &amp; efficiency matrix</h1></div>
         <button disabled={running} onClick={() => void run()}>{running ? "Running…" : "Run browser snapshot"}</button>
       </header>
-      <p>This executes every declared language/target pair locally, performs two uncached builds, validates reproducible artifacts and expected results, then repeats deterministic runs. Net cost is the observed raw weighted cost minus the calibrated empty-program baseline for the exact artifact profile. Add <code>?suite=full</code> for the header-heavy libc++ efficiency case; compare the snapshot with <code>npm run conformance:server</code>.</p>
+      <p>This executes every declared language/target pair locally, performs two uncached builds, validates reproducible artifacts and expected results, then repeats deterministic runs. Net cost is the observed raw weighted cost minus the calibrated empty-program baseline for the exact artifact profile. Add <code>?suite=full</code> for the header-heavy libc++ efficiency case; compare the snapshot with <code>pnpm run conformance:server</code>.</p>
       {error && <pre className="conformance-error" data-testid="conformance-error">{error}</pre>}
       {!snapshot && !error && <div className="conformance-empty" data-testid="conformance-status">{running ? status : "No snapshot yet."}</div>}
       {snapshot && (

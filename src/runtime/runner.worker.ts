@@ -58,6 +58,8 @@ import {
   moduleWorkerBaseUrl,
 } from "./module-worker";
 import wasmerThreadWorkerUrl from "./wasmer-thread.worker?worker&url";
+import { loadBrowserRuntimeDriverPlugins } from "./browser-runtime-plugin";
+import type { BrowserRuntimeDriverPlugin } from "@/src/core/types";
 
 const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 const workerBaseUrl = moduleWorkerBaseUrl();
@@ -134,6 +136,7 @@ async function initializeRuntime(
   requestId: string,
   assetBaseUrl?: string,
   additionalCostBaselines?: Readonly<Record<string, number>>,
+  runtimeDriverPlugins: readonly BrowserRuntimeDriverPlugin[] = [],
 ): Promise<void> {
   if (!crossOriginIsolated) {
     throw new Error("The deterministic runner requires a cross-origin-isolated page with COOP and COEP headers.");
@@ -161,6 +164,12 @@ async function initializeRuntime(
   runtimeDrivers = createDefaultRuntimeDrivers(
     createExtendedCostBaselineRegistry(additionalCostBaselines),
   );
+  if (runtimeDriverPlugins.length > 0) {
+    progress(requestId, "initializing", "Loading pinned runtime-driver plug-ins", 0.85);
+    for (const driver of await loadBrowserRuntimeDriverPlugins(runtimeDriverPlugins, workerBaseUrl.href)) {
+      runtimeDrivers.register(driver);
+    }
+  }
   progress(requestId, "initializing", "Deterministic Wasmer runner ready", 1);
 }
 
@@ -468,6 +477,7 @@ scope.addEventListener("message", (event: MessageEvent<RunnerRequest>) => {
             request.requestId,
             request.assetBaseUrl,
             request.additionalCostBaselines,
+            request.runtimeDriverPlugins,
           );
           post({ type: "ready", requestId: request.requestId });
           break;

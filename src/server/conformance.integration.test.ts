@@ -82,7 +82,7 @@ describe.skipIf(!enabled)("real server conformance snapshot", () => {
       suite: process.env.FORGE_CONFORMANCE_SUITE === "full" ? "full" : "default",
       specPath: path.relative(process.cwd(), SPEC_PATH),
       specSha256: createHash("sha256").update(spec).digest("hex"),
-      executionCommand: "npm run conformance:server",
+      executionCommand: "pnpm run conformance:server",
       gitHead: git("rev-parse", "HEAD"),
       worktreeStatus: git("status", "--short"),
       sourceTree: await sourceTreeProvenance(),

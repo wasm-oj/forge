@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readPnpmLock, requireLockedPackage } from "./pnpm-lock.mjs";
 
 const EXPECTED_VERSION = "0.10.0";
 const EXPECTED_INTEGRITY = "sha512-YQ+s5tGag6P/I8kp9BTH+XhjoS9UFvWiZJvnWEEovClHffhYToKhprWr4UJG7wLP7c/2HQpGkF7ZrjoUvKjdmA==";
@@ -16,7 +17,7 @@ const EXPECTED_CARGO_LOCK_SHA256 = "d352926f3f05e3d4308c4e261711d07db568e5c2b438
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const forgePackage = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
-const lock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8"));
+const lock = await readPnpmLock(root);
 const sdkPackagePath = fileURLToPath(import.meta.resolve("@wasmer/sdk/package.json"));
 const sdkRoot = path.dirname(sdkPackagePath);
 const sdkPackage = JSON.parse(await readFile(sdkPackagePath, "utf8"));
@@ -38,13 +39,9 @@ if (sdkPackage.name !== "@wasmer/sdk" || sdkPackage.version !== EXPECTED_VERSION
   );
 }
 
-const lockedSdk = lock.packages?.["node_modules/@wasmer/sdk"];
-if (
-  lock.packages?.[""]?.dependencies?.["@wasmer/sdk"] !== EXPECTED_VERSION
-  || lockedSdk?.version !== EXPECTED_VERSION
-  || lockedSdk?.integrity !== EXPECTED_INTEGRITY
-) {
-  throw new Error(`package-lock.json does not bind the official @wasmer/sdk ${EXPECTED_VERSION} tarball.`);
+const lockedSdk = requireLockedPackage(lock, "@wasmer/sdk", EXPECTED_VERSION);
+if (lockedSdk.integrity !== EXPECTED_INTEGRITY) {
+  throw new Error(`pnpm-lock.yaml does not bind the official @wasmer/sdk ${EXPECTED_VERSION} tarball.`);
 }
 
 for (const [relative, expected] of Object.entries(EXPECTED_FILES)) {

@@ -121,7 +121,7 @@ async function main() {
     schema: MANIFEST_SCHEMA,
     experimentId: EXPERIMENT_ID,
     transformScript: "scripts/transform-cost-baselines.mjs",
-    transformCommand: `npm run cost-baseline:transform -- ${rawRelative}`,
+    transformCommand: `pnpm run cost-baseline:transform ${rawRelative}`,
     sourceRawRecord: rawRelative,
     sourceRawSha256: sha256(rawBytes),
     specPath: path.relative(root, specPath),

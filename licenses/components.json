@@ -92,6 +92,28 @@
       ]
     },
     {
+      "id": "es-module-lexer",
+      "name": "es-module-lexer",
+      "version": "2.3.1",
+      "source": {
+        "url": "https://github.com/guybedford/es-module-lexer",
+        "revision": "2b2e6209bac5c06c6ba457f9730014613e1128fb"
+      },
+      "distributions": [
+        {
+          "kind": "npm",
+          "package": "es-module-lexer@2.3.1",
+          "integrity": "sha512-shc1dbU90Yl/xq1QrC7QRtfcwURZuVRfPhZbDoldJ1cn1gzDvBaBWlv0eFolj5+0znnPJz5TXLxsN77X/12KTA=="
+        }
+      ],
+      "licenseFiles": [
+        {
+          "path": "licenses/es-module-lexer-MIT.txt",
+          "sha256": "8a4b6c44eebfb026d23719a348145a661a555568dbfdc11618ff2d0dd9306b00"
+        }
+      ]
+    },
+    {
       "id": "fflate",
       "name": "fflate",
       "version": "0.8.3",

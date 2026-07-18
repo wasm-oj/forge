@@ -13,6 +13,8 @@ import {
   GO_STANDARD_LIBRARY_SHA256,
   GO_VERSION,
 } from "../core/toolchains.ts";
+import type { GoDependencyPackage } from "./dependency-input.ts";
+import { goImports } from "./dependency-input.ts";
 
 export const GO_LANGUAGE_VERSION = `go${GO_VERSION.split(".").slice(0, 2).join(".")}`;
 export const GO_COMPILE_TIMEOUT_MS = 180_000;
@@ -39,7 +41,9 @@ export const GO_TOOLCHAIN = Object.freeze({
 export interface GoCompileRequest {
   entry: string;
   files: readonly ProjectFile[];
+  dependencyFiles?: readonly ProjectFile[];
   optimization: OptimizationLevel;
+  dependencies?: readonly GoDependencyPackage[];
 }
 
 export interface GoCompileResult {
@@ -177,10 +181,60 @@ export function encodeGoCompilerFiles(
   ]));
 }
 
-export function goImportConfig(packages: readonly GoPackageContract[], includeMain: boolean): string {
+export function goImportConfig(
+  packages: readonly Pick<GoPackageContract, "importPath" | "archivePath">[],
+  includeMain: boolean,
+): string {
   const lines = packages.map((item) => `packagefile ${item.importPath}=${item.archivePath}`);
   if (includeMain) lines.push(`packagefile command-line-arguments=${GO_ARCHIVE_PATH}`);
   return `${lines.join("\n")}\n`;
+}
+
+export function reachableGoDependencies(
+  projectFiles: readonly ProjectFile[],
+  dependencies: readonly GoDependencyPackage[],
+  standardLibrary: readonly Pick<GoPackageContract, "importPath">[],
+): GoDependencyPackage[] {
+  const byImport = new Map(dependencies.map((item) => [item.importPath, item]));
+  const standard = new Set(standardLibrary.map((item) => item.importPath));
+  const state = new Map<string, "visiting" | "visited">();
+  const ordered: GoDependencyPackage[] = [];
+  const visitImport = (importPath: string, importer: string) => {
+    if (standard.has(importPath)) return;
+    const dependency = byImport.get(importPath);
+    if (!dependency) throw new Error(`Go package '${importer}' imports unlocked package '${importPath}'.`);
+    const current = state.get(importPath);
+    if (current === "visited") return;
+    if (current === "visiting") throw new Error(`Go dependency import cycle contains '${importPath}'.`);
+    state.set(importPath, "visiting");
+    for (const nested of dependency.imports) visitImport(nested, importPath);
+    state.set(importPath, "visited");
+    ordered.push(dependency);
+  };
+  for (const source of projectFiles.filter((file) => file.path.endsWith(".go"))) {
+    for (const importPath of goImports(source.content)) visitImport(importPath, "main");
+  }
+  return ordered;
+}
+
+export function goCompileDependencyArguments(
+  dependency: GoDependencyPackage,
+  optimization: OptimizationLevel,
+): string[] {
+  return [
+    "-o", dependency.archivePath,
+    "-p", dependency.importPath,
+    "-lang", GO_LANGUAGE_VERSION,
+    "-complete",
+    `-buildid=forge_dependency_${dependency.importPath}`,
+    "-c=1",
+    "-dwarf=false",
+    "-trimpath", "/work=.",
+    "-importcfg", "/work/importcfg",
+    "-pack",
+    ...(optimization === "debug" ? ["-N", "-l"] : []),
+    ...dependency.sourcePaths.map((path) => `/work/${path}`),
+  ];
 }
 
 export function goCompileArguments(files: readonly ProjectFile[], optimization: OptimizationLevel): string[] {

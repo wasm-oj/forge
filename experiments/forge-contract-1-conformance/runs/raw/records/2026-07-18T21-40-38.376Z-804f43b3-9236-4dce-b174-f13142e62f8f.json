@@ -1,0 +1,106 @@
+{
+  "schema": "wasm-oj-forge-v1/conformance-evidence",
+  "experimentId": "forge-contract-1-conformance",
+  "runId": "2026-07-18T21-40-38.376Z-804f43b3-9236-4dce-b174-f13142e62f8f",
+  "collectedAt": "2026-07-18T21:40:38.377Z",
+  "forgeContract": 1,
+  "suite": "default",
+  "specPath": "experiments/forge-contract-1-conformance/SPEC.md",
+  "specSha256": "020dc0ca23beb8edee3e9f215f2c05a33342832b38ceede406e7fc5299cba860",
+  "executionCommand": "pnpm run conformance:server",
+  "gitHead": "b6cb764a214a3512df1f047a3051014a551c02a7",
+  "worktreeStatus": "M README.md\n M THIRD_PARTY_NOTICES.md\n M crates/runtime-core/README.md\n M docs/architecture.md\n M docs/library-contract.md\n M experiments/forge-contract-1-conformance/SPEC.md\n M licenses/components.json\n D package-lock.json\n M package.json\n M public/toolchains/README.md\n M scripts/generate-third-party-components.mjs\n M scripts/package-rust-toolchain.mjs\n M scripts/packed-package.mjs\n M scripts/prepare-python-toolchain.mjs\n M scripts/run-browser-conformance.mjs\n M scripts/third-party-components.mjs\n M scripts/transform-cost-baselines.mjs\n M scripts/verify-library-nodenext.mjs\n M scripts/verify-library.mjs\n M scripts/verify-wasmer-sdk-init.mjs\n M src/compiler/go-toolchain.ts\n M src/compiler/rust-toolchain.ts\n M src/compiler/sdk-direct-clang.ts\n M src/compiler/wasmer-engine.ts\n M src/components/conformance-lab.tsx\n M src/core/artifact-validation.ts\n M src/core/hash.ts\n M src/core/project-validation.ts\n M src/core/types.ts\n M src/dependencies/manager.ts\n M src/runner/artifact.test.ts\n M src/runner/artifact.ts\n M src/runtime/compiler-client.ts\n M src/runtime/go-stage.worker.ts\n M src/runtime/runner-client.ts\n M src/runtime/runner.worker.ts\n M src/runtime/rustc-stage.worker.ts\n M src/sdk/browser.ts\n M src/sdk/core.ts\n M src/sdk/engine.test.ts\n M src/sdk/engine.ts\n M src/sdk/forge.ts\n M src/sdk/project.ts\n M src/server/conformance.integration.test.ts\n M src/server/cost-baseline.integration.test.ts\n M src/server/go-stage.mjs\n M src/server/index.ts\n M src/server/rustc-stage.mjs\n M src/server/server-build-stage.mjs\n M src/server/server-compiler.ts\n?? docs/host-integration-contract.md\n?? docs/integration-guide.md\n?? experiments/forge-contract-1-conformance/runs/raw/records/2026-07-18T21-22-35.015Z-20a6651d-ddb0-4f22-993b-db1ed87f87b1.json\n?? experiments/forge-contract-1-conformance/runs/raw/records/2026-07-18T21-27-33.234Z-4f5bc300-b701-46f3-8a99-590f3606d349.json\n?? licenses/es-module-lexer-MIT.txt\n?? pnpm-lock.yaml\n?? scripts/pnpm-lock.mjs\n?? scripts/verify-docs.mjs\n?? scripts/verify-package-manager.mjs\n?? src/compiler/build-timeout-policy.test.ts\n?? src/compiler/build-timeout-policy.ts\n?? src/compiler/dependency-input.test.ts\n?? src/compiler/dependency-input.ts\n?? src/core/errors.test.ts\n?? src/core/errors.ts\n?? src/core/sha256.ts\n?? src/dependencies/build.test.ts\n?? src/dependencies/build.ts\n?? src/operations/\n?? src/runtime/browser-runtime-plugin.test.ts\n?? src/runtime/browser-runtime-plugin.ts\n?? src/server/artifact-store.test.ts\n?? src/server/artifact-store.ts\n?? src/server/dependencies.integration.test.ts\n?? src/server/factory.test.ts\n?? src/server/factory.ts",
+  "sourceTree": {
+    "algorithm": "forge-source-tree-sha256",
+    "sha256": "452093f45520372d4052becca3a95229203a61ed9accfa2cd5dcfdbb03af2ba9",
+    "files": 394
+  },
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v24.2.0",
+    "cpu": "Apple M5 Pro"
+  },
+  "snapshot": {
+    "schema": "wasm-oj-forge-v1/conformance",
+    "host": "server-native",
+    "repetitions": 2,
+    "caseIds": [
+      "c-wasip1-logical-time-limit"
+    ],
+    "samples": [
+      {
+        "host": "server-native",
+        "caseId": "c-wasip1-logical-time-limit",
+        "caseLabel": "C / wasip1 / logical time limit",
+        "success": true,
+        "artifactDigest": "feae5bbd244ecbc5417488be717cbeb10475b0726e2cd8b4b8143b9be8be648d",
+        "artifactBytes": 1254,
+        "firstUncachedCompileMs": 1690.89275,
+        "repeatUncachedCompileMs": 1464.802209,
+        "runMedianMs": 437.9889999999998,
+        "transcript": {
+          "code": 137,
+          "stdout": "",
+          "stderr": "",
+          "files": {},
+          "termination": "logical-time-limit",
+          "determinism": {
+            "randomSeed": 1592594996,
+            "realtimeEpochMs": 946684800000,
+            "clockStepNs": 1000000
+          },
+          "resources": {
+            "instructionBudget": 10000000000,
+            "logicalTimeLimitMs": 10,
+            "memoryLimitBytes": 268435456,
+            "outputLimitBytes": 4194304,
+            "filesystemWriteLimitBytes": 67108864,
+            "filesystemEntryLimit": 4096,
+            "wallTimeLimitMs": 60000
+          },
+          "metrics": {
+            "cost": 51,
+            "rawCost": 197,
+            "baselineCost": 146,
+            "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+            "costModel": "weighted",
+            "operations": {
+              "Block": 4,
+              "Br": 1,
+              "BrIf": 3,
+              "Call": 9,
+              "End": 11,
+              "GlobalGet": 4,
+              "GlobalSet": 2,
+              "I32Add": 6,
+              "I32Const": 37,
+              "I32Eqz": 1,
+              "I32GtU": 1,
+              "I32Load": 2,
+              "I32LtU": 1,
+              "I32Store": 11,
+              "I32Store8": 1,
+              "I32Sub": 3,
+              "I64Const": 13,
+              "I64Store": 13,
+              "LocalGet": 30,
+              "LocalSet": 7,
+              "LocalTee": 2,
+              "Return": 1,
+              "Select": 3,
+              "Unreachable": 3
+            },
+            "memoryBytes": 131072,
+            "logicalTimeNs": 10000000,
+            "filesystemBytes": 0,
+            "filesystemEntries": 0,
+            "stdoutBytes": 0,
+            "stderrBytes": 0
+          }
+        },
+        "diagnostics": []
+      }
+    ]
+  }
+}

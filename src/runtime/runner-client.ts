@@ -1,5 +1,6 @@
 import type {
   BuildArtifact,
+  BrowserRuntimeDriverPlugin,
   InteractiveRunConfig,
   InteractiveRunResult,
   RunnerRequest,
@@ -18,6 +19,8 @@ import {
 } from "../core/cost";
 import RunnerWorkerUrl from "./runner.worker?worker&url";
 import { createModuleWorker } from "./module-worker";
+import { validateBrowserRuntimeDriverPlugins } from "./browser-runtime-plugin";
+import { runtimePreparationTimeoutMs } from "../runner/preparation-timeout-policy";
 
 type ProgressListener = (progress: WorkerProgress) => void;
 type StreamListener = (stream: "stdout" | "stderr", chunk: string) => void;
@@ -42,6 +45,8 @@ export interface BrowserForgeRunnerOptions {
   assetBaseUrl?: string;
   /** Calibrated profiles for downstream languages; canonical Forge profiles cannot be replaced. */
   additionalCostBaselines?: Readonly<Record<string, number>>;
+  /** Trusted same-origin, content-pinned RuntimeDriver modules loaded inside the runner Worker. */
+  runtimeDriverPlugins?: readonly BrowserRuntimeDriverPlugin[];
 }
 
 type RunnerRequestWithoutId = RunnerRequest extends infer Request
@@ -58,6 +63,7 @@ export class BrowserForgeRunner implements ForgeRunner {
   private readyPromise: Promise<void>;
   private readonly assetBaseUrl?: string;
   private readonly additionalCostBaselines: Readonly<Record<string, number>>;
+  private readonly runtimeDriverPlugins: readonly BrowserRuntimeDriverPlugin[];
   private readonly costBaselines: CostBaselineRegistry;
   private disposed = false;
   private activeOperation: RunnerOperation | undefined;
@@ -68,6 +74,9 @@ export class BrowserForgeRunner implements ForgeRunner {
   constructor(options: BrowserForgeRunnerOptions = {}) {
     this.assetBaseUrl = options.assetBaseUrl;
     this.additionalCostBaselines = Object.freeze({ ...options.additionalCostBaselines });
+    this.runtimeDriverPlugins = options.runtimeDriverPlugins?.length
+      ? validateBrowserRuntimeDriverPlugins(options.runtimeDriverPlugins, location.href)
+      : [];
     this.costBaselines = createExtendedCostBaselineRegistry(this.additionalCostBaselines);
     this.worker = this.createWorker();
     this.readyPromise = this.initializeWorker();
@@ -78,6 +87,7 @@ export class BrowserForgeRunner implements ForgeRunner {
       type: "initialize",
       assetBaseUrl: this.assetBaseUrl,
       additionalCostBaselines: this.additionalCostBaselines,
+      runtimeDriverPlugins: this.runtimeDriverPlugins,
     }, CONTROL_TIMEOUT_MS);
     // A replacement can be disposed before another run awaits ready(). Keep
     // the rejection visible to callers without letting it become unhandled.
@@ -164,6 +174,7 @@ export class BrowserForgeRunner implements ForgeRunner {
           durationMs: performance.now() - started,
           determinism: { ...config.determinism },
         }),
+        Math.max(runtimePreparationTimeoutMs(contestant), runtimePreparationTimeoutMs(interactor)),
       );
     } finally {
       if (this.activeOperation === operation) this.activeOperation = undefined;
@@ -196,6 +207,7 @@ export class BrowserForgeRunner implements ForgeRunner {
           termination: "wall-time-limit",
           metrics: unavailableExecutionMetrics(cost, WEIGHTED_METER_MODEL),
         }),
+        runtimePreparationTimeoutMs(artifact),
       );
     } finally {
       if (this.activeOperation === operation) this.activeOperation = undefined;
@@ -314,6 +326,7 @@ export class BrowserForgeRunner implements ForgeRunner {
     request: RunnerRequestWithoutId,
     timeoutMs?: number,
     timeoutResult?: () => T,
+    preparationTimeoutMs = CONTROL_TIMEOUT_MS,
   ): Promise<T> {
     this.assertActive();
     const requestId = crypto.randomUUID();
@@ -324,11 +337,11 @@ export class BrowserForgeRunner implements ForgeRunner {
         pending.boundaryTimer = setTimeout(() => {
           if (!this.pending.delete(requestId)) return;
           const error = new Error(
-            `ForgeRunner runtime preparation exceeded the ${CONTROL_TIMEOUT_MS} ms browser boundary.`,
+            `ForgeRunner runtime preparation exceeded the ${preparationTimeoutMs} ms browser boundary.`,
           );
           reject(error);
           if (!this.disposed) this.replaceWorker(error);
-        }, CONTROL_TIMEOUT_MS);
+        }, preparationTimeoutMs);
       } else if (timeoutMs !== undefined) {
         pending.boundaryTimer = setTimeout(() => {
           if (!this.pending.delete(requestId)) return;

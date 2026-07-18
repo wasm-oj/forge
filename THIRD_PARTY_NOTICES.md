@@ -12,6 +12,19 @@ listed file to a SHA-256 digest and rejects unlisted toolchain or license files.
 
 ## JavaScript runtime dependency
 
+### es-module-lexer
+
+- Component: `es-module-lexer` 2.3.1
+- npm integrity: `sha512-shc1dbU90Yl/xq1QrC7QRtfcwURZuVRfPhZbDoldJ1cn1gzDvBaBWlv0eFolj5+0znnPJz5TXLxsN77X/12KTA==`
+- Source revision: `guybedford/es-module-lexer@2b2e6209bac5c06c6ba457f9730014613e1128fb`
+- Source: <https://github.com/guybedford/es-module-lexer/tree/2b2e6209bac5c06c6ba457f9730014613e1128fb>
+- License: MIT
+- License material: `licenses/es-module-lexer-MIT.txt`
+
+Forge uses es-module-lexer inside the browser runner Worker to reject every
+static or dynamic transitive import before loading a content-pinned runtime
+driver plug-in.
+
 ### fflate
 
 - Component: `fflate` 0.8.3
@@ -20,8 +33,8 @@ listed file to a SHA-256 digest and rejects unlisted toolchain or license files.
 - License: MIT
 - License material: `licenses/fflate-MIT.txt`
 
-Forge uses fflate to verify the canonical Go module `h1:` hash over module
-ZIP entries in the browser dependency adapter.
+Forge uses fflate for bounded dependency archive extraction and to verify the
+canonical Go module `h1:` hash over module ZIP entries.
 
 ### Wasmer JavaScript SDK
 

@@ -7,6 +7,7 @@ import { costProfileId } from "../core/cost-profile";
 import { toolchainPackageIdentities } from "../core/toolchains";
 import type { ForgeRunner } from "../runner/runner";
 import { ForgeEngine, type ForgeArtifactStore } from "./engine";
+import type { ForgeOperationEvent } from "../operations/operation";
 
 const artifact: WasmArtifact = {
   kind: "wasm",
@@ -20,10 +21,10 @@ const artifact: WasmArtifact = {
   optimization: "release",
   createdAt: 0,
   durationMs: 0,
-  size: 1,
+  size: 8,
   toolchains: toolchainPackageIdentities("c"),
   costProfile: costProfileId("c", "wasip1", "release"),
-  bytes: new Uint8Array([0]),
+  bytes: new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]),
 };
 
 describe("ForgeEngine", () => {
@@ -106,6 +107,22 @@ describe("ForgeEngine", () => {
     expect((await engine.compile(input)).cacheHit).toBe(true);
     expect(compiler.build).toHaveBeenCalledTimes(1);
     expect((await engine.run(artifact)).stdout).toBe("ok\n");
+    await expect(engine.compile({ language: "c", entry: "main.c", files: {} })).rejects.toMatchObject({
+      code: "invalid-input",
+      stage: "compile",
+      retryable: false,
+    });
+    runner.run.mockRejectedValueOnce(new Error("runtime transport failed"));
+    await expect(engine.run(artifact)).rejects.toMatchObject({
+      code: "runner-failure",
+      stage: "run",
+      retryable: true,
+    });
+    await expect(engine.run(artifact, { args: "abc" as unknown as string[] })).rejects.toMatchObject({
+      code: "invalid-input",
+      stage: "run",
+      retryable: false,
+    });
 
     await engine.clearCache();
     expect(compiler.clearToolchainCache).toHaveBeenCalledOnce();
@@ -119,6 +136,94 @@ describe("ForgeEngine", () => {
     expect(runner.dispose).toHaveBeenCalledOnce();
     expect(() => engine.restart()).toThrow("ForgeEngine is disposed");
     await expect(engine.compile(input)).rejects.toThrow("ForgeEngine is disposed");
+  });
+
+  it("executes one observable submission and protects its operation boundary", async () => {
+    const compiler = {
+      cacheIdentity: vi.fn(() => "forge-test-c-compiler-1"),
+      ready: vi.fn(async () => undefined),
+      build: vi.fn(async (project, cacheKey) => ({
+        success: true,
+        diagnostics: [],
+        artifact: { ...artifact, projectId: project.id, cacheKey, name: `${project.name}.wasm` },
+        stdout: "",
+        stderr: "",
+        cacheHit: false,
+      })),
+      onProgress: vi.fn(() => () => undefined),
+      clearToolchainCache: vi.fn(async () => undefined),
+      cancel: vi.fn(),
+      restart: vi.fn(),
+      dispose: vi.fn(),
+    } satisfies ForgeCompiler;
+    const runner = {
+      ready: vi.fn(async () => undefined),
+      run: vi.fn(async (_artifact, config) => ({
+        code: 0,
+        stdout: "ok\n",
+        stderr: "",
+        files: {},
+        durationMs: 1,
+        determinism: config.determinism,
+        resources: config.resources,
+        termination: "exited" as const,
+        metrics: {
+          cost: 1,
+          rawCost: 4,
+          baselineCost: 3,
+          costProfile: artifact.costProfile,
+          costModel: WEIGHTED_METER_MODEL,
+          operations: { I32Const: 1 },
+          memoryBytes: 65_536,
+          logicalTimeNs: 0,
+          filesystemBytes: 0,
+          filesystemEntries: 0,
+          stdoutBytes: 3,
+          stderrBytes: 0,
+        },
+      })),
+      interact: vi.fn(),
+      onProgress: vi.fn(() => () => undefined),
+      onStream: vi.fn(() => () => undefined),
+      clearRuntimeCache: vi.fn(async () => undefined),
+      cancel: vi.fn(),
+      cancelAndWait: vi.fn(async () => undefined),
+      restart: vi.fn(),
+      dispose: vi.fn(),
+    } satisfies ForgeRunner;
+    const engine = new ForgeEngine({ compiler, runner });
+    const input = { language: "c" as const, entry: "main.c", files: { "main.c": "int main(){}" } };
+    const events: ForgeOperationEvent[] = [];
+    engine.onObservation((event) => events.push(event));
+
+    const operation = engine.submit({
+      id: "submission-1",
+      input,
+      spec: {
+        version: FORGE_CONTRACT_VERSION,
+        cases: [{
+          id: "sample",
+          kind: "batch",
+          input: { kind: "inline", value: "" },
+          matcher: { id: "text", config: { expected: "ok\n", normalization: "lines" } },
+        }],
+      },
+    });
+    await expect(engine.compile(input)).rejects.toMatchObject({ code: "operation-conflict" });
+    expect(() => engine.clearCache()).toThrow(expect.objectContaining({ code: "operation-conflict" }));
+
+    await expect(operation.result).resolves.toMatchObject({
+      build: { success: true },
+      judge: { verdict: "accepted" },
+    });
+    expect(events.every((event) => event.operationId === operation.id)).toBe(true);
+    expect(events.map((event) => event.sequence)).toEqual(events.map((_, index) => index));
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "build", success: true }),
+      expect.objectContaining({ type: "case", caseId: "sample", verdict: "accepted" }),
+      expect.objectContaining({ type: "state", state: "succeeded" }),
+    ]));
+    engine.dispose();
   });
 
   it.each(["cancel", "restart"] as const)(

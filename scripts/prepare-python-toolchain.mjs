@@ -47,7 +47,7 @@ if (process.platform !== "darwin" || process.arch !== "arm64") {
 if (process.argv.length !== 5) {
   throw new Error([
     "The official CPython source archive, its SPDX document, and WASI SDK archive are required.",
-    "Usage: npm run toolchain:python:prepare -- \\",
+    "Usage: pnpm run toolchain:python:prepare \\",
     "  /absolute/path/to/Python-3.14.6.tar.xz \\",
     "  /absolute/path/to/Python-3.14.6.tar.xz.spdx.json \\",
     "  /absolute/path/to/wasi-sdk-24.0-arm64-macos.tar.gz",

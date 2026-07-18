@@ -11,8 +11,10 @@ import {
   type ProjectFile,
   type ResourcePolicy,
 } from "./types.ts";
+import { assertValidDependencyBuildBundle } from "../dependencies/build.ts";
 
 const PROJECT_KEYS = Object.freeze(["id", "name", "files", "config", "activeFile", "updatedAt"] as const);
+const PROJECT_KEYS_WITH_DEPENDENCIES = Object.freeze([...PROJECT_KEYS, "dependencies"] as const);
 const PROJECT_FILE_KEYS = Object.freeze(["path", "language", "content"] as const);
 const PROJECT_CONFIG_KEYS = Object.freeze([
   "language",
@@ -167,7 +169,12 @@ function assertProjectConfig(value: unknown): asserts value is ProjectConfig {
  * type coercion, or shape recovery.
  */
 export function assertValidProject(candidate: unknown): asserts candidate is Project {
-  const project = exactDataRecord(candidate, "Project", PROJECT_KEYS);
+  const hasDependencies = Boolean(candidate && typeof candidate === "object" && Object.hasOwn(candidate, "dependencies"));
+  const project = exactDataRecord(
+    candidate,
+    "Project",
+    hasDependencies ? PROJECT_KEYS_WITH_DEPENDENCIES : PROJECT_KEYS,
+  );
   requiredTrimmedString(project.id, "Project id", 16_384);
   requiredTrimmedString(project.name, "Project name", 4_096);
   assertProjectFiles(project.files);
@@ -183,4 +190,5 @@ export function assertValidProject(candidate: unknown): asserts candidate is Pro
   if (typeof project.updatedAt !== "number" || !Number.isFinite(project.updatedAt) || project.updatedAt < 0) {
     throw new Error("Project updatedAt must be a non-negative finite number.");
   }
+  if (hasDependencies) assertValidDependencyBuildBundle(project.dependencies);
 }

@@ -13,6 +13,7 @@ import {
   decodeRustLinkerArgumentContract,
   type RustLinkerArgumentContract,
 } from "./rust-linker.ts";
+import type { RustDependencyCrate } from "./dependency-input.ts";
 
 export const RUST_TARGET_TRIPLE = "wasm32-wasip1-threads";
 export const RUST_EDITION = "2024";
@@ -38,6 +39,8 @@ export interface RustCompileRequest {
   entry: string;
   files: readonly ProjectFile[];
   optimization: OptimizationLevel;
+  dependencies?: readonly RustDependencyCrate[];
+  rootExterns?: readonly { crateName: string; path: string }[];
 }
 
 export interface RustCompileResult {
@@ -52,7 +55,11 @@ export interface RustToolchainManifestContract {
   readonly linkerArguments: RustLinkerArgumentContract;
 }
 
-export function rustcObjectArguments(entry: string, optimization: OptimizationLevel): string[] {
+export function rustcObjectArguments(
+  entry: string,
+  optimization: OptimizationLevel,
+  rootExterns: readonly { crateName: string; path: string }[] = [],
+): string[] {
   const optimizationArguments = optimization === "release"
     ? ["-C", "opt-level=2", "-C", "debuginfo=0"]
     : ["-C", "opt-level=0", "-C", "debuginfo=1"];
@@ -76,10 +83,46 @@ export function rustcObjectArguments(entry: string, optimization: OptimizationLe
     "--json=diagnostic-rendered-ansi",
     "--remap-path-prefix=/work=.",
     "-C", "panic=abort",
+    ...rootExterns.flatMap((item) => ["--extern", `${item.crateName}=${item.path}`]),
     ...optimizationArguments,
     "-C", "save-temps=yes",
     "--emit=obj",
     "-o", RUST_OBJECT_PATH,
+  ];
+}
+
+export function rustcDependencyArguments(
+  dependency: RustDependencyCrate,
+  optimization: OptimizationLevel,
+): string[] {
+  const optimizationArguments = optimization === "release"
+    ? ["-C", "opt-level=2", "-C", "debuginfo=0"]
+    : ["-C", "opt-level=0", "-C", "debuginfo=1"];
+  return [
+    "--target", RUST_TARGET_TRIPLE,
+    "--sysroot", "/rust",
+    "-Zno-parallel-backend",
+    "-Z", "threads=1",
+    "-Z", "randomize-layout=no",
+    "-Z", "layout-seed=0",
+    "-C", "codegen-units=1",
+    "-C", "llvm-args=-rng-seed=1",
+    "-C", `metadata=${dependency.id}`,
+    "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals",
+    `/work/${dependency.root}`,
+    "--crate-name", dependency.crateName,
+    "--crate-type", "rlib",
+    "--edition", dependency.edition,
+    "--error-format=json",
+    "--json=diagnostic-rendered-ansi",
+    "--remap-path-prefix=/work=.",
+    "-C", "panic=abort",
+    "--cap-lints", "allow",
+    ...dependency.features.flatMap((feature) => ["--cfg", `feature=${JSON.stringify(feature)}`]),
+    ...dependency.externs.flatMap((item) => ["--extern", `${item.crateName}=${item.path}`]),
+    ...optimizationArguments,
+    "--emit=link",
+    "-o", dependency.outputPath,
   ];
 }
 

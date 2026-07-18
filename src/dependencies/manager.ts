@@ -17,6 +17,12 @@ import type {
   ForgeDependencyResolver,
   ResolveDependencyOptions,
 } from "./types.ts";
+import {
+  createDefaultDependencyBuildAdapters,
+  createDependencyBuildBundle,
+  type DependencyBuildAdapter,
+  type DependencyBuildBundle,
+} from "./build.ts";
 
 export class MemoryDependencyCache implements ForgeDependencyCache {
   private readonly payloads = new Map<string, Uint8Array>();
@@ -126,6 +132,10 @@ export class ForgeDependencyManager {
     }
   }
 
+  clearCache(): Promise<void> {
+    return this.cache.clear();
+  }
+
   /** Returns package-ID keyed payloads after re-verifying the content-addressed cache. */
   async materialize(lock: DependencyLock): Promise<ReadonlyMap<string, Uint8Array>> {
     await this.verifyCached(lock);
@@ -134,6 +144,14 @@ export class ForgeDependencyManager {
       payloads.set(item.id, (await this.cache.load(item.integritySha256))!);
     }
     return payloads;
+  }
+
+  /** Resolve cached archives into the verified, compiler-facing file-tree contract. */
+  async prepareBuild(
+    lock: DependencyLock,
+    adapters: readonly DependencyBuildAdapter[] = createDefaultDependencyBuildAdapters(),
+  ): Promise<DependencyBuildBundle> {
+    return createDependencyBuildBundle(lock, await this.materialize(lock), adapters);
   }
 
   async exportOffline(lock: DependencyLock): Promise<DependencyOfflineBundle> {

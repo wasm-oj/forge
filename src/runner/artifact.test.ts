@@ -331,6 +331,29 @@ describe("artifact runner preparation", () => {
     expect(() => runInNewContext(source, context)).toThrow("escapes the project root");
   });
 
+  it("resolves a locked flat npm package by its canonical package main", () => {
+    const artifact = {
+      entry: "main.js",
+      files: {
+        "main.js": 'require("std").out.puts(String(require("answer")));',
+        "node_modules/answer/package.json": JSON.stringify({ main: "lib/index.js" }),
+        "node_modules/answer/lib/index.js": "module.exports = 42;",
+      },
+    } as unknown as RuntimeBundleArtifact;
+    const source = quickJsBundle(artifact, "", config);
+    const stdout = vi.fn();
+
+    runInNewContext(source, {
+      __forge_determinism_seed: () => 0,
+      __forge_determinism_epoch_ms: () => 0,
+      __forge_determinism_step_ns: () => 1,
+      __forge_write_stdout: stdout,
+      __forge_write_stderr: vi.fn(),
+    });
+
+    expect(stdout).toHaveBeenCalledWith("42");
+  });
+
   it("rejects non-canonical QuickJS module separators", () => {
     const artifact = {
       entry: "main.js",

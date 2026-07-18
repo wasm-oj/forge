@@ -54,6 +54,7 @@ import {
 } from "../runner/artifact";
 import { verifyAndDecodeRuntimeFiles } from "../runner/runtime-files";
 import { BoundedByteCollector, readBoundedRegularFile } from "./bounded-transport.ts";
+import { runtimePreparationTimeoutMs } from "../runner/preparation-timeout-policy.ts";
 
 export interface ServerForgeRunnerOptions {
   /** Native `forge-runner` executable built from `crates/runtime-core`. */
@@ -152,7 +153,6 @@ interface RunnerStageResult {
 const FORGE_RUNTIME_CACHE_FILE = /^[0-9a-f]{64}\.forgefs$/;
 const FORGE_RUNTIME_CACHE_TEMPORARY_FILE =
   /^[0-9a-f]{64}\.forgefs\.[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/;
-const SERVER_RUNTIME_PREPARATION_TIMEOUT_MS = 120_000;
 const SERVER_RUNNER_STAGE_SCRIPT = "server-runner-stage.mjs";
 const MAX_RUNNER_STAGE_RESPONSE_BYTES = 256 * 1024 * 1024;
 const MAX_RUNNER_STAGE_DIAGNOSTIC_BYTES = 1024 * 1024;
@@ -397,16 +397,17 @@ export class ServerForgeRunner implements ForgeRunner {
     artifact: BuildArtifact,
     config: RunConfig,
   ): Promise<PreparedRunRequest> {
+    const timeoutMs = runtimePreparationTimeoutMs(artifact);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
         const error = new Error(
-          `Server runtime preparation exceeded ${SERVER_RUNTIME_PREPARATION_TIMEOUT_MS} ms.`,
+          `Server runtime preparation exceeded ${timeoutMs} ms.`,
         );
         operation.superseded = true;
         this.abortPreparationStages(error, operation);
         reject(error);
-      }, SERVER_RUNTIME_PREPARATION_TIMEOUT_MS);
+      }, timeoutMs);
     });
     try {
       return await Promise.race([
@@ -424,16 +425,17 @@ export class ServerForgeRunner implements ForgeRunner {
     artifact: BuildArtifact,
     config: RunConfig,
   ): Promise<PreparedRunRequest> {
+    const timeoutMs = runtimePreparationTimeoutMs(artifact);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
         const error = new Error(
-          `Server interactive runtime preparation exceeded ${SERVER_RUNTIME_PREPARATION_TIMEOUT_MS} ms.`,
+          `Server interactive runtime preparation exceeded ${timeoutMs} ms.`,
         );
         operation.superseded = true;
         this.abortPreparationStages(error, operation);
         reject(error);
-      }, SERVER_RUNTIME_PREPARATION_TIMEOUT_MS);
+      }, timeoutMs);
     });
     try {
       return await Promise.race([

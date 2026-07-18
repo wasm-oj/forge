@@ -3,11 +3,11 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { unpackNpmPackage } from "./packed-package.mjs";
+import { unpackPublishPackage } from "./packed-package.mjs";
 
 const run = promisify(execFile);
 const repositoryRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const packed = await unpackNpmPackage(repositoryRoot, "forge-nodenext-consumer-");
+const packed = await unpackPublishPackage(repositoryRoot, "forge-nodenext-consumer-");
 
 try {
   const temporary = path.dirname(packed.packageRoot);
@@ -40,6 +40,8 @@ try {
 import {
   FORGE_CONTRACT_ID,
   FORGE_CONTRACT_VERSION,
+  FORGE_ERROR_CODES,
+  ForgeError,
   ForgeDependencyManager,
   ForgeCompilerRegistry,
   ForgeEngine,
@@ -54,6 +56,10 @@ import {
   type CostBudget,
   type DependencyManifest,
   type ForgeCompiler,
+  type ForgeErrorRecord,
+  type ForgeOperationEvent,
+  type ForgeSubmissionOperation,
+  type ForgeSubmissionRequest,
   type ForgeRunner,
   type InteractiveRunConfig,
   type InteractiveRunResult,
@@ -73,15 +79,21 @@ import {
   BrowserForgeCompiler,
   BrowserForgeRunner,
   IndexedDbDependencyCache,
+  BROWSER_RUNTIME_PLUGIN_LIMITS,
   registerToolchainCache,
   type BrowserForgeCompilerOptions,
   type BrowserForgeRunnerOptions,
+  type BrowserRuntimeDriverPlugin,
   type ToolchainCacheRegistrationOptions,
 } from "@wasm-oj/forge/browser";
 import {
   ServerForgeCompiler,
   ServerForgeRunner,
   FileSystemDependencyCache,
+  FileSystemArtifactStore,
+  createServerForge,
+  resolveServerForgePaths,
+  type CreateServerForgeOptions,
   type ServerForgeCompilerOptions,
   type ServerForgeRunnerOptions,
 } from "@wasm-oj/forge/server";
@@ -97,11 +109,18 @@ export interface VerifiedForgeSurface {
   toolchainCacheOptions: ToolchainCacheRegistrationOptions;
   serverCompilerOptions: ServerForgeCompilerOptions;
   serverRunnerOptions: ServerForgeRunnerOptions;
+  serverFactoryOptions: CreateServerForgeOptions;
+  runtimeDriverPlugin: BrowserRuntimeDriverPlugin;
+  operation?: ForgeSubmissionOperation;
+  operationEvent?: ForgeOperationEvent;
+  error: ForgeErrorRecord;
 }
 
 export const forgeValues = [
   FORGE_CONTRACT_ID,
   FORGE_CONTRACT_VERSION,
+  FORGE_ERROR_CODES,
+  ForgeError,
   ForgeCompilerRegistry,
   ForgeEngine,
   ForgeDependencyManager,
@@ -110,10 +129,14 @@ export const forgeValues = [
   BrowserForgeCompiler,
   BrowserForgeRunner,
   IndexedDbDependencyCache,
+  BROWSER_RUNTIME_PLUGIN_LIMITS,
   registerToolchainCache,
   ServerForgeCompiler,
   ServerForgeRunner,
   FileSystemDependencyCache,
+  FileSystemArtifactStore,
+  createServerForge,
+  resolveServerForgePaths,
   costProfileId,
   createExtendedCostBaselineRegistry,
   resolveArtifactCostBudget,
@@ -207,6 +230,20 @@ const dependencyManifest: DependencyManifest = {
   requirements: [{ ecosystem: "go", name: "example.com/module", requirement: "v1.0.0" }],
 };
 const dependencyManager = new ForgeDependencyManager(new MemoryDependencyCache());
+const runtimeDriverPlugin: BrowserRuntimeDriverPlugin = {
+  id: "consumer-runtime",
+  moduleUrl: "/runtime-driver.js",
+  sha256: "0000000000000000000000000000000000000000000000000000000000000000",
+};
+const browserRunnerOptions: BrowserForgeRunnerOptions = {
+  runtimeDriverPlugins: [runtimeDriverPlugin],
+};
+const stableError = new ForgeError("consumer failure", {
+  code: "invalid-input",
+  stage: "operation",
+});
+const submit = (engine: ForgeEngine, request: ForgeSubmissionRequest): ForgeSubmissionOperation =>
+  engine.submit(request);
 
 const customCompiler = new ConsumerCompiler();
 const compilerRegistry = new ForgeCompilerRegistry([{
@@ -254,6 +291,10 @@ export const consumerImplementations = {
   judgeExecutor,
   dependencyManifest,
   dependencyManager,
+  runtimeDriverPlugin,
+  browserRunnerOptions,
+  stableError: stableError.toJSON(),
+  submit,
   customProject,
   customArtifact,
   customBudget,

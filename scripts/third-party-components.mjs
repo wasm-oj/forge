@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { readPnpmLock, requireLockedPackage } from "./pnpm-lock.mjs";
 
 export const COMPONENT_MANIFEST_PATH = "licenses/components.json";
 export const COMPONENT_MANIFEST_SCHEMA = "wasm-oj-forge-v1/third-party-components";
@@ -167,17 +168,10 @@ function parseNpmSpecifier(specifier) {
 }
 
 async function verifyNpmDistribution(root, distribution) {
-  let lockfile;
-  try {
-    lockfile = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8"));
-  } catch (error) {
-    if (error?.code === "ENOENT") return;
-    throw error;
-  }
   const { name, version } = parseNpmSpecifier(distribution.package);
-  const locked = lockfile.packages?.[`node_modules/${name}`];
-  if (locked?.version !== version || locked.integrity !== distribution.integrity) {
-    fail(`npm distribution '${distribution.package}' does not match package-lock.json.`);
+  const locked = requireLockedPackage(await readPnpmLock(root), name, version);
+  if (locked.integrity !== distribution.integrity) {
+    fail(`npm distribution '${distribution.package}' does not match pnpm-lock.yaml.`);
   }
 }
 

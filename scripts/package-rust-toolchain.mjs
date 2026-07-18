@@ -32,7 +32,7 @@ if (!archiveArgument) {
   throw new Error([
     "A verified rust.tar.br from the pinned upstream build is required.",
     `Download GitHub Actions run ${SOURCE_RUN} from ${SOURCE_REPOSITORY}, then run:`,
-    "npm run toolchain:rust:prepare -- /absolute/path/to/rust.tar.br",
+    "pnpm run toolchain:rust:prepare /absolute/path/to/rust.tar.br",
   ].join("\n"));
 }
 

@@ -178,12 +178,18 @@ export function quickJsBundle(
 ): string {
   const modules = Object.fromEntries(
     canonicalFileEntries(artifact.files)
-      .filter(([path, value]) => path.endsWith(".js") && typeof value === "string"),
+      .filter(([path, value]) => /\.(?:js|cjs)$/.test(path) && typeof value === "string"),
+  );
+  const packageManifests = Object.fromEntries(
+    canonicalFileEntries(artifact.files)
+      .filter(([path, value]) => /(?:^|\/)package\.json$/.test(path) && typeof value === "string")
+      .map(([path, value]) => [path, JSON.parse(value as string)]),
   );
   return String.raw`
 "use strict";
 ${quickJsDeterminismPrelude(config.determinism)}
 const __modules = ${JSON.stringify(modules)};
+const __packageManifests = ${JSON.stringify(packageManifests)};
 const __input = ${JSON.stringify(stdin)};
 const __cache = Object.create(null);
 const __std = {
@@ -193,11 +199,30 @@ const __std = {
 };
 function __resolve(request, parent) {
   if (request === "std") return request;
-  if (!request.startsWith(".")) throw new Error("Unsupported module '" + request + "'.");
   if (request.includes("\\")) throw new Error("Module paths must use canonical forward slashes.");
-  const parts = parent.split("/");
-  parts.pop();
-  for (const part of request.split("/")) {
+  let parts;
+  let requestedParts;
+  if (!request.startsWith(".")) {
+    const requestParts = request.split("/");
+    const packageName = request.startsWith("@") ? requestParts.splice(0, 2).join("/") : requestParts.shift();
+    if (!packageName || packageName === "@" || requestParts.some((part) => !part || part === "." || part === "..")) {
+      throw new Error("Module '" + request + "' is not a canonical package request.");
+    }
+    const packageRoot = "node_modules/" + packageName;
+    parts = packageRoot.split("/");
+    if (requestParts.length) requestedParts = requestParts;
+    else {
+      const manifest = __packageManifests[packageRoot + "/package.json"] || {};
+      const entry = typeof manifest.main === "string" ? manifest.main : "index.js";
+      if (entry.startsWith("/") || entry.includes("\\")) throw new Error("Package '" + packageName + "' has an invalid main entry.");
+      requestedParts = entry.split("/");
+    }
+  } else {
+    parts = parent.split("/");
+    parts.pop();
+    requestedParts = request.split("/");
+  }
+  for (const part of requestedParts) {
     if (!part || part === ".") continue;
     if (part === "..") {
       if (parts.length === 0) throw new Error("Module '" + request + "' escapes the project root.");
@@ -206,6 +231,8 @@ function __resolve(request, parent) {
   }
   let resolved = parts.join("/");
   if (!Object.prototype.hasOwnProperty.call(__modules, resolved) && Object.prototype.hasOwnProperty.call(__modules, resolved + ".js")) resolved += ".js";
+  if (!Object.prototype.hasOwnProperty.call(__modules, resolved) && Object.prototype.hasOwnProperty.call(__modules, resolved + ".cjs")) resolved += ".cjs";
+  if (!Object.prototype.hasOwnProperty.call(__modules, resolved) && Object.prototype.hasOwnProperty.call(__modules, resolved + "/index.js")) resolved += "/index.js";
   if (!Object.prototype.hasOwnProperty.call(__modules, resolved)) throw new Error("Module '" + request + "' was not found from '" + parent + "'.");
   return resolved;
 }
@@ -268,7 +295,7 @@ export function createDefaultRuntimeDrivers(
         ...request.env,
         PYTHONHOME: "/cpython",
         PYTHONHASHSEED: "0",
-        PYTHONPATH: "/project/src",
+        PYTHONPATH: "/project/build/site-packages:/project/site-packages:/project/src:/project",
         PYTHONDONTWRITEBYTECODE: "1",
       };
       const runtimeFiles = await resolver.packageFileSystem({

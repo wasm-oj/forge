@@ -11,6 +11,10 @@ import {
   type ProjectFile,
   type TargetAbi,
 } from "../core/types";
+import {
+  assertValidDependencyBuildBundle,
+  type DependencyBuildBundle,
+} from "../dependencies/build";
 
 export interface CompileInput {
   language: Language;
@@ -20,6 +24,7 @@ export interface CompileInput {
   optimization?: OptimizationLevel;
   name?: string;
   projectId?: string;
+  dependencies?: DependencyBuildBundle;
 }
 
 function optionalMetadata(value: unknown, label: string, maximum: number): string | undefined {
@@ -65,12 +70,14 @@ export function createSdkProject(input: CompileInput): Project {
   const inferredName = entry.split("/").at(-1)?.replace(/\.[^.]+$/, "") || "forge-project";
   const name = optionalMetadata(input.name, "Project name", 4_096) ?? inferredName;
   const projectId = optionalMetadata(input.projectId, "Project ID", 16_384) ?? `sdk:${name}`;
+  if (input.dependencies !== undefined) assertValidDependencyBuildBundle(input.dependencies);
   return {
     id: projectId,
     name,
     files: canonicalProjectFiles(files),
     activeFile: entry,
     updatedAt: Date.now(),
+    ...(input.dependencies === undefined ? {} : { dependencies: structuredClone(input.dependencies) }),
     config: {
       language: input.language,
       target,

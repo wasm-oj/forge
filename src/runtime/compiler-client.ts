@@ -17,8 +17,7 @@ import {
   observedOutputReadyClangStages,
   usesOutputReadyClang,
 } from "../compiler/browser-clang-policy";
-import { GO_COMPILE_TIMEOUT_MS } from "../compiler/go-toolchain";
-import { RUST_COMPILE_TIMEOUT_MS } from "../compiler/rust-toolchain";
+import { buildControlTimeoutMs } from "../compiler/build-timeout-policy";
 import {
   MAX_OUTPUT_READY_RUST_STAGES_PER_WORKER,
   maximumOutputReadyRustStages,
@@ -40,9 +39,6 @@ interface CompilerOperation {
   kind: "build" | "cache-clear";
 }
 
-const BUILD_TIMEOUT_MS = 60_000;
-const GO_BUILD_TIMEOUT_MS = GO_COMPILE_TIMEOUT_MS + 10_000;
-const RUST_BUILD_TIMEOUT_MS = RUST_COMPILE_TIMEOUT_MS + 10_000;
 const CONTROL_TIMEOUT_MS = 120_000;
 const QUIESCE_TIMEOUT_MS = 10_000;
 
@@ -152,11 +148,7 @@ export class BrowserForgeCompiler implements ForgeCompiler {
       buildWorker = this.worker;
       const result = await this.request<BuildResult>(
         { type: "build", project, cacheKey },
-        persistentRust
-          ? RUST_BUILD_TIMEOUT_MS
-          : persistentGo
-            ? GO_BUILD_TIMEOUT_MS
-            : BUILD_TIMEOUT_MS,
+        buildControlTimeoutMs(project.config.language),
       );
       if (boundedClang) {
         this.outputReadyClangStages += observedOutputReadyClangStages(result, maximumClangStages);

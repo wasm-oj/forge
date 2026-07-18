@@ -212,6 +212,12 @@ function assertArtifactMetadata(artifact: Record<string, unknown>): void {
     throw new Error("Artifact toolchains must be non-empty, unique, trimmed identities.");
   }
   requiredTrimmedString(artifact.costProfile, "Artifact costProfile");
+  if (artifact.dependencyLockSha256 !== undefined && (
+    typeof artifact.dependencyLockSha256 !== "string"
+    || !/^[0-9a-f]{64}$/.test(artifact.dependencyLockSha256)
+  )) {
+    throw new Error("Artifact dependencyLockSha256 must be lowercase SHA-256 hexadecimal.");
+  }
 }
 
 function assertBuiltinContract(artifact: BuildArtifact): void {
@@ -329,8 +335,9 @@ export function assertValidBuildArtifact(
     language: project.config.language,
     target: project.config.target,
     optimization: project.config.optimization,
+    dependencyLockSha256: project.dependencies?.lockSha256,
   } as const;
-  for (const key of ["cacheKey", "projectId", "language", "target", "optimization"] as const) {
+  for (const key of ["cacheKey", "projectId", "language", "target", "optimization", "dependencyLockSha256"] as const) {
     if (artifact[key] !== expected[key]) {
       throw new Error(
         `Artifact ${key} '${String(artifact[key])}' does not match build identity '${String(expected[key])}'.`,

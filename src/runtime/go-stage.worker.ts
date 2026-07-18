@@ -11,8 +11,10 @@ import {
   deterministicGoCompilerEnvironment,
   encodeGoCompilerFiles,
   goCompileArguments,
+  goCompileDependencyArguments,
   goImportConfig,
   goLinkArguments,
+  reachableGoDependencies,
   type GoCompileResult,
   type GoStageRequest,
   type GoStageResponse,
@@ -59,11 +61,21 @@ async function compile(message: Extract<GoStageRequest, { type: "compile" }>): P
   const baseUrl = new URL(message.assetBaseUrl, workerBaseUrl);
   if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname += "/";
   const loaded = await loadToolchain(baseUrl);
+  const dependencies = reachableGoDependencies(
+    message.request.files,
+    message.request.dependencies ?? [],
+    loaded.manifest.packages,
+  );
+  const importPackages = [
+    ...loaded.manifest.packages,
+    ...dependencies.map((item) => ({ importPath: item.importPath, archivePath: item.archivePath })),
+  ];
   const files = encodeGoCompilerFiles({
     ...loaded.standardLibraryFiles,
     ...Object.fromEntries(message.request.files.map((file) => [`/work/${file.path}`, file.content])),
-    "/work/importcfg": goImportConfig(loaded.manifest.packages, false),
-    "/work/importcfg.link": goImportConfig(loaded.manifest.packages, true),
+    ...Object.fromEntries((message.request.dependencyFiles ?? []).map((file) => [`/work/${file.path}`, file.content])),
+    "/work/importcfg": goImportConfig(importPackages, false),
+    "/work/importcfg.link": goImportConfig(importPackages, true),
   });
   const common = {
     env: deterministicGoCompilerEnvironment(),
@@ -79,6 +91,12 @@ async function compile(message: Extract<GoStageRequest, { type: "compile" }>): P
     },
     files,
     stages: [
+      ...dependencies.map((dependency) => ({
+        ...common,
+        command: "go-compile",
+        args: goCompileDependencyArguments(dependency, message.request.optimization),
+        outputPaths: [dependency.archivePath],
+      })),
       {
         ...common,
         command: "go-compile",
@@ -99,13 +117,14 @@ async function compile(message: Extract<GoStageRequest, { type: "compile" }>): P
   const decoder = new TextDecoder();
   const stdout = response.result.stages.map((stage) => decoder.decode(stage.stdout)).join("");
   const stderr = response.result.stages.map((stage) => decoder.decode(stage.stderr)).join("");
-  const linked = response.result.stages.at(1);
+  const linked = response.result.stages.at(-1);
   const wasm = linked?.code === 0 ? linked.outputFiles[GO_OUTPUT_PATH] : undefined;
   const validWasm = wasm === undefined
     ? false
     : WebAssembly.validate(Uint8Array.from(wasm));
   return {
-    success: response.result.stages.length === 2 && response.result.stages.every((stage) => stage.code === 0)
+    success: response.result.stages.length === dependencies.length + 2
+      && response.result.stages.every((stage) => stage.code === 0)
       && validWasm,
     wasm,
     stdout,

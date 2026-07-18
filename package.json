@@ -4,6 +4,14 @@
   "description": "Deterministic, local-first WASI and WASIX compiler and judge library powered by Wasmer.",
   "license": "MIT",
   "author": "JacobLinCool",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wasm-oj/forge.git"
+  },
+  "homepage": "https://github.com/wasm-oj/forge#readme",
+  "bugs": {
+    "url": "https://github.com/wasm-oj/forge/issues"
+  },
   "keywords": [
     "online-judge",
     "wasi",
@@ -12,9 +20,11 @@
     "wasmer"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "type": "module",
+  "packageManager": "pnpm@10.21.0",
   "types": "./lib/core.d.ts",
   "exports": {
     ".": {
@@ -52,6 +62,7 @@
     "public/toolchain-cache-sw.js",
     "public/toolchains",
     "rust-toolchain.toml",
+    "pnpm-lock.yaml",
     "crates/runtime-core/Cargo.lock",
     "crates/runtime-core/Cargo.toml",
     "crates/runtime-core/README.md",
@@ -65,6 +76,8 @@
     "vendor/virtual-fs/LICENSE",
     "vendor/virtual-fs/src",
     "README.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
     "licenses",
@@ -83,8 +96,8 @@
     "lint": "eslint .",
     "assets:og": "node scripts/render-og.mjs",
     "library:build": "node scripts/build-library.mjs",
-    "library:verify": "npm run contract:verify && npm run licenses:verify && npm run runtime:licenses:verify && npm run toolchain:verify && npm run wasmer-sdk:verify && node scripts/verify-library.mjs && node scripts/verify-library-nodenext.mjs",
-    "prepack": "npm run library:build && npm run library:verify",
+    "library:verify": "pnpm run contract:verify && pnpm run package-manager:verify && pnpm run docs:verify && pnpm run github:verify && pnpm run conformance:verify && pnpm run licenses:verify && pnpm run runtime:licenses:verify && pnpm run toolchain:verify && pnpm run wasmer-sdk:verify && node scripts/verify-library.mjs && node scripts/verify-library-nodenext.mjs",
+    "prepack": "pnpm run library:build && pnpm run library:verify",
     "runtime:build": "bash scripts/build-runtime-core.sh",
     "runtime:build-native": "cargo build --locked --manifest-path crates/runtime-core/Cargo.toml --release --bins",
     "runtime:test": "cargo test --locked --manifest-path crates/runtime-core/Cargo.toml",
@@ -95,9 +108,15 @@
     "components:generate": "node scripts/generate-third-party-components.mjs",
     "licenses:verify": "node scripts/verify-third-party-licenses.mjs",
     "contract:verify": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-contract.mjs",
+    "package-manager:verify": "node scripts/verify-package-manager.mjs",
+    "docs:verify": "node scripts/verify-docs.mjs",
+    "github:verify": "node scripts/verify-github-workflows.mjs",
     "conformance:server": "FORGE_RUN_CONFORMANCE=1 vitest run --config vitest.config.ts src/server/conformance.integration.test.ts --reporter=verbose",
     "conformance:browser": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/run-browser-conformance.mjs",
     "conformance:compare": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/compare-conformance.ts",
+    "conformance:verify": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-conformance.mjs",
+    "release:verify": "node scripts/verify-release.mjs",
+    "ci:verify": "pnpm run github:verify && pnpm run conformance:verify && pnpm run typecheck && pnpm run lint && pnpm test && pnpm run library:build && pnpm run library:verify && pnpm run build && pnpm run runtime:test && pnpm run runtime:check-web",
     "judge:integration": "FORGE_RUN_JUDGE_INTEGRATION=1 vitest run --config vitest.config.ts src/server/judge.integration.test.ts --reporter=verbose",
     "cost-baseline:calibrate": "FORGE_RUN_COST_BASELINE=1 vitest run --config vitest.config.ts src/server/cost-baseline.integration.test.ts --reporter=verbose",
     "cost-baseline:transform": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/transform-cost-baselines.mjs",
@@ -113,6 +132,7 @@
   },
   "dependencies": {
     "@wasmer/sdk": "0.10.0",
+    "es-module-lexer": "2.3.1",
     "fflate": "0.8.3"
   },
   "devDependencies": {
@@ -127,6 +147,7 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.10",
     "fake-indexeddb": "6.2.5",
+    "js-yaml": "4.3.0",
     "lucide-react": "1.25.0",
     "monaco-editor": "0.52.2",
     "next": "16.2.10",
@@ -144,5 +165,13 @@
   },
   "overrides": {
     "postcss": "8.5.19"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "unrs-resolver",
+      "workerd"
+    ]
   }
 }

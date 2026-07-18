@@ -1,4 +1,16 @@
 export { DEFAULT_DETERMINISM, resolveDeterminism } from "../core/determinism";
+export {
+  asForgeError,
+  ForgeError,
+  FORGE_ERROR_CODES,
+  FORGE_ERROR_STAGES,
+} from "../core/errors";
+export type {
+  ForgeErrorCode,
+  ForgeErrorOptions,
+  ForgeErrorRecord,
+  ForgeErrorStage,
+} from "../core/errors";
 export { FORGE_CONTRACT_ID, FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "../core/contract";
 export { DEFAULT_RESOURCE_POLICY, resolveResourcePolicy, WEIGHTED_METER_MODEL } from "../core/resources";
 export {
@@ -26,6 +38,7 @@ export type {
   BuildConfig,
   BuildArtifact,
   BuildResult,
+  BrowserRuntimeDriverPlugin,
   DeterminismConfig,
   Diagnostic,
   DiagnosticSeverity,
@@ -50,6 +63,15 @@ export type {
 } from "../core/types";
 export { createForgeEngine, ForgeEngine } from "./engine";
 export type { JudgeProjectResult, ForgeEngineOptions } from "./engine";
+export type {
+  ForgeOperation,
+  ForgeOperationEvent,
+  ForgeOperationEventPayload,
+  ForgeOperationKind,
+  ForgeOperationState,
+  ForgeSubmissionOperation,
+  ForgeSubmissionRequest,
+} from "../operations/operation";
 export type { ForgeArtifactStore, PrecompileOutcome, PrecompileStatus } from "../compiler/coordinator";
 export type { ForgeCompiler } from "../compiler/compiler";
 export {
@@ -123,6 +145,19 @@ export type {
 } from "../judge/spec";
 export { normalizeOutput } from "../judge/normalization";
 export type { OutputNormalization } from "../judge/normalization";
+export {
+  assertValidDependencyBuildBundle,
+  createDefaultDependencyBuildAdapters,
+  createDependencyBuildBundle,
+  DEPENDENCY_BUILD_LIMITS,
+  dependencyFileTreeSha256,
+  verifyDependencyBuildBundle,
+} from "../dependencies/build";
+export type {
+  DependencyBuildAdapter,
+  DependencyBuildBundle,
+  MaterializedDependencyPackage,
+} from "../dependencies/build";
 export {
   createDefaultDependencyManager,
   ForgeDependencyManager,

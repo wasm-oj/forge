@@ -40,8 +40,8 @@ Instruction, logical-time, memory, output, and filesystem limits are enforced in
 Build targets:
 
 ```bash
-npm run runtime:build-native
-npm run runtime:build
+pnpm run runtime:build-native
+pnpm run runtime:build
 ```
 
 The native CLI accepts Forge contract 1 `wasm-oj-forge-v1/run-request` JSON on stdin or through `--request REQUEST.json`, with binary fields encoded as base64. The browser binding uses the same logical `RunRequest` and `RunResult` fields through its JavaScript interface, with binary values transferred as typed arrays; the transports are intentionally host-specific.

@@ -6,7 +6,7 @@ judge, and library behavior. The current preregistered evidence is maintained
 under the single [contract 1 conformance experiment](../experiments/forge-contract-1-conformance/).
 
 <!-- forge-conformance-summary:start -->
-This report records real local server and browser runs on 2026-07-18
+This report records real local server and browser runs on 2026-07-19
 (Asia/Taipei). The canonical matrix is generated from independent append-only
 evidence records under `wasm-oj-forge-v1`; it is not a synthetic estimate.
 <!-- forge-conformance-summary:end -->
@@ -46,27 +46,27 @@ compatibility.
 
 | Case | Artifact | Bytes | Net / raw / baseline | Server compile 1 / 2 | Browser compile 1 / 2 | Median run server / browser |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| C / wasip1 | `18662d3e…b9b29` | 45,625 | 5,445 / 5,591 / 146 | 1,688 ms / 1,485 ms | 1,187 ms / 1 ms | 34 ms / 8 ms |
-| C / wasip1 / filesystem metadata | `91f788d7…b3549` | 33,056 | 15,427 / 15,573 / 146 | 1,784 ms / 1,769 ms | 175 ms / 1 ms | 28 ms / 6 ms |
-| C / wasip1 / multi-file IO | `d2c40caa…a5bc3` | 49,908 | 16,883 / 17,029 / 146 | 1,747 ms / 1,755 ms | 175 ms / 768 ms | 32 ms / 8 ms |
-| C / wasip1 / filesystem write limit | `26558a2c…3d068` | 18,945 | 6,219 / 6,365 / 146 | 1,724 ms / 1,730 ms | 329 ms / 1 ms | 18 ms / 3 ms |
-| C / WASIX | `ff412007…4473c` | 4,064 | 1,138 / 1,284 / 146 | 1,706 ms / 1,693 ms | 160 ms / 1 ms | 8 ms / 1 ms |
-| C / WASIX / denied thread_spawn | `c6ac35d1…81e16` | 1,072 | 0 / 133 / 146 | 1,621 ms / 1,695 ms | 167 ms / 723 ms | 6 ms / 1 ms |
-| C++ / wasip1 | `b73a8158…d923f` | 4,059 | 934 / 1,080 / 146 | 1,709 ms / 1,734 ms | 553 ms / 1 ms | 9 ms / 1 ms |
-| C++ / WASIX | `01966026…eb47e` | 4,059 | 934 / 1,080 / 146 | 1,756 ms / 1,746 ms | 83 ms / 1 ms | 9 ms / 1 ms |
-| Rust / wasip1 | `f84d1972…922d8` | 142,818 | 14,761 / 24,243 / 9,482 | 2,865 ms / 2,967 ms | 2,610 ms / 476 ms | 39 ms / 14 ms |
-| Python / wasip1 | `21068a97…a0e66` | 1,851 | 170,594 / 2,420,004,603 / 2,419,834,009 | 16,378 ms / 16,376 ms | 1,438 ms / 436 ms | 1,043 ms / 780 ms |
-| JavaScript / wasip1 | `4b161551…8dfbe` | 1,902 | 3,598,245 / 13,183,230 / 9,584,985 | 2,368 ms / 2,198 ms | 1,689 ms / 1,908 ms | 224 ms / 164 ms |
-| TypeScript / wasip1 | `e464cd52…49429` | 1,925 | 3,568,036 / 13,153,021 / 9,584,985 | 1,780 ms / 1,789 ms | 1,431 ms / 1,443 ms | 233 ms / 163 ms |
-| Go / wasip1 | `6a4e2b66…a89ef` | 2,550,145 | 429,396 / 2,136,517 / 1,707,121 | 2,844 ms / 2,524 ms | 1,576 ms / 383 ms | 357 ms / 273 ms |
-| C / wasip1 / virtual clock | `8b1002ba…3e198` | 18,565 | 8,022 / 8,168 / 146 | 1,800 ms / 1,778 ms | 1,079 ms / 1 ms | 19 ms / 3 ms |
-| C / wasip1 / logical time limit | `3b7bfb51…867d1` | 1,254 | 51 / 197 / 146 | 1,740 ms / 1,747 ms | 341 ms / 1 ms | 6 ms / 0 ms |
-| C++ / wasip1 / virtual sleep | `bb9c9846…f9b31` | 23,327 | 4,985 / 5,131 / 146 | 1,832 ms / 1,825 ms | 219 ms / 721 ms | 22 ms / 4 ms |
-| Rust / wasip1 / virtual sleep | `5486f059…6922f` | 168,053 | 16,640 / 26,122 / 9,482 | 2,952 ms / 2,796 ms | 2,541 ms / 572 ms | 40 ms / 15 ms |
-| Python / wasip1 / virtual sleep | `34213784…6f24a` | 2,041 | 185,316 / 2,420,019,325 / 2,419,834,009 | 8,280 ms / 8,286 ms | 1,462 ms / 432 ms | 1,025 ms / 774 ms |
-| JavaScript / wasip1 / virtual clock | `092f667b…ef276` | 1,948 | 27,430,723 / 37,015,708 / 9,584,985 | 1,785 ms / 1,772 ms | 1,800 ms / 1,441 ms | 227 ms / 165 ms |
-| TypeScript / wasip1 / virtual clock | `bb1ac027…60cb2` | 1,948 | 27,430,723 / 37,015,708 / 9,584,985 | 1,787 ms / 2,096 ms | 1,690 ms / 1,831 ms | 225 ms / 164 ms |
-| Go / wasip1 / virtual sleep | `28e01807…24baf` | 2,561,512 | 589,026 / 2,296,147 / 1,707,121 | 2,508 ms / 2,512 ms | 840 ms / 388 ms | 363 ms / 274 ms |
+| C / wasip1 | `b195a678…f952b` | 45,625 | 5,445 / 5,591 / 146 | 1,802 ms / 1,536 ms | 1,244 ms / 1 ms | 35 ms / 8 ms |
+| C / wasip1 / filesystem metadata | `856e2fe9…c013e` | 33,056 | 15,427 / 15,573 / 146 | 1,533 ms / 1,772 ms | 175 ms / 1 ms | 27 ms / 5 ms |
+| C / wasip1 / multi-file IO | `334dab5d…3bf97` | 49,908 | 16,883 / 17,029 / 146 | 1,772 ms / 1,793 ms | 171 ms / 749 ms | 31 ms / 8 ms |
+| C / wasip1 / filesystem write limit | `b3d8825f…4f79a` | 18,945 | 6,219 / 6,365 / 146 | 1,759 ms / 1,708 ms | 327 ms / 6 ms | 17 ms / 3 ms |
+| C / WASIX | `c3928999…8cd19` | 4,064 | 1,138 / 1,284 / 146 | 1,511 ms / 1,739 ms | 297 ms / 1 ms | 9 ms / 1 ms |
+| C / WASIX / denied thread_spawn | `432af0c8…210a7` | 1,072 | 0 / 133 / 146 | 1,714 ms / 1,724 ms | 161 ms / 752 ms | 6 ms / 1 ms |
+| C++ / wasip1 | `db897e4f…bb50d` | 4,059 | 934 / 1,080 / 146 | 1,787 ms / 1,769 ms | 553 ms / 1 ms | 8 ms / 1 ms |
+| C++ / WASIX | `e5f96539…40e11` | 4,059 | 934 / 1,080 / 146 | 1,775 ms / 1,770 ms | 88 ms / 1 ms | 8 ms / 1 ms |
+| Rust / wasip1 | `05fcf6e0…6fac0` | 142,818 | 14,761 / 24,243 / 9,482 | 3,014 ms / 3,009 ms | 2,635 ms / 586 ms | 37 ms / 14 ms |
+| Python / wasip1 | `98561f95…ac712` | 1,851 | 4,632,241 / 2,424,466,250 / 2,419,834,009 | 16,388 ms / 16,406 ms | 1,456 ms / 428 ms | 1,065 ms / 773 ms |
+| JavaScript / wasip1 | `673f1db6…927a7` | 1,902 | 4,489,846 / 14,074,831 / 9,584,985 | 2,234 ms / 2,290 ms | 2,031 ms / 1,594 ms | 231 ms / 165 ms |
+| TypeScript / wasip1 | `8cc8d4b3…83ae4` | 1,925 | 4,514,568 / 14,099,553 / 9,584,985 | 1,877 ms / 1,831 ms | 1,797 ms / 1,445 ms | 228 ms / 161 ms |
+| Go / wasip1 | `39d6cb9e…596fb` | 2,550,145 | 429,396 / 2,136,517 / 1,707,121 | 3,283 ms / 2,576 ms | 1,600 ms / 386 ms | 365 ms / 274 ms |
+| C / wasip1 / virtual clock | `f72e1525…dc27b` | 18,565 | 8,022 / 8,168 / 146 | 1,800 ms / 1,753 ms | 1,086 ms / 1 ms | 20 ms / 3 ms |
+| C / wasip1 / logical time limit | `feae5bbd…e648d` | 1,254 | 51 / 197 / 146 | 1,541 ms / 1,724 ms | 322 ms / 1 ms | 6 ms / 0 ms |
+| C++ / wasip1 / virtual sleep | `7ef531ef…2cba1` | 23,327 | 4,985 / 5,131 / 146 | 1,589 ms / 1,854 ms | 227 ms / 734 ms | 21 ms / 4 ms |
+| Rust / wasip1 / virtual sleep | `28b9dca7…7e74d` | 168,053 | 16,640 / 26,122 / 9,482 | 2,934 ms / 2,983 ms | 2,534 ms / 554 ms | 40 ms / 15 ms |
+| Python / wasip1 / virtual sleep | `3b6e2b1c…5830b` | 2,041 | 4,648,726 / 2,424,482,735 / 2,419,834,009 | 16,378 ms / 16,395 ms | 1,439 ms / 436 ms | 1,106 ms / 766 ms |
+| JavaScript / wasip1 / virtual clock | `77fedb77…d488f` | 1,948 | 28,374,535 / 37,959,520 / 9,584,985 | 1,852 ms / 1,940 ms | 1,422 ms / 1,442 ms | 239 ms / 164 ms |
+| TypeScript / wasip1 / virtual clock | `3cd0cb23…bcab5` | 1,948 | 28,374,535 / 37,959,520 / 9,584,985 | 2,157 ms / 2,031 ms | 1,731 ms / 1,741 ms | 236 ms / 162 ms |
+| Go / wasip1 / virtual sleep | `8a7e09d7…3c07f` | 2,561,512 | 589,026 / 2,296,147 / 1,707,121 | 2,735 ms / 2,649 ms | 845 ms / 391 ms | 374 ms / 274 ms |
 <!-- forge-conformance-matrix:end -->
 
 The default panel contains all 21 execution cases shown above: the nine

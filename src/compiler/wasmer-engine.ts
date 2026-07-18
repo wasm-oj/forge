@@ -43,6 +43,13 @@ import type {
 import type { PythonFrontendRequest, PythonFrontendResult } from "./python-toolchain.ts";
 import type { GoCompileRequest, GoCompileResult } from "./go-toolchain.ts";
 import { buildClangWithSdkDirect } from "./sdk-direct-clang.ts";
+import {
+  assertProjectDependencyEcosystem,
+  goDependencyInput,
+  npmDependencyFiles,
+  pythonDependencyFiles,
+  rustDependencyInput,
+} from "./dependency-input.ts";
 const encoder = new TextEncoder();
 let typescriptCompilerBytes: Promise<Uint8Array> | undefined;
 
@@ -105,16 +112,20 @@ function createArtifactBase(project: Project, cacheKey: string, started: number,
       project.config.target,
       project.config.optimization,
     ),
+    ...(project.dependencies === undefined ? {} : { dependencyLockSha256: project.dependencies.lockSha256 }),
   } as const;
 }
 
 async function buildRust(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
   const started = performance.now();
   progress(requestId, "compiling", `Compiling with rustc ${RUST_VERSION}`, 0.2);
+  const dependencies = rustDependencyInput(project);
   const compiled = await requireHost().compileRust({
     entry: project.config.entry,
-    files: project.files,
+    files: [...project.files, ...dependencies.files],
     optimization: project.config.optimization,
+    dependencies: dependencies.crates,
+    rootExterns: dependencies.roots,
   });
   if (!compiled.success || !compiled.wasm) {
     return {
@@ -152,9 +163,11 @@ function sumFileSize(files: Record<string, string | Uint8Array>): number {
 
 async function buildPython(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
   const started = performance.now();
-  const pythonFiles = project.files.filter((file) => file.path.endsWith(".py"));
+  const dependencies = pythonDependencyFiles(project);
+  const compilerFiles = [...project.files, ...dependencies.sourceFiles];
+  const pythonFiles = compilerFiles.filter((file) => file.path.endsWith(".py"));
   progress(requestId, "compiling", `Byte-compiling ${pythonFiles.length} Python file${pythonFiles.length === 1 ? "" : "s"}`, 0.55);
-  const frontend = await requireHost().compilePython({ files: project.files });
+  const frontend = await requireHost().compilePython({ files: compilerFiles });
   if (!frontend.success) {
     return {
       success: false,
@@ -169,6 +182,7 @@ async function buildPython(project: Project, cacheKey: string, requestId: string
     };
   }
   const files: Record<string, string | Uint8Array> = Object.fromEntries(project.files.map((file) => [file.path, file.content]));
+  Object.assign(files, dependencies.artifactFiles);
   files[PYTHON_RUNNER_PATH] = PYTHON_DETERMINISTIC_RUNNER;
   for (const file of pythonFiles) {
     const compiledPath = `build/${file.path.replace(/\.py$/, ".pyc")}`;
@@ -197,10 +211,13 @@ async function buildPython(project: Project, cacheKey: string, requestId: string
 async function buildGo(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
   const started = performance.now();
   progress(requestId, "compiling", `Compiling with Go ${GO_VERSION}`, 0.3);
+  const dependencies = goDependencyInput(project);
   const compiled = await requireHost().compileGo({
     entry: project.config.entry,
     files: project.files,
+    dependencyFiles: dependencies.files,
     optimization: project.config.optimization,
+    dependencies: dependencies.packages,
   });
   if (!compiled.success || !compiled.wasm) {
     return {
@@ -253,6 +270,7 @@ interface TypeScriptWasiResponse {
 async function transpileScriptProject(project: Project, requestId: string): Promise<{ files: Record<string, string | Uint8Array>; output: Output; response?: TypeScriptWasiResponse }> {
   const scriptFiles = scriptSourceFiles(project);
   const emittedFiles = emittedSourceFiles(project);
+  const dependencyFiles = npmDependencyFiles(project);
   progress(requestId, "loading-toolchain", `Loading TypeScript ${TYPESCRIPT_VERSION}/WASI`);
   const compiler = await getTypeScriptCompiler();
   const entrypoint = compiler.entrypoint;
@@ -263,10 +281,19 @@ async function transpileScriptProject(project: Project, requestId: string): Prom
     stdin: JSON.stringify({
       files: {
         ...Object.fromEntries(project.files.map((file) => [`/project/${file.path}`, file.content])),
+        ...Object.fromEntries(Object.entries(dependencyFiles)
+          .filter(([, contents]) => typeof contents === "string")
+          .map(([path, contents]) => [`/project/${path}`, contents])),
         [declarationPath]: QUICKJS_STD_MODULE_DECLARATION,
       },
       javascript: project.config.language === "javascript",
-      sources: [declarationPath, ...scriptFiles.map((file) => `/project/${file.path}`)],
+      sources: [
+        declarationPath,
+        ...scriptFiles.map((file) => `/project/${file.path}`),
+        ...Object.entries(dependencyFiles)
+          .filter(([path, contents]) => path.endsWith(".d.ts") && typeof contents === "string")
+          .map(([path]) => `/project/${path}`),
+      ],
       outputs: outputPaths.map((path) => `/project/build/${path}`),
     }),
   });
@@ -286,6 +313,7 @@ async function transpileScriptProject(project: Project, requestId: string): Prom
       if (contents !== undefined) files[outputPath] = contents;
     }
   }
+  Object.assign(files, dependencyFiles);
   return { files, output, response };
 }
 
@@ -310,8 +338,9 @@ async function buildScript(project: Project, cacheKey: string, requestId: string
   progress(requestId, "compiling", `Compiling ${project.config.language === "typescript" ? "TypeScript" : "JavaScript"} with TypeScript/WASI`, 0.5);
   const { files, output, response } = await transpileScriptProject(project, requestId);
   const diagnostics = parseTypeScriptDiagnostics(response?.diagnostics ?? "");
-  const expectedOutputs = emittedSourceFiles(project).length;
-  if (!output.ok || !response || response.status !== 0 || Object.keys(files).length !== expectedOutputs || diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+  const emittedOutputsPresent = emittedSourceFiles(project)
+    .every((file) => Object.hasOwn(files, emittedScriptPath(file.path)));
+  if (!output.ok || !response || response.status !== 0 || !emittedOutputsPresent || diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
     return {
       success: false,
       diagnostics: ensureFailureDiagnostic(diagnostics, {
@@ -344,6 +373,7 @@ async function buildScript(project: Project, cacheKey: string, requestId: string
 
 export async function buildProject(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
   const canonicalProject = { ...project, files: canonicalProjectFiles(project.files) };
+  assertProjectDependencyEcosystem(canonicalProject);
   progress(requestId, "checking", "Validating project configuration", 0.05);
   if (!canonicalProject.files.some((file) => file.path === canonicalProject.config.entry)) {
     return {

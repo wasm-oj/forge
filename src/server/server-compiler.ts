@@ -1,11 +1,11 @@
 import { constants as fsConstants } from "node:fs";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { deserialize } from "node:v8";
+import { deserialize, serialize } from "node:v8";
 import { gunzipSync } from "node:zlib";
 import { Runtime } from "@wasmer/sdk/node";
 import type { ForgeCompiler } from "../compiler/compiler.ts";
@@ -32,6 +32,7 @@ import { expectedToolchainAssetSha256, toolchainCacheIdentity } from "../core/to
 import { assertValidProject } from "../core/project-validation.ts";
 import { assertCompilerCacheKey } from "../core/hash.ts";
 import { BoundedByteCollector, readBoundedRegularFile } from "./bounded-transport.ts";
+import { buildControlTimeoutMs } from "../compiler/build-timeout-policy.ts";
 
 export interface ServerForgeCompilerOptions {
   /** Native `forge-compiler` executable built from `crates/runtime-core`. */
@@ -41,10 +42,10 @@ export interface ServerForgeCompilerOptions {
 }
 
 const IN_PROCESS_STAGE = Symbol("forge-in-process-server-compiler");
-const SERVER_BUILD_TIMEOUT_MS = 20 * 60 * 1_000;
 const SERVER_STAGE_LOG_LIMIT_BYTES = 1024 * 1024;
 const SERVER_STAGE_PROGRESS_LINE_LIMIT_BYTES = 1024 * 1024;
 const SERVER_BUILD_RESPONSE_LIMIT_BYTES = 256 * 1024 * 1024;
+const SERVER_BUILD_REQUEST_LIMIT_BYTES = 768 * 1024 * 1024;
 const SERVER_COMPILER_STAGE_RESPONSE_LIMIT_BYTES = 256 * 1024 * 1024;
 const SERVER_STAGE_SCRIPTS = new Set([
   "server-build-stage.mjs",
@@ -208,15 +209,31 @@ export class ServerForgeCompiler implements ForgeCompiler {
   ): Promise<BuildResult> {
     const transportDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-build-response-"));
     const responsePath = path.join(transportDirectory, "response.v8");
+    const requestPath = path.join(transportDirectory, "request.v8");
+    const timeoutMs = buildControlTimeoutMs(project.config.language);
     try {
       this.assertCurrent(operation, "Server compilation was cancelled before its isolated stage started.");
+      const encodedRequest = serialize({
+        compilerExecutable: this.compilerExecutable,
+        toolchainDirectory: this.toolchainDirectory,
+        project,
+        cacheKey,
+      });
+      if (encodedRequest.byteLength > SERVER_BUILD_REQUEST_LIMIT_BYTES) {
+        throw new Error(`Server compiler request exceeds ${SERVER_BUILD_REQUEST_LIMIT_BYTES} bytes.`);
+      }
+      await writeFile(requestPath, encodedRequest, { flag: "wx", mode: 0o600 });
       return await new Promise((resolve, reject) => {
         const script = resolveStageScript("server-build-stage.mjs");
         const child = spawn(process.execPath, ["--experimental-strip-types", script], {
           // Progress on fd 3 is best-effort. The artifact response uses a private
           // one-shot file because Wasmer worker transports may claim inherited fds.
           stdio: ["pipe", "pipe", "pipe", "pipe"],
-          env: { ...process.env, FORGE_BUILD_RESPONSE: responsePath },
+          env: {
+            ...process.env,
+            FORGE_BUILD_REQUEST: requestPath,
+            FORGE_BUILD_RESPONSE: responsePath,
+          },
         });
         this.activeChildren.add(child);
         let progressBuffer = "";
@@ -272,13 +289,13 @@ export class ServerForgeCompiler implements ForgeCompiler {
         const timer = setTimeout(() => {
           timedOut = true;
           child.kill("SIGKILL");
-        }, SERVER_BUILD_TIMEOUT_MS);
+        }, timeoutMs);
         child.on("close", async () => {
           clearTimeout(timer);
           this.activeChildren.delete(child);
           try {
             this.assertCurrent(operation, "Server compilation was cancelled.");
-            if (timedOut) throw new Error(`Server compilation exceeded ${SERVER_BUILD_TIMEOUT_MS} ms.`);
+            if (timedOut) throw new Error(`Server compilation exceeded ${timeoutMs} ms.`);
             if (transportError) throw transportError;
             let encodedResponse: Buffer;
             try {
@@ -306,12 +323,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
             reject(error);
           }
         });
-        child.stdin.end(JSON.stringify({
-          compilerExecutable: this.compilerExecutable,
-          toolchainDirectory: this.toolchainDirectory,
-          project,
-          cacheKey,
-        }));
+        child.stdin.end();
       });
     } finally {
       await rm(transportDirectory, { recursive: true, force: true });

@@ -32,9 +32,9 @@ and execution metrics are contract data.
 ## Command and evidence
 
 ```sh
-npm run conformance:server
-npm run conformance:browser
-npm run conformance:compare -- <server-record.json> <browser-record.json>
+pnpm run conformance:server
+pnpm run conformance:browser
+pnpm run conformance:compare <server-record.json> <browser-record.json>
 ```
 
 Every attempt writes append-only evidence to `runs/raw/records/` and binds the

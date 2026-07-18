@@ -39,6 +39,34 @@ const result = await engine.judgeProject({
 
 `judgeProject()` is the compile-once/run-many convenience operation. `compile()`, `run()`, and `judge()` remain separately available for applications that own artifact scheduling or persistence.
 
+### Submission, observation, and error boundary
+
+`submit()` is the scheduling boundary for an OJ submission. It returns a
+`ForgeSubmissionOperation` with one stable ID, FIFO state machine, abort signal,
+result promise, scoped cancellation, and observation subscription. Engine-wide
+`onObservation()` receives the same events. Every event carries the operation
+ID and a monotonically increasing zero-based sequence; the structured variants
+are state, progress, stdout/stderr stream, build summary, completed case, and
+error. Register the engine-wide listener before `submit()` for the complete
+trace. A scoped listener starts with the operation's current state snapshot.
+Listener exceptions never alter contestant execution.
+
+Only one submission executes at a time per engine. Queued cancellation removes
+only that submission. Active cancellation reaches the compiler/runner owned by
+that submission and then admits the next queued item. Direct
+compile/run/judge/replay operations and cache clearing are rejected with
+`operation-conflict` while the submission queue is non-empty.
+
+`ForgeError` is the stable exception at high-level asynchronous boundaries. It
+contains `code`, `stage`, `retryable`, optional `operationId`, and plain
+`details`; `toJSON()` removes stack/cause and returns the portable record.
+Invalid public input, initialization, compiler/runner transport failure,
+dependency preparation, storage failure, replay failure, cancellation,
+conflict, disposal, and unexpected internal failure have distinct codes.
+Compile diagnostics remain `BuildResult` data, resource limits remain
+`RunResult.termination`, and judge outcomes remain verdicts rather than
+exceptions.
+
 Every `BuildArtifact` carries `forgeContract: 1`. `assertValidBuildArtifact()`
 is the shared fail-closed boundary used after compilation, on artifact-cache
 loads, and before runtime-driver selection or cost-baseline lookup. For built-in
@@ -82,18 +110,34 @@ For C++ a single project file whose basename is `forge.pch.hpp` opts into precom
 
 ## Dependency and lockfile contract
 
-`ForgeDependencyManager` presents one API over Cargo crates, npm packages, PyPI distributions, Go modules, and C/C++ libraries. A `DependencyManifest` contains normalized requirements plus ecosystem-tagged native `manifest`, `lockfile`, or `source` files. `createDefaultDependencyResolvers()` supplies five concrete adapters: Cargo.lock v3/v4 with crates.io SHA-256, package-lock v2/v3 with SRI, exact `requirements.txt` entries with SHA-256 and a portable wheel-or-sdist selection, go.mod/go.sum with the official Go `h1` directory hash, and `forge-cpp.lock.json` with explicit HTTPS archives and graph edges. The registry endpoints used to construct Cargo, PyPI, and Go requests, plus fetch, size limits, and concurrency, are injectable. npm fetches the exact `resolved` URLs bound by package-lock integrity instead of rewriting them through a second registry policy. Every root version is exact; unsupported sources, ranges, redirects, insecure URLs, local Go replacements, and platform-only Python wheels fail closed instead of invoking an unverified resolver path.
+`ForgeDependencyManager` presents one API over Cargo crates, npm packages, PyPI distributions, Go modules, and C/C++ libraries. A `DependencyManifest` contains normalized requirements plus ecosystem-tagged native `manifest`, `lockfile`, or `source` files. `createDefaultDependencyResolvers()` supplies five concrete adapters: Cargo.lock v3/v4 with crates.io SHA-256, package-lock v2/v3 with SRI, exact hash-locked `requirements.txt` entries, go.mod/go.sum with the official Go `h1` ZIP hash, and `forge-cpp.lock.json` with explicit HTTPS archives and graph edges. The registry endpoints used to construct Cargo, PyPI, and Go requests, plus fetch, size limits, and concurrency, are injectable. npm fetches the exact `resolved` URLs bound by package-lock integrity instead of rewriting them through a second registry policy. Every root version is exact; unsupported sources, ranges, redirects, insecure URLs, local Go replacements, and platform-only Python wheels fail closed instead of invoking an unverified resolver path.
 
 Resolution produces one canonical `DependencyLock` containing ecosystem-qualified package IDs, exact versions, source identities, dependency edges, features, and SHA-256 payload integrity. Its `manifestSha256` binds the lock to the complete canonical cross-ecosystem request. Cycles are permitted because valid npm graphs may contain them. Scoped npm names are valid package names. Conflicting package records, missing or extra payloads, digest failures, dangling edges, and non-canonical locks fail closed.
 
 `IndexedDbDependencyCache`, `FileSystemDependencyCache`, and `MemoryDependencyCache` implement the same content-addressed cache interface. Offline bundles contain the canonical lock and exactly one verified payload for every distinct digest. `resolve(..., { offline: true, previousLock })` never invokes a resolver; it requires a manifest-matching lock and verifies every cached payload first. This gives browser and server hosts the same lock and offline-import semantics without claiming that Forge core itself owns registry credentials or network policy.
+
+`prepareBuild()` is the required archive-to-compiler boundary. It rehashes each
+cached archive, safely extracts a bounded canonical file tree, rejects unsafe
+paths and unsupported native/build-time behavior, computes each
+`filesSha256`, and returns a `DependencyBuildBundle` bound to the canonical lock
+SHA-256. `CompileInput.dependencies` accepts only this bundle. Project
+validation, build hashing, artifact metadata, object/link nodes, and replay all
+bind the lock and verified file-tree identities.
+
+Compiler admission is language-specific: Cargo feeds Rust crate rlibs; npm
+feeds flat uniquely named CommonJS packages to QuickJS and TypeScript; PyPI
+feeds pure-wheel modules to Python; Go modules feed reachable pure-Go package
+archives and importcfg; C/C++ archives feed include roots and source translation
+units. Build scripts, proc macros, renamed Cargo crates, native links, npm
+lifecycle/ESM/native packages, Python sdists/native or `.data` wheels, Go build
+constraints/cgo/assembly, and prebuilt C/C++ native/Wasm objects fail explicitly.
+Mixed ecosystems or a language/ecosystem mismatch also fail.
 
 ```ts
 const manager = createDefaultDependencyManager(cache, { fetch });
 const manifest = {
   requirements: [
     { ecosystem: "cargo", name: "serde", requirement: "=1.0.228" },
-    { ecosystem: "npm", name: "@scope/parser", requirement: "1.4.0" },
   ],
   sourceFiles: [{
     ecosystem: "cargo",
@@ -103,7 +147,14 @@ const manifest = {
   }],
 } as const;
 const lock = await manager.resolve(manifest);
-const packagePayloads = await manager.materialize(lock);
+const dependencies = await manager.prepareBuild(lock);
+const build = await forge.compile({
+  language: "rust",
+  target: "wasip1",
+  entry: "src/main.rs",
+  files: { "src/main.rs": rustSource },
+  dependencies,
+});
 const offlineBundle = await manager.exportOffline(lock);
 ```
 
@@ -177,7 +228,7 @@ and TypeScript target profiles plus deterministic filesystem metadata,
 multi-file I/O, and denied-capability probes. The C/WASIX probe requires
 `wasix_32v1.thread_spawn` to terminate with Forge's denied-capability trap. The
 exported full suite adds a header-heavy libc++ probe. `/conformance` runs the
-browser snapshot (`?suite=full` opts in to that probe); `npm run
+browser snapshot (`?suite=full` opts in to that probe); `pnpm run
 conformance:server` runs the native-host snapshot
 (`FORGE_CONFORMANCE_SUITE=full` does the same). The canonical panel is defined
 in the [conformance specification](../experiments/forge-contract-1-conformance/SPEC.md),
@@ -221,10 +272,21 @@ that needs to clear shared runtime storage must call `cancelAndWait()` before
 mutating storage after deletion starts. The built-in engine performs that
 ordering as part of its cache-clear contract.
 
-The current browser Worker boundary has one deliberate extension limit: `BrowserForgeRunner` can transfer `additionalCostBaselines`, but it cannot accept an arbitrary `RuntimeDriver` function through `postMessage`. Its Worker initializes only the runtime drivers bundled with Forge. Consequently, downstream languages that emit standalone Wasm or use an existing bundled runtime work in the browser, while a new runtime-bundle driver must first be included in the browser Worker build (or gain a future serializable Worker-extension protocol). Registering that driver only in the environment-neutral or server registry does not make it available inside the browser Worker.
+Browser hosts transfer `additionalCostBaselines` and declarative
+`runtimeDriverPlugins`, never driver functions, through `postMessage`. Each
+plug-in is a trusted same-origin ESM URL plus the exact source SHA-256. Before
+runtime lookup, the runner Worker rejects redirects, source above 1 MiB, digest
+mismatch, every static or dynamic transitive import, invalid factory exports,
+driver-ID mismatch, and ambiguous ownership. It imports at most sixteen
+self-contained modules from temporary Blob URLs and constructs their drivers
+inside the Worker. This makes new runtime-bundle drivers deployable without a
+custom Forge Worker build while keeping the host extension explicit and
+content-pinned. Plug-ins execute with runner-Worker authority, are not guest
+sandbox code, and must preserve the prepared request's deterministic,
+resource, and calibrated-cost contract.
 
 Forge starts its emitted module Workers through same-origin `blob:` bootstraps. Every Wasmer SDK initialization supplies Forge's secondary-worker asset through the official `workerUrl` protocol. That worker validates the SDK initialization envelope (including `sdkUrl`), disables registry access, calls `initSync` with the transferred module and memory plus a page-aligned 1 MiB stack, installs the validated `sdkUrl`, and constructs the official `ThreadPoolWorker`. The packed build emits the facade, SDK/runtime Wasm, and nested Workers as external content-hashed assets rather than library-mode data URLs. This is host compiler/runtime scheduling policy and never grants guest thread-spawn capability.
 
-A production host must serve `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: credentialless`, and `Cross-Origin-Resource-Policy: same-origin`; a Content Security Policy must allow `worker-src 'self' blob:`. Packed deployments must retain the emitted compiler, runner, Python-stage, Rust-stage, and Wasmer secondary-worker assets at URLs reachable from their parent bundles. Toolchain and cross-origin assets still require the CORS and Cross-Origin-Resource-Policy behavior imposed by the page's COEP policy.
+A production host must serve `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: credentialless`, and `Cross-Origin-Resource-Policy: same-origin`; a Content Security Policy must allow `worker-src 'self' blob:`. Packed deployments must retain the emitted compiler, runner, Python-stage, Rust-stage, Go-stage, and Wasmer secondary-worker assets at URLs reachable from their parent bundles. Toolchain and cross-origin assets still require the CORS and Cross-Origin-Resource-Policy behavior imposed by the page's COEP policy.
 
 Judge code remains unchanged. Any incompatible judge, artifact, normalization, metering, compiler, runner, extension, or conformance change increments the one Forge contract; artifacts and requests from older contracts are rejected explicitly. See [the versioning policy](versioning.md).

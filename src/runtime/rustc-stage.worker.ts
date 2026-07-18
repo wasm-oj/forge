@@ -10,6 +10,7 @@ import {
   decodeRustToolchainManifest,
   deterministicRustCompilerEnvironment,
   deterministicRustLinkerEnvironment,
+  rustcDependencyArguments,
   rustcObjectArguments,
   type RustcStageRequest,
   type RustcStageResponse,
@@ -55,8 +56,42 @@ async function compile(message: RustcStageRequest) {
       message.request.files.map((file) => [`/${file.path}`, file.content]),
     ));
     await work.createDir("/build");
+    await work.createDir("/build/deps");
+    let dependencyStdout = "";
+    let dependencyStderr = "";
+    for (const dependency of message.request.dependencies ?? []) {
+      const instance = await rustc.run({
+        args: rustcDependencyArguments(dependency, message.request.optimization),
+        env: deterministicRustCompilerEnvironment(),
+        mount: { "/work": work },
+        cwd: "/work",
+      });
+      const output = await observeMountedOutput(
+        instance,
+        work,
+        dependency.outputPath,
+        `rustc dependency ${dependency.id}`,
+        (stderr) => parseRustDiagnostics(stderr).some((diagnostic) => diagnostic.severity === "error"),
+        false,
+        isRustArchive,
+      );
+      dependencyStdout += output.stdout;
+      dependencyStderr += output.stderr;
+      if (!output.success) {
+        return {
+          success: false,
+          stdout: dependencyStdout,
+          stderr: dependencyStderr,
+          diagnostics: parseRustDiagnostics(dependencyStderr),
+        };
+      }
+    }
     const rustcInstance = await rustc.run({
-      args: rustcObjectArguments(message.request.entry, message.request.optimization),
+      args: rustcObjectArguments(
+        message.request.entry,
+        message.request.optimization,
+        message.request.rootExterns,
+      ),
       env: deterministicRustCompilerEnvironment(),
       mount: { "/work": work },
       cwd: "/work",
@@ -69,22 +104,27 @@ async function compile(message: RustcStageRequest) {
       (stderr) => parseRustDiagnostics(stderr).some((diagnostic) => diagnostic.severity === "error"),
       true,
     );
-    const diagnostics = parseRustDiagnostics(compiled.stderr);
+    const diagnostics = parseRustDiagnostics(`${dependencyStderr}${compiled.stderr}`);
     if (!compiled.success) {
       return {
         success: false,
-        stdout: compiled.stdout,
-        stderr: compiled.stderr,
+        stdout: `${dependencyStdout}${compiled.stdout}`,
+        stderr: `${dependencyStderr}${compiled.stderr}`,
         diagnostics,
       };
     }
 
-    const linkerInstance = await linker.run({
-      args: instantiateRustLinkerArguments(
+    const linkerArguments = instantiateRustLinkerArguments(
         manifest.linkerArguments,
         message.request.optimization,
         requireAllocatorBitcodePath(compiled),
-      ),
+      );
+    const objectIndex = linkerArguments.indexOf(RUST_OBJECT_PATH);
+    if (objectIndex < 0) throw new Error("Pinned Rust linker arguments omit the submission object.");
+    const libraries = [...(message.request.dependencies ?? [])].reverse().map((item) => item.outputPath);
+    if (libraries.length > 0) linkerArguments.splice(objectIndex + 1, 0, ...libraries);
+    const linkerInstance = await linker.run({
+      args: linkerArguments,
       env: deterministicRustLinkerEnvironment(),
       mount: { "/work": work },
       cwd: "/work",
@@ -99,8 +139,8 @@ async function compile(message: RustcStageRequest) {
     return {
       success: linked.success && Boolean(linked.bytes),
       wasm: linked.bytes,
-      stdout: `${compiled.stdout}${linked.stdout}`,
-      stderr: `${compiled.stderr}${linked.stderr}`,
+      stdout: `${dependencyStdout}${compiled.stdout}${linked.stdout}`,
+      stderr: `${dependencyStderr}${compiled.stderr}${linked.stderr}`,
       diagnostics,
     };
   } finally {
@@ -260,6 +300,7 @@ async function observeMountedOutput(
   stage: string,
   hasTerminalError: (stderr: string) => boolean,
   requiresAllocatorBitcode = false,
+  outputValidator: (bytes: Uint8Array) => boolean = (bytes) => WebAssembly.validate(Uint8Array.from(bytes)),
 ): Promise<StageObservation> {
   const stdout = captureReadable(instance.stdout);
   const stderr = captureReadable(instance.stderr);
@@ -272,7 +313,7 @@ async function observeMountedOutput(
       const stderrText = stderr.text();
       const quiet = stdout.quietFor(OUTPUT_QUIET_PERIOD_MS) && stderr.quietFor(OUTPUT_QUIET_PERIOD_MS);
       const observedAt = performance.now();
-      const bytes = outputStability.observe(await readValidWasm(work, guestPath), observedAt);
+      const bytes = outputStability.observe(await readValidOutput(work, guestPath, outputValidator), observedAt);
       const allocator = requiresAllocatorBitcode ? await readRustAllocatorBitcode(work) : undefined;
       if (allocator?.path !== allocatorCandidatePath) {
         allocatorCandidatePath = allocator?.path;
@@ -357,14 +398,22 @@ function concatenate(chunks: readonly Uint8Array[]): Uint8Array {
   return output;
 }
 
-async function readValidWasm(work: Directory, guestPath: string): Promise<Uint8Array | undefined> {
+async function readValidOutput(
+  work: Directory,
+  guestPath: string,
+  validator: (bytes: Uint8Array) => boolean,
+): Promise<Uint8Array | undefined> {
   const mountRelativePath = guestPath.startsWith("/work/") ? guestPath.slice("/work".length) : guestPath;
   try {
     const bytes = (await work.readFile(mountRelativePath)).slice();
-    return bytes.byteLength > 8 && WebAssembly.validate(bytes) ? bytes : undefined;
+    return bytes.byteLength > 8 && validator(bytes) ? bytes : undefined;
   } catch {
     return undefined;
   }
+}
+
+function isRustArchive(bytes: Uint8Array): boolean {
+  return bytes.byteLength > 8 && new TextDecoder().decode(bytes.subarray(0, 8)) === "!<arch>\n";
 }
 
 async function readRustAllocatorBitcode(
