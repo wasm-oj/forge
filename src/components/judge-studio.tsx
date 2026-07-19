@@ -19,6 +19,7 @@ import {
   Hammer,
   HardDrive,
   LockKeyhole,
+  MessageCircle,
   Package,
   Play,
   Plus,
@@ -50,6 +51,7 @@ import { FORGE_CONTRACT_VERSION } from "@/src/core/contract";
 import { textMatcher } from "@/src/judge/spec";
 import { normalizeOutput } from "@/src/judge/normalization";
 import { createJudgeProject, judgeProjectId, problemIdFromProject } from "@/src/judge/project";
+import { buildChatGptProblemUrl } from "@/src/judge/chatgpt-help";
 import { BrowserForgeCompiler } from "@/src/runtime/compiler-client";
 import { BrowserForgeRunner } from "@/src/runtime/runner-client";
 import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, loadLatestProject, saveArtifact, saveProject } from "@/src/storage/database";
@@ -261,6 +263,10 @@ export function JudgeStudio() {
   const projectLanguage: BuiltinLanguage = isBuiltinLanguage(project.config.language)
     ? project.config.language
     : "c";
+  const chatGptProblemUrl = useMemo(
+    () => buildChatGptProblemUrl(activeProblem, problemLocale, projectLanguage),
+    [activeProblem, problemLocale, projectLanguage],
+  );
   const activeToolchain = TOOLCHAINS[projectLanguage];
   const buildIdentity = useMemo(() => projectBuildIdentity(project), [project]);
   const filteredProblems = useMemo(
@@ -981,6 +987,16 @@ export function JudgeStudio() {
             <button className={problemPane === "editorial" ? "active" : ""} onClick={() => setProblemPane("editorial")}>
               {problemLocale === "zh-TW" ? "題解" : "Editorial"}
             </button>
+            <a
+              className="ask-chatgpt-button"
+              href={chatGptProblemUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={problemLocale === "zh-TW" ? "帶著完整題目與目前語言模板詢問 ChatGPT" : "Ask ChatGPT with the full problem and current language template"}
+            >
+              <MessageCircle size={13} />
+              {problemLocale === "zh-TW" ? "詢問 ChatGPT" : "Ask ChatGPT"}
+            </a>
           </div>
           <ProblemMarkdown markdown={problemPane === "statement" ? activeProblemText.statement : activeProblemText.editorial} />
           <div className="local-judge-note">
