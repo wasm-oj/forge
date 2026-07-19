@@ -76,12 +76,16 @@ assertRunContains(publishJob, "pnpm run release:verify", "Release publish job");
 assertRunContains(publishJob, "pnpm publish", "Release publish job");
 assertRunContains(publishJob, "download-registry-artifact.mjs", "Release publish job");
 assertRunContains(publishJob, "verify-release-artifacts.mjs", "Release publish job");
+assertRunContains(publishJob, "verify-github-release-assets.mjs", "Release publish job");
 assertRunContains(publishJob, "gh release edit", "Release publish job");
 if (release.source.includes("secrets.NPM_TOKEN") || release.source.includes("NODE_AUTH_TOKEN")) {
   throw new Error("Release workflow must use only the npm trusted publisher identity.");
 }
 if (release.source.includes('pnpm pack "$package_spec"')) {
   throw new Error("Release workflow must download registry bytes instead of repacking the source tree.");
+}
+if (!release.source.includes('test "$status" -eq 10')) {
+  throw new Error("Release asset reuse must distinguish an expected mismatch from invalid metadata.");
 }
 assertAutomationCheckout(publishJob);
 assertCheckoutPolicy(publishJob, "Release publish job", true, "Check out the release tag and LFS assets");

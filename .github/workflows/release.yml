@@ -120,8 +120,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "$TARBALL" "$CHECKSUM" --clobber
+          release_metadata="$RUNNER_TEMP/forge-github-release.json"
+          if gh release view "$RELEASE_TAG" --json assets > "$release_metadata" 2>/dev/null; then
+            if node ../.release-automation/scripts/verify-github-release-assets.mjs \
+              "$release_metadata" "$TARBALL" "$CHECKSUM"; then
+              echo "Canonical GitHub Release assets already exist; skipping upload."
+            else
+              status="$?"
+              test "$status" -eq 10
+              gh release upload "$RELEASE_TAG" "$TARBALL" "$CHECKSUM" --clobber
+            fi
           else
             gh release create "$RELEASE_TAG" "$TARBALL" "$CHECKSUM" \
               --draft --verify-tag --generate-notes --title "$RELEASE_TAG"

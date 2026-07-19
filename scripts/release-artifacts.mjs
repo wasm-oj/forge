@@ -99,6 +99,35 @@ export async function verifyReleaseArtifacts({ candidate, canonical }) {
   });
 }
 
+export async function githubReleaseAssetsMatch({ assets, files }) {
+  if (!Array.isArray(assets)) throw new Error("GitHub Release metadata must contain an assets array.");
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new Error("At least one local release artifact is required.");
+  }
+
+  const expected = await Promise.all(files.map(async (file) => {
+    const name = file.split(/[\\/]/).at(-1);
+    if (!name) throw new Error(`Release artifact path '${file}' has no filename.`);
+    const sha256 = (await hashFile(file, ["sha256"])).sha256;
+    return Object.freeze({
+      digest: `sha256:${sha256.hex}`,
+      name,
+      size: sha256.size,
+    });
+  }));
+  if (new Set(expected.map(({ name }) => name)).size !== expected.length) {
+    throw new Error("Local release artifact filenames must be unique.");
+  }
+
+  return expected.every((artifact) => {
+    const matches = assets.filter((asset) => asset?.name === artifact.name);
+    return matches.length === 1
+      && matches[0].state === "uploaded"
+      && matches[0].size === artifact.size
+      && matches[0].digest === artifact.digest;
+  });
+}
+
 async function hashGzipPayload(file) {
   const hash = createHash("sha256");
   let size = 0;
