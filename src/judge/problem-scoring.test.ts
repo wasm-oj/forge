@@ -105,6 +105,55 @@ describe("problem policy scoring", () => {
     expect(score.numerator).toBe(120);
     expect(score.denominator).toBe(2);
     expect(score.passedByPolicy).toEqual({ baseline: 2, efficient: 1, optimal: 1 });
+    expect(score.cases[0].metrics).toMatchObject({
+      cost: 200,
+      rawCost: 210,
+      baselineCost: 10,
+      memoryBytes: 900,
+    });
+    expect(score.cases[0].policyEvaluations.map((policy) => policy.earned)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(score.cases[1].policyEvaluations.map((policy) => policy.earned)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it("explains a cumulative partial score and the resource that blocks the next policy", () => {
+    const score = scoreProblemResults(problem, language, [
+      accepted("sample-01", 200, 1_200),
+      accepted("adversarial-01", 200, 1_200),
+    ]);
+    expect(score.points).toBe(50);
+    expect(score.cases[0].passedPolicyIds).toEqual(["baseline", "efficient"]);
+    expect(score.cases[0].policyEvaluations).toEqual([
+      expect.objectContaining({ id: "baseline", resourcePassed: true, earned: true }),
+      expect.objectContaining({ id: "efficient", resourcePassed: true, earned: true }),
+      expect.objectContaining({
+        id: "optimal",
+        costPassed: true,
+        memoryPassed: false,
+        resourcePassed: false,
+        earned: false,
+      }),
+    ]);
+  });
+
+  it("reports resource status without awarding points when output is wrong", () => {
+    const wrongAnswer = accepted("sample-01", 100);
+    wrongAnswer.verdict = "wrong-answer";
+    const score = scoreProblemResults(problem, language, [
+      wrongAnswer,
+      accepted("adversarial-01", 100),
+    ]);
+    expect(score.cases[0].outputAccepted).toBe(false);
+    expect(score.cases[0].points).toBe(0);
+    expect(score.cases[0].policyEvaluations.every((policy) => policy.resourcePassed)).toBe(true);
+    expect(score.cases[0].policyEvaluations.every((policy) => !policy.earned)).toBe(true);
   });
 
   it("fails closed on profile and execution-inventory mismatches", () => {
@@ -116,5 +165,31 @@ describe("problem policy scoring", () => {
       wrongProfile,
       accepted("adversarial-01", 0),
     ])).toThrow("different");
+
+    const missingMetrics = accepted("sample-01", 0);
+    missingMetrics.run!.metrics.memoryBytes = null;
+    expect(() => scoreProblemResults(problem, language, [
+      missingMetrics,
+      accepted("adversarial-01", 0),
+    ])).toThrow("complete scoring metrics");
+
+    const asymmetricCost = accepted("sample-01", 0);
+    asymmetricCost.run!.metrics.cost = null;
+    expect(() => scoreProblemResults(problem, language, [
+      asymmetricCost,
+      accepted("adversarial-01", 0),
+    ])).toThrow("incomplete normalized cost metrics");
+
+    const reverseAsymmetricCost = accepted("sample-01", 0);
+    reverseAsymmetricCost.run!.metrics.rawCost = null;
+    expect(() => scoreProblemResults(problem, language, [
+      reverseAsymmetricCost,
+      accepted("adversarial-01", 0),
+    ])).toThrow("incomplete normalized cost metrics");
+
+    expect(() => scoreProblemResults(problem, language, [
+      { id: "sample-01", verdict: "accepted" },
+      accepted("adversarial-01", 0),
+    ])).toThrow("successful execution");
   });
 });

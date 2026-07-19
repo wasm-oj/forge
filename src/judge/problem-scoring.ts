@@ -4,8 +4,29 @@ import type { JudgeProblem, ProblemScoringPolicy } from "./problems";
 
 export interface ScoredProblemCase {
   id: string;
+  outputAccepted: boolean;
+  metrics: ObservedCaseMetrics | null;
+  policyEvaluations: readonly PolicyEvaluation[];
   passedPolicyIds: readonly string[];
   points: number;
+}
+
+export interface ObservedCaseMetrics {
+  cost: number | null;
+  rawCost: number | null;
+  baselineCost: number;
+  memoryBytes: number | null;
+  logicalTimeNs: number | null;
+}
+
+export interface PolicyEvaluation {
+  id: string;
+  points: number;
+  costPassed: boolean;
+  memoryPassed: boolean;
+  logicalTimePassed: boolean | null;
+  resourcePassed: boolean;
+  earned: boolean;
 }
 
 export interface ProblemScore {
@@ -18,10 +39,14 @@ export interface ProblemScore {
 }
 
 function requireMetric(value: number | null, label: string): number {
-  if (!Number.isSafeInteger(value) || value === null || value < 0) {
+  if (value === null || !Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} must be a non-negative safe integer.`);
   }
   return value;
+}
+
+function optionalMetric(value: number | null, label: string): number | null {
+  return value === null ? null : requireMetric(value, label);
 }
 
 export function assertProblemCostProfile(
@@ -40,21 +65,63 @@ export function assertProblemCostProfile(
   }
 }
 
-function policyPasses(
-  policy: ProblemScoringPolicy,
-  cost: number,
-  memoryBytes: number,
-  logicalTimeNs: number | null,
-): boolean {
-  if (
-    cost > policy.limits.instructionBudget
-    || memoryBytes > policy.limits.memoryLimitBytes
-  ) {
-    return false;
+function observedMetrics(
+  problem: JudgeProblem,
+  language: BuiltinLanguage,
+  result: JudgeCaseResult,
+): ObservedCaseMetrics | null {
+  if (!result.run) return null;
+  const metrics = result.run.metrics;
+  assertProblemCostProfile(problem, language, metrics.costProfile);
+  if (metrics.costModel !== "weighted") {
+    throw new Error(`Problem '${problem.id}' received an unsupported cost model.`);
   }
-  if (policy.limits.logicalTimeLimitMs === undefined) return true;
-  const logicalTime = requireMetric(logicalTimeNs, "logicalTimeNs");
-  return logicalTime <= policy.limits.logicalTimeLimitMs * 1_000_000;
+  const observed: ObservedCaseMetrics = {
+    cost: optionalMetric(metrics.cost, "cost"),
+    rawCost: optionalMetric(metrics.rawCost, "rawCost"),
+    baselineCost: requireMetric(metrics.baselineCost, "baselineCost"),
+    memoryBytes: optionalMetric(metrics.memoryBytes, "memoryBytes"),
+    logicalTimeNs: optionalMetric(metrics.logicalTimeNs, "logicalTimeNs"),
+  };
+  if ((observed.cost === null) !== (observed.rawCost === null)) {
+    throw new Error(`Problem '${problem.id}' received incomplete normalized cost metrics.`);
+  }
+  if (
+    observed.cost !== null
+    && observed.rawCost !== null
+    && observed.cost !== Math.max(0, observed.rawCost - observed.baselineCost)
+  ) {
+    throw new Error(`Problem '${problem.id}' received inconsistent normalized cost metrics.`);
+  }
+  return observed;
+}
+
+function evaluatePolicy(
+  policy: ProblemScoringPolicy,
+  metrics: ObservedCaseMetrics | null,
+  outputAccepted: boolean,
+): PolicyEvaluation {
+  const costPassed = metrics !== null
+    && metrics.cost !== null
+    && metrics.cost <= policy.limits.instructionBudget;
+  const memoryPassed = metrics !== null
+    && metrics.memoryBytes !== null
+    && metrics.memoryBytes <= policy.limits.memoryLimitBytes;
+  const logicalTimePassed = policy.limits.logicalTimeLimitMs === undefined
+    ? null
+    : metrics !== null
+      && metrics.logicalTimeNs !== null
+      && metrics.logicalTimeNs <= policy.limits.logicalTimeLimitMs * 1_000_000;
+  const resourcePassed = costPassed && memoryPassed && logicalTimePassed !== false;
+  return {
+    id: policy.id,
+    points: policy.points,
+    costPassed,
+    memoryPassed,
+    logicalTimePassed,
+    resourcePassed,
+    earned: outputAccepted && resourcePassed,
+  };
 }
 
 export function scoreProblemResults(
@@ -74,30 +141,41 @@ export function scoreProblemResults(
     problem.scoring.policies.map((policy) => [policy.id, 0]),
   );
   const cases = results.map((result): ScoredProblemCase => {
-    if (!result.run || result.verdict !== "accepted" || result.run.termination !== "exited") {
-      return { id: result.id, passedPolicyIds: [], points: 0 };
+    if (result.verdict === "accepted" && result.run?.termination !== "exited") {
+      throw new Error(`Problem '${problem.id}' accepted a case without a successful execution.`);
     }
-    const metrics = result.run.metrics;
-    assertProblemCostProfile(problem, language, metrics.costProfile);
-    if (metrics.costModel !== "weighted") {
-      throw new Error(`Problem '${problem.id}' received an unsupported cost model.`);
+    const metrics = observedMetrics(problem, language, result);
+    const outputAccepted = result.verdict === "accepted" && result.run?.termination === "exited";
+    if (
+      outputAccepted
+      && (
+        metrics === null
+        || metrics.cost === null
+        || metrics.rawCost === null
+        || metrics.memoryBytes === null
+      )
+    ) {
+      throw new Error(`Problem '${problem.id}' accepted a case without complete scoring metrics.`);
     }
-    const cost = requireMetric(metrics.cost, "cost");
-    const rawCost = requireMetric(metrics.rawCost, "rawCost");
-    const baselineCost = requireMetric(metrics.baselineCost, "baselineCost");
-    const memoryBytes = requireMetric(metrics.memoryBytes, "memoryBytes");
-    if (cost !== Math.max(0, rawCost - baselineCost)) {
-      throw new Error(`Problem '${problem.id}' received inconsistent normalized cost metrics.`);
-    }
+    const policyEvaluations = problem.scoring.policies.map((policy) => (
+      evaluatePolicy(policy, metrics, outputAccepted)
+    ));
     const passedPolicyIds: string[] = [];
     let points = 0;
-    for (const policy of problem.scoring.policies) {
-      if (!policyPasses(policy, cost, memoryBytes, metrics.logicalTimeNs)) continue;
-      passedPolicyIds.push(policy.id);
-      passedByPolicy[policy.id] += 1;
-      points += policy.points;
+    for (const evaluation of policyEvaluations) {
+      if (!evaluation.earned) continue;
+      passedPolicyIds.push(evaluation.id);
+      passedByPolicy[evaluation.id] += 1;
+      points += evaluation.points;
     }
-    return { id: result.id, passedPolicyIds, points };
+    return {
+      id: result.id,
+      outputAccepted,
+      metrics,
+      policyEvaluations,
+      passedPolicyIds,
+      points,
+    };
   });
   const numerator = cases.reduce((total, testCase) => total + testCase.points, 0);
   const denominator = problem.judgeCases.length;

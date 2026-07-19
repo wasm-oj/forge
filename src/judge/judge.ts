@@ -1,4 +1,5 @@
 import { FORGE_CONTRACT_ID } from "../core/contract";
+import type { ObservedCaseMetrics, PolicyEvaluation } from "./problem-scoring";
 
 export type CaseVerdict = "accepted" | "wrong-answer" | "runtime-error" | "time-limit" | "judge-error";
 export type SubmissionVerdict = "running" | "accepted" | "wrong-answer" | "runtime-error" | "time-limit" | "judge-error" | "compile-error" | "cancelled";
@@ -12,7 +13,10 @@ export interface JudgeUiCaseResult {
   exitCode: number | null;
   durationMs: number;
   points?: number;
+  outputAccepted?: boolean;
   passedPolicyIds?: readonly string[];
+  metrics?: ObservedCaseMetrics;
+  policyEvaluations?: readonly PolicyEvaluation[];
 }
 
 export interface JudgeUiSession {
