@@ -31,6 +31,10 @@ async function fixture() {
     title: problem.title,
     trackId: problem.trackId,
     track: problem.track,
+    statementPaths: {
+      "zh-TW": `problems/001-${problem.id}/statement.zh-TW.md`,
+      en: `problems/001-${problem.id}/statement.en.md`,
+    },
     difficulty: problem.difficulty,
     tags: problem.tags,
     caseCount: problem.judgeCases.length,
@@ -43,7 +47,7 @@ async function fixture() {
   const index = {
     schema: BROWSER_COLLECTION_SCHEMA,
     problemSchema: BROWSER_PROBLEM_SCHEMA,
-    revision: await sha256(encoder.encode(`1\0${digest}\n`)),
+    revision: await sha256(encoder.encode(`1\0${digest}\0${entry.statementPaths["zh-TW"]}\0${entry.statementPaths.en}\n`)),
     localization: { defaultLocale: "zh-TW", supportedLocales: ["zh-TW", "en"] },
     problems: [entry],
   };
@@ -51,12 +55,12 @@ async function fixture() {
 }
 
 describe("remote problem collection", () => {
-  it("isolates the v3 verified cache namespace from incompatible collection schemas", async () => {
+  it("isolates the v4 verified cache namespace from incompatible collection schemas", async () => {
     const deleteCache = vi.fn(async () => true);
     vi.stubGlobal("caches", { delete: deleteCache });
     try {
       await clearProblemCollectionCache();
-      expect(deleteCache).toHaveBeenCalledWith("wasm-oj-verified-problem-collections-v3");
+      expect(deleteCache).toHaveBeenCalledWith("wasm-oj-verified-problem-collections-v4");
     } finally {
       vi.unstubAllGlobals();
     }

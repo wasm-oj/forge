@@ -13,9 +13,7 @@ import {
   CircleStop,
   Clock3,
   Code2,
-  Copy,
   Download,
-  ExternalLink,
   FileCode2,
   Gauge,
   Hammer,
@@ -55,7 +53,7 @@ import { FORGE_CONTRACT_VERSION } from "@/src/core/contract";
 import { textMatcher } from "@/src/judge/spec";
 import { normalizeOutput } from "@/src/judge/normalization";
 import { createJudgeProject, judgeProjectId, latestJudgeProjectForCollection, problemIdentityFromProject } from "@/src/judge/project";
-import { CHATGPT_HOME_URL, buildChatGptProblemPrompt } from "@/src/judge/chatgpt-help";
+import { buildChatGptProblemUrl } from "@/src/judge/chatgpt-help";
 import { BrowserForgeCompiler } from "@/src/runtime/compiler-client";
 import { BrowserForgeRunner } from "@/src/runtime/runner-client";
 import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, saveArtifact, saveProject } from "@/src/storage/database";
@@ -76,6 +74,7 @@ import {
   DEFAULT_PROBLEM_COLLECTION_SOURCE,
   PROBLEM_COLLECTION_SOURCE_KEY,
   clearProblemCollectionCache,
+  githubRawContentUrl,
   loadProblemCollection,
   normalizeProblemCollectionSource,
   type GithubProblemCollectionSource,
@@ -111,7 +110,6 @@ type BusyAction = "build" | "test" | "judge" | "cache" | undefined;
 type DifficultyFilter = "all" | ProblemDifficulty;
 type CompileAheadState = "idle" | "scheduled" | "compiling" | "ready" | "error";
 type ProblemPane = "statement" | "editorial";
-type ChatGptCopyState = "idle" | "copied" | "error";
 
 interface PanelResizeSession {
   pointerId: number;
@@ -413,8 +411,6 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   const [problemPane, setProblemPane] = useState<ProblemPane>("statement");
   const [filter, setFilter] = useState<DifficultyFilter>("all");
   const [problemSearch, setProblemSearch] = useState("");
-  const [chatGptHelpOpen, setChatGptHelpOpen] = useState(false);
-  const [chatGptCopyState, setChatGptCopyState] = useState<ChatGptCopyState>("idle");
   const [solved, setSolved] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
   const [runtimeReady, setRuntimeReady] = useState(false);
@@ -475,9 +471,14 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   const projectLanguage: BuiltinLanguage = isBuiltinLanguage(project.config.language)
     ? project.config.language
     : "c";
-  const chatGptProblemPrompt = useMemo(
-    () => buildChatGptProblemPrompt(activeProblem, problemLocale, projectLanguage),
-    [activeProblem, problemLocale, projectLanguage],
+  const chatGptProblemUrl = useMemo(
+    () => buildChatGptProblemUrl(
+      activeProblem,
+      problemLocale,
+      projectLanguage,
+      githubRawContentUrl(collection.source, activeProblemEntry.statementPaths[problemLocale]),
+    ),
+    [activeProblem, activeProblemEntry.statementPaths, collection.source, problemLocale, projectLanguage],
   );
   const activeToolchain = TOOLCHAINS[projectLanguage];
   const buildIdentity = useMemo(() => projectBuildIdentity(project), [project]);
@@ -513,22 +514,6 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     if (!text) return;
     setLogs((current) => [...current, { id: crypto.randomUUID(), stream, text }]);
   }, []);
-
-  const copyChatGptPrompt = useCallback(async (openChatGpt: boolean) => {
-    setChatGptCopyState("idle");
-    const copy = navigator.clipboard?.writeText(chatGptProblemPrompt);
-    if (openChatGpt) window.open(CHATGPT_HOME_URL, "_blank", "noopener,noreferrer");
-    if (!copy) {
-      setChatGptCopyState("error");
-      return;
-    }
-    try {
-      await copy;
-      setChatGptCopyState("copied");
-    } catch {
-      setChatGptCopyState("error");
-    }
-  }, [chatGptProblemPrompt]);
 
   const measureBottomPanel = useCallback(() => {
     const stack = editorStackRef.current;
@@ -1383,18 +1368,16 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
             <button className={problemPane === "editorial" ? "active" : ""} onClick={() => setProblemPane("editorial")}>
               {problemLocale === "zh-TW" ? "題解" : "Editorial"}
             </button>
-            <button
-              type="button"
+            <a
               className="ask-chatgpt-button"
-              onClick={() => {
-                setChatGptCopyState("idle");
-                setChatGptHelpOpen(true);
-              }}
-              title={problemLocale === "zh-TW" ? "帶著完整題目與目前語言模板詢問 ChatGPT" : "Ask ChatGPT with the full problem and current language template"}
+              href={chatGptProblemUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={problemLocale === "zh-TW" ? "以題目連結與目前語言模板詢問 ChatGPT" : "Ask ChatGPT with the problem link and current language template"}
             >
               <MessageCircle size={13} />
               {problemLocale === "zh-TW" ? "詢問 ChatGPT" : "Ask ChatGPT"}
-            </button>
+            </a>
           </div>
           <ProblemMarkdown markdown={problemPane === "statement" ? activeProblemText.statement : activeProblemText.editorial} />
           <div className="local-judge-note">
@@ -1694,42 +1677,6 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
         <div>{project.config.target.toUpperCase()}</div>
         <div>Ln {location.line}, Col {location.column}</div>
       </footer>
-
-      {chatGptHelpOpen && (
-        <div className="chatgpt-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setChatGptHelpOpen(false); }}>
-          <section className="chatgpt-help-dialog" role="dialog" aria-modal="true" aria-labelledby="chatgpt-help-title">
-            <header>
-              <div>
-                <span>LEARNING ASSISTANT</span>
-                <h2 id="chatgpt-help-title">{problemLocale === "zh-TW" ? "帶著完整題目詢問 ChatGPT" : "Ask ChatGPT with the full problem"}</h2>
-              </div>
-              <button className="icon-button" type="button" onClick={() => setChatGptHelpOpen(false)} aria-label={problemLocale === "zh-TW" ? "關閉" : "Close"}><X size={16} /></button>
-            </header>
-            <p>
-              {problemLocale === "zh-TW"
-                ? "完整 prompt 不再放進網址，以免題目與程式碼過長造成 HTTP 431。下方內容包含完整題目、全部範例與目前語言模板。"
-                : "The complete prompt is kept out of the URL to avoid HTTP 431 errors with long statements and code. It includes the full problem, every sample, and the current language template."}
-            </p>
-            <textarea
-              readOnly
-              value={chatGptProblemPrompt}
-              onFocus={(event) => event.currentTarget.select()}
-              aria-label={problemLocale === "zh-TW" ? "完整 ChatGPT 提示" : "Complete ChatGPT prompt"}
-            />
-            <div className={`chatgpt-copy-status ${chatGptCopyState}`} aria-live="polite">
-              {chatGptCopyState === "copied"
-                ? (problemLocale === "zh-TW" ? "已複製；請在 ChatGPT 貼上。" : "Copied; paste it into ChatGPT.")
-                : chatGptCopyState === "error"
-                  ? (problemLocale === "zh-TW" ? "瀏覽器未允許自動複製，請在上方全選並手動複製。" : "Clipboard access was denied. Select the prompt above and copy it manually.")
-                  : (problemLocale === "zh-TW" ? "prompt 只會寫入剪貼簿，不會由 Forge 上傳。" : "Forge only writes the prompt to your clipboard; it does not upload it.")}
-            </div>
-            <footer>
-              <button type="button" className="secondary" onClick={() => void copyChatGptPrompt(false)}><Copy size={13} />{problemLocale === "zh-TW" ? "只複製" : "Copy only"}</button>
-              <button type="button" className="primary" onClick={() => void copyChatGptPrompt(true)}><ExternalLink size={13} />{problemLocale === "zh-TW" ? "複製並開啟 ChatGPT" : "Copy and open ChatGPT"}</button>
-            </footer>
-          </section>
-        </div>
-      )}
 
       {settingsOpen && (
         <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>

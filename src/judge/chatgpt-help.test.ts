@@ -1,43 +1,48 @@
 import { describe, expect, it } from "vitest";
 import { LANGUAGES } from "../core/types";
-import { CHATGPT_HOME_URL, buildChatGptProblemPrompt } from "./chatgpt-help";
+import { buildChatGptProblemPrompt, buildChatGptProblemUrl } from "./chatgpt-help";
 import { judgeStarterSource } from "./project";
 import { PROBLEM_LOCALES, PROBLEMS, sampleCases } from "./problems";
 
 describe("ChatGPT problem help", () => {
-  it("includes the complete localized statement, every sample, and the selected language template", () => {
+  it("references the complete statement instead of embedding it and includes the selected language template", () => {
     const problem = PROBLEMS[39];
-    const prompt = buildChatGptProblemPrompt(problem, "zh-TW", "rust");
+    const statementUrl = "https://raw.githubusercontent.com/wasm-oj/problems/main/problems/034-capability-cut/statement.zh-TW.md";
+    const prompt = buildChatGptProblemPrompt(problem, "zh-TW", "rust", statementUrl);
 
     expect(prompt).toContain(problem.title["zh-TW"]);
-    expect(prompt).toContain(problem.statement["zh-TW"].trim());
+    expect(prompt).toContain(statementUrl);
+    expect(prompt).not.toContain(problem.statement["zh-TW"].trim());
     for (const sample of sampleCases(problem)) {
-      expect(prompt).toContain(sample.input.trimEnd());
-      expect(prompt).toContain(sample.output.trimEnd());
+      expect(prompt).not.toContain(sample.input.trimEnd());
     }
     expect(prompt).toContain("## 目前語言：Rust");
     expect(prompt).toContain(judgeStarterSource(problem, "rust").trimEnd());
   });
 
-  it("keeps the ChatGPT destination separate from the full prompt", () => {
+  it("places the compact prompt directly in the one-click ChatGPT URL", () => {
     const problem = PROBLEMS[0];
-    const prompt = buildChatGptProblemPrompt(problem, "en", "cpp");
-    const url = new URL(CHATGPT_HOME_URL);
+    const statementUrl = "https://raw.githubusercontent.com/wasm-oj/problems/main/problems/041-progressive-cost-budget/statement.en.md";
+    const prompt = buildChatGptProblemPrompt(problem, "en", "cpp", statementUrl);
+    const url = new URL(buildChatGptProblemUrl(problem, "en", "cpp", statementUrl));
 
     expect(url.origin).toBe("https://chatgpt.com");
     expect(url.pathname).toBe("/");
-    expect(url.search).toBe("");
-    expect(prompt).toContain(problem.statement.en.trim());
+    expect(url.searchParams.get("q")).toBe(prompt);
+    expect(prompt).toContain(statementUrl);
     expect(prompt).toContain("## Current Language: C++");
   });
 
-  it("can construct complete prompts for every problem, locale, and built-in language", () => {
+  it("keeps every problem, locale, and language URL safely below a common request-line limit", () => {
     for (const problem of PROBLEMS) {
       for (const locale of PROBLEM_LOCALES) {
         for (const language of LANGUAGES) {
-          const prompt = buildChatGptProblemPrompt(problem, locale, language);
-          expect(prompt).toContain(problem.statement[locale].trim());
+          const statementUrl = `https://raw.githubusercontent.com/wasm-oj/problems/main/problems/${problem.id}/statement.${locale}.md`;
+          const prompt = buildChatGptProblemPrompt(problem, locale, language, statementUrl);
+          const url = buildChatGptProblemUrl(problem, locale, language, statementUrl);
+          expect(prompt).not.toContain(problem.statement[locale].trim());
           expect(prompt).toContain(judgeStarterSource(problem, language).trimEnd());
+          expect(url.length).toBeLessThan(2_048);
         }
       }
     }

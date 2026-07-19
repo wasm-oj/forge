@@ -15,7 +15,7 @@ import {
   type ProblemScoringPolicy,
 } from "./problem-model";
 
-export const BROWSER_COLLECTION_SCHEMA = "wasm-oj-browser-collection-v3";
+export const BROWSER_COLLECTION_SCHEMA = "wasm-oj-browser-collection-v4";
 export const BROWSER_PROBLEM_SCHEMA = "wasm-oj-browser-problem-v3";
 export const PROBLEM_COLLECTION_SOURCE_KEY = "wasm-oj-forge-v1:problem-collection-source";
 export const DEFAULT_PROBLEM_COLLECTION_SOURCE = Object.freeze({
@@ -29,7 +29,7 @@ export const DEFAULT_PROBLEM_COLLECTION_SOURCE = Object.freeze({
 const INDEX_MAX_BYTES = 512 * 1024;
 const BUNDLE_MAX_BYTES = 32 * 1024 * 1024;
 const MAX_PROBLEMS = 1_000;
-const CACHE_NAME = "wasm-oj-verified-problem-collections-v3";
+const CACHE_NAME = "wasm-oj-verified-problem-collections-v4";
 const LANGUAGES = ["c", "cpp", "rust", "go", "python", "javascript", "typescript"] as const;
 const POLICY_IDS = ["baseline", "efficient", "optimal"] as const;
 const CALIBRATION_METHOD = "forge-v1-compiled-average-optimal-rounded-v1";
@@ -52,6 +52,7 @@ export interface ProblemBundleDescriptor {
 }
 
 export interface ProblemCollectionEntry extends JudgeProblemSummary {
+  readonly statementPaths: LocalizedText;
   readonly bundle: ProblemBundleDescriptor;
 }
 
@@ -351,7 +352,7 @@ function parseCollectionEntry(
   bundlePaths: Set<string>,
   bundleDigests: Set<string>,
 ): ProblemCollectionEntry {
-  if (!isRecord(value) || !hasExactKeys(value, ["id", "number", "title", "trackId", "track", "difficulty", "tags", "caseCount", "bundle"])) {
+  if (!isRecord(value) || !hasExactKeys(value, ["id", "number", "title", "trackId", "track", "statementPaths", "difficulty", "tags", "caseCount", "bundle"])) {
     throw schemaError(`Problem collection entry ${expectedNumber} has an invalid shape.`);
   }
   if (value.number !== expectedNumber || typeof value.id !== "string" || !ID_PATTERN.test(value.id) || ids.has(value.id)) {
@@ -381,6 +382,20 @@ function parseCollectionEntry(
   }
   bundlePaths.add(bundlePath);
   bundleDigests.add(value.bundle.sha256);
+  const rawStatementPaths = parseLocalizedText(value.statementPaths, `problem '${value.id}' statement paths`);
+  const statementPaths = {
+    "zh-TW": normalizedRelativePath(
+      rawStatementPaths["zh-TW"],
+      `problem '${value.id}' statement path for 'zh-TW'`,
+    ),
+    en: normalizedRelativePath(
+      rawStatementPaths.en,
+      `problem '${value.id}' statement path for 'en'`,
+    ),
+  } satisfies LocalizedText;
+  if (PROBLEM_LOCALES.some((locale) => !statementPaths[locale].endsWith(".md"))) {
+    throw schemaError(`Problem '${value.id}' has a statement path that is not Markdown.`);
+  }
   if (!Number.isSafeInteger(value.bundle.bytes) || (value.bundle.bytes as number) < 2 || (value.bundle.bytes as number) > BUNDLE_MAX_BYTES) {
     throw schemaError(`Problem '${value.id}' has an invalid bundle byte length.`);
   }
@@ -390,6 +405,7 @@ function parseCollectionEntry(
     title: parseLocalizedText(value.title, `problem '${value.id}' title`),
     trackId: value.trackId,
     track: parseLocalizedText(value.track, `problem '${value.id}' track`),
+    statementPaths,
     difficulty,
     tags,
     caseCount: value.caseCount as number,
@@ -553,7 +569,7 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 
 async function verifyCollectionRevision(index: ProblemCollectionIndex): Promise<void> {
   const revisionInput = index.problems
-    .map((entry) => `${entry.number}\0${entry.bundle.sha256}\n`)
+    .map((entry) => `${entry.number}\0${entry.bundle.sha256}\0${entry.statementPaths["zh-TW"]}\0${entry.statementPaths.en}\n`)
     .join("");
   if (await sha256Hex(new TextEncoder().encode(revisionInput)) !== index.revision) {
     throw new ProblemCollectionError("The problem collection revision does not match its ordered bundles.", "integrity");
