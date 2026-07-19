@@ -1,7 +1,7 @@
 import { FORGE_CONTRACT_ID } from "../core/contract";
 
-export type CaseVerdict = "accepted" | "wrong-answer" | "runtime-error" | "time-limit";
-export type SubmissionVerdict = "running" | "accepted" | "wrong-answer" | "runtime-error" | "time-limit" | "compile-error" | "cancelled";
+export type CaseVerdict = "accepted" | "wrong-answer" | "runtime-error" | "time-limit" | "judge-error";
+export type SubmissionVerdict = "running" | "accepted" | "wrong-answer" | "runtime-error" | "time-limit" | "judge-error" | "compile-error" | "cancelled";
 
 export interface JudgeUiCaseResult {
   number: number;
@@ -11,6 +11,8 @@ export interface JudgeUiCaseResult {
   stderr: string;
   exitCode: number | null;
   durationMs: number;
+  points?: number;
+  passedPolicyIds?: readonly string[];
 }
 
 export interface JudgeUiSession {
@@ -20,6 +22,13 @@ export interface JudgeUiSession {
   total: number;
   cases: JudgeUiCaseResult[];
   durationMs: number;
+  message?: string;
+  score?: {
+    numerator: number;
+    denominator: number;
+    points: number;
+    maximumPoints: number;
+  };
 }
 
 export const JUDGE_PROGRESS_KEY = `${FORGE_CONTRACT_ID}:judge-progress`;

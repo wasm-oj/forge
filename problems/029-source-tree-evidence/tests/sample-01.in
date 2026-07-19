@@ -1,0 +1,6 @@
+5 .evidence
+F src/main.c 1 12 deadbeef
+D old.c
+F .evidence/report 0 3 00000001
+L link src/main.c
+F .evidence2/x 0 4 00000002

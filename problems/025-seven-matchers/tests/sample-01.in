@@ -1,0 +1,22 @@
+7
+EXACT 2 2
+ab c
+a bc
+LINES 3 1
+x # #
+x
+TOKENS 2 2
+a b
+b a
+FLOAT 3 3 2
+10 -5 7
+12 -6 4
+SET 3 2
+a a b
+b a
+MULTISET 3 2
+a a b
+a b
+FILESET 2 2
+a@00000001 b@00000002
+b@00000002 a@00000001

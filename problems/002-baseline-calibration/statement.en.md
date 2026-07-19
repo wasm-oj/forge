@@ -1,0 +1,106 @@
+# Empty-Program Baseline Calibration
+
+The judge measures the cost of an empty program under `P` compilation profiles. Each profile is expected to have exactly one observation for every seed from `1` through `S`. A profile's baseline may be published only if every seed is present and all observed costs are identical.
+
+The same `(profile, seed)` pair appears at most once, but observations may arrive in any order. For each raw-cost query, output `INVALID` if the profile has no publishable baseline. Otherwise, output the baseline and the net cost after subtracting it. Net cost may not be negative, so it is defined as `max(0, raw-baseline)`.
+
+## Input
+
+The first line contains `P S N Q`. The next `N` lines contain `profile seed cost`. The final `Q` lines contain `profile raw`.
+
+## Output
+
+Output one line per query. For a valid profile, output `baseline net`. For an invalid profile, output only `INVALID`. Queries do not modify the calibration data.
+
+## Constraints
+
+- `1 ≤ P,S,Q ≤ 200000`
+- `0 ≤ N ≤ 200000`
+- `1 ≤ profile ≤ P`, `1 ≤ seed ≤ S`
+- All `(profile,seed)` pairs are distinct.
+- `0 ≤ cost,raw ≤ 9×10^18`
+
+Given the seed range and uniqueness guarantees above, `count=S` is equivalent to saying that the profile has no missing seed. The full constraints rule out rescanning all observations for every query.
+
+## Examples
+
+<!-- BEGIN GENERATED SAMPLES -->
+
+### Example One
+
+Input:
+
+```text
+3 2 5 5
+1 1 10
+2 2 8
+3 2 4
+1 2 10
+2 1 7
+1 6
+1 15
+2 99
+3 4
+1 10
+```
+
+Output:
+
+```text
+10 0
+10 5
+INVALID
+INVALID
+10 0
+```
+
+### Example Two
+
+Input:
+
+```text
+4 1 3 4
+3 1 9
+1 1 0
+4 1 20
+1 5
+2 5
+3 8
+4 25
+```
+
+Output:
+
+```text
+0 5
+INVALID
+9 0
+20 5
+```
+
+### Example Three
+
+Input:
+
+```text
+2 3 6 3
+2 3 5
+1 2 0
+2 1 5
+1 1 0
+2 2 5
+1 3 0
+1 0
+1 12
+2 4
+```
+
+Output:
+
+```text
+0 0
+0 12
+5 0
+```
+
+<!-- END GENERATED SAMPLES -->

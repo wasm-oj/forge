@@ -1,0 +1,10 @@
+3
+SET 12 11
+a a a a b c d e f g h i
+a b b c c d e f g h i
+SET 8 8
+a a b c d e f g
+a b c d e f g h
+MULTISET 6 5
+a a a b c d
+a a b c d

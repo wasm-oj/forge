@@ -1,7 +1,12 @@
 import type { BuiltinLanguage, Project, ProjectFile } from "@/src/core/types";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { DEFAULT_RESOURCE_POLICY } from "../core/resources";
-import type { JudgeProblem } from "./problems";
+import {
+  broadestPolicy,
+  DEFAULT_PROBLEM_LOCALE,
+  sampleCases,
+  type JudgeProblem,
+} from "./problems";
 
 const ENTRY_BY_LANGUAGE: Record<BuiltinLanguage, string> = {
   c: "src/main.c",
@@ -14,7 +19,7 @@ const ENTRY_BY_LANGUAGE: Record<BuiltinLanguage, string> = {
 };
 
 function starterSource(problem: JudgeProblem, language: BuiltinLanguage): string {
-  const heading = `Problem ${problem.number}: ${problem.title}`;
+  const heading = `Problem ${problem.number}: ${problem.title[DEFAULT_PROBLEM_LOCALE]}`;
   switch (language) {
     case "c":
       return [
@@ -49,10 +54,7 @@ function starterSource(problem: JudgeProblem, language: BuiltinLanguage): string
         `    // ${heading}`,
         "    let mut input = String::new();",
         "    io::stdin().read_to_string(&mut input).unwrap();",
-        "    let data: Vec<i64> = input.split_whitespace()",
-        "        .map(|value| value.parse().unwrap())",
-        "        .collect();",
-        "    // TODO: compute and print the required answer from data.",
+        "    // TODO: parse input, compute, and print the required answer.",
         "}",
         "",
       ].join("\n");
@@ -60,7 +62,7 @@ function starterSource(problem: JudgeProblem, language: BuiltinLanguage): string
       return [
         "import sys",
         "",
-        "data = list(map(int, sys.stdin.read().split()))",
+        "input_data = sys.stdin.read()",
         `# ${heading}`,
         "# TODO: compute and print the required answer.",
         "",
@@ -69,8 +71,7 @@ function starterSource(problem: JudgeProblem, language: BuiltinLanguage): string
       return [
         "import * as std from \"std\";",
         "",
-        "const input = std.in.readAsString().trim();",
-        "const data = input ? input.split(/\\s+/).map(BigInt) : [];",
+        "const input = std.in.readAsString();",
         `// ${heading}`,
         "// TODO: compute and print the required answer.",
         "",
@@ -79,8 +80,7 @@ function starterSource(problem: JudgeProblem, language: BuiltinLanguage): string
       return [
         "import * as std from \"std\";",
         "",
-        "const input: string = std.in.readAsString().trim();",
-        "const data: bigint[] = input ? input.split(/\\s+/).map(BigInt) : [];",
+        "const input: string = std.in.readAsString();",
         `// ${heading}`,
         "// TODO: compute and print the required answer.",
         "",
@@ -117,6 +117,9 @@ export function problemIdFromProject(project: Project): string | undefined {
 }
 
 export function createJudgeProject(problem: JudgeProblem, language: BuiltinLanguage): Project {
+  const baseline = broadestPolicy(problem);
+  const sample = sampleCases(problem)[0];
+  if (!sample) throw new Error(`Problem '${problem.id}' has no sample case.`);
   const entry = ENTRY_BY_LANGUAGE[language];
   const file: ProjectFile = {
     path: entry,
@@ -135,10 +138,18 @@ export function createJudgeProject(problem: JudgeProblem, language: BuiltinLangu
       optimization: "release",
       entry,
       args: [],
-      stdin: problem.examples[0].input,
+      stdin: sample.input,
       env: {},
       determinism: { ...DEFAULT_DETERMINISM },
-      resources: { ...DEFAULT_RESOURCE_POLICY, instructionBudget: problem.instructionBudget },
+      resources: {
+        ...DEFAULT_RESOURCE_POLICY,
+        instructionBudget: baseline.limits.instructionBudget,
+        memoryLimitBytes: baseline.limits.memoryLimitBytes,
+        wallTimeLimitMs: problem.scoring.safetyLimits.wallTimeLimitMs,
+        ...(baseline.limits.logicalTimeLimitMs === undefined
+          ? {}
+          : { logicalTimeLimitMs: baseline.limits.logicalTimeLimitMs }),
+      },
     },
   };
 }

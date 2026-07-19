@@ -1,0 +1,1 @@
+clang wasm32 o2 deadbeef 3 inc/x.h cccccccc src/a.c bbbbbbbb src/z.c aaaaaaaa

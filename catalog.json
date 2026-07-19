@@ -1,0 +1,213 @@
+{
+  "schema": "wasm-oj-catalog-v2",
+  "problemSchema": "wasm-oj-problem-v3",
+  "localization": {
+    "defaultLocale": "zh-TW",
+    "supportedLocales": [
+      "zh-TW",
+      "en"
+    ]
+  },
+  "problems": [
+    {
+      "id": 1,
+      "slug": "weighted-opcode-scale",
+      "manifest": "problems/001-weighted-opcode-scale/problem.json"
+    },
+    {
+      "id": 2,
+      "slug": "baseline-calibration",
+      "manifest": "problems/002-baseline-calibration/problem.json"
+    },
+    {
+      "id": 3,
+      "slug": "memory-gate",
+      "manifest": "problems/003-memory-gate/problem.json"
+    },
+    {
+      "id": 4,
+      "slug": "shared-output-pool",
+      "manifest": "problems/004-shared-output-pool/problem.json"
+    },
+    {
+      "id": 5,
+      "slug": "transactional-vfs-quota",
+      "manifest": "problems/005-transactional-vfs-quota/problem.json"
+    },
+    {
+      "id": 6,
+      "slug": "logical-poll-clock",
+      "manifest": "problems/006-logical-poll-clock/problem.json"
+    },
+    {
+      "id": 7,
+      "slug": "guest-path-firewall",
+      "manifest": "problems/007-guest-path-firewall/problem.json"
+    },
+    {
+      "id": 8,
+      "slug": "mounted-directory-baseline",
+      "manifest": "problems/008-mounted-directory-baseline/problem.json"
+    },
+    {
+      "id": 9,
+      "slug": "sparse-file-quota",
+      "manifest": "problems/009-sparse-file-quota/problem.json"
+    },
+    {
+      "id": 10,
+      "slug": "all-or-nothing-output-collection",
+      "manifest": "problems/010-all-or-nothing-output-collection/problem.json"
+    },
+    {
+      "id": 11,
+      "slug": "mount-tree-conflicts",
+      "manifest": "problems/011-mount-tree-conflicts/problem.json"
+    },
+    {
+      "id": 12,
+      "slug": "bounded-tar-stream",
+      "manifest": "problems/012-bounded-tar-stream/problem.json"
+    },
+    {
+      "id": 13,
+      "slug": "build-fingerprint",
+      "manifest": "problems/013-build-fingerprint/problem.json"
+    },
+    {
+      "id": 14,
+      "slug": "runtime-bundle-encoding",
+      "manifest": "problems/014-runtime-bundle-encoding/problem.json"
+    },
+    {
+      "id": 15,
+      "slug": "dirty-build-nodes",
+      "manifest": "problems/015-dirty-build-nodes/problem.json"
+    },
+    {
+      "id": 16,
+      "slug": "exact-dependency-cache",
+      "manifest": "problems/016-exact-dependency-cache/problem.json"
+    },
+    {
+      "id": 17,
+      "slug": "graph-blob-lru",
+      "manifest": "problems/017-graph-blob-lru/problem.json"
+    },
+    {
+      "id": 18,
+      "slug": "worker-generations",
+      "manifest": "problems/018-worker-generations/problem.json"
+    },
+    {
+      "id": 19,
+      "slug": "reproducible-build-order",
+      "manifest": "problems/019-reproducible-build-order/problem.json"
+    },
+    {
+      "id": 20,
+      "slug": "offline-dependency-bundle",
+      "manifest": "problems/020-offline-dependency-bundle/problem.json"
+    },
+    {
+      "id": 21,
+      "slug": "compiler-race",
+      "manifest": "problems/021-compiler-race/problem.json"
+    },
+    {
+      "id": 22,
+      "slug": "submission-conveyor",
+      "manifest": "problems/022-submission-conveyor/problem.json"
+    },
+    {
+      "id": 23,
+      "slug": "storage-evacuation",
+      "manifest": "problems/023-storage-evacuation/problem.json"
+    },
+    {
+      "id": 24,
+      "slug": "judge-ledger",
+      "manifest": "problems/024-judge-ledger/problem.json"
+    },
+    {
+      "id": 25,
+      "slug": "seven-matchers",
+      "manifest": "problems/025-seven-matchers/problem.json"
+    },
+    {
+      "id": 26,
+      "slug": "bidirectional-pipes",
+      "manifest": "problems/026-bidirectional-pipes/problem.json"
+    },
+    {
+      "id": 27,
+      "slug": "chunk-independent-random",
+      "manifest": "problems/027-chunk-independent-random/problem.json"
+    },
+    {
+      "id": 28,
+      "slug": "canonical-replay-bundle",
+      "manifest": "problems/028-canonical-replay-bundle/problem.json"
+    },
+    {
+      "id": 29,
+      "slug": "source-tree-evidence",
+      "manifest": "problems/029-source-tree-evidence/problem.json"
+    },
+    {
+      "id": 30,
+      "slug": "cross-host-matrix",
+      "manifest": "problems/030-cross-host-matrix/problem.json"
+    },
+    {
+      "id": 31,
+      "slug": "compile-critical-path",
+      "manifest": "problems/031-compile-critical-path/problem.json"
+    },
+    {
+      "id": 32,
+      "slug": "conflict-package-cover",
+      "manifest": "problems/032-conflict-package-cover/problem.json"
+    },
+    {
+      "id": 33,
+      "slug": "toolchain-mirror-network",
+      "manifest": "problems/033-toolchain-mirror-network/problem.json"
+    },
+    {
+      "id": 34,
+      "slug": "capability-cut",
+      "manifest": "problems/034-capability-cut/problem.json"
+    },
+    {
+      "id": 35,
+      "slug": "wait-for-cycles",
+      "manifest": "problems/035-wait-for-cycles/problem.json"
+    },
+    {
+      "id": 36,
+      "slug": "artifact-cache-knapsack",
+      "manifest": "problems/036-artifact-cache-knapsack/problem.json"
+    },
+    {
+      "id": 37,
+      "slug": "dependency-tree-knapsack",
+      "manifest": "problems/037-dependency-tree-knapsack/problem.json"
+    },
+    {
+      "id": 38,
+      "slug": "conformance-feature-coverage",
+      "manifest": "problems/038-conformance-feature-coverage/problem.json"
+    },
+    {
+      "id": 39,
+      "slug": "calibration-multiple-choice-knapsack",
+      "manifest": "problems/039-calibration-multiple-choice-knapsack/problem.json"
+    },
+    {
+      "id": 40,
+      "slug": "dual-quota-output-knapsack",
+      "manifest": "problems/040-dual-quota-output-knapsack/problem.json"
+    }
+  ]
+}
