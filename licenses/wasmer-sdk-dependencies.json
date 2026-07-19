@@ -17,7 +17,7 @@
   },
   "report": {
     "path": "licenses/wasmer-sdk-dependencies.html",
-    "sha256": "1e9f17a7922524c6da838ea90054dd37863a2d21611168acd5a6aa8ea11499d9"
+    "sha256": "ec4b0175b4d1affb0f97996cb6661ec6fa1c5959dbce637d89b39cf3559b079a"
   },
   "packages": [
     {

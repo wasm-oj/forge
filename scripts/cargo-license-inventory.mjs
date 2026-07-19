@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { TextDecoder } from "node:util";
 import { publishEvidenceFiles } from "./evidence-publication.mjs";
 
 export async function publishCargoLicenseInventory(options) {
@@ -13,10 +14,11 @@ export async function publishCargoLicenseInventory(options) {
     graph,
     reportRelativePath,
   } = options;
-  const [rawBytes, reportBytes] = await Promise.all([
+  const [rawBytes, generatedReportBytes] = await Promise.all([
     readFile(path.resolve(rawPath)),
     readFile(path.resolve(stagedReportPath)),
   ]);
+  const reportBytes = canonicalGeneratedText(generatedReportBytes);
   const raw = JSON.parse(rawBytes.toString("utf8"));
   if (!Array.isArray(raw.crates) || !Array.isArray(raw.licenses)) {
     throw new Error("cargo-about returned an unsupported JSON document.");
@@ -80,6 +82,11 @@ export async function publishCargoLicenseInventory(options) {
     { path: path.resolve(reportPath), bytes: reportBytes },
     { path: path.resolve(inventoryPath), bytes: `${JSON.stringify(inventory, null, 2)}\n` },
   ]);
+}
+
+export function canonicalGeneratedText(bytes) {
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  return Buffer.from(text.replace(/\r\n?/g, "\n"), "utf8");
 }
 
 function compareCodePoints(left, right) {

@@ -6,6 +6,27 @@ import { describe, expect, it } from "vitest";
 const ROOT = process.cwd();
 
 describe("evidence workflow scripts", () => {
+  it("canonicalizes generated license reports to UTF-8 with LF line endings", () => {
+    const moduleUrl = scriptUrl("scripts/cargo-license-inventory.mjs");
+    const result = evaluate(`
+      import { canonicalGeneratedText } from ${JSON.stringify(moduleUrl)};
+      const input = Buffer.from("first\\r\\nsecond\\rthird\\n", "utf8");
+      const output = canonicalGeneratedText(input);
+      let invalidUtf8Rejected = false;
+      try { canonicalGeneratedText(Uint8Array.of(0xc3, 0x28)); } catch { invalidUtf8Rejected = true; }
+      console.log(JSON.stringify({
+        text: output.toString("utf8"),
+        containsCarriageReturn: output.includes(13),
+        invalidUtf8Rejected,
+      }));
+    `);
+    expect(result).toEqual({
+      text: "first\nsecond\nthird\n",
+      containsCarriageReturn: false,
+      invalidUtf8Rejected: true,
+    });
+  });
+
   it("keeps generated baseline source stable across equivalent raw runs", () => {
     const moduleUrl = scriptUrl("scripts/transform-cost-baselines.mjs");
     const result = evaluate(`

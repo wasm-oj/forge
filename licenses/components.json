@@ -223,22 +223,22 @@
         {
           "kind": "file",
           "path": "licenses/runtime-core-dependencies.html",
-          "sha256": "d3aa3164c198c5de1ec13970171800596f2e0dc5479240c64b6c3334c657625c"
+          "sha256": "a8ea582d5a8b02e12712b8f65f5d9751d8d4fecd4b18ce93322c51a62f58cc5c"
         },
         {
           "kind": "file",
           "path": "licenses/runtime-core-dependencies.json",
-          "sha256": "702a57d7ce457be73bd7cea08e05b4159723de0447876c9e793be86acd0bd454"
+          "sha256": "19bcf9f9f33bc9759f1eda03fcf279948998c94201e1615262105267d3360af5"
         }
       ],
       "licenseFiles": [
         {
           "path": "licenses/runtime-core-dependencies.html",
-          "sha256": "d3aa3164c198c5de1ec13970171800596f2e0dc5479240c64b6c3334c657625c"
+          "sha256": "a8ea582d5a8b02e12712b8f65f5d9751d8d4fecd4b18ce93322c51a62f58cc5c"
         },
         {
           "path": "licenses/runtime-core-dependencies.json",
-          "sha256": "702a57d7ce457be73bd7cea08e05b4159723de0447876c9e793be86acd0bd454"
+          "sha256": "19bcf9f9f33bc9759f1eda03fcf279948998c94201e1615262105267d3360af5"
         }
       ]
     },
@@ -484,12 +484,12 @@
         {
           "kind": "file",
           "path": "licenses/wasmer-sdk-dependencies.html",
-          "sha256": "1e9f17a7922524c6da838ea90054dd37863a2d21611168acd5a6aa8ea11499d9"
+          "sha256": "ec4b0175b4d1affb0f97996cb6661ec6fa1c5959dbce637d89b39cf3559b079a"
         },
         {
           "kind": "file",
           "path": "licenses/wasmer-sdk-dependencies.json",
-          "sha256": "465a76b76f4189d98345b99e8849a952278a674e2ed03a9f3d95e758a1b1c5ba"
+          "sha256": "97793c6616808cfaa1eb770755b57cdfe2c7668ad6f1a258a1cd57be94f68d1d"
         },
         {
           "kind": "npm",
@@ -504,11 +504,11 @@
         },
         {
           "path": "licenses/wasmer-sdk-dependencies.html",
-          "sha256": "1e9f17a7922524c6da838ea90054dd37863a2d21611168acd5a6aa8ea11499d9"
+          "sha256": "ec4b0175b4d1affb0f97996cb6661ec6fa1c5959dbce637d89b39cf3559b079a"
         },
         {
           "path": "licenses/wasmer-sdk-dependencies.json",
-          "sha256": "465a76b76f4189d98345b99e8849a952278a674e2ed03a9f3d95e758a1b1c5ba"
+          "sha256": "97793c6616808cfaa1eb770755b57cdfe2c7668ad6f1a258a1cd57be94f68d1d"
         }
       ]
     }
