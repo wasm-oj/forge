@@ -1,6 +1,6 @@
 # Problem catalog
 
-Forge carries the complete 40-problem systems track at the repository root.
+Forge carries the complete 45-problem systems track at the repository root.
 `catalog.json` is the only discovery entry point; consumers must follow each
 manifest path and then resolve every declared content path relative to that
 manifest. Directory listing and filename guessing are not part of the contract.
@@ -14,9 +14,13 @@ locales fail validation; consumers must not silently substitute another locale.
 The browser does not maintain a second handwritten problem list.
 `scripts/generate-judge-problems.mjs` resolves the catalog, reads the explicitly
 declared localized documents and test pairs, validates the manifest identities,
-and writes `src/judge/problems.generated.ts`. The generated file is committed so
-the browser bundle has no runtime filesystem dependency. `pnpm problems:verify`
-reconstructs it byte-for-byte and fails when it is stale.
+and writes two committed projections: `src/judge/problems.generated.ts` for the
+typed library/test surface and `public/problems/catalog.json` for the browser.
+The browser fetches that exact same-origin static asset, validates its schema,
+count, ordering, and identities, and has no runtime filesystem discovery or
+fallback path. Keeping the large case payload out of the server Worker preserves
+the deployment provider's code-size boundary. `pnpm problems:verify`
+reconstructs both projections byte-for-byte and fails when either is stale.
 
 Instruction policies are evidence-derived. For each language, Forge first takes
 the maximum net weighted cost over the complete manifest case set. The optimal
@@ -41,3 +45,8 @@ a linear memory threshold axis.
 
 The original handwritten 20-problem catalog and its single fixed instruction
 budget were removed. There is no compatibility reader or fallback fixture path.
+
+The five introductory additions have a separate
+[independent blind-review record](problem-bank/independent-041-045.md) covering
+statement-only derivation, brute-force cross-checks, seven-language execution,
+validator/oracle/generator audits, asymptotic optimality, and cost-policy hashes.

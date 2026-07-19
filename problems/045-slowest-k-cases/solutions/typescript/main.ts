@@ -1,0 +1,71 @@
+import * as std from "std";
+
+interface CaseRecord {
+    cost: number;
+    index: number;
+}
+
+const input = std.in.readAsString();
+let cursor = 0;
+function nextToken(): string {
+    while (cursor < input.length && input.charCodeAt(cursor) <= 32) cursor++;
+    const start = cursor;
+    while (cursor < input.length && input.charCodeAt(cursor) > 32) cursor++;
+    return input.slice(start, cursor);
+}
+
+function better(left: CaseRecord, right: CaseRecord): boolean {
+    return left.cost > right.cost || (left.cost === right.cost && left.index < right.index);
+}
+
+function worse(left: CaseRecord, right: CaseRecord): boolean {
+    return left.cost < right.cost || (left.cost === right.cost && left.index > right.index);
+}
+
+function push(heap: CaseRecord[], value: CaseRecord): void {
+    let position = heap.length;
+    heap.push(value);
+    while (position > 0) {
+        const parent = Math.floor((position - 1) / 2);
+        if (!worse(heap[position], heap[parent])) break;
+        [heap[position], heap[parent]] = [heap[parent], heap[position]];
+        position = parent;
+    }
+}
+
+function repairRoot(heap: CaseRecord[]): void {
+    let position = 0;
+    while (true) {
+        const left = position * 2 + 1;
+        if (left >= heap.length) return;
+        const right = left + 1;
+        let child = left;
+        if (right < heap.length && worse(heap[right], heap[left])) child = right;
+        if (!worse(heap[child], heap[position])) return;
+        [heap[child], heap[position]] = [heap[position], heap[child]];
+        position = child;
+    }
+}
+
+const n = Number(nextToken());
+const k = Number(nextToken());
+const heap: CaseRecord[] = [];
+let output = "";
+function emit(item: CaseRecord): void {
+    output += `${item.index} ${item.cost}\n`;
+    if (output.length >= 65536) {
+        std.out.puts(output);
+        output = "";
+    }
+}
+for (let index = 1; index <= n; index++) {
+    const candidate = { cost: Number(nextToken()), index };
+    if (heap.length < k) {
+        push(heap, candidate);
+    } else if (better(candidate, heap[0])) {
+        heap[0] = candidate;
+        repairRoot(heap);
+    }
+    if (index >= k) emit(heap[0]);
+}
+if (output) std.out.puts(output);

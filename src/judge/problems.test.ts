@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { PROBLEM_LOCALES, PROBLEMS, broadestPolicy, sampleCases } from "./problems";
 
 describe("problem catalog", () => {
-  it("contains exactly 40 ordered, unique, localized, judgeable problems", () => {
-    expect(PROBLEMS).toHaveLength(40);
-    expect(new Set(PROBLEMS.map((problem) => problem.id)).size).toBe(40);
-    expect(PROBLEMS.map((problem) => problem.number)).toEqual(Array.from({ length: 40 }, (_, index) => index + 1));
+  it("contains exactly 45 ordered, unique, localized, judgeable problems", () => {
+    expect(PROBLEMS).toHaveLength(45);
+    expect(new Set(PROBLEMS.map((problem) => problem.id)).size).toBe(45);
+    expect(PROBLEMS.map((problem) => problem.number)).toEqual(Array.from({ length: 45 }, (_, index) => index + 1));
     for (const problem of PROBLEMS) {
       expect(Object.keys(problem.title).sort()).toEqual([...PROBLEM_LOCALES].sort());
       expect(Object.keys(problem.statement).sort()).toEqual([...PROBLEM_LOCALES].sort());

@@ -17,7 +17,7 @@
   ],
   "properties": {
     "schema": { "const": "wasm-oj-problem-v3" },
-    "id": { "type": "integer", "minimum": 1, "maximum": 40 },
+    "id": { "type": "integer", "minimum": 1, "maximum": 45 },
     "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
     "title": { "$ref": "#/$defs/localizedText" },
     "difficulty": { "enum": ["easy", "medium", "hard"] },

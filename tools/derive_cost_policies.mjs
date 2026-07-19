@@ -16,6 +16,7 @@ const LANGUAGES = Object.freeze([
   "typescript",
 ]);
 const COMPILED_LANGUAGES = Object.freeze(["c", "cpp", "rust", "go"]);
+const PROBLEM_COUNT = 45;
 const POLICY_IDS = Object.freeze(["baseline", "efficient", "optimal"]);
 const EVIDENCE_PATH = path.join(
   ROOT,
@@ -288,7 +289,7 @@ function normalizedRecords(evidence) {
     if (
       !Number.isInteger(record.problemId) ||
       record.problemId < 1 ||
-      record.problemId > 40 ||
+      record.problemId > PROBLEM_COUNT ||
       !LANGUAGES.includes(record.language) ||
       typeof record.slug !== "string" ||
       typeof record.sourcePath !== "string" ||
@@ -306,8 +307,8 @@ function normalizedRecords(evidence) {
     }
     records.set(key, record);
   }
-  if (records.size !== 40 * LANGUAGES.length) {
-    fail(`expected 280 calibration records, found ${records.size}`);
+  if (records.size !== PROBLEM_COUNT * LANGUAGES.length) {
+    fail(`expected ${PROBLEM_COUNT * LANGUAGES.length} calibration records, found ${records.size}`);
   }
   return records;
 }
@@ -319,8 +320,8 @@ async function derive(evidenceBytes, evidence) {
     fail("catalog.json changed after measurement");
   }
   const catalog = JSON.parse(catalogBytes.toString("utf8"));
-  if (!Array.isArray(catalog.problems) || catalog.problems.length !== 40) {
-    fail("catalog.json must contain exactly 40 problems");
+  if (!Array.isArray(catalog.problems) || catalog.problems.length !== PROBLEM_COUNT) {
+    fail(`catalog.json must contain exactly ${PROBLEM_COUNT} problems`);
   }
   const problems = [];
   for (const entry of catalog.problems) {
@@ -433,7 +434,7 @@ async function main() {
   if (options.write) {
     await atomicWriteJson(DERIVATION_PATH, derivation);
     await updateManifests(derivation);
-    console.log("wrote measured policy derivation and 40 manifests");
+    console.log(`wrote measured policy derivation and ${PROBLEM_COUNT} manifests`);
     return;
   }
   const recorded = await readJson(DERIVATION_PATH);
@@ -458,7 +459,7 @@ async function main() {
       }
     }
   }
-  console.log("cost policy derivation and all 40 manifests are current");
+  console.log(`cost policy derivation and all ${PROBLEM_COUNT} manifests are current`);
 }
 
 const isMain = process.argv[1]

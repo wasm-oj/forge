@@ -158,7 +158,7 @@ UI 如何顯示或四捨五入不屬於 judging contract，且不得回頭影響
 
 ## Measured multi-language policies
 
-40 題使用三層 measured policy：
+45 題使用三層 measured policy：
 
 | Policy | Incremental points | Instruction budget | Memory budget |
 | --- | ---: | ---: | ---: |
@@ -212,8 +212,8 @@ Manifest 以
 原始逐案 metrics、source/test digest 與 runtime content digest 位於
 `calibration/forge-v1/reference-costs.json`；機器推導結果位於
 `calibration/forge-v1/derived-policies.json`。`node tools/derive_cost_policies.mjs` 會重新
-雜湊所有 solution 與 test、要求完整 40 × 7 records、重算三層 multi-language derivation，並
-核對 40 份 manifest。任何輸入或證據改變都 fail closed；要套用經人工審閱的新證據，使用
+雜湊所有 solution 與 test、要求完整 45 × 7 records、重算三層 multi-language derivation，並
+核對 45 份 manifest。任何輸入或證據改變都 fail closed；要套用經人工審閱的新證據，使用
 `node tools/derive_cost_policies.mjs --write`。
 
 ## Validation

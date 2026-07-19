@@ -80,7 +80,7 @@ try {
 <span class="muted">07</span>  <span class="green">✓ deterministic</span>  <span class="green">✓ zero uploads</span></pre>
         <div class="accepted"><span class="check">✓</span>ACCEPTED</div>
       </section>
-      <div class="footer">40 ORIGINAL CHALLENGES · SEVEN WASMER-POWERED LANGUAGES</div>
+      <div class="footer">45 ORIGINAL CHALLENGES · SEVEN WASMER-POWERED LANGUAGES</div>
     </main>
   </body>
 </html>`);

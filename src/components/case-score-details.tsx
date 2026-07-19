@@ -4,7 +4,7 @@ import type {
   JudgeProblem,
   ProblemLocale,
   ProblemScoringPolicy,
-} from "@/src/judge/problems";
+} from "@/src/judge/problem-model";
 
 interface ResourceThreshold {
   id: string;

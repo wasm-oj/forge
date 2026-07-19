@@ -1,6 +1,6 @@
 import type { BuiltinLanguage } from "../core/types";
 import type { JudgeCaseResult } from "./engine";
-import type { JudgeProblem, ProblemScoringPolicy } from "./problems";
+import type { JudgeProblem, ProblemScoringPolicy } from "./problem-model";
 
 export interface ScoredProblemCase {
   id: string;

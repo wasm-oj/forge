@@ -1,12 +1,12 @@
 {
   "schema": "wasm-oj-cost-calibration-v1",
-  "generatedAt": "2026-07-19T11:20:21.592Z",
-  "repositoryCatalogSha256": "b61abf16c3d95895650803ee296163030d3c2c1b93b0d0c27bb9f2c46155a109",
+  "generatedAt": "2026-07-19T16:57:43.009Z",
+  "repositoryCatalogSha256": "cbe034d2214ad4caee922b31c0766375aa2dd27a58901df3be36d9a4d81a1b38",
   "forge": {
     "contract": "wasm-oj-forge-v1",
     "nodeVersion": "v24.2.0",
-    "gitCommit": "baac61a2d3734b8689bc19e6871fef1c4f63ce8d",
-    "gitStatus": "?? node_modules",
+    "gitCommit": "496c050fc79a8e472dabbd6bc805d53df992bed5",
+    "gitStatus": " M README.md\n M app/globals.css\n M app/layout.tsx\n M app/page.tsx\n M calibration/forge-v1/README.md\n M calibration/forge-v1/derived-policies.json\n M calibration/forge-v1/reference-costs.json\n M catalog.json\n M docs/architecture.md\n M docs/problem-bank/CONTRACT.md\n M docs/problem-bank/MANIFEST.md\n M docs/problem-catalog.md\n M public/og.png\n M schemas/problem-catalog.schema.json\n M schemas/problem.schema.json\n M scripts/generate-judge-problems.mjs\n M scripts/render-og.mjs\n M src/components/case-score-details.tsx\n M src/components/judge-studio.tsx\n M src/judge/chatgpt-help.ts\n M src/judge/problem-scoring.ts\n M src/judge/problems.generated.ts\n M src/judge/problems.test.ts\n M src/judge/problems.ts\n M src/judge/project.ts\n M tools/derive_cost_policies.mjs\n?? IDEA.md\n?? docs/problem-bank/independent-041-045.md\n?? problems/041-progressive-cost-budget/\n?? problems/042-first-duplicate-test/\n?? problems/043-verdict-range-counts/\n?? problems/044-recent-submission-reuse/\n?? problems/045-slowest-k-cases/\n?? public/problems/\n?? src/judge/problem-catalog-loader.test.ts\n?? src/judge/problem-catalog-loader.ts\n?? src/judge/problem-model.ts",
     "compilerSha256": "9442964af9e0080379a4090e73e2363bbb06a7cd9d424a4b20e2fb64ecf0a9fc",
     "runnerSha256": "28ebdf2c37a5e7a5893e0357a3cc7a6dc08a7e3f339f6f0aad6356a703eff7b1",
     "libraryTreeSha256": "516e788b67457ecdd7d7fae5cdd282b8504c12529b732f8412af2df9a7e1c73c",
@@ -17088,6 +17088,2106 @@
           "logicalTimeNs": 2000000
         }
       ]
+    },
+    {
+      "problemId": 41,
+      "slug": "progressive-cost-budget",
+      "language": "c",
+      "sourcePath": "solutions/c/main.c",
+      "sourceSha256": "80b11b177e0ff6a37786a2df7c3efdeef1ae43a6a3756b5b2bc02e2fc402029e",
+      "artifactId": "a6e9da64-4d6c-40a6-bbf8-42b193f907c7",
+      "artifactCacheKey": "3faaecf8b9c7b3ecd6769818d5c05114ba3f167593054e7427a20f63924910e9",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1b05a67a0e425c5186ab54a10826113920429185359b354714822edff106b009",
+          "outputSha256": "639238ce93ec20f262fc8beaaf4d6d9d6f660d74a2afec4ba0187406ac420edb",
+          "cost": 23323,
+          "rawCost": 23469,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "e5d0f0e60d03d5e86a126a4d60fd44912cee63aac2fe4f5418236f4e61d37763",
+          "outputSha256": "8dc39fa305efdc5d853fabc01efebbf3b4edba09f56ea0a3ffcf73e2c8f0032b",
+          "cost": 25521,
+          "rawCost": 25667,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "d794fc3fd9f459e39a21cb2ddef4c41f955372f10cc59eb0c3282f6ac996dd8c",
+          "outputSha256": "76fe9f61152f4c08745cab737f023db2c534642e01b7fe8c86032d7fe3724b0d",
+          "cost": 15485,
+          "rawCost": 15631,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "a0a2173ef5185ad120216e3de693889ecdcf82529e34680370562ba1a942acbd",
+          "outputSha256": "d2d062585979c8c80b9352dbe829d5168b4ba3e58a266b6345d603818f2d9b2e",
+          "cost": 1196875261,
+          "rawCost": 1196875407,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1703936,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 41,
+      "slug": "progressive-cost-budget",
+      "language": "cpp",
+      "sourcePath": "solutions/cpp/main.cpp",
+      "sourceSha256": "c9987f2f25d88a68436def4b1d42911d4758e7b5f4179cc2b43797abf6d1af74",
+      "artifactId": "dee2bc84-711f-4a40-97df-452f9cddc399",
+      "artifactCacheKey": "7dcf9499dd78df9a622fb6f9b2f4089602d9741a448a39975e124031d15f7fb2",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1b05a67a0e425c5186ab54a10826113920429185359b354714822edff106b009",
+          "outputSha256": "639238ce93ec20f262fc8beaaf4d6d9d6f660d74a2afec4ba0187406ac420edb",
+          "cost": 373700,
+          "rawCost": 373846,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "e5d0f0e60d03d5e86a126a4d60fd44912cee63aac2fe4f5418236f4e61d37763",
+          "outputSha256": "8dc39fa305efdc5d853fabc01efebbf3b4edba09f56ea0a3ffcf73e2c8f0032b",
+          "cost": 370844,
+          "rawCost": 370990,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "d794fc3fd9f459e39a21cb2ddef4c41f955372f10cc59eb0c3282f6ac996dd8c",
+          "outputSha256": "76fe9f61152f4c08745cab737f023db2c534642e01b7fe8c86032d7fe3724b0d",
+          "cost": 260946,
+          "rawCost": 261092,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "a0a2173ef5185ad120216e3de693889ecdcf82529e34680370562ba1a942acbd",
+          "outputSha256": "d2d062585979c8c80b9352dbe829d5168b4ba3e58a266b6345d603818f2d9b2e",
+          "cost": 25360713531,
+          "rawCost": 25360713677,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1703936,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 41,
+      "slug": "progressive-cost-budget",
+      "language": "rust",
+      "sourcePath": "solutions/rust/main.rs",
+      "sourceSha256": "ac2d7fbe5974d65a96eebdb58a8fbfe9c4e9dae17a35e615867747b8a0692488",
+      "artifactId": "96916264-0979-47c4-9716-fdb511a7cd51",
+      "artifactCacheKey": "c64ed09ac890c1cd93efd9b8704ba4bdfa2440e02a9d56d6657a947728728feb",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1b05a67a0e425c5186ab54a10826113920429185359b354714822edff106b009",
+          "outputSha256": "639238ce93ec20f262fc8beaaf4d6d9d6f660d74a2afec4ba0187406ac420edb",
+          "cost": 49892,
+          "rawCost": 59374,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "e5d0f0e60d03d5e86a126a4d60fd44912cee63aac2fe4f5418236f4e61d37763",
+          "outputSha256": "8dc39fa305efdc5d853fabc01efebbf3b4edba09f56ea0a3ffcf73e2c8f0032b",
+          "cost": 54072,
+          "rawCost": 63554,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "d794fc3fd9f459e39a21cb2ddef4c41f955372f10cc59eb0c3282f6ac996dd8c",
+          "outputSha256": "76fe9f61152f4c08745cab737f023db2c534642e01b7fe8c86032d7fe3724b0d",
+          "cost": 44224,
+          "rawCost": 53706,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "a0a2173ef5185ad120216e3de693889ecdcf82529e34680370562ba1a942acbd",
+          "outputSha256": "d2d062585979c8c80b9352dbe829d5168b4ba3e58a266b6345d603818f2d9b2e",
+          "cost": 1801887493,
+          "rawCost": 1801896975,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 9437184,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 41,
+      "slug": "progressive-cost-budget",
+      "language": "go",
+      "sourcePath": "solutions/go/main.go",
+      "sourceSha256": "33841ceb63079d04bec8da460ef3215618e66124f88454cf2ea715f2e99d82d7",
+      "artifactId": "8acb24b6-07ad-44c6-9dfa-91707e6e934c",
+      "artifactCacheKey": "f2603b0d46bc17549ddf38883273dfeffa9ba4f862d5ded4cbf37a49d8acbc9b",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1b05a67a0e425c5186ab54a10826113920429185359b354714822edff106b009",
+          "outputSha256": "639238ce93ec20f262fc8beaaf4d6d9d6f660d74a2afec4ba0187406ac420edb",
+          "cost": 1023150,
+          "rawCost": 2730271,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "e5d0f0e60d03d5e86a126a4d60fd44912cee63aac2fe4f5418236f4e61d37763",
+          "outputSha256": "8dc39fa305efdc5d853fabc01efebbf3b4edba09f56ea0a3ffcf73e2c8f0032b",
+          "cost": 1032920,
+          "rawCost": 2740041,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "d794fc3fd9f459e39a21cb2ddef4c41f955372f10cc59eb0c3282f6ac996dd8c",
+          "outputSha256": "76fe9f61152f4c08745cab737f023db2c534642e01b7fe8c86032d7fe3724b0d",
+          "cost": 877018,
+          "rawCost": 2584139,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "a0a2173ef5185ad120216e3de693889ecdcf82529e34680370562ba1a942acbd",
+          "outputSha256": "d2d062585979c8c80b9352dbe829d5168b4ba3e58a266b6345d603818f2d9b2e",
+          "cost": 27174679021,
+          "rawCost": 27176386142,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 11534336,
+          "logicalTimeNs": 76000000
+        }
+      ]
+    },
+    {
+      "problemId": 41,
+      "slug": "progressive-cost-budget",
+      "language": "python",
+      "sourcePath": "solutions/python/main.py",
+      "sourceSha256": "24a5c6fb75c5ad22b32528b8f8ef8fb6c0fc6854ebbe2eb7806cda9fc1ac85c4",
+      "artifactId": "e952655f-3958-4bd2-ad8c-99912beb6878",
+      "artifactCacheKey": "04f19bb0d4de186c304d2dfbcccdedc9ac58c1348f2caaad841a2c527cc33158",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1b05a67a0e425c5186ab54a10826113920429185359b354714822edff106b009",
+          "outputSha256": "639238ce93ec20f262fc8beaaf4d6d9d6f660d74a2afec4ba0187406ac420edb",
+          "cost": 2260737,
+          "rawCost": 2422094746,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "e5d0f0e60d03d5e86a126a4d60fd44912cee63aac2fe4f5418236f4e61d37763",
+          "outputSha256": "8dc39fa305efdc5d853fabc01efebbf3b4edba09f56ea0a3ffcf73e2c8f0032b",
+          "cost": 2262679,
+          "rawCost": 2422096688,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "d794fc3fd9f459e39a21cb2ddef4c41f955372f10cc59eb0c3282f6ac996dd8c",
+          "outputSha256": "76fe9f61152f4c08745cab737f023db2c534642e01b7fe8c86032d7fe3724b0d",
+          "cost": 2165325,
+          "rawCost": 2421999334,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "a0a2173ef5185ad120216e3de693889ecdcf82529e34680370562ba1a942acbd",
+          "outputSha256": "d2d062585979c8c80b9352dbe829d5168b4ba3e58a266b6345d603818f2d9b2e",
+          "cost": 7937261209,
+          "rawCost": 10357095218,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 46727168,
+          "logicalTimeNs": 6000000
+        }
+      ]
+    },
+    {
+      "problemId": 41,
+      "slug": "progressive-cost-budget",
+      "language": "javascript",
+      "sourcePath": "solutions/javascript/main.js",
+      "sourceSha256": "5ae90c65a6bded1c9297d764bccddc9b6511b6583b0a8369b89a3077f1f827bc",
+      "artifactId": "c260b627-5f02-4567-9fdb-7f4cbac6fb3b",
+      "artifactCacheKey": "04756bbc707f2694f783135ec5ed69d7a3e7a26d9a65531798cb9243c79be796",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1b05a67a0e425c5186ab54a10826113920429185359b354714822edff106b009",
+          "outputSha256": "639238ce93ec20f262fc8beaaf4d6d9d6f660d74a2afec4ba0187406ac420edb",
+          "cost": 5821939,
+          "rawCost": 15406924,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "e5d0f0e60d03d5e86a126a4d60fd44912cee63aac2fe4f5418236f4e61d37763",
+          "outputSha256": "8dc39fa305efdc5d853fabc01efebbf3b4edba09f56ea0a3ffcf73e2c8f0032b",
+          "cost": 5822356,
+          "rawCost": 15407341,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "d794fc3fd9f459e39a21cb2ddef4c41f955372f10cc59eb0c3282f6ac996dd8c",
+          "outputSha256": "76fe9f61152f4c08745cab737f023db2c534642e01b7fe8c86032d7fe3724b0d",
+          "cost": 5650777,
+          "rawCost": 15235762,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "a0a2173ef5185ad120216e3de693889ecdcf82529e34680370562ba1a942acbd",
+          "outputSha256": "d2d062585979c8c80b9352dbe829d5168b4ba3e58a266b6345d603818f2d9b2e",
+          "cost": 26572861963,
+          "rawCost": 26582446948,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 51838976,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 41,
+      "slug": "progressive-cost-budget",
+      "language": "typescript",
+      "sourcePath": "solutions/typescript/main.ts",
+      "sourceSha256": "7364b7efede28a8dcebdfe1b92a2513b44bf775cb5a225265d1649b299d13349",
+      "artifactId": "8337e6f1-909e-4d96-9be1-97fc8697ea19",
+      "artifactCacheKey": "3f59d3dc55082b1c26d07605ea3b7c16bf7b43a2b2e2f5ffa36600e6e80acf56",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1b05a67a0e425c5186ab54a10826113920429185359b354714822edff106b009",
+          "outputSha256": "639238ce93ec20f262fc8beaaf4d6d9d6f660d74a2afec4ba0187406ac420edb",
+          "cost": 5821939,
+          "rawCost": 15406924,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "e5d0f0e60d03d5e86a126a4d60fd44912cee63aac2fe4f5418236f4e61d37763",
+          "outputSha256": "8dc39fa305efdc5d853fabc01efebbf3b4edba09f56ea0a3ffcf73e2c8f0032b",
+          "cost": 5822356,
+          "rawCost": 15407341,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "d794fc3fd9f459e39a21cb2ddef4c41f955372f10cc59eb0c3282f6ac996dd8c",
+          "outputSha256": "76fe9f61152f4c08745cab737f023db2c534642e01b7fe8c86032d7fe3724b0d",
+          "cost": 5650777,
+          "rawCost": 15235762,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "a0a2173ef5185ad120216e3de693889ecdcf82529e34680370562ba1a942acbd",
+          "outputSha256": "d2d062585979c8c80b9352dbe829d5168b4ba3e58a266b6345d603818f2d9b2e",
+          "cost": 26572861963,
+          "rawCost": 26582446948,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 51838976,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 42,
+      "slug": "first-duplicate-test",
+      "language": "c",
+      "sourcePath": "solutions/c/main.c",
+      "sourceSha256": "352ebd18f78da361bc4bff248a540ea78ee05b7aa5cc2e604307b692b0427d4b",
+      "artifactId": "abf257fc-5545-4b15-a6e0-8e558209b2cd",
+      "artifactCacheKey": "8ced62ffd80cc7e10a170b2d02f195425c518683301313a4ecb3e16bd04abc8f",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "82abb3325691c837497f035ac853cd2ebc68c10859f0e950c3a01ce387bafd44",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 12174,
+          "rawCost": 12320,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "2cbf905c1723901826eb26c6d9376b2177587937519fdb0d318a1102973f5c8e",
+          "outputSha256": "51cfd463b6af8a57b3380487f986abf10f137073e9be453e44a7e9a5b4c0e72b",
+          "cost": 8948,
+          "rawCost": 9094,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "320b631e936e31a64ec2997e817f36503f7f9e62dd20fcf69573aa0d46c06c64",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 11850,
+          "rawCost": 11996,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "fe4363981de8ac8b732ce9b242a9b4a6e747f691cb255882c39d2c0fa946f6dc",
+          "outputSha256": "c7c22e04ca5a959e04ef2abcc3ce6e0b79d82b4131758a011915bc7699042d89",
+          "cost": 333427292,
+          "rawCost": 333427438,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 21102592,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 42,
+      "slug": "first-duplicate-test",
+      "language": "cpp",
+      "sourcePath": "solutions/cpp/main.cpp",
+      "sourceSha256": "c4fc8b35ee1f7a7638f2d458f7dff6a8e7277c907e63046a602f16522d60ed9d",
+      "artifactId": "f5595321-a954-426a-b7e2-35fcc2ecbbbf",
+      "artifactCacheKey": "214cb93bf7b90a30a14667b4464751985b4ebf9dd901ce65018c8fb027d7169f",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "82abb3325691c837497f035ac853cd2ebc68c10859f0e950c3a01ce387bafd44",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 189960,
+          "rawCost": 190106,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "2cbf905c1723901826eb26c6d9376b2177587937519fdb0d318a1102973f5c8e",
+          "outputSha256": "51cfd463b6af8a57b3380487f986abf10f137073e9be453e44a7e9a5b4c0e72b",
+          "cost": 172907,
+          "rawCost": 173053,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "320b631e936e31a64ec2997e817f36503f7f9e62dd20fcf69573aa0d46c06c64",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 184039,
+          "rawCost": 184185,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "fe4363981de8ac8b732ce9b242a9b4a6e747f691cb255882c39d2c0fa946f6dc",
+          "outputSha256": "c7c22e04ca5a959e04ef2abcc3ce6e0b79d82b4131758a011915bc7699042d89",
+          "cost": 3444036654,
+          "rawCost": 3444036800,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 8126464,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 42,
+      "slug": "first-duplicate-test",
+      "language": "rust",
+      "sourcePath": "solutions/rust/main.rs",
+      "sourceSha256": "b1f672629e739c06e093196d66c9d337ab6240e6782e84c00f786bbc009c85af",
+      "artifactId": "ecc6a020-5371-4597-a96d-0f2538378cfb",
+      "artifactCacheKey": "0ad8e2a627ffac69af826dd08da89fe6bb71681e685774ff0065f3b851a6a016",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "82abb3325691c837497f035ac853cd2ebc68c10859f0e950c3a01ce387bafd44",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 43253,
+          "rawCost": 52735,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "2cbf905c1723901826eb26c6d9376b2177587937519fdb0d318a1102973f5c8e",
+          "outputSha256": "51cfd463b6af8a57b3380487f986abf10f137073e9be453e44a7e9a5b4c0e72b",
+          "cost": 37904,
+          "rawCost": 47386,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "320b631e936e31a64ec2997e817f36503f7f9e62dd20fcf69573aa0d46c06c64",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 42942,
+          "rawCost": 52424,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "fe4363981de8ac8b732ce9b242a9b4a6e747f691cb255882c39d2c0fa946f6dc",
+          "outputSha256": "c7c22e04ca5a959e04ef2abcc3ce6e0b79d82b4131758a011915bc7699042d89",
+          "cost": 487436842,
+          "rawCost": 487446324,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 12058624,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 42,
+      "slug": "first-duplicate-test",
+      "language": "go",
+      "sourcePath": "solutions/go/main.go",
+      "sourceSha256": "550ec883c88d2528e9aefae93a71dede6aad2cf0256fe3f30e4748c0d3a0d750",
+      "artifactId": "c59935ea-8e90-4c29-997e-c0bda879b4b6",
+      "artifactCacheKey": "f12d2009877bcaddcfc2d201930654001d5a26a702458054bc9426a065deff28",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "82abb3325691c837497f035ac853cd2ebc68c10859f0e950c3a01ce387bafd44",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 774282,
+          "rawCost": 2481403,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 4194304,
+          "logicalTimeNs": 12000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "2cbf905c1723901826eb26c6d9376b2177587937519fdb0d318a1102973f5c8e",
+          "outputSha256": "51cfd463b6af8a57b3380487f986abf10f137073e9be453e44a7e9a5b4c0e72b",
+          "cost": 761070,
+          "rawCost": 2468191,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 4194304,
+          "logicalTimeNs": 12000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "320b631e936e31a64ec2997e817f36503f7f9e62dd20fcf69573aa0d46c06c64",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 763543,
+          "rawCost": 2470664,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 4194304,
+          "logicalTimeNs": 12000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "fe4363981de8ac8b732ce9b242a9b4a6e747f691cb255882c39d2c0fa946f6dc",
+          "outputSha256": "c7c22e04ca5a959e04ef2abcc3ce6e0b79d82b4131758a011915bc7699042d89",
+          "cost": 7086523868,
+          "rawCost": 7088230989,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 16252928,
+          "logicalTimeNs": 126000000
+        }
+      ]
+    },
+    {
+      "problemId": 42,
+      "slug": "first-duplicate-test",
+      "language": "python",
+      "sourcePath": "solutions/python/main.py",
+      "sourceSha256": "29e6f08a23bc1cee651ba9e1b7d33342b14ec1833f4c74663fcc2be0d6bd789b",
+      "artifactId": "8385fc3b-8b72-44e6-9555-5ae440a9c2f6",
+      "artifactCacheKey": "ee2bc6f091f3bb1549833a1a98c040b61c2bae670f3cc88ec8283e6dbdb40d8f",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "82abb3325691c837497f035ac853cd2ebc68c10859f0e950c3a01ce387bafd44",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 2278515,
+          "rawCost": 2422112524,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "2cbf905c1723901826eb26c6d9376b2177587937519fdb0d318a1102973f5c8e",
+          "outputSha256": "51cfd463b6af8a57b3380487f986abf10f137073e9be453e44a7e9a5b4c0e72b",
+          "cost": 2264686,
+          "rawCost": 2422098695,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "320b631e936e31a64ec2997e817f36503f7f9e62dd20fcf69573aa0d46c06c64",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 2275021,
+          "rawCost": 2422109030,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "fe4363981de8ac8b732ce9b242a9b4a6e747f691cb255882c39d2c0fa946f6dc",
+          "outputSha256": "c7c22e04ca5a959e04ef2abcc3ce6e0b79d82b4131758a011915bc7699042d89",
+          "cost": 4471164343,
+          "rawCost": 6890998352,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 46006272,
+          "logicalTimeNs": 6000000
+        }
+      ]
+    },
+    {
+      "problemId": 42,
+      "slug": "first-duplicate-test",
+      "language": "javascript",
+      "sourcePath": "solutions/javascript/main.js",
+      "sourceSha256": "a50edd60afeaa9b8d442ee413cda998d453e65a32f231e762a0a720bfcaba272",
+      "artifactId": "95ba38c8-17dc-4a0c-b3af-bac3f5ef13e1",
+      "artifactCacheKey": "348091479cf891e49276f04feb147e0029fdc3cfe03a0d7052e9c90a1e8595de",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "82abb3325691c837497f035ac853cd2ebc68c10859f0e950c3a01ce387bafd44",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 5688746,
+          "rawCost": 15273731,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "2cbf905c1723901826eb26c6d9376b2177587937519fdb0d318a1102973f5c8e",
+          "outputSha256": "51cfd463b6af8a57b3380487f986abf10f137073e9be453e44a7e9a5b4c0e72b",
+          "cost": 5669827,
+          "rawCost": 15254812,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "320b631e936e31a64ec2997e817f36503f7f9e62dd20fcf69573aa0d46c06c64",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 5664409,
+          "rawCost": 15249394,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "fe4363981de8ac8b732ce9b242a9b4a6e747f691cb255882c39d2c0fa946f6dc",
+          "outputSha256": "c7c22e04ca5a959e04ef2abcc3ce6e0b79d82b4131758a011915bc7699042d89",
+          "cost": 15597707571,
+          "rawCost": 15607292556,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 27000832,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 42,
+      "slug": "first-duplicate-test",
+      "language": "typescript",
+      "sourcePath": "solutions/typescript/main.ts",
+      "sourceSha256": "98e126d857746b072bdae12f75484edbbcff3cc650251be5e300e3729d15e1b5",
+      "artifactId": "a7db2097-6bf4-47d7-b9fe-bd10d5b0a9eb",
+      "artifactCacheKey": "cdc7fb7db4400e2f87744b4bc4c03afbc8628f309826652aa97fcbf9195244bf",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "82abb3325691c837497f035ac853cd2ebc68c10859f0e950c3a01ce387bafd44",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 5688746,
+          "rawCost": 15273731,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "2cbf905c1723901826eb26c6d9376b2177587937519fdb0d318a1102973f5c8e",
+          "outputSha256": "51cfd463b6af8a57b3380487f986abf10f137073e9be453e44a7e9a5b4c0e72b",
+          "cost": 5669827,
+          "rawCost": 15254812,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "320b631e936e31a64ec2997e817f36503f7f9e62dd20fcf69573aa0d46c06c64",
+          "outputSha256": "1ff1273ff0843500f56e865a8db4eef6b86f93e801c74545141fe0de19fff83e",
+          "cost": 5664409,
+          "rawCost": 15249394,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "fe4363981de8ac8b732ce9b242a9b4a6e747f691cb255882c39d2c0fa946f6dc",
+          "outputSha256": "c7c22e04ca5a959e04ef2abcc3ce6e0b79d82b4131758a011915bc7699042d89",
+          "cost": 15597707571,
+          "rawCost": 15607292556,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 27000832,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 43,
+      "slug": "verdict-range-counts",
+      "language": "c",
+      "sourcePath": "solutions/c/main.c",
+      "sourceSha256": "58113b54a75af172831ad044ee0cd1adfc8a17e63afccc7373988457315dd4db",
+      "artifactId": "e5166476-72b4-4dbf-bcdd-a531d30d58d0",
+      "artifactCacheKey": "f2a19304c031a9a2bb00543b0becde1e384ecd6b4d44f0493b96b392f52e16ea",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1fb8d7eb44536478a52f4e3535967423591c5a8e8ec7a57461aafdd6f5a2ec1f",
+          "outputSha256": "592c13a51686e15f01dd1ab6426697a35ea72e59ad16e929ce96f6b86eb3fbc1",
+          "cost": 27134,
+          "rawCost": 27280,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "a999a9cbf64836192e96e2a076e11da29488cad140adfb28fa9d335f4e8b35e2",
+          "outputSha256": "c946f3a37d4652572b42aa8bc7b199ebe4efd4b952b3ac2c92ee05b804f94af8",
+          "cost": 21596,
+          "rawCost": 21742,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "3b2f945c68cf6541034c7de0a6d76967c919a918d8ab4ce5c3fc78597bb77d3f",
+          "outputSha256": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+          "cost": 26731,
+          "rawCost": 26877,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "ebcd1dced3464a4a0a576299e90aedff23e5fedefdecd31bb097a6dac2cc4547",
+          "outputSha256": "457de6fa0f6a55bc98d081bffe71468a9d89611ba384a116572825b77bb91838",
+          "cost": 489062936,
+          "rawCost": 489063082,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1835008,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 43,
+      "slug": "verdict-range-counts",
+      "language": "cpp",
+      "sourcePath": "solutions/cpp/main.cpp",
+      "sourceSha256": "cca51a60cf20187bb27afb8fc25f195cd4f5739b6012dbb370b4feed36456391",
+      "artifactId": "0b37cc26-e73e-476d-a918-c6128831eafd",
+      "artifactCacheKey": "22bd9ede0b36482a2d18c048a6d0f67c78f95dfdc0e9604cb07869949df2e5b4",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1fb8d7eb44536478a52f4e3535967423591c5a8e8ec7a57461aafdd6f5a2ec1f",
+          "outputSha256": "592c13a51686e15f01dd1ab6426697a35ea72e59ad16e929ce96f6b86eb3fbc1",
+          "cost": 392100,
+          "rawCost": 392246,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "a999a9cbf64836192e96e2a076e11da29488cad140adfb28fa9d335f4e8b35e2",
+          "outputSha256": "c946f3a37d4652572b42aa8bc7b199ebe4efd4b952b3ac2c92ee05b804f94af8",
+          "cost": 331217,
+          "rawCost": 331363,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "3b2f945c68cf6541034c7de0a6d76967c919a918d8ab4ce5c3fc78597bb77d3f",
+          "outputSha256": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+          "cost": 384592,
+          "rawCost": 384738,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "ebcd1dced3464a4a0a576299e90aedff23e5fedefdecd31bb097a6dac2cc4547",
+          "outputSha256": "457de6fa0f6a55bc98d081bffe71468a9d89611ba384a116572825b77bb91838",
+          "cost": 7503512402,
+          "rawCost": 7503512548,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 2097152,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 43,
+      "slug": "verdict-range-counts",
+      "language": "rust",
+      "sourcePath": "solutions/rust/main.rs",
+      "sourceSha256": "f951a2298af5cec25390788085d19b4612bbdac1614f56a26e50b0f5cda898aa",
+      "artifactId": "d2e022e1-80fa-4dde-a755-37e9c8038514",
+      "artifactCacheKey": "d5d002eb8811acb36eae08c9233725cb33cd21bf2e09f5841c1677ed2cad0992",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1fb8d7eb44536478a52f4e3535967423591c5a8e8ec7a57461aafdd6f5a2ec1f",
+          "outputSha256": "592c13a51686e15f01dd1ab6426697a35ea72e59ad16e929ce96f6b86eb3fbc1",
+          "cost": 60975,
+          "rawCost": 70457,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "a999a9cbf64836192e96e2a076e11da29488cad140adfb28fa9d335f4e8b35e2",
+          "outputSha256": "c946f3a37d4652572b42aa8bc7b199ebe4efd4b952b3ac2c92ee05b804f94af8",
+          "cost": 53057,
+          "rawCost": 62539,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "3b2f945c68cf6541034c7de0a6d76967c919a918d8ab4ce5c3fc78597bb77d3f",
+          "outputSha256": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+          "cost": 59952,
+          "rawCost": 69434,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "ebcd1dced3464a4a0a576299e90aedff23e5fedefdecd31bb097a6dac2cc4547",
+          "outputSha256": "457de6fa0f6a55bc98d081bffe71468a9d89611ba384a116572825b77bb91838",
+          "cost": 615950036,
+          "rawCost": 615959518,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5767168,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 43,
+      "slug": "verdict-range-counts",
+      "language": "go",
+      "sourcePath": "solutions/go/main.go",
+      "sourceSha256": "03a08a7d5e605f83d783e046f2be4639ffd14951077429f32cf455f8040e8be6",
+      "artifactId": "2a619b85-586c-4d7a-8ba2-1e97ebb33bff",
+      "artifactCacheKey": "17653756a082152a8b1180f743893b48acf963e17ccb53d3ee139f8d59c41572",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1fb8d7eb44536478a52f4e3535967423591c5a8e8ec7a57461aafdd6f5a2ec1f",
+          "outputSha256": "592c13a51686e15f01dd1ab6426697a35ea72e59ad16e929ce96f6b86eb3fbc1",
+          "cost": 1101123,
+          "rawCost": 2808244,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "a999a9cbf64836192e96e2a076e11da29488cad140adfb28fa9d335f4e8b35e2",
+          "outputSha256": "c946f3a37d4652572b42aa8bc7b199ebe4efd4b952b3ac2c92ee05b804f94af8",
+          "cost": 1025952,
+          "rawCost": 2733073,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "3b2f945c68cf6541034c7de0a6d76967c919a918d8ab4ce5c3fc78597bb77d3f",
+          "outputSha256": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+          "cost": 1103862,
+          "rawCost": 2810983,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "ebcd1dced3464a4a0a576299e90aedff23e5fedefdecd31bb097a6dac2cc4547",
+          "outputSha256": "457de6fa0f6a55bc98d081bffe71468a9d89611ba384a116572825b77bb91838",
+          "cost": 9388420980,
+          "rawCost": 9390128101,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 11534336,
+          "logicalTimeNs": 60000000
+        }
+      ]
+    },
+    {
+      "problemId": 43,
+      "slug": "verdict-range-counts",
+      "language": "python",
+      "sourcePath": "solutions/python/main.py",
+      "sourceSha256": "bcadd02636d6212afa153ce3133cca0cdd0d0c21844d2486aaad25a2e6ad3965",
+      "artifactId": "90d4e1fc-07a1-4f8c-907f-2320c42a80e2",
+      "artifactCacheKey": "92364775d3189d7600a65a3fec510b4e9748b9f3344795826678f2a5098b1943",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1fb8d7eb44536478a52f4e3535967423591c5a8e8ec7a57461aafdd6f5a2ec1f",
+          "outputSha256": "592c13a51686e15f01dd1ab6426697a35ea72e59ad16e929ce96f6b86eb3fbc1",
+          "cost": 3035046,
+          "rawCost": 2422869055,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "a999a9cbf64836192e96e2a076e11da29488cad140adfb28fa9d335f4e8b35e2",
+          "outputSha256": "c946f3a37d4652572b42aa8bc7b199ebe4efd4b952b3ac2c92ee05b804f94af8",
+          "cost": 2827405,
+          "rawCost": 2422661414,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "3b2f945c68cf6541034c7de0a6d76967c919a918d8ab4ce5c3fc78597bb77d3f",
+          "outputSha256": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+          "cost": 2818752,
+          "rawCost": 2422652761,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "ebcd1dced3464a4a0a576299e90aedff23e5fedefdecd31bb097a6dac2cc4547",
+          "outputSha256": "457de6fa0f6a55bc98d081bffe71468a9d89611ba384a116572825b77bb91838",
+          "cost": 9561633408,
+          "rawCost": 11981467417,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        }
+      ]
+    },
+    {
+      "problemId": 43,
+      "slug": "verdict-range-counts",
+      "language": "javascript",
+      "sourcePath": "solutions/javascript/main.js",
+      "sourceSha256": "bede9aafb5634aabf9d8baae69605b69d51358e1e374e271eb1472a47549a40d",
+      "artifactId": "c7ba18ae-2045-4781-9c59-6b9ef9112a71",
+      "artifactCacheKey": "547af279b3c47229caec9f757e35ccd9c03340b5187cf5ecfb4f60fa9e8b7838",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1fb8d7eb44536478a52f4e3535967423591c5a8e8ec7a57461aafdd6f5a2ec1f",
+          "outputSha256": "592c13a51686e15f01dd1ab6426697a35ea72e59ad16e929ce96f6b86eb3fbc1",
+          "cost": 8093959,
+          "rawCost": 17678944,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "a999a9cbf64836192e96e2a076e11da29488cad140adfb28fa9d335f4e8b35e2",
+          "outputSha256": "c946f3a37d4652572b42aa8bc7b199ebe4efd4b952b3ac2c92ee05b804f94af8",
+          "cost": 7716864,
+          "rawCost": 17301849,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "3b2f945c68cf6541034c7de0a6d76967c919a918d8ab4ce5c3fc78597bb77d3f",
+          "outputSha256": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+          "cost": 7787590,
+          "rawCost": 17372575,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "ebcd1dced3464a4a0a576299e90aedff23e5fedefdecd31bb097a6dac2cc4547",
+          "outputSha256": "457de6fa0f6a55bc98d081bffe71468a9d89611ba384a116572825b77bb91838",
+          "cost": 24511720153,
+          "rawCost": 24521305138,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5570560,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 43,
+      "slug": "verdict-range-counts",
+      "language": "typescript",
+      "sourcePath": "solutions/typescript/main.ts",
+      "sourceSha256": "b9eb7d81ebcdfd68c1826cb3f962e21f3047fda6f01ba356a802c2fd8ecf7719",
+      "artifactId": "aae3846b-7a01-4bc6-9bef-3e0d208da4ae",
+      "artifactCacheKey": "74a61291ccd3cfbb43443d3f07c4b83dafce8929a49fe8ee1e7e7ac19563e554",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "1fb8d7eb44536478a52f4e3535967423591c5a8e8ec7a57461aafdd6f5a2ec1f",
+          "outputSha256": "592c13a51686e15f01dd1ab6426697a35ea72e59ad16e929ce96f6b86eb3fbc1",
+          "cost": 8046449,
+          "rawCost": 17631434,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "a999a9cbf64836192e96e2a076e11da29488cad140adfb28fa9d335f4e8b35e2",
+          "outputSha256": "c946f3a37d4652572b42aa8bc7b199ebe4efd4b952b3ac2c92ee05b804f94af8",
+          "cost": 7666714,
+          "rawCost": 17251699,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "3b2f945c68cf6541034c7de0a6d76967c919a918d8ab4ce5c3fc78597bb77d3f",
+          "outputSha256": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+          "cost": 7738797,
+          "rawCost": 17323782,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "ebcd1dced3464a4a0a576299e90aedff23e5fedefdecd31bb097a6dac2cc4547",
+          "outputSha256": "457de6fa0f6a55bc98d081bffe71468a9d89611ba384a116572825b77bb91838",
+          "cost": 24497364813,
+          "rawCost": 24506949798,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5636096,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 44,
+      "slug": "recent-submission-reuse",
+      "language": "c",
+      "sourcePath": "solutions/c/main.c",
+      "sourceSha256": "e44d0a5cb7a42a78c64c299eb932c286426f898a5a3e70d81b7d348b0f341ccf",
+      "artifactId": "8822b7b9-ab89-4a56-bf77-f7a7177f7ee5",
+      "artifactCacheKey": "2c5076d8ec43ab8e7a04f73ee477bf91f53c52cb02337fb2730e8b4724da07cf",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "03e56d871c9d426bd2fd5bb0f59235774e699a3ec8de4d20f4fac2667c50ee80",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 15019,
+          "rawCost": 15165,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "5ff6654d6e45b29effc373606f5d3bf49ab4e9ff1c26ac53e8a6dcbf06f96837",
+          "outputSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "cost": 11670,
+          "rawCost": 11816,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "9708ba68cdea8235a5c4826a3223d9195940db8ef330af659faff9cb380aedbb",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 12979,
+          "rawCost": 13125,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "1365672e299241e1466cfa9cb24af80b166b83c3d5f2aa903a57ef9cbae51d23",
+          "outputSha256": "aceaf168c6709487a120d0059d87a99ab4aad4ee7f8a4d05a91c8ee20161ef75",
+          "cost": 321896784,
+          "rawCost": 321896930,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 21102592,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 44,
+      "slug": "recent-submission-reuse",
+      "language": "cpp",
+      "sourcePath": "solutions/cpp/main.cpp",
+      "sourceSha256": "862f07edc650da18369a1148ff51e857ab0f2542663c75dfa830b8e7796e5d40",
+      "artifactId": "f3bd4579-9f8d-4b18-9b20-ba66ea0ab406",
+      "artifactCacheKey": "b0b15aefc490c728359fd2f30b289a4ec3b432a14d8b3c9a3010fca50acbbd02",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "03e56d871c9d426bd2fd5bb0f59235774e699a3ec8de4d20f4fac2667c50ee80",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 229456,
+          "rawCost": 229602,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "5ff6654d6e45b29effc373606f5d3bf49ab4e9ff1c26ac53e8a6dcbf06f96837",
+          "outputSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "cost": 203242,
+          "rawCost": 203388,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "9708ba68cdea8235a5c4826a3223d9195940db8ef330af659faff9cb380aedbb",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 218279,
+          "rawCost": 218425,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "1365672e299241e1466cfa9cb24af80b166b83c3d5f2aa903a57ef9cbae51d23",
+          "outputSha256": "aceaf168c6709487a120d0059d87a99ab4aad4ee7f8a4d05a91c8ee20161ef75",
+          "cost": 3188541104,
+          "rawCost": 3188541250,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 3342336,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 44,
+      "slug": "recent-submission-reuse",
+      "language": "rust",
+      "sourcePath": "solutions/rust/main.rs",
+      "sourceSha256": "ccbc6ab9b5690ec58ea52f6cece22cea9f03b7c318d03da48aa531af4b1b6bbb",
+      "artifactId": "1d480eff-3ead-4b8d-b8e0-be9b56fe9343",
+      "artifactCacheKey": "24e6fe070da7923b7eeca449fa66c9d9d00f04fbfc4bffda19aeead6a2fd45d3",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "03e56d871c9d426bd2fd5bb0f59235774e699a3ec8de4d20f4fac2667c50ee80",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 47700,
+          "rawCost": 57182,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "5ff6654d6e45b29effc373606f5d3bf49ab4e9ff1c26ac53e8a6dcbf06f96837",
+          "outputSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "cost": 42139,
+          "rawCost": 51621,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "9708ba68cdea8235a5c4826a3223d9195940db8ef330af659faff9cb380aedbb",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 44365,
+          "rawCost": 53847,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "1365672e299241e1466cfa9cb24af80b166b83c3d5f2aa903a57ef9cbae51d23",
+          "outputSha256": "aceaf168c6709487a120d0059d87a99ab4aad4ee7f8a4d05a91c8ee20161ef75",
+          "cost": 530896017,
+          "rawCost": 530905499,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 9961472,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 44,
+      "slug": "recent-submission-reuse",
+      "language": "go",
+      "sourcePath": "solutions/go/main.go",
+      "sourceSha256": "25dfd975386b8326e2b26ba4fe457640493e96908dfb88c9506dacfcfcba6242",
+      "artifactId": "fda2d66b-570e-4d0f-8310-594039a93a07",
+      "artifactCacheKey": "773552f43d572f70ee6d115b19790fe81ca6af20e1760480888a0921eb633af0",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "03e56d871c9d426bd2fd5bb0f59235774e699a3ec8de4d20f4fac2667c50ee80",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 858916,
+          "rawCost": 2566037,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 4194304,
+          "logicalTimeNs": 12000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "5ff6654d6e45b29effc373606f5d3bf49ab4e9ff1c26ac53e8a6dcbf06f96837",
+          "outputSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "cost": 798507,
+          "rawCost": 2505628,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 4194304,
+          "logicalTimeNs": 12000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "9708ba68cdea8235a5c4826a3223d9195940db8ef330af659faff9cb380aedbb",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 824871,
+          "rawCost": 2531992,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 4194304,
+          "logicalTimeNs": 12000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "1365672e299241e1466cfa9cb24af80b166b83c3d5f2aa903a57ef9cbae51d23",
+          "outputSha256": "aceaf168c6709487a120d0059d87a99ab4aad4ee7f8a4d05a91c8ee20161ef75",
+          "cost": 6799168221,
+          "rawCost": 6800875342,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 16252928,
+          "logicalTimeNs": 126000000
+        }
+      ]
+    },
+    {
+      "problemId": 44,
+      "slug": "recent-submission-reuse",
+      "language": "python",
+      "sourcePath": "solutions/python/main.py",
+      "sourceSha256": "6af56cc638d663ef5023f03df9f5eaf90e0a857084071d65314ed0802f8ff474",
+      "artifactId": "10477305-aeb3-4a43-9e70-ef0fa9526fd6",
+      "artifactCacheKey": "2b17400ed4607827f3c2d8039cfab6d947fcf0c842385c58d0eae939db3c4339",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "03e56d871c9d426bd2fd5bb0f59235774e699a3ec8de4d20f4fac2667c50ee80",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 2369927,
+          "rawCost": 2422203936,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "5ff6654d6e45b29effc373606f5d3bf49ab4e9ff1c26ac53e8a6dcbf06f96837",
+          "outputSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "cost": 2315978,
+          "rawCost": 2422149987,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "9708ba68cdea8235a5c4826a3223d9195940db8ef330af659faff9cb380aedbb",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 2341945,
+          "rawCost": 2422175954,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "1365672e299241e1466cfa9cb24af80b166b83c3d5f2aa903a57ef9cbae51d23",
+          "outputSha256": "aceaf168c6709487a120d0059d87a99ab4aad4ee7f8a4d05a91c8ee20161ef75",
+          "cost": 5372216742,
+          "rawCost": 7792050751,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        }
+      ]
+    },
+    {
+      "problemId": 44,
+      "slug": "recent-submission-reuse",
+      "language": "javascript",
+      "sourcePath": "solutions/javascript/main.js",
+      "sourceSha256": "6c7d91ca68019d141cf78487af22b3599f1f374e965da9faf737af732d867bae",
+      "artifactId": "64976884-3405-4494-88d5-0f6c786b29c4",
+      "artifactCacheKey": "0c0ba1086c75f74fa4835a0091146faffdc6c2b09ea247695904a53ff6591417",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "03e56d871c9d426bd2fd5bb0f59235774e699a3ec8de4d20f4fac2667c50ee80",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 5872884,
+          "rawCost": 15457869,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "5ff6654d6e45b29effc373606f5d3bf49ab4e9ff1c26ac53e8a6dcbf06f96837",
+          "outputSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "cost": 5751787,
+          "rawCost": 15336772,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "9708ba68cdea8235a5c4826a3223d9195940db8ef330af659faff9cb380aedbb",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 5811215,
+          "rawCost": 15396200,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "1365672e299241e1466cfa9cb24af80b166b83c3d5f2aa903a57ef9cbae51d23",
+          "outputSha256": "aceaf168c6709487a120d0059d87a99ab4aad4ee7f8a4d05a91c8ee20161ef75",
+          "cost": 14791697052,
+          "rawCost": 14801282037,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 8257536,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 44,
+      "slug": "recent-submission-reuse",
+      "language": "typescript",
+      "sourcePath": "solutions/typescript/main.ts",
+      "sourceSha256": "4bde0493cf1ee5c82ebb9265ce97781866e9fa7f7b5f8738dedcf99db6f93d54",
+      "artifactId": "c4c3296e-90bb-45b4-b3f7-6903bdf99e66",
+      "artifactCacheKey": "377bea2874cebc50f823ade9762803db634a0d236ab2d98cc64ec6140006fe26",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "03e56d871c9d426bd2fd5bb0f59235774e699a3ec8de4d20f4fac2667c50ee80",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 5872884,
+          "rawCost": 15457869,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "5ff6654d6e45b29effc373606f5d3bf49ab4e9ff1c26ac53e8a6dcbf06f96837",
+          "outputSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "cost": 5751787,
+          "rawCost": 15336772,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "9708ba68cdea8235a5c4826a3223d9195940db8ef330af659faff9cb380aedbb",
+          "outputSha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+          "cost": 5811215,
+          "rawCost": 15396200,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-blind-01",
+          "inputSha256": "1365672e299241e1466cfa9cb24af80b166b83c3d5f2aa903a57ef9cbae51d23",
+          "outputSha256": "aceaf168c6709487a120d0059d87a99ab4aad4ee7f8a4d05a91c8ee20161ef75",
+          "cost": 14791697052,
+          "rawCost": 14801282037,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 8257536,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 45,
+      "slug": "slowest-k-cases",
+      "language": "c",
+      "sourcePath": "solutions/c/main.c",
+      "sourceSha256": "16687f64c827e4b9f13d45f511443555bb1849d962ad5f1c311b00c69ba6c29b",
+      "artifactId": "69498f5e-2144-4ab4-bd86-4ef3c3197039",
+      "artifactCacheKey": "d11ffe65259bc4534e8a0e4278d7b356fb995f7005ddbfebb7a0b82035d5cd66",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "dce5e59ad5b33728eed5aafb89dc0c2549306b5acf8abfb9f70bcac5e70364f5",
+          "outputSha256": "a6f8f319a08b86e3ca534312549c20093610d681eeeae9d3a33a0e51ab5d6c36",
+          "cost": 21486,
+          "rawCost": 21632,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "329660a263407fd5627a263aa993e77449e005ad44896f01e4a2f5cb9596d004",
+          "outputSha256": "6f4a6f4375b02be1270609b2e558413b67c3cd69bf6549943ec1300177a9465f",
+          "cost": 12256,
+          "rawCost": 12402,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "c378679ec77cd54c5e96a2f77f5f16d1c3016090a125f7c636daf15149f608f9",
+          "outputSha256": "b99f506f502a0c45ba9c25b049ca07cdb8704da8f498cddaef9da0b6afd29f5d",
+          "cost": 33733,
+          "rawCost": 33879,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "d345cc31b2b28278efe847f1707567a9e08987a96b876333410382b5f7c2ce5c",
+          "outputSha256": "3e2d78576a752a9622ea9e55571fcfb488d7939f25ec3c2925d83a1950f13aba",
+          "cost": 1522930993,
+          "rawCost": 1522931139,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 196608,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 45,
+      "slug": "slowest-k-cases",
+      "language": "cpp",
+      "sourcePath": "solutions/cpp/main.cpp",
+      "sourceSha256": "8ac4dfb99e00c63d16dd96787fb0c15227d2b0eece66680b1d0904692507ee05",
+      "artifactId": "e6c7a062-ced6-46c0-9fb0-e3b7f5b47cd5",
+      "artifactCacheKey": "0b30d2d983848fa480c5272869823ca415fa839fb1c525d3c9d004294d162b4c",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "dce5e59ad5b33728eed5aafb89dc0c2549306b5acf8abfb9f70bcac5e70364f5",
+          "outputSha256": "a6f8f319a08b86e3ca534312549c20093610d681eeeae9d3a33a0e51ab5d6c36",
+          "cost": 315359,
+          "rawCost": 315505,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "329660a263407fd5627a263aa993e77449e005ad44896f01e4a2f5cb9596d004",
+          "outputSha256": "6f4a6f4375b02be1270609b2e558413b67c3cd69bf6549943ec1300177a9465f",
+          "cost": 248277,
+          "rawCost": 248423,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "c378679ec77cd54c5e96a2f77f5f16d1c3016090a125f7c636daf15149f608f9",
+          "outputSha256": "b99f506f502a0c45ba9c25b049ca07cdb8704da8f498cddaef9da0b6afd29f5d",
+          "cost": 350335,
+          "rawCost": 350481,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 131072,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "d345cc31b2b28278efe847f1707567a9e08987a96b876333410382b5f7c2ce5c",
+          "outputSha256": "3e2d78576a752a9622ea9e55571fcfb488d7939f25ec3c2925d83a1950f13aba",
+          "cost": 18158141489,
+          "rawCost": 18158141635,
+          "baselineCost": 146,
+          "costProfile": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 393216,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 45,
+      "slug": "slowest-k-cases",
+      "language": "rust",
+      "sourcePath": "solutions/rust/main.rs",
+      "sourceSha256": "943d8c0623fc59d3a0ef9319cad39714f2b87ddff68b170f27920a3797cd56de",
+      "artifactId": "93e1a6a0-c5ad-4b0d-b000-d063cb8697f8",
+      "artifactCacheKey": "8a9af2d4bfe497d263fbedc296ddabdecb5333a1f8f1c382c56baef2c68eedd6",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "dce5e59ad5b33728eed5aafb89dc0c2549306b5acf8abfb9f70bcac5e70364f5",
+          "outputSha256": "a6f8f319a08b86e3ca534312549c20093610d681eeeae9d3a33a0e51ab5d6c36",
+          "cost": 41216,
+          "rawCost": 50698,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "329660a263407fd5627a263aa993e77449e005ad44896f01e4a2f5cb9596d004",
+          "outputSha256": "6f4a6f4375b02be1270609b2e558413b67c3cd69bf6549943ec1300177a9465f",
+          "cost": 36628,
+          "rawCost": 46110,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "c378679ec77cd54c5e96a2f77f5f16d1c3016090a125f7c636daf15149f608f9",
+          "outputSha256": "b99f506f502a0c45ba9c25b049ca07cdb8704da8f498cddaef9da0b6afd29f5d",
+          "cost": 45647,
+          "rawCost": 55129,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 1114112,
+          "logicalTimeNs": 0
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "d345cc31b2b28278efe847f1707567a9e08987a96b876333410382b5f7c2ce5c",
+          "outputSha256": "3e2d78576a752a9622ea9e55571fcfb488d7939f25ec3c2925d83a1950f13aba",
+          "cost": 1187965236,
+          "rawCost": 1187974718,
+          "baselineCost": 9482,
+          "costProfile": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 9437184,
+          "logicalTimeNs": 0
+        }
+      ]
+    },
+    {
+      "problemId": 45,
+      "slug": "slowest-k-cases",
+      "language": "go",
+      "sourcePath": "solutions/go/main.go",
+      "sourceSha256": "de96f5aea9f701dbbfe04a111f3217b3ae52da9723169bbc1bf09fb28daa27b5",
+      "artifactId": "e2cc4dd7-6dfd-4dd5-8723-c99999edc2a8",
+      "artifactCacheKey": "e65192e7e8a4f6a05c65339edd2d51ab0e37bd20d10f57771d3a95f3f020f3c5",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "dce5e59ad5b33728eed5aafb89dc0c2549306b5acf8abfb9f70bcac5e70364f5",
+          "outputSha256": "a6f8f319a08b86e3ca534312549c20093610d681eeeae9d3a33a0e51ab5d6c36",
+          "cost": 959984,
+          "rawCost": 2667105,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "329660a263407fd5627a263aa993e77449e005ad44896f01e4a2f5cb9596d004",
+          "outputSha256": "6f4a6f4375b02be1270609b2e558413b67c3cd69bf6549943ec1300177a9465f",
+          "cost": 901018,
+          "rawCost": 2608139,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "c378679ec77cd54c5e96a2f77f5f16d1c3016090a125f7c636daf15149f608f9",
+          "outputSha256": "b99f506f502a0c45ba9c25b049ca07cdb8704da8f498cddaef9da0b6afd29f5d",
+          "cost": 1007863,
+          "rawCost": 2714984,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 5242880,
+          "logicalTimeNs": 14000000
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "d345cc31b2b28278efe847f1707567a9e08987a96b876333410382b5f7c2ce5c",
+          "outputSha256": "3e2d78576a752a9622ea9e55571fcfb488d7939f25ec3c2925d83a1950f13aba",
+          "cost": 21435819413,
+          "rawCost": 21437526534,
+          "baselineCost": 1707121,
+          "costProfile": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 8912896,
+          "logicalTimeNs": 142000000
+        }
+      ]
+    },
+    {
+      "problemId": 45,
+      "slug": "slowest-k-cases",
+      "language": "python",
+      "sourcePath": "solutions/python/main.py",
+      "sourceSha256": "06bc4dfe92233922a9bfa2fbc9a2dcf1d462c491547616209ade5d0aa24e8f1c",
+      "artifactId": "c0d5930a-7394-41d1-b2fc-3eaa1413db3f",
+      "artifactCacheKey": "2ddabc18e8b1f1d6d6710771622498846926a8099a5acf12210239953b2b98cf",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "dce5e59ad5b33728eed5aafb89dc0c2549306b5acf8abfb9f70bcac5e70364f5",
+          "outputSha256": "a6f8f319a08b86e3ca534312549c20093610d681eeeae9d3a33a0e51ab5d6c36",
+          "cost": 141426439,
+          "rawCost": 2561260448,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "329660a263407fd5627a263aa993e77449e005ad44896f01e4a2f5cb9596d004",
+          "outputSha256": "6f4a6f4375b02be1270609b2e558413b67c3cd69bf6549943ec1300177a9465f",
+          "cost": 141349260,
+          "rawCost": 2561183269,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "c378679ec77cd54c5e96a2f77f5f16d1c3016090a125f7c636daf15149f608f9",
+          "outputSha256": "b99f506f502a0c45ba9c25b049ca07cdb8704da8f498cddaef9da0b6afd29f5d",
+          "cost": 141492967,
+          "rawCost": 2561326976,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 41943040,
+          "logicalTimeNs": 6000000
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "d345cc31b2b28278efe847f1707567a9e08987a96b876333410382b5f7c2ce5c",
+          "outputSha256": "3e2d78576a752a9622ea9e55571fcfb488d7939f25ec3c2925d83a1950f13aba",
+          "cost": 14209587618,
+          "rawCost": 16629421627,
+          "baselineCost": 2419834009,
+          "costProfile": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 49938432,
+          "logicalTimeNs": 6000000
+        }
+      ]
+    },
+    {
+      "problemId": 45,
+      "slug": "slowest-k-cases",
+      "language": "javascript",
+      "sourcePath": "solutions/javascript/main.js",
+      "sourceSha256": "2b3846bd0c81958af192c6aced83e876ddd472b860fd00f0f11a30c7bf17460b",
+      "artifactId": "a180a58e-b120-486f-bba3-4e6d9d1f02ee",
+      "artifactCacheKey": "f1be94a9ebdde5c6c4ec6636cbe7f7572f311e95f90e36129f15ebd0b1edd6d5",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "dce5e59ad5b33728eed5aafb89dc0c2549306b5acf8abfb9f70bcac5e70364f5",
+          "outputSha256": "a6f8f319a08b86e3ca534312549c20093610d681eeeae9d3a33a0e51ab5d6c36",
+          "cost": 8687702,
+          "rawCost": 18272687,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 458752,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "329660a263407fd5627a263aa993e77449e005ad44896f01e4a2f5cb9596d004",
+          "outputSha256": "6f4a6f4375b02be1270609b2e558413b67c3cd69bf6549943ec1300177a9465f",
+          "cost": 8645969,
+          "rawCost": 18230954,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 458752,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "c378679ec77cd54c5e96a2f77f5f16d1c3016090a125f7c636daf15149f608f9",
+          "outputSha256": "b99f506f502a0c45ba9c25b049ca07cdb8704da8f498cddaef9da0b6afd29f5d",
+          "cost": 8717612,
+          "rawCost": 18302597,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 458752,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "d345cc31b2b28278efe847f1707567a9e08987a96b876333410382b5f7c2ce5c",
+          "outputSha256": "3e2d78576a752a9622ea9e55571fcfb488d7939f25ec3c2925d83a1950f13aba",
+          "cost": 146734142894,
+          "rawCost": 146743727879,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 8519680,
+          "logicalTimeNs": 2000000
+        }
+      ]
+    },
+    {
+      "problemId": 45,
+      "slug": "slowest-k-cases",
+      "language": "typescript",
+      "sourcePath": "solutions/typescript/main.ts",
+      "sourceSha256": "4a38fa4e7b0182a24bd78e6961ee1d09d84fca1adea637adc863b823e6a4f5ad",
+      "artifactId": "5022ad8d-8665-41b5-bcfe-f2e5504fc240",
+      "artifactCacheKey": "3f7134626d41b3d4eb92709c7a031286fd2a929cf365f2c7c3dc43b6f8c8af47",
+      "artifactCostProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+      "cases": [
+        {
+          "id": "sample-01",
+          "inputSha256": "dce5e59ad5b33728eed5aafb89dc0c2549306b5acf8abfb9f70bcac5e70364f5",
+          "outputSha256": "a6f8f319a08b86e3ca534312549c20093610d681eeeae9d3a33a0e51ab5d6c36",
+          "cost": 8490693,
+          "rawCost": 18075678,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 458752,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-02",
+          "inputSha256": "329660a263407fd5627a263aa993e77449e005ad44896f01e4a2f5cb9596d004",
+          "outputSha256": "6f4a6f4375b02be1270609b2e558413b67c3cd69bf6549943ec1300177a9465f",
+          "cost": 8451080,
+          "rawCost": 18036065,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 458752,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "sample-03",
+          "inputSha256": "c378679ec77cd54c5e96a2f77f5f16d1c3016090a125f7c636daf15149f608f9",
+          "outputSha256": "b99f506f502a0c45ba9c25b049ca07cdb8704da8f498cddaef9da0b6afd29f5d",
+          "cost": 8525501,
+          "rawCost": 18110486,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 458752,
+          "logicalTimeNs": 2000000
+        },
+        {
+          "id": "adversarial-01",
+          "inputSha256": "d345cc31b2b28278efe847f1707567a9e08987a96b876333410382b5f7c2ce5c",
+          "outputSha256": "3e2d78576a752a9622ea9e55571fcfb488d7939f25ec3c2925d83a1950f13aba",
+          "cost": 146744584040,
+          "rawCost": 146754169025,
+          "baselineCost": 9584985,
+          "costProfile": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+          "costModel": "weighted",
+          "memoryBytes": 8519680,
+          "logicalTimeNs": 2000000
+        }
+      ]
     }
   ],
   "summaries": [
@@ -18810,6 +20910,221 @@
       ],
       "minimumLanguage": "c",
       "minimumWorstCaseCost": 27614
+    },
+    {
+      "id": 41,
+      "slug": "progressive-cost-budget",
+      "languages": [
+        {
+          "language": "c",
+          "maximumCost": 1196875261,
+          "maximumMemoryBytes": 1703936
+        },
+        {
+          "language": "rust",
+          "maximumCost": 1801887493,
+          "maximumMemoryBytes": 9437184
+        },
+        {
+          "language": "python",
+          "maximumCost": 7937261209,
+          "maximumMemoryBytes": 46727168
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 25360713531,
+          "maximumMemoryBytes": 1703936
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 26572861963,
+          "maximumMemoryBytes": 51838976
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 26572861963,
+          "maximumMemoryBytes": 51838976
+        },
+        {
+          "language": "go",
+          "maximumCost": 27174679021,
+          "maximumMemoryBytes": 11534336
+        }
+      ],
+      "minimumLanguage": "c",
+      "minimumWorstCaseCost": 1196875261
+    },
+    {
+      "id": 42,
+      "slug": "first-duplicate-test",
+      "languages": [
+        {
+          "language": "c",
+          "maximumCost": 333427292,
+          "maximumMemoryBytes": 21102592
+        },
+        {
+          "language": "rust",
+          "maximumCost": 487436842,
+          "maximumMemoryBytes": 12058624
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 3444036654,
+          "maximumMemoryBytes": 8126464
+        },
+        {
+          "language": "python",
+          "maximumCost": 4471164343,
+          "maximumMemoryBytes": 46006272
+        },
+        {
+          "language": "go",
+          "maximumCost": 7086523868,
+          "maximumMemoryBytes": 16252928
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 15597707571,
+          "maximumMemoryBytes": 27000832
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 15597707571,
+          "maximumMemoryBytes": 27000832
+        }
+      ],
+      "minimumLanguage": "c",
+      "minimumWorstCaseCost": 333427292
+    },
+    {
+      "id": 43,
+      "slug": "verdict-range-counts",
+      "languages": [
+        {
+          "language": "c",
+          "maximumCost": 489062936,
+          "maximumMemoryBytes": 1835008
+        },
+        {
+          "language": "rust",
+          "maximumCost": 615950036,
+          "maximumMemoryBytes": 5767168
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 7503512402,
+          "maximumMemoryBytes": 2097152
+        },
+        {
+          "language": "go",
+          "maximumCost": 9388420980,
+          "maximumMemoryBytes": 11534336
+        },
+        {
+          "language": "python",
+          "maximumCost": 9561633408,
+          "maximumMemoryBytes": 41943040
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 24497364813,
+          "maximumMemoryBytes": 5636096
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 24511720153,
+          "maximumMemoryBytes": 5570560
+        }
+      ],
+      "minimumLanguage": "c",
+      "minimumWorstCaseCost": 489062936
+    },
+    {
+      "id": 44,
+      "slug": "recent-submission-reuse",
+      "languages": [
+        {
+          "language": "c",
+          "maximumCost": 321896784,
+          "maximumMemoryBytes": 21102592
+        },
+        {
+          "language": "rust",
+          "maximumCost": 530896017,
+          "maximumMemoryBytes": 9961472
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 3188541104,
+          "maximumMemoryBytes": 3342336
+        },
+        {
+          "language": "python",
+          "maximumCost": 5372216742,
+          "maximumMemoryBytes": 41943040
+        },
+        {
+          "language": "go",
+          "maximumCost": 6799168221,
+          "maximumMemoryBytes": 16252928
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 14791697052,
+          "maximumMemoryBytes": 8257536
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 14791697052,
+          "maximumMemoryBytes": 8257536
+        }
+      ],
+      "minimumLanguage": "c",
+      "minimumWorstCaseCost": 321896784
+    },
+    {
+      "id": 45,
+      "slug": "slowest-k-cases",
+      "languages": [
+        {
+          "language": "rust",
+          "maximumCost": 1187965236,
+          "maximumMemoryBytes": 9437184
+        },
+        {
+          "language": "c",
+          "maximumCost": 1522930993,
+          "maximumMemoryBytes": 196608
+        },
+        {
+          "language": "python",
+          "maximumCost": 14209587618,
+          "maximumMemoryBytes": 49938432
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 18158141489,
+          "maximumMemoryBytes": 393216
+        },
+        {
+          "language": "go",
+          "maximumCost": 21435819413,
+          "maximumMemoryBytes": 8912896
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 146734142894,
+          "maximumMemoryBytes": 8519680
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 146744584040,
+          "maximumMemoryBytes": 8519680
+        }
+      ],
+      "minimumLanguage": "rust",
+      "minimumWorstCaseCost": 1187965236
     }
   ]
 }

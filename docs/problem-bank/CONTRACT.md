@@ -2,10 +2,10 @@
 
 ## 範圍
 
-本 repository 固定收錄 40 題。題號、slug 與目錄一經建立即為穩定識別；
+本 repository 固定收錄 45 題。題號、slug 與目錄一經建立即為穩定識別；
 題意可以修正，但不得以隱藏 fallback 或相容分支保留錯誤契約。
 
-根目錄 `catalog.json` 是唯一 discovery entry point，依序明列 40 份 `problem.json`。
+根目錄 `catalog.json` 是唯一 discovery entry point，依序明列 45 份 `problem.json`。
 Consumer 不得先列出目錄再猜 manifest path。
 
 每題必須具備以下檔案：
