@@ -23,8 +23,10 @@ single `wasm-oj-forge-v1` compiler, runner, judge, replay, and evidence contract
   difference.
 - The exact registry bytes are the canonical artifact. Only those bytes receive
   the SHA-256 sidecar, GitHub build attestation, and GitHub Release attachment.
-  A rerun therefore remains idempotent even when the package version already
-  exists.
+  A rerun verifies the existing attachment names, uploaded state, byte lengths,
+  and GitHub SHA-256 digests before reusing them. Exact matches skip the large
+  upload; absent or different assets are replaced. A rerun therefore remains
+  idempotent even when the package version and GitHub Release already exist.
 
 Every action dependency is pinned to an immutable commit. Workflows use the
 minimum permissions declared by each job. The release job is attached to the

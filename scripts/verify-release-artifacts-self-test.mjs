@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 import {
+  githubReleaseAssetsMatch,
   parseRegistryMetadata,
   verifyRegistryArtifactFile,
   verifyReleaseArtifacts,
@@ -32,7 +33,41 @@ try {
   await verifyRegistryArtifactFile(canonical, metadata);
   const verified = await verifyReleaseArtifacts({ candidate, canonical });
   assert.equal(verified.payloadSha256, createHash("sha256").update(payload).digest("hex"));
-  assert.match(await readFile(`${canonical}.sha256`, "utf8"), /^[0-9a-f]{64}  canonical\.tgz\n$/);
+  const checksum = `${canonical}.sha256`;
+  const checksumBytes = await readFile(checksum);
+  assert.match(checksumBytes.toString("utf8"), /^[0-9a-f]{64}  canonical\.tgz\n$/);
+
+  const releaseAssets = [
+    {
+      digest: `sha256:${verified.canonicalSha256}`,
+      name: "canonical.tgz",
+      size: canonicalBytes.length,
+      state: "uploaded",
+    },
+    {
+      digest: `sha256:${createHash("sha256").update(checksumBytes).digest("hex")}`,
+      name: "canonical.tgz.sha256",
+      size: checksumBytes.length,
+      state: "uploaded",
+    },
+  ];
+  assert.equal(
+    await githubReleaseAssetsMatch({ assets: releaseAssets, files: [canonical, checksum] }),
+    true,
+  );
+  assert.equal(
+    await githubReleaseAssetsMatch({
+      assets: releaseAssets.map((asset, index) => (
+        index === 0 ? { ...asset, digest: `sha256:${"0".repeat(64)}` } : asset
+      )),
+      files: [canonical, checksum],
+    }),
+    false,
+  );
+  assert.equal(
+    await githubReleaseAssetsMatch({ assets: releaseAssets.slice(1), files: [canonical, checksum] }),
+    false,
+  );
 
   const different = path.join(directory, "different.tgz");
   await writeFile(different, gzipSync(Buffer.from("different payload\n")));
@@ -51,6 +86,10 @@ try {
       tarball: "https://example.com/forge.tgz",
     })),
     /Registry tarball URL/,
+  );
+  await assert.rejects(
+    githubReleaseAssetsMatch({ assets: {}, files: [canonical] }),
+    /assets array/,
   );
 } finally {
   await rm(directory, { force: true, recursive: true });
