@@ -35,7 +35,9 @@ the index and initially downloads only the first problem. Selecting another prob
 The learning-assistant button opens ChatGPT in one click with a compact query. It links to the
 active locale's public statement Markdown, which includes the samples, and keeps only the selected
 language's starter template inline. Forge never guesses a statement path from a slug or bundle
-name. This keeps the query URL bounded while preserving an explicit source for the full problem.
+name. This keeps the query URL bounded while preserving an explicit source for the full problem;
+the default catalog is regression-tested so every locale and language combination stays below
+2,048 URL characters.
 
 The canonical repository keeps stable manifest IDs and paths for calibration evidence and API
 consumers. Its separate `learning-path.json` groups problems by topic and orders each group from
