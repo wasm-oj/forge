@@ -45,16 +45,27 @@ assertCheckoutPolicy(ciJob, "CI verify job", false);
 
 const release = workflows.get(".github/workflows/release.yml");
 assertTrigger(release.document, "push", "Release");
-if (Object.keys(release.document.on).some((key) => key !== "push")) {
-  throw new Error("Release workflow must have the version-tag push as its only trigger.");
+assertTrigger(release.document, "workflow_dispatch", "Release");
+if (Object.keys(release.document.on).some((key) => !["push", "workflow_dispatch"].includes(key))) {
+  throw new Error("Release workflow may only use version-tag pushes and explicit recovery dispatches.");
 }
 const tagPatterns = release.document.on.push?.tags;
 if (!Array.isArray(tagPatterns) || tagPatterns.length !== 1 || tagPatterns[0] !== "v*.*.*") {
   throw new Error("Release workflow must accept only vMAJOR.MINOR.PATCH-shaped tags.");
 }
+const recoveryTag = release.document.on.workflow_dispatch?.inputs?.tag;
+if (recoveryTag?.required !== true || recoveryTag?.type !== "string") {
+  throw new Error("Release recovery dispatch must require one explicit tag string.");
+}
 assertPermission(release.document.permissions, "contents", "read", "Release workflow");
 const publishJob = requiredJob(release.document, "publish", "Release workflow");
 if (publishJob.environment !== "npm") throw new Error("Release publish job must use the npm environment.");
+if (publishJob.env?.RELEASE_TAG !== "${{ inputs.tag || github.ref_name }}") {
+  throw new Error("Release publish job must bind all operations to the requested or pushed tag.");
+}
+if (publishJob.defaults?.run?.["working-directory"] !== "source") {
+  throw new Error("Release commands must execute against the separately checked-out release source.");
+}
 for (const [permission, value] of [
   ["contents", "write"],
   ["id-token", "write"],
@@ -63,8 +74,18 @@ for (const [permission, value] of [
 assertRunContains(publishJob, "pnpm run ci:verify", "Release publish job");
 assertRunContains(publishJob, "pnpm run release:verify", "Release publish job");
 assertRunContains(publishJob, "pnpm publish", "Release publish job");
+assertRunContains(publishJob, "download-registry-artifact.mjs", "Release publish job");
+assertRunContains(publishJob, "verify-release-artifacts.mjs", "Release publish job");
 assertRunContains(publishJob, "gh release edit", "Release publish job");
-assertCheckoutPolicy(publishJob, "Release publish job", true);
+if (release.source.includes("secrets.NPM_TOKEN") || release.source.includes("NODE_AUTH_TOKEN")) {
+  throw new Error("Release workflow must use only the npm trusted publisher identity.");
+}
+if (release.source.includes('pnpm pack "$package_spec"')) {
+  throw new Error("Release workflow must download registry bytes instead of repacking the source tree.");
+}
+assertAutomationCheckout(publishJob);
+assertCheckoutPolicy(publishJob, "Release publish job", true, "Check out the release tag and LFS assets");
+assertReleaseStepOrder(publishJob);
 
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 if (packageJson.repository?.url !== "git+https://github.com/wasm-oj/forge.git") {
@@ -116,12 +137,45 @@ function assertRunContains(job, expected, label) {
   if (!commands.includes(expected)) throw new Error(`${label} does not execute '${expected}'.`);
 }
 
-function assertCheckoutPolicy(job, label, requireHistory) {
-  const checkout = (job.steps ?? []).find((step) => String(step?.uses ?? "").startsWith("actions/checkout@"));
+function assertCheckoutPolicy(job, label, requireHistory, stepName) {
+  const checkout = (job.steps ?? []).find((step) => (
+    String(step?.uses ?? "").startsWith("actions/checkout@")
+    && (stepName === undefined || step.name === stepName)
+  ));
   if (checkout?.with?.lfs !== true || checkout.with["persist-credentials"] !== false) {
     throw new Error(`${label} must materialize LFS and remove checkout credentials.`);
   }
   if (requireHistory && checkout.with["fetch-depth"] !== 0) {
     throw new Error(`${label} must fetch tag and main ancestry.`);
+  }
+}
+
+function assertAutomationCheckout(job) {
+  const checkout = (job.steps ?? []).find((step) => step?.name === "Check out release automation");
+  if (
+    !String(checkout?.uses ?? "").startsWith("actions/checkout@")
+    || checkout.with?.path !== ".release-automation"
+    || checkout.with?.["persist-credentials"] !== false
+  ) {
+    throw new Error("Release workflow must isolate current automation from the immutable release source.");
+  }
+}
+
+function assertReleaseStepOrder(job) {
+  const names = (job.steps ?? []).map((step) => step?.name);
+  const required = [
+    "Pack and verify the release candidate",
+    "Publish candidate and resolve canonical registry artifact",
+    "Attest the canonical registry artifact",
+    "Create or update the draft GitHub Release",
+    "Publish the GitHub Release",
+  ];
+  const positions = required.map((name) => names.indexOf(name));
+  if (positions.some((position) => position < 0) || positions.some((position, index) => index > 0 && position <= positions[index - 1])) {
+    throw new Error("Release workflow must publish, resolve, attest, and expose the canonical artifact in that order.");
+  }
+  const attestation = (job.steps ?? [])[positions[2]];
+  if (attestation?.with?.["subject-path"] !== "${{ steps.registry.outputs.tarball }}") {
+    throw new Error("Release attestation must bind the canonical registry bytes.");
   }
 }

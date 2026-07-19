@@ -10,13 +10,21 @@ single `wasm-oj-forge-v1` compiler, runner, judge, replay, and evidence contract
   verifies pnpm policy, conformance provenance, types, lint, tests, the packed
   browser/server consumers, the production site, native runtime tests, and the
   web runtime target.
-- `.github/workflows/release.yml` runs only for a `vMAJOR.MINOR.PATCH` tag. It
-  repeats the full CI gate without a dependency cache, checks that the tag is
-  exactly `v${package.version}`, packs one deterministic tarball, creates a
-  SHA-256 sidecar and GitHub build attestation, publishes that exact tarball to
-  npm, and then publishes the draft GitHub Release.
-- A rerun accepts an existing npm version only when the registry tarball is
-  byte-identical to the locally verified release tarball.
+- `.github/workflows/release.yml` normally runs for a `vMAJOR.MINOR.PATCH` tag.
+  An explicit manual dispatch may resume one existing annotated tag; it cannot
+  substitute a branch or a different commit. The workflow repeats the full CI
+  gate without a dependency cache and checks that the tag is exactly
+  `v${package.version}`.
+- The packed source artifact is a release candidate. After publication, the
+  workflow downloads the immutable npm `dist.tarball`, verifies its SHA-1 and
+  SHA-512 registry metadata, and requires its complete uncompressed tar payload
+  to equal the candidate. This deliberately permits harmless gzip-header
+  differences between operating systems without permitting any package-content
+  difference.
+- The exact registry bytes are the canonical artifact. Only those bytes receive
+  the SHA-256 sidecar, GitHub build attestation, and GitHub Release attachment.
+  A rerun therefore remains idempotent even when the package version already
+  exists.
 
 Every action dependency is pinned to an immutable commit. Workflows use the
 minimum permissions declared by each job. The release job is attached to the
@@ -30,12 +38,13 @@ The release workflow is prepared for npm trusted publishing from organization
 `npm`. Trusted publishing is the steady-state credential: it exchanges GitHub's
 short-lived OIDC identity and publishes provenance without storing an npm token.
 
-The first package publication must bootstrap the npm package identity. During
-that one release only, store a publish-capable granular token as the `NPM_TOKEN`
-secret on the `npm` environment. After `@wasm-oj/forge` exists, configure the
-trusted publisher in npm and delete that secret. The workflow deliberately
-supports both states so the published artifact and verification path do not
-change during the credential migration.
+The first package publication must bootstrap the npm package identity because
+npm does not accept a trusted-publisher relationship for a package that does
+not yet exist. Pack and verify the tagged candidate locally, publish that exact
+file with an interactive npm session, configure the trusted publisher
+immediately, and manually dispatch the same tag. The resumed workflow downloads
+the just-published registry bytes, proves payload equivalence, and completes the
+normal attestation and GitHub Release path. No npm token is stored in GitHub.
 
 ## Cutting a release
 
@@ -45,9 +54,13 @@ change during the credential migration.
    `pnpm run conformance:verify`.
 4. Create and push one annotated tag, for example `git tag -a v0.1.0 -m v0.1.0`
    followed by `git push origin v0.1.0`.
-5. Monitor the `Release` workflow. Do not publish the same version manually.
-6. Verify the npm provenance statement, GitHub artifact attestation, attached
-   tarball checksum, and generated release notes.
+5. Monitor the `Release` workflow. For a recovery, dispatch `Release` with the
+   exact existing tag; never move or recreate the tag.
+6. Verify registry integrity, the GitHub artifact attestation, attached tarball
+   checksum, generated release notes, and npm provenance for every
+   trusted-publisher release after the one-time bootstrap.
 
-The tag is the only release trigger. There is no manual dispatch, alternate
-branch, or unverified local-publish fallback.
+Manual dispatch is a recovery entry point, not an alternate release identity.
+Both triggers check out and verify the immutable tag. The one interactive npm
+publication described above is permitted only to create a package identity that
+npm requires before trusted publishing can be configured.

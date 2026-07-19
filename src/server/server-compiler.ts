@@ -225,7 +225,11 @@ export class ServerForgeCompiler implements ForgeCompiler {
       await writeFile(requestPath, encodedRequest, { flag: "wx", mode: 0o600 });
       return await new Promise((resolve, reject) => {
         const script = resolveStageScript("server-build-stage.mjs");
-        const child = spawn(process.execPath, ["--experimental-strip-types", script], {
+        const child = spawn(process.execPath, [
+          "--experimental-strip-types",
+          "--disable-warning=ExperimentalWarning",
+          script,
+        ], {
           // Progress on fd 3 is best-effort. The artifact response uses a private
           // one-shot file because Wasmer worker transports may claim inherited fds.
           stdio: ["pipe", "pipe", "pipe", "pipe"],
