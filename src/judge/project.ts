@@ -18,7 +18,7 @@ const ENTRY_BY_LANGUAGE: Record<BuiltinLanguage, string> = {
   go: "src/main.go",
 };
 
-function starterSource(problem: JudgeProblem, language: BuiltinLanguage): string {
+export function judgeStarterSource(problem: JudgeProblem, language: BuiltinLanguage): string {
   const heading = `Problem ${problem.number}: ${problem.title[DEFAULT_PROBLEM_LOCALE]}`;
   switch (language) {
     case "c":
@@ -124,7 +124,7 @@ export function createJudgeProject(problem: JudgeProblem, language: BuiltinLangu
   const file: ProjectFile = {
     path: entry,
     language,
-    content: starterSource(problem, language),
+    content: judgeStarterSource(problem, language),
   };
   return {
     id: judgeProjectId(problem.id, language),
