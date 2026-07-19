@@ -1,12 +1,16 @@
 # Unambiguous Runtime Bundle
 
-Encode text and binary files into a unique, prefix-free runtime bundle. First sort all files by ASCII lexicographic path order, then output these bytes:
+A WASM OJ needs to deliver text source files and binary resources together to an isolated runtime. If paths and payloads were merely concatenated, different field boundaries could produce the same byte stream. If file-enumeration order were unstable, the same contents could also produce different bundles. For reliable storage, transport, and comparison, we need a unique, prefix-free format.
+
+Given a collection of text and binary files, first sort them by ASCII lexicographic path order, then output these bytes:
 
 1. the ASCII magic `WOBJ`;
 2. the file count as an unsigned 32-bit big-endian integer;
 3. each file in order: a one-byte type tag (`T=01`, `B=02`), the path byte length as u32 big-endian, the ASCII path bytes, the payload byte length as u64 big-endian, and the payload bytes.
 
-The length prefixes and type tag make field boundaries unambiguous.
+The type tag distinguishes text from binary payloads. The fixed-width length prefix before each variable-length field determines where that field ends. Consequently, different file or field boundaries cannot be confused as the same valid encoding.
+
+Output the complete runtime bundle produced by this specification.
 
 ## Input
 

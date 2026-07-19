@@ -1,8 +1,12 @@
 # Toolchain 鏡像網路
 
-Host 1 已持有 toolchain。每條無向 link `u v cost` 可把 toolchain 在兩 host 間傳送一次；只要其中一端已取得，便能沿選定 link 讓另一端取得。請選一組 link，使所有 host 最終都取得 toolchain且總成本最小。
+在設計分散式 WASM OJ 時，多個執行 host 都需要相同版本的 compiler toolchain。若每台 host 都直接從中央儲存下載，不但重複占用頻寬，也可能讓單一來源成為部署瓶頸，因此我們考慮讓已取得 toolchain 的 host 繼續轉送給其他 host。
 
-選定連線後可依任一從 host 1 出發的順序傳送；因此要求等價於選一個涵蓋全部 host 的 connected subgraph。
+不同 host 之間的傳輸成本並不相同，某些連線可能位於同一資料中心，另一些則必須跨區域傳送。部署開始時只有 host `1` 已持有 toolchain；我們需要先選出要使用的傳輸 links，再按照可行的順序完成散布。
+
+每條無向 link `u v cost` 可以在兩個 host 之間傳送一次 toolchain。只要其中一端已取得 toolchain，就能沿著選定的 link 讓另一端取得。選定 links 後，傳輸可以依任一從 host `1` 可達的順序進行。
+
+請選擇一組 links，使所有 host 最終都取得 toolchain，並讓選定 links 的總成本最小。換句話說，所選 links 必須形成一個涵蓋全部 host 的 connected subgraph。
 
 ## 輸入
 

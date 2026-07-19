@@ -1,21 +1,21 @@
 # Browser Storage Evacuation
 
-The cache currently contains `N` indivisible items. Its logical limit is `C` bytes. The browser currently has `A` bytes available, and the system requires at least `R` available bytes to remain.
+When a WASM OJ stores compilation artifacts and test data in the browser, it must respect two limits at once: the cache's own logical capacity and the free space that the browser must preserve for other features. If either requirement is violated, the storage manager has to evacuate items from the cache.
 
-If total item size is `T`, at least
+The cache currently contains `N` indivisible items and has a logical limit of `C` bytes. The browser currently has `A` bytes available, and the system requires at least `R` bytes to remain available after evacuation. If the total size of all items is `T`, at least
 
 `need = max(0, T - C, R - A)`
 
-bytes must be freed. If `need` exceeds `T`, evacuation is impossible.
+bytes must be freed. If `need` exceeds `T`, even deleting the entire cache cannot satisfy the requirement, so evacuation is impossible.
 
-Each item has `size priority lastUsed participant key`. The fixed eviction order is:
+To make the result reproducible across devices, eviction does not choose an arbitrary combination that happens to free enough space. Each item has `size priority lastUsed participant key`, and the fixed order is:
 
 1. lower `priority` first;
 2. for equal priority, lower (older) `lastUsed` first;
 3. then ASCII-lexicographically smaller `participant`;
 4. finally ASCII-lexicographically smaller `key`.
 
-Delete complete items in this order until the freed amount first reaches or exceeds `need`. This order is policy; you may not choose a different combination that sums exactly to the target.
+Delete complete items in this order until the freed amount first reaches or exceeds `need`. This order is the storage policy; you may not choose a different combination that sums exactly to the target.
 
 ## Input
 

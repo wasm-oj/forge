@@ -1,12 +1,16 @@
 # 不可混淆的 Runtime Bundle
 
-請將文字與二進位檔案編成唯一、prefix-free 的 runtime bundle。所有檔案先依 path 的 ASCII 字典序排列，接著輸出以下 bytes：
+WASM OJ 需要把文字原始碼與二進位資源一起交給隔離 runtime。若只串接 path 與 payload，不同的欄位切法可能產生完全相同的 byte stream；若檔案列舉順序不固定，同一組內容也可能得到不同 bundle。為了可靠地儲存、傳輸與比對，我們要定義唯一且 prefix-free 的格式。
+
+給定一組文字與二進位檔案，先依 path 的 ASCII 字典序排列，再依下列順序輸出 bytes：
 
 1. magic ASCII `WOBJ`；
 2. 檔案數的 unsigned 32-bit big-endian；
 3. 每個檔案依序編碼：一 byte type tag（`T=01`、`B=02`）、path byte 長度的 u32 big-endian、path ASCII bytes、payload byte 長度的 u64 big-endian、payload bytes。
 
-長度前綴與 type tag 使不同欄位切法不能混淆。
+type tag 區分文字與二進位 payload；每個可變長欄位前的固定寬度長度前綴則界定其終點。因此，不同檔案或欄位切法不能混淆成同一份有效編碼。
+
+請輸出依此規格產生的完整 runtime bundle。
 
 ## 輸入
 

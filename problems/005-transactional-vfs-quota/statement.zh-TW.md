@@ -1,15 +1,15 @@
 # 交易式 VFS 配額
 
-一個虛擬檔案系統有 `P` 個可能的 canonical guest path，ID `x` 代表 `/file/x`。初始時全部不存在。系統同時限制檔案總 logical bytes 不超過 `B`，存在的檔案數（inode 數）不超過 `I`。
+在設計 WASM OJ 的虛擬檔案系統時，我們不只要限制寫入的總 bytes，也要限制可建立的檔案數。更重要的是，配額檢查不能讓失敗的操作留下半套狀態：若檔案大小已改變才發現超限，後續判題就不再可重現。因此，每個檔案操作都必須以交易方式完整提交或完全回滾。
 
-請依序執行 `N` 個操作：
+虛擬檔案系統有 `P` 個可能的 canonical guest path，ID `x` 代表 `/file/x`，初始時全部不存在。所有檔案的 logical bytes 總和不得超過 `B`，存在的檔案數（inode 數）不得超過 `I`。請依序執行 `N` 個操作：
 
 - `CREATE x`：建立大小為零的檔案。
 - `WRITE x offset length`：在檔案寫入 `length` bytes。若 `length>0`，新 logical size 為 `max(oldSize,offset+length)`；若 `length=0`，size 不變。
 - `TRUNCATE x size`：把 logical size 精確改成 `size`，可增長或縮小。
 - `UNLINK x`：刪除檔案並釋放其全部 bytes 與一個 inode。
 
-每個操作都是交易。失敗時，存在狀態、size、用量與 peak 全都不得改變。錯誤依下列順序決定：
+每個操作都是一筆交易。失敗時，存在狀態、size、用量與 peak 全都不得改變。為了讓相同操作永遠得到相同錯誤，請依下列順序決定結果：
 
 - `CREATE`：已存在先回 `EXISTS`；否則若 inode 將超限，回 `INODES`。
 - `WRITE`／`TRUNCATE`：不存在先回 `NOENT`；否則若 bytes 將超限，回 `BYTES`。
@@ -17,7 +17,7 @@
 
 成功輸出 `OK`，失敗輸出 `ERR code`。任何一次 `BYTES` 或 `INODES` 錯誤會把 sticky quota failure 設為 `1`，之後永不清除；`EXISTS` 與 `NOENT` 不影響它。
 
-所有操作後，再輸出目前用量、執行期間成功狀態的 peak 用量及 sticky bit。
+所有操作完成後，再輸出目前用量、執行期間所有成功提交狀態中的 peak 用量，以及 sticky bit。
 
 ## 輸入
 

@@ -1,6 +1,10 @@
 # Artifact Cache Trade-offs
 
-There are `N` independent build artifacts. Artifact `i` consumes `size_i` units of cache and saves `value_i` units of time during the next build if retained. Each artifact may be retained at most once, and the cache has total capacity `C`.
+While designing an incremental compilation cache for a WASM OJ, we found that keeping every build artifact was not practical. Browser storage is limited, and artifacts differ greatly in both size and reconstruction cost: one large artifact may save little time on the next build, while a small artifact may be very valuable to retain.
+
+To decide what should survive a cache cleanup, we record the cache space used by each artifact and the build time that reusing it would save. This problem first considers independent artifacts, so retaining one does not require retaining any other artifact.
+
+There are `N` build artifacts. Artifact `i` consumes `size_i` units of cache and saves `value_i` units of time during the next build if retained. Each artifact may be retained at most once, and the cache has total capacity `C`.
 
 Choose a subset whose total size does not exceed `C` and whose total saved time is maximum. Output only the maximum value, not the subset. The empty subset is always valid.
 

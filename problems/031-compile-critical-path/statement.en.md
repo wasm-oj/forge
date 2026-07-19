@@ -1,12 +1,12 @@
 # Compile Pipeline Critical Path
 
-A project's build consists of `N` stages. Stage `i` takes `d_i` units of time. A dependency `u v` means that stage `v` cannot start until stage `u` has finished.
+While designing the in-browser compiler for a WASM OJ, we wanted to estimate the earliest time a project could finish building before actually starting the build. Compilation jobs often depend on one another, but jobs whose prerequisites are complete can be assigned to different workers and run concurrently.
 
-The dependencies form a directed acyclic graph. There are infinitely many workers, so every stage whose dependencies are satisfied may run concurrently. A stage with no predecessor starts at time `0`.
+To focus on the dependency structure itself, we use an idealized system with infinitely many workers. The project contains `N` stages, and stage `i` takes `d_i` units of time. A dependency `u v` means that stage `v` cannot start until stage `u` has finished. The dependency graph is guaranteed to be a directed acyclic graph, and every stage with no predecessor starts at time `0`.
 
-A complete pipeline is a directed path from a stage with indegree zero to a stage with outdegree zero. The project's earliest completion time is the maximum sum of stage durations along any complete pipeline. Output that completion time and the number of complete pipelines attaining it, modulo `1,000,000,007`.
+Besides the earliest completion time, we want to know how many distinct critical build pipelines determine that time, because each such pipeline is a bottleneck worth examining when improving the scheduler. A complete pipeline is a directed path from a stage with indegree zero to a stage with outdegree zero. The project's earliest completion time is the maximum sum of stage durations along any complete pipeline.
 
-Two pipelines are different exactly when their stage sequences differ. An isolated stage is both a source and a sink and therefore forms a complete pipeline by itself.
+Output the earliest completion time and the number of complete pipelines attaining it, modulo `1,000,000,007`. Two pipelines are the same exactly when their stage sequences are identical. An isolated stage is both a source and a sink, so it forms a complete pipeline by itself.
 
 ## Input
 

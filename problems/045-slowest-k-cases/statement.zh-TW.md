@@ -1,8 +1,10 @@
 # 持續追蹤第 K 慢測試
 
-一個 submission 的 test case 依序完成。第 `i` 個 case 完成時，系統收到它的 instruction cost `cost_i`，而 case index 就是 `i`。
+在設計 WASM OJ 的即時效能面板時，我們希望在 submission 尚未跑完所有測資前，就持續顯示目前最值得調查的慢速 cases。只顯示最慢的一筆容易被單一極端值支配，因此面板需要追蹤目前排名第 `K` 慢的 case，作為較穩定的觀察門檻。
 
-在每個 `i >= K` 的時間點，請只考慮前 `i` 個 case，輸出其中排名第 `K` 慢的 case。成本越高排名越前；成本相同時，index 越小排名越前。每個前綴的答案在後續 case 完成前就已確定，之後收到的 cost 不屬於先前的前綴。
+Test cases 依序完成。第 `i` 個 case 完成時，系統收到它的 instruction cost `cost_i`，而 case index 就是 `i`。面板必須立即根據目前已完成的 cases 更新，不能使用尚未收到的後續資料。
+
+在每個 `i >= K` 的時間點，請只考慮前 `i` 個 cases，輸出其中排名第 `K` 慢的 case。成本越高排名越前；成本相同時，index 越小排名越前。每個前綴的答案在後續 case 完成前就已確定，之後收到的 cost 不屬於先前的前綴。
 
 ## 輸入
 

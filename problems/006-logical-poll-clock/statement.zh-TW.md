@@ -1,17 +1,21 @@
 # 不等待的虛擬時鐘
 
-確定性 runtime 的 logical clock 初始為 `0`，不能真的等待。請依序處理 `N` 個命令：
+在設計 WASM OJ 的確定性執行環境時，poll 不能真的依賴主機經過了多少時間。同一份程式若因電腦速度或系統負載不同而看到不同的 timer 結果，判題便無法重現。因此，我們使用 logical clock，並在沒有立即可處理的事件時直接推進到下一個 deadline。
+
+logical clock 初始為 `0`。系統不會實際等待，而是依序處理 `N` 個命令：
 
 - `T id deadline`：加入絕對 deadline 的 timer。每個 `id` 在整份輸入只加入一次。
 - `C id`：取消目前仍 active 的 timer。
 - `P ready`：執行一次 poll；`ready` 是當下已 ready 的 fd 事件數。
 
-POLL 規則如下：
+每次 poll 必須遵守以下規則：
 
 1. 若 `ready>0`，clock 不前進。
 2. 若 `ready=0`、沒有 deadline 不大於目前 clock 的 active timer、但仍有 active timer，clock 立刻快轉到最小 active deadline。
 3. 接著觸發並移除所有 `deadline≤clock` 的 active timer。
 4. 若 `ready=0` 且沒有 active timer，clock 不變。clock 永不倒退。
+
+請模擬這套規則，讓 timer 的觸發只由命令與 logical clock 決定，而不依賴任何實際等待時間。
 
 ## 輸入
 

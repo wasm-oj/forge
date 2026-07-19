@@ -1,12 +1,14 @@
 # Submission Conveyor
 
-The judge executes at most one submission at a time. All others wait in insertion order. Events are given in a deterministic total order.
+When a WASM OJ submission scheduler has one execution slot, at most one submission can run at a time and every other submission waits in insertion order. Besides normal completion, a user may cancel a submission that is active or still queued, so the scheduler must maintain an unambiguous active job and waiting count after every event.
+
+Events are given in a deterministic total order. Once a submission finishes normally or is cancelled, it becomes terminal and never runs again. Process these events:
 
 - `A id`: add a submission whose ID has never appeared before. If there is no active submission, it becomes active immediately; otherwise it joins the back of the queue.
 - `C id`: cancel that ID. If it is waiting or active, it becomes terminal; otherwise do nothing. If the active submission is cancelled, immediately start the earliest-added submission that is still waiting.
 - `E`: the active submission finishes normally and becomes terminal; do nothing if no submission is active. Then likewise start the earliest waiting submission.
 
-Cancelling a waiting submission does not change the relative order of the others.
+Whenever the active submission leaves the system, the scheduler immediately starts the earliest-added submission that is still waiting. Cancelling a waiting submission does not change the relative order of the others. Cancelling an ID that has not been added or is already terminal changes no state.
 
 ## Input
 

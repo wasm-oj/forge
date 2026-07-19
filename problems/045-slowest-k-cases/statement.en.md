@@ -1,6 +1,8 @@
 # Running K-th Slowest Case
 
-A submission's test cases finish one at a time. When case `i` finishes, the system receives its instruction cost `cost_i`; its case index is `i`.
+While designing a live performance panel for a WASM OJ, we wanted to show the cases most worth investigating before a submission had finished every test. Displaying only the single slowest case can be dominated by one extreme value, so the panel tracks the case currently ranked `K`-th slowest as a more stable threshold.
+
+Test cases finish one at a time. When case `i` finishes, the system receives its instruction cost `cost_i`; its case index is `i`. The panel must update from the cases completed so far and cannot use costs that have not arrived yet.
 
 At every moment `i >= K`, consider only the first `i` cases and output the case ranked `K`-th slowest. Higher cost ranks first; at equal cost, the smaller index ranks first. Each prefix answer is fixed before the next case finishes, and later costs do not belong to earlier prefixes.
 

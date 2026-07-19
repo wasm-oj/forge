@@ -1,15 +1,15 @@
 # Transactional VFS Quotas
 
-A virtual file system has `P` possible canonical guest paths; ID `x` represents `/file/x`. Initially, none of them exists. The total logical size of all files may not exceed `B` bytes, and the number of existing files (inodes) may not exceed `I`.
+While designing the virtual file system for a WASM OJ, we need to limit both the total bytes written and the number of files that can be created. More importantly, a failed quota check must not leave a half-applied operation behind. If a file size changed before an over-limit result was discovered, later judging behavior would no longer be reproducible. Every file operation must therefore commit completely or roll back completely as a transaction.
 
-Execute `N` operations in order:
+The virtual file system has `P` possible canonical guest paths; ID `x` represents `/file/x`, and initially none of them exists. The sum of all logical file sizes may not exceed `B` bytes, and the number of existing files (inodes) may not exceed `I`. Execute `N` operations in order:
 
 - `CREATE x`: create a zero-length file.
 - `WRITE x offset length`: write `length` bytes to the file. If `length>0`, its new logical size is `max(oldSize,offset+length)`; if `length=0`, its size is unchanged.
 - `TRUNCATE x size`: set the logical size to exactly `size`, either growing or shrinking it.
 - `UNLINK x`: delete the file and release all of its bytes and one inode.
 
-Every operation is a transaction. If it fails, existence, size, usage, and peak usage must all remain unchanged. Determine errors in this order:
+Every operation is one transaction. If it fails, existence, size, usage, and peak usage must all remain unchanged. To ensure that the same operation always produces the same error, determine results in this order:
 
 - `CREATE`: return `EXISTS` first if the file exists; otherwise return `INODES` if the inode limit would be exceeded.
 - `WRITE`/`TRUNCATE`: return `NOENT` first if the file does not exist; otherwise return `BYTES` if the byte limit would be exceeded.
@@ -17,7 +17,7 @@ Every operation is a transaction. If it fails, existence, size, usage, and peak 
 
 Output `OK` on success and `ERR code` on failure. Any `BYTES` or `INODES` error sets the sticky quota-failure bit to `1`; it is never cleared. `EXISTS` and `NOENT` do not affect it.
 
-After all operations, output current usage, peak usage over all successfully committed states, and the sticky bit.
+After all operations, output current usage, peak usage among all successfully committed states during execution, and the sticky bit.
 
 ## Input
 

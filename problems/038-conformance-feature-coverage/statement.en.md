@@ -1,8 +1,12 @@
 # Best-Value Conformance Suite
 
-A runtime has `F` features to validate, numbered `1..F`. Candidate test `i` has execution cost `cost_i` and covers a set of features. A feature is validated if at least one selected test covers it.
+While designing a runtime conformance suite for a WASM OJ, we accumulated many candidate tests but could not run all of them before every release. Tests have different instruction costs, and one test may validate several runtime features at once. If multiple tests validate the same feature, that feature still counts as only one covered feature.
 
-Choose any subset of tests with total cost at most budget `B`, maximizing the number of distinct covered features. A test cannot be selected more than once, and the empty subset is valid. Output only the maximum coverage count. Covering a feature repeatedly gives no additional benefit.
+Under a limited execution budget, we therefore want to choose the most useful collection of tests so that as many distinct features as possible are actually validated before release.
+
+The runtime has `F` features to validate, numbered `1..F`. Candidate test `i` has execution cost `cost_i` and covers a set of features. A feature is validated if at least one selected test covers it.
+
+Choose any subset of tests with total cost at most budget `B`, maximizing the number of distinct covered features. A test cannot be selected more than once, and the empty subset is valid. Covering a feature repeatedly gives no additional benefit. Output only the maximum coverage count, not the subset.
 
 ## Input
 

@@ -1,8 +1,12 @@
 # Exact Dependency Cache
 
-The compiler records exactly which headers each translation unit (TU) actually read. In a round, a TU is a cache miss if the changed set contains at least one header it read; otherwise it is a hit. Every miss has been rebuilt by the end of that round, so the next round starts again from a clean baseline.
+The in-browser compilation cache of a WASM OJ must avoid recompiling every translation unit (TU) whenever one header changes. That conservative policy is safe, but it wastes substantial instruction cost and turns a small source edit into a full rebuild.
 
-Given fixed exact dependencies and several rounds of changed-header sets, output the number of cache-miss TUs in each round.
+Instead, the compiler records exactly which headers each TU actually read during compilation. A TU is a cache miss in a round only if the changed set contains at least one of those headers. If the changed set and its exact dependencies are disjoint, the existing compilation result remains a hit.
+
+To evaluate a series of independent editing scenarios, assume that every miss has finished rebuilding by the end of its round. The next round therefore starts again from a clean baseline rather than inheriting changes from earlier rounds.
+
+Given the fixed TU-to-header dependencies and several changed-header sets, output how many TUs are cache misses in each round.
 
 ## Input
 

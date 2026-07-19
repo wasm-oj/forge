@@ -1,8 +1,12 @@
 # Progressive Cost Budget
 
-A workflow contains `N` stages in order. Stage `i` costs `cost_i` instruction-cost points. Stages cannot be skipped: completing stage `k` requires completing all preceding stages first.
+While designing a WASM OJ, we needed to limit how much computation a user program could consume. Relying only on wall-clock time was not ideal: the same program can produce very different timings across browsers, devices, and system loads. We therefore record instruction cost during WebAssembly execution, making resource limits more stable and reproducible.
 
-You are given `Q` progressively relaxed budgets `budget_1, budget_2, ..., budget_Q`, guaranteed to be nondecreasing. Each budget independently evaluates the same workflow. For every budget, output the greatest number of consecutive stages from the beginning that can be completed. In other words, find the largest `k` such that:
+A complete judging workflow is divided into `N` stages that run in order. Stage `i` costs `cost_i` instruction-cost points. Later stages depend on earlier results, so intermediate stages cannot be skipped: completing stage `k` requires completing the preceding `k-1` stages first.
+
+Before choosing the cost limit used in production, we prepare `Q` progressively relaxed candidate budgets `budget_1, budget_2, ..., budget_Q`, guaranteed to be nondecreasing. Each budget starts from the first stage and independently evaluates the same workflow.
+
+For every `budget_j`, output the greatest number of consecutive stages from the beginning that can be completed. In other words, find the largest `k` such that:
 
 ```text
 cost_1 + cost_2 + ... + cost_k <= budget_j

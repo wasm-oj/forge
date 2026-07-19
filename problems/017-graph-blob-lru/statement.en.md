@@ -1,6 +1,8 @@
 # Graph Blob LRU
 
-Several build-graph nodes may reference the same output digest; the cache pays for that blob only once. When capacity is insufficient, blobs are evicted in LRU order, immediately invalidating every node that references the evicted digest.
+Different nodes in a build graph may produce identical output, creating duplicate data that a WASM OJ build cache must handle. Storing a separate copy for every node would quickly waste storage on the same content, so the cache identifies blobs by digest. Several nodes may share one blob, whose size is charged only once.
+
+Sharing introduces another requirement: when a blob is evicted, every node that references that digest must become invalid immediately. When capacity is insufficient, eviction therefore operates on whole blobs in LRU order rather than removing individual node references.
 
 There are `N` nodes and `D` digests. Process these operations:
 

@@ -1,17 +1,19 @@
 # 全有或全無的輸出蒐集
 
-stdout 與 stderr 已共同使用 `U` bytes。Judge 接著要蒐集 `N` 個輸出檔，檔案必須按 path 的 UTF-8 byte lexicographic order 處理。所有 path 只含 ASCII，所以等同一般逐 byte 字典序；較短且是另一字串 prefix 時，較短者在前。
+WASM OJ 在程式結束後會蒐集輸出檔，但蒐集期間檔案的 metadata 與實際內容可能已不一致。若先依 metadata 通過配額檢查，讀取時卻得到不同長度，就會產生 TOCTOU 問題。此外，輸出檔還必須與先前的 stdout、stderr 共用同一份 byte budget。
 
-每個檔案記錄 `path metadataLength actualLength`。蒐集一個檔案時，先比較兩種長度：不相同代表 metadata 與實際讀取間發生 TOCTOU mismatch；相同時才嘗試把 `metadataLength` 加入共用 byte budget。
+為了讓結果不受檔案列舉順序影響，`N` 個輸出檔必須按 path 的 UTF-8 byte lexicographic order 處理。所有 path 只含 ASCII，所以等同一般逐 byte 字典序；若較短字串是另一字串的 prefix，較短者在前。stdout 與 stderr 已共同使用 `U` bytes。
 
-每個 budget 查詢都從「尚未蒐集任何檔案、但已使用 U bytes」的狀態獨立開始，並依 canonical 順序處理：
+每個檔案記錄 `path metadataLength actualLength`。處理一個檔案時，必須先比較兩種長度：不相同代表 metadata 與實際讀取之間發生 TOCTOU mismatch；只有相同時，才嘗試把 `metadataLength` 加入共用 byte budget。
+
+每個 budget 查詢都從「尚未蒐集任何檔案、但已使用 `U` bytes」的狀態獨立開始，並依 canonical 順序處理：
 
 1. 若一開始 `U>budget`，立即 quota failure，尚未接觸任何 path。
 2. 對目前檔案，先檢查 mismatch；若 mismatch，立即失敗。
 3. 否則若加入該檔會使總量超過 budget，在該 path quota failure。
 4. 否則完整加入並繼續。
 
-蒐集是 all-or-nothing：任何失敗都不回傳部分檔案。budget 查詢依輸入保證非遞減。
+蒐集採 all-or-nothing 語意：任何失敗都不回傳部分檔案。輸入保證 budget 查詢非遞減。
 
 ## 輸入
 

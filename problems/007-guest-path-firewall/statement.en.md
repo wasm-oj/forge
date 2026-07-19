@@ -1,6 +1,8 @@
 # Guest Path Firewall
 
-You receive `N` untrusted absolute guest paths. Normalize each path lexically from left to right using POSIX-like rules:
+A WASM OJ lets submitted programs access an isolated guest file system, but paths supplied by those programs cannot be passed directly to the host. Repeated separators, `.`, and `..` can make different-looking strings refer to the same place or even attempt to cross the guest root. To obtain a consistent result before any real file access, we first perform purely lexical normalization.
+
+You receive `N` untrusted absolute guest paths. Process the segments of each path from left to right using these POSIX-like rules:
 
 - Ignore empty segments, which arise from repeated `/` or the leading or trailing `/`.
 - Ignore a segment equal to `.`.
@@ -9,6 +11,8 @@ You receive `N` untrusted absolute guest paths. Normalize each path lexically fr
 - Every other segment, including `...`, is ordinary. Case is not converted.
 
 For a valid path, output its unique canonical absolute form: use a single `/` between segments, contain neither `.` nor `..` segments, and have no trailing slash. If there are no ordinary segments, output `/`.
+
+The result is determined entirely by the input string; the host file system is neither needed nor consulted.
 
 ## Input
 

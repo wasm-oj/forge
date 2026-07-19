@@ -1,17 +1,21 @@
 # Non-Blocking Logical Clock
 
-A deterministic runtime has a logical clock initially equal to `0` and cannot actually wait. Process `N` commands in order:
+While designing a deterministic runtime for a WASM OJ, polling cannot depend on how much time passes on the host. If the same program observed different timer behavior because of machine speed or system load, judging would not be reproducible. We therefore use a logical clock and, when no event is immediately ready, advance it directly to the next deadline.
+
+The logical clock is initially `0`. The system never waits in real time and instead processes `N` commands in order:
 
 - `T id deadline`: add a timer with an absolute deadline. Each `id` is added only once in the entire input.
 - `C id`: cancel a timer that is currently active.
 - `P ready`: perform one poll; `ready` is the current number of ready file-descriptor events.
 
-The poll rules are:
+Every poll must follow these rules:
 
 1. If `ready>0`, the clock does not advance.
 2. If `ready=0`, no active timer has deadline at most the current clock, and at least one active timer exists, immediately fast-forward the clock to the minimum active deadline.
 3. Then fire and remove every active timer with `deadline≤clock`.
 4. If `ready=0` and there is no active timer, the clock is unchanged. The clock never moves backward.
+
+Simulate this policy so that timer firing depends only on the commands and the logical clock, never on any real waiting time.
 
 ## Input
 

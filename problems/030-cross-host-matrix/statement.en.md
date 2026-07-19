@@ -1,14 +1,16 @@
 # Cross-Host Consistency Matrix
 
-The first host is the baseline. Every host records an **ordered** sequence of cases. Each case has an ID, a runtime, and transcript fields whose dotted paths are strictly increasing. Runtime is not part of the deterministic transcript.
+The same WASM OJ calibration cases must produce an identical deterministic transcript on every host, or their measurements cannot be compared directly. Runtime may vary between devices and is used only for performance aggregation. Case order, field presence, and field values must match the baseline environment.
 
-For each non-baseline host, in input order:
+The first host in the input is the baseline. Every host records an **ordered** sequence of cases. Each case has an ID, a runtime, and transcript fields whose dotted paths are strictly increasing. Runtime is not part of the deterministic transcript.
+
+For each non-baseline host, in input order, perform the following comparison:
 
 1. If its case-ID sequence, including its length, is not identical to the baseline sequence, output `HOST name CASE_ORDER` and do not compare fields for that host.
 2. Otherwise, find every dotted path that differs in each corresponding case. A path differs if it occurs on only one side or if its values differ. Report differences in baseline case order and then ASCII lexicographic path order.
 3. If there are no differences, output `HOST name OK`. Otherwise output `HOST name k p1 ... pk`, writing each path as `caseId.fieldPath`.
 
-If every non-baseline host is `OK`, also output the lower median runtime for every baseline case. Sort all `H` runtimes and choose index `floor((H - 1) / 2)`, then output `MEDIAN caseId value`. If any host is inconsistent, output no median lines.
+Only when every non-baseline host is `OK` can the performance data be treated as measurements of the same deterministic work. Then output the lower median runtime for every baseline case: sort all `H` runtimes, choose index `floor((H - 1) / 2)`, and output `MEDIAN caseId value`. If any host is inconsistent, output no median lines.
 
 ## Input
 

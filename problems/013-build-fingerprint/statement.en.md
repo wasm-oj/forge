@@ -1,8 +1,12 @@
 # Build Fingerprint
 
-A real build digest hashes a canonical preimage. This problem does not ask you to implement SHA-256; instead, output a token representation of that canonical preimage.
+In a WASM OJ, identical source code and compilation settings should hit the same build cache, while any input that can change the artifact must produce a different identity. If a fingerprint depended on file-enumeration order, the same project could be compiled repeatedly merely because its inputs arrived in another order. We therefore need a unique canonical preimage.
 
-A project has `N` files, each with a unique path and a precomputed digest. Every build specifies a compiler, target, optimization level, dependency digest, and an arbitrarily ordered set of file indices. The canonical representation preserves the input order of the four metadata fields and orders the files by ASCII lexicographic path order.
+A real build digest hashes this canonical preimage. This problem does not ask you to implement SHA-256 or make the hash function itself an obstacle. Instead, output a token representation of the canonical preimage.
+
+A project has `N` files, each with a unique path and a precomputed digest. Every build specifies a compiler, target, optimization level, dependency digest, and an arbitrarily ordered set of file indices.
+
+The canonical representation preserves the input order of those four metadata fields and orders the file portion by ASCII lexicographic path order. Produce the unique token sequence that would be supplied to the later hashing step.
 
 ## Input
 

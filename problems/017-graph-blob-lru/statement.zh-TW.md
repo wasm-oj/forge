@@ -1,6 +1,8 @@
 # Graph Blob LRU
 
-Build graph 的多個節點可引用相同 output digest；cache 只為該 blob 付一次空間。容量不足時按 blob 的 LRU 淘汰，並立即讓所有引用該 digest 的節點失效。
+Build graph 中不同節點可能產生完全相同的 output，這是我們替 WASM OJ 設計 build cache 時必須處理的重複資料。若每個節點都各存一份，儲存空間會被相同內容快速耗盡；因此 cache 以 digest 識別 blob，多個節點可以共享同一份資料，容量也只計算一次。
+
+共享帶來另一個問題：當一個 blob 被淘汰時，所有引用該 digest 的節點都必須立刻失效。cache 容量不足時，以 blob 為單位按照 LRU 順序淘汰，而不是個別移除節點引用。
 
 有 `N` 個節點、`D` 個 digest。操作：
 

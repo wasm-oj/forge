@@ -1,10 +1,12 @@
 # Mounted Directory-Tree Baseline
 
-Before the judge starts, it mounts `M` read-only input files and pre-creates `O` zero-length output files. To avoid string-parsing details, a canonical absolute path is represented by positive integer segments: `k s1 ... sk` denotes `/s1/.../sk`. The last segment is the filename, and all preceding segments are parent directories.
+Before each isolated WASM OJ execution starts, the system mounts test inputs and creates the output files that the problem permits. These initialization resources already occupy VFS quota before the submitted program begins, so they must not be mistaken for usage added during execution. We need to establish a reproducible mount baseline first.
 
-Every required parent directory is created automatically and counted only once. The guest root `/` always exists and consumes one inode. Every file also consumes one inode. Baseline bytes include only the logical sizes of read-only input files; pre-created output files have size zero.
+The environment mounts `M` read-only input files and pre-creates `O` zero-length output files. To keep the task focused on directory-tree resource accounting, a canonical absolute path is represented by positive integer segments: `k s1 ... sk` denotes `/s1/.../sk`. The last segment is the filename, and all preceding segments are parent directories.
 
-The system will seal this baseline under byte quota `B` and inode quota `I`. Compute the baseline and determine whether it can be sealed.
+During mounting, every required parent directory is created automatically, but the same directory is counted only once no matter how many files share it. The guest root `/` always exists and consumes one inode, and every file consumes one inode of its own. Baseline bytes include only the logical sizes of read-only input files; pre-created output files have size zero.
+
+The system will seal this baseline under byte quota `B` and inode quota `I`. Compute its byte and inode usage and determine whether it can be sealed under both quotas.
 
 ## Input
 

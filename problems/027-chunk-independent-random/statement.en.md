@@ -1,6 +1,10 @@
 # Chunk-Independent Deterministic Randomness
 
-The first `S` bytes of the conceptual random sequence come from the startup stream. After that, the user stream begins at offset 0. The `Q` calls to `random_get` consume `k_i` bytes in order. For each call, output the first and last byte of its chunk without generating the potentially enormous contents between them.
+If `random_get` uses the host's random source directly, the same WASM OJ submission may be impossible to replay deterministically. Its result also cannot depend on how the runtime divides reads into chunks: regardless of the requested length, every global position must have one value that can be computed directly.
+
+The system divides the conceptual random sequence into two parts. Its first `S` bytes come from the startup stream. After that, the user stream begins at its own offset 0. The `Q` calls to `random_get` consume `k_i` bytes in order, with each call beginning where the previous one ended.
+
+To verify the endpoints after chunking, output the first and last byte returned by every call. A chunk may be enormous, so the bytes between those endpoints do not need to be generated.
 
 For a stream with seed `s`, the byte at offset `x` is defined as follows, with all arithmetic reduced modulo `2^64` after each operation:
 

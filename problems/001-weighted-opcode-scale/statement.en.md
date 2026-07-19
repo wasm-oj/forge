@@ -1,8 +1,12 @@
 # Weighted Opcode Scale
 
-WASM Judge limits program execution using "cost points." Opcodes are represented by integer IDs from `1` through `K`. Exactly `W` IDs have explicitly specified weights; every unlisted ID has the conservative weight `1000`.
+While designing compute limits for a WASM OJ, we cannot merely count how many instructions a program executes. Different WebAssembly opcodes do different amounts of work; treating them all as equally expensive would place the same unreasonable limit on simple operations and costly ones. We therefore assign weights to opcodes that have been characterized and use a conservative cost for opcodes that have not yet been calibrated individually.
 
-An execution trace has been compressed into `R` runs. Each run contains an opcode ID and the number of consecutive occurrences. For every independent budget query, execution restarts at the beginning of the trace, and only complete instructions may be executed. Output the maximum number of instructions that can be completed and their actual total cost.
+Opcodes are represented by integer IDs from `1` through `K`. Exactly `W` IDs have explicitly specified weights, and every unlisted ID has weight `1000`. Because an execution trace can be long, the measured trace has already compressed consecutive occurrences of the same opcode into `R` runs. Each run records an opcode ID and its consecutive occurrence count.
+
+When tuning the cost budget, we evaluate the same trace under several candidate budgets. Every query is independent: execution restarts at the beginning of the trace, and an instruction may only be executed in full. It is not possible to pay part of its cost and leave a partially completed instruction.
+
+For each budget, output the maximum number of instructions that can be completed in order and the actual total cost of those completed instructions.
 
 ## Input
 

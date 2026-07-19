@@ -1,8 +1,12 @@
 # Calibration Experiment Scheduling
 
-There are `G` calibration profiles. Profile `g` offers `K_g` mutually exclusive measurement plans, each with an execution time and a confidence value. At most one plan may be chosen from a profile, and a profile may be skipped entirely. Choices from different profiles do not exclude one another.
+While designing instruction-cost calibration for a WASM OJ, we needed to measure different language and toolchain profiles regularly. For one profile, we might run a fast plan that provides limited evidence or spend more time on a broader benchmark. These plans are alternative ways to perform the same calibration, so they cannot both be selected for one profile.
 
-Maximize total confidence subject to total time at most `C`. Plans are indivisible and cannot be repeated. Output only the maximum value. The empty schedule is valid.
+Calibration time before a release is limited. We may skip some profiles and choose different measurement depths for others. Choices for different profiles do not exclude one another, but all experiments share the same total time limit.
+
+There are `G` calibration profiles. Profile `g` offers `K_g` mutually exclusive measurement plans, each with an execution time and a confidence value. At most one plan may be chosen from a profile, and a profile may be skipped entirely.
+
+Maximize total confidence subject to total time at most `C`. Plans are indivisible and cannot be repeated. The empty schedule is valid. Output only the maximum value.
 
 ## Input
 

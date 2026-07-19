@@ -1,6 +1,8 @@
 # Judge Ledger Range Queries
 
-Each case records `verdict cost time memory vfs` in sequence. Verdict is encoded as an integer: `0=AC, 1=WA, 2=RE, 3=TLE`. A metric that is unavailable is represented by `-1`.
+The final verdict of an entire submission does not contain every useful diagnostic, so a WASM OJ results interface must also let users inspect an execution summary for a selected range of test cases. One view may process the complete range, while another stops at the first failing case, so the cases included in their aggregates are different.
+
+Each case records `verdict cost time memory vfs` in sequence. Verdict is encoded as an integer: `0=AC, 1=WA, 2=RE, 3=TLE`. An unavailable metric is represented by `-1`. Answer several interval queries that reproduce the summary shown under each fail-fast setting.
 
 Each query `l r f` aggregates the 1-indexed closed interval `[l,r]`:
 

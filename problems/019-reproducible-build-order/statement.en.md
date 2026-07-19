@@ -1,6 +1,10 @@
 # Reproducible Package Build Order
 
-An offline toolchain must build packages according to a dependency graph. To make builds reproducible across hosts, whenever several packages have all their dependencies completed, the package with the ASCII-lexicographically smallest name must be chosen.
+An offline WASM OJ toolchain must build its packages according to a dependency graph. The same graph often permits several valid orders. If each host chooses an arbitrary package whenever there is a choice, the resulting artifacts and build logs may no longer be reproducible byte for byte.
+
+We therefore use a deterministic rule: whenever several packages have all their dependencies completed, choose the package with the ASCII-lexicographically smallest name. If package `a` depends on package `b`, then `b` must be built before `a`.
+
+The lockfile itself may also be corrupt. A dependency edge is dangling if either endpoint is absent from the known package list. If every endpoint is valid but not all packages can be completed, the graph contains a cycle. Validate the data using the specified error priority, or produce the unique build order.
 
 ## Input
 

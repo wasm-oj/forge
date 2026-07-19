@@ -1,13 +1,15 @@
 # Mount-Tree Conflict Detection
 
-The judge mounts a sequence of directories (`D`) and regular files (`F`) into one virtual file tree. Either condition below makes a pair conflict:
+When a WASM OJ constructs an isolated file system, it mounts inputs, tools, and working directories into one virtual file tree. Mount settings may come from different parts of the configuration. If two records occupy the same path, or if a regular file is placed at an ancestor of another item, the resulting tree has no valid interpretation.
+
+The system receives a sequence of directory (`D`) and regular-file (`F`) records. Either condition below makes a pair conflict:
 
 1. The two records have exactly the same path, regardless of their kinds.
 2. One record is a regular file whose path is a **strict ancestor** of the other record's path.
 
-For example, `/a` is an ancestor of `/a/b`, but not of `/ab`. The root path `/` is an ancestor of every other path.
+Ancestry is determined by complete path segments. For example, `/a` is an ancestor of `/a/b`, but not of `/ab`. The root path `/` is an ancestor of every other path.
 
-Find the earliest conflict in input order. For conflicting record indices `i < j`, minimize `j` first, then minimize `i` among ties. If no conflict exists, output `VALID`.
+Configuration validation must report the earliest conflict that can be established in input order. For conflicting record indices `i < j`, minimize `j` first, then minimize `i` among ties. If no conflict exists, output `VALID`.
 
 ## Input
 

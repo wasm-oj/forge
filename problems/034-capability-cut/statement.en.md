@@ -1,8 +1,12 @@
 # Cutting Dangerous Capabilities
 
-A function call graph is directed. If any dangerous function is reachable from any public entry function, the sandbox may reach a network, thread, or process capability.
+While designing the capability sandbox for a WASM OJ, checking only which APIs a module imports directly was not enough. A public entry function may pass through several helper calls before reaching a function that can create a network connection, thread, or process. If any such call path exists, the user program may still reach a forbidden capability.
 
-You may block function `i` at cost `cost[i]`. Blocking removes the function and every incident call edge. Entry functions and dangerous functions may also be blocked. Find the minimum total cost that eliminates every path from every entry to every dangerous function.
+We can block selected functions while loading the module, but functions have different blocking costs: some are easy to replace, while disabling others also removes substantial legitimate behavior. The goal is therefore not to block the most functions, but to cut every dangerous path at minimum total cost.
+
+Represent the function call relation as a directed graph. A dangerous path exists if any dangerous function is reachable from any public entry function along call edges. Blocking function `i` costs `cost[i]` and removes that function together with every incident call edge. Public entry functions and dangerous functions themselves may also be blocked.
+
+Find the minimum total cost required to eliminate every path from every entry function to every dangerous function.
 
 ## Input
 

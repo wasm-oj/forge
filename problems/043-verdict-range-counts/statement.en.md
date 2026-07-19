@@ -1,8 +1,10 @@
 # Verdict Range Counts
 
-A contest stores `N` case verdicts by index. Every character is `A` (Accepted), `W` (Wrong Answer), `R` (Runtime Error), or `T` (Time Limit).
+While designing the verdict-analysis interface for a WASM OJ, we wanted users to inspect the failure distribution within any consecutive group of tests quickly. For example, they may want to count Runtime Errors only in the stress-test section or compare the number of Wrong Answers between two groups of cases.
 
-Answer `Q` static range queries. A query `L R V` asks how many times verdict `V` occurs in the closed interval `[L, R]`. Indices are one-based, and the record never changes between queries.
+One submission has already recorded `N` verdicts by case index. Each verdict is represented by one character: `A` for Accepted, `W` for Wrong Answer, `R` for Runtime Error, or `T` for Time Limit. This record does not change while it is being analyzed.
+
+Answer `Q` static range queries. A query `L R V` asks how many times verdict `V` occurs in the closed interval `[L, R]`. All indices are one-based.
 
 ## Input
 

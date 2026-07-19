@@ -1,8 +1,12 @@
 # 空程式基線校正
 
-Judge 對 `P` 個編譯 profile 測量空程式成本。每個 profile 預期恰有 seed `1..S` 的 `S` 筆觀測；只有所有 seed 都有觀測，且這些成本完全相同，該 profile 才能發布 baseline。
+在 WASM OJ 裡量測 instruction cost 時，編譯器與執行環境本身也會產生固定開銷。若直接把這些開銷算進使用者程式的成本，不同編譯 profile 之間便無法公平比較。因此，我們先執行空程式，替每個 profile 建立可扣除的 baseline。
 
-輸入只會讓同一組 `(profile, seed)` 出現至多一次，但觀測順序任意。對每個 raw cost 查詢：若 profile 沒有可發布的 baseline，輸出 `INVALID`；否則輸出 baseline 與扣除基線後的 net cost。net cost 不得為負，因此定義為 `max(0, raw-baseline)`。
+一個 baseline 只有在量測完整而且可重現時才能發布。系統對 `P` 個編譯 profile 進行觀測；每個 profile 預期恰有 seed `1..S` 的 `S` 筆結果。只有所有 seed 都有觀測，而且觀測到的成本完全相同，該 profile 才具有可發布的 baseline。
+
+量測結果可能以任意順序抵達，但同一組 `(profile, seed)` 在輸入中至多出現一次。之後的每筆查詢會提供一個 profile 與 raw cost，用來計算扣除環境基線後的使用者程式成本。
+
+若該 profile 沒有可發布的 baseline，輸出 `INVALID`；否則輸出 baseline 與 net cost。net cost 不得為負，因此定義為 `max(0, raw-baseline)`。
 
 ## 輸入
 

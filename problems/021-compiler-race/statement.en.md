@@ -1,6 +1,8 @@
 # Compiler Job Generation Race
 
-The browser compiler coalesces jobs with the same key. One `S` (supersede) event cancels all background jobs alive in the current generation. Events are already ordered by when they actually occurred, so there are no undefined thread interleavings.
+Automatic checks, manual runs, and interface updates may trigger several in-browser compilation jobs for the same WASM OJ source in quick succession. Creating another compilation when identical input is already being processed wastes instruction cost and can allow an older result to overwrite newer state.
+
+The coordinator therefore coalesces live jobs with the same key and uses generations to distinguish background requests for different versions. When new state supersedes old state, an `S` event cancels every background job still alive in the current generation. Foreground jobs remain alive until they complete successfully. Events are already ordered by when they actually occurred, so there are no undefined thread interleavings.
 
 Job IDs start at 1 and increase only when a job is created. The current generation starts at 0. Process these events:
 
