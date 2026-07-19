@@ -1,52 +1,72 @@
-# Problem catalog
+# Problem collection loading
 
-Forge carries the complete 45-problem systems track at the repository root.
-`catalog.json` is the only discovery entry point; consumers must follow each
-manifest path and then resolve every declared content path relative to that
-manifest. Directory listing and filename guessing are not part of the contract.
+Forge's default problem collection is the public
+[`wasm-oj/problems`](https://github.com/wasm-oj/problems) repository. The browser never lists
+repository directories or guesses statement, editorial, solution, or test paths.
 
-The catalog uses `wasm-oj-catalog-v2` and names `wasm-oj-problem-v3`. Its
-localization block declares `zh-TW` as the default and the ordered locale set
-`["zh-TW", "en"]`. Every problem provides both locales for its title,
-statement, editorial, scoring-policy titles, and complexity-path names. Missing
-locales fail validation; consumers must not silently substitute another locale.
+## Source configuration
 
-The browser does not maintain a second handwritten problem list.
-`scripts/generate-judge-problems.mjs` resolves the catalog, reads the explicitly
-declared localized documents and test pairs, validates the manifest identities,
-and writes two committed projections: `src/judge/problems.generated.ts` for the
-typed library/test surface and `public/problems/catalog.json` for the browser.
-The browser fetches that exact same-origin static asset, validates its schema,
-count, ordering, and identities, and has no runtime filesystem discovery or
-fallback path. Keeping the large case payload out of the server Worker preserves
-the deployment provider's code-size boundary. `pnpm problems:verify`
-reconstructs both projections byte-for-byte and fails when either is stale.
+The user-selectable source has exactly four GitHub fields:
 
-Instruction policies are evidence-derived. For each language, Forge first takes
-the maximum net weighted cost over the complete manifest case set. The optimal
-tier averages the C, C++, Rust, and Go maxima and adds 5%; the efficient tier
-uses the maximum of those four plus 5%; and the baseline tier uses the maximum
-of all seven reference languages plus 5%. Every result is rounded upward by the
-documented decimal quantum. `pnpm problems:verify` recomputes this derivation
-from the content-bound calibration evidence before accepting the catalog.
+```json
+{
+  "owner": "wasm-oj",
+  "repository": "problems",
+  "ref": "main",
+  "indexPath": "collection/index.json"
+}
+```
 
-Every judge case is executed once under the first, broadest resource policy.
-After output matching, Forge evaluates the same normalized cost, peak linear
-memory, and optional logical-time metrics against every cumulative policy. The
-incremental policy points are summed per case and averaged over the complete
-manifest case set. Artifact language and exact cost-profile identity must match
-the manifest calibration before judging begins.
+Forge validates every value before constructing a `raw.githubusercontent.com` URL. Repository
+paths must be normalized relative POSIX paths and cannot contain absolute paths, empty segments,
+backslashes, `.` or `..`. Settings are scoped to the current browser. Project drafts and solved
+progress combine the normalized source key with each problem bundle digest. Unchanged problems
+keep their state across index updates; a changed problem is isolated automatically even when its
+slug stays the same.
 
-Each completed case retains its exact net, raw, and baseline instruction cost,
-peak linear memory, optional logical time, and the result of every individual
-policy check. The result panel exposes those values, the remaining distance to
-the next cumulative policy, a logarithmic instruction-cost threshold axis, and
-a linear memory threshold axis.
+## Lazy loading and integrity
 
-The original handwritten 20-problem catalog and its single fixed instruction
-budget were removed. There is no compatibility reader or fallback fixture path.
+The `wasm-oj-browser-collection-v2` index is capped at 512 KiB and contains localized list
+metadata plus one bundle descriptor per problem. Forge renders the challenge list after loading
+the index and initially downloads only the first problem. Selecting another problem fetches its
+`wasm-oj-browser-problem-v2` bundle on demand.
 
-The five introductory additions have a separate
-[independent blind-review record](problem-bank/independent-041-045.md) covering
-statement-only derivation, brute-force cross-checks, seven-language execution,
-validator/oracle/generator audits, asymptotic optimality, and cost-policy hashes.
+Every descriptor declares the exact byte length and lowercase SHA-256 digest. Forge enforces a
+32 MiB per-problem ceiling while streaming the response, verifies the digest over the original
+bytes before UTF-8 decoding or JSON parsing, then validates:
+
+- bundle/index identity, order, title, difficulty, tags, and case count;
+- both supported locales for titles, statements, editorials, policy names, and complexities;
+- unique test identities and supported case kinds;
+- exact calibration languages and method;
+- the ordered baseline, efficient, and optimal cumulative policies;
+- positive safe-integer resource limits and broad-to-strict monotonicity; and
+- the accepted optimal complexity path.
+
+Any HTTP, size, digest, UTF-8, JSON, schema, or identity failure is reported as a collection
+configuration error. Forge does not silently switch repositories or use a bundled catalog.
+
+## Cache behavior
+
+Verified bundles are stored in the browser Cache API by SHA-256, not request URL or branch name.
+Cached bytes are re-hashed before reuse, so unchanged problems survive index revisions safely.
+The index is requested again on startup. If and only if the network itself is unavailable, Forge
+may load the previously validated index for the exact same source key and labels it `verified
+cache` in the interface. HTTP and validation failures never fall back to cached configuration.
+
+The canonical source repository defines generation and publication of the split collection.
+Forge keeps `src/judge/problems.generated.ts` solely as a typed test fixture regenerated from its
+development mirror; no problem payload is emitted as a Sites static asset or included in the
+server Worker.
+
+## Scoring
+
+Instruction policies remain evidence-derived. For each language, Forge takes the maximum net
+weighted cost over the complete manifest case set. The optimal tier averages the C, C++, Rust,
+and Go maxima and adds 5%; efficient uses the maximum of those four plus 5%; baseline uses the
+maximum of all seven reference languages plus 5%. Results are rounded upward by the documented
+decimal quantum.
+
+Each judge case runs once under the broadest hard limits. Forge then evaluates the same normalized
+cost, peak linear memory, and optional logical time against each cumulative policy. Artifact
+language and exact cost-profile identity must match the problem calibration before judging begins.

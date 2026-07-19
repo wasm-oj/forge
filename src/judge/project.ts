@@ -107,16 +107,36 @@ export function judgeStarterSource(problem: JudgeProblem, language: BuiltinLangu
   }
 }
 
-export function judgeProjectId(problemId: string, language: BuiltinLanguage): string {
-  return `judge:${problemId}:${language}`;
+export interface JudgeProjectIdentity {
+  readonly problemId: string;
+  readonly bundleSha256: string;
 }
 
-export function problemIdFromProject(project: Project): string | undefined {
-  const match = /^judge:([^:]+):(?:c|cpp|rust|python|javascript|typescript|go)$/.exec(project.id);
-  return match?.[1];
+export function judgeProjectId(collectionKey: string, bundleSha256: string, problemId: string, language: BuiltinLanguage): string {
+  return `judge:${encodeURIComponent(collectionKey)}:${bundleSha256}:${problemId}:${language}`;
 }
 
-export function createJudgeProject(problem: JudgeProblem, language: BuiltinLanguage): Project {
+export function problemIdentityFromProject(project: Project, collectionKey: string): JudgeProjectIdentity | undefined {
+  const prefix = `judge:${encodeURIComponent(collectionKey)}:`;
+  if (!project.id.startsWith(prefix)) return undefined;
+  const match = /^([0-9a-f]{64}):([^:]+):(?:c|cpp|rust|python|javascript|typescript|go)$/.exec(project.id.slice(prefix.length));
+  return match ? { bundleSha256: match[1], problemId: match[2] } : undefined;
+}
+
+export function latestJudgeProjectForCollection(
+  projects: readonly Project[],
+  collectionKey: string,
+  currentProblemDigests: ReadonlyMap<string, string>,
+): Project | undefined {
+  return projects
+    .filter((project) => {
+      const identity = problemIdentityFromProject(project, collectionKey);
+      return identity !== undefined && currentProblemDigests.get(identity.problemId) === identity.bundleSha256;
+    })
+    .sort((left, right) => right.updatedAt - left.updatedAt)[0];
+}
+
+export function createJudgeProject(collectionKey: string, bundleSha256: string, problem: JudgeProblem, language: BuiltinLanguage): Project {
   const baseline = broadestPolicy(problem);
   const sample = sampleCases(problem)[0];
   if (!sample) throw new Error(`Problem '${problem.id}' has no sample case.`);
@@ -127,7 +147,7 @@ export function createJudgeProject(problem: JudgeProblem, language: BuiltinLangu
     content: judgeStarterSource(problem, language),
   };
   return {
-    id: judgeProjectId(problem.id, language),
+    id: judgeProjectId(collectionKey, bundleSha256, problem.id, language),
     name: `judge-${String(problem.number).padStart(2, "0")}-${problem.id}`,
     files: [file],
     activeFile: entry,
