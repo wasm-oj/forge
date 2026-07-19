@@ -89,8 +89,9 @@ normalized POSIX relative path。
   mismatch 時 fail closed。
 - `scoring.calibration.profiles` 明列七語言的 exact Forge cost profile；execution 必須帶
   submission language，且 metrics profile 必須與該語言校準值 byte-identical。
-- 每題至少兩個 cumulative policies，依 relaxed-to-strict 排列；每層至少收緊
-  instruction cost、memory 或 deterministic logical time 之一。
+- 本 catalog 固定使用依 relaxed-to-strict 排列的 `baseline`、`efficient`、`optimal`
+  三個 cumulative policies；每層至少收緊 instruction cost、memory 或 deterministic
+  logical time 之一。缺少、重複或重新排序任何 policy 都是無效 manifest。
 - `scoring.caseSet=all-manifest-tests`：所有 policies 都使用 `files.tests` 明列的完整
   case set。每個 case 在最寬鬆 hard limits 下執行一次，再以同一份正確性結果及
   metrics 判斷通過哪些 policies。

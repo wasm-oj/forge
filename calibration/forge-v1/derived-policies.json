@@ -1,9 +1,9 @@
 {
-  "schema": "wasm-oj-derived-cost-policies-v1",
-  "method": "forge-v1-reference-order-statistics-rounded-v1",
+  "schema": "wasm-oj-derived-cost-policies-v2",
+  "method": "forge-v1-compiled-average-optimal-rounded-v1",
   "sourceEvidence": "calibration/forge-v1/reference-costs.json",
   "sourceEvidenceSha256": "83ba7f0d1ab6134bd6e8a9ad714a3142d162d4ea8bdfa1681939ec45e823701c",
-  "basis": "language-worst-cost-order-statistics-over-all-manifest-tests",
+  "basis": "compiled-language-average-optimal-with-compiled-and-all-language-maximum-tiers",
   "headroom": {
     "numerator": 105,
     "denominator": 100
@@ -13,54 +13,139 @@
     "quantumFormula": "5 * 10^(decimalDigits(unroundedInstructionBudget) - 2)",
     "appliesFromDecimalDigits": 3
   },
-  "policyRanks": {
-    "baseline": 7,
-    "efficient": 2,
-    "optimal": 1
+  "policyBasis": {
+    "baseline": {
+      "aggregation": "maximum",
+      "languages": [
+        "c",
+        "cpp",
+        "rust",
+        "go",
+        "python",
+        "javascript",
+        "typescript"
+      ]
+    },
+    "efficient": {
+      "aggregation": "maximum",
+      "languages": [
+        "c",
+        "cpp",
+        "rust",
+        "go"
+      ]
+    },
+    "optimal": {
+      "aggregation": "arithmetic-mean",
+      "languages": [
+        "c",
+        "cpp",
+        "rust",
+        "go"
+      ]
+    }
   },
   "problems": [
     {
       "id": 1,
       "slug": "weighted-opcode-scale",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "python",
-          "measuredWorstCaseCost": 33754674,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "python",
+              "measuredWorstCaseCost": 33754674,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 33754674,
           "unroundedInstructionBudget": 35442408,
           "roundingQuantum": 5000000,
           "instructionBudget": 40000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 162858,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 171001,
-          "roundingQuantum": 50000,
-          "instructionBudget": 200000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1474233,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1474233,
+          "unroundedInstructionBudget": 1547945,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 65896,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 69191,
-          "roundingQuantum": 5000,
-          "instructionBudget": 70000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 65896,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 1142329,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 162858,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1474233,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2845316",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 746896,
+          "roundingQuantum": 50000,
+          "instructionBudget": 750000
         }
       },
       "instructionBudgets": {
         "baseline": 40000000,
-        "efficient": 200000,
-        "optimal": 70000
+        "efficient": 2000000,
+        "optimal": 750000
       },
       "languageMaximumCosts": [
         {
@@ -126,45 +211,103 @@
     {
       "id": 2,
       "slug": "baseline-calibration",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 9010448,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 9010448,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 9010448,
           "unroundedInstructionBudget": 9460971,
           "roundingQuantum": 500000,
           "instructionBudget": 9500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 95808,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 100599,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1767681,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1767681,
+          "unroundedInstructionBudget": 1856066,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 56678,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 59512,
-          "roundingQuantum": 5000,
-          "instructionBudget": 60000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 56678,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 1158113,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 95808,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1767681,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "3078280",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 808049,
+          "roundingQuantum": 50000,
+          "instructionBudget": 850000
         }
       },
       "instructionBudgets": {
         "baseline": 9500000,
-        "efficient": 150000,
-        "optimal": 60000
+        "efficient": 2000000,
+        "optimal": 850000
       },
       "languageMaximumCosts": [
         {
@@ -230,45 +373,103 @@
     {
       "id": 3,
       "slug": "memory-gate",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 9484637,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 9484637,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 9484637,
           "unroundedInstructionBudget": 9958869,
           "roundingQuantum": 500000,
           "instructionBudget": 10000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 114257,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 119970,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1666976,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1666976,
+          "unroundedInstructionBudget": 1750325,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 70550,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 74078,
-          "roundingQuantum": 5000,
-          "instructionBudget": 75000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 70550,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 973973,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 114257,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1666976,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2825756",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 741761,
+          "roundingQuantum": 50000,
+          "instructionBudget": 750000
         }
       },
       "instructionBudgets": {
         "baseline": 10000000,
-        "efficient": 150000,
-        "optimal": 75000
+        "efficient": 2000000,
+        "optimal": 750000
       },
       "languageMaximumCosts": [
         {
@@ -334,45 +535,103 @@
     {
       "id": 4,
       "slug": "shared-output-pool",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 8597999,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 8597999,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 8597999,
           "unroundedInstructionBudget": 9027899,
           "roundingQuantum": 500000,
           "instructionBudget": 9500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 145815,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 153106,
-          "roundingQuantum": 50000,
-          "instructionBudget": 200000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1386242,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1386242,
+          "unroundedInstructionBudget": 1455555,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 76576,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 80405,
-          "roundingQuantum": 5000,
-          "instructionBudget": 85000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 76576,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 890836,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 145815,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1386242,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2499469",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 656111,
+          "roundingQuantum": 50000,
+          "instructionBudget": 700000
         }
       },
       "instructionBudgets": {
         "baseline": 9500000,
-        "efficient": 200000,
-        "optimal": 85000
+        "efficient": 1500000,
+        "optimal": 700000
       },
       "languageMaximumCosts": [
         {
@@ -438,45 +697,103 @@
     {
       "id": 5,
       "slug": "transactional-vfs-quota",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 11220926,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 11220926,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 11220926,
           "unroundedInstructionBudget": 11781973,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 119075,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 125029,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 2071419,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 2071419,
+          "unroundedInstructionBudget": 2174990,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 90022,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 94524,
-          "roundingQuantum": 5000,
-          "instructionBudget": 95000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 90022,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 1139544,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 119075,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 2071419,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "3420060",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 897766,
+          "roundingQuantum": 50000,
+          "instructionBudget": 900000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 150000,
-        "optimal": 95000
+        "efficient": 2500000,
+        "optimal": 900000
       },
       "languageMaximumCosts": [
         {
@@ -542,45 +859,103 @@
     {
       "id": 6,
       "slug": "logical-poll-clock",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "python",
-          "measuredWorstCaseCost": 141895993,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "python",
+              "measuredWorstCaseCost": 141895993,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 141895993,
           "unroundedInstructionBudget": 148990793,
           "roundingQuantum": 50000000,
           "instructionBudget": 150000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 123042,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 129195,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1690803,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1690803,
+          "unroundedInstructionBudget": 1775344,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 75700,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 79485,
-          "roundingQuantum": 5000,
-          "instructionBudget": 80000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 75700,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 748697,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 123042,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1690803,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2638242",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 692539,
+          "roundingQuantum": 50000,
+          "instructionBudget": 700000
         }
       },
       "instructionBudgets": {
         "baseline": 150000000,
-        "efficient": 150000,
-        "optimal": 80000
+        "efficient": 2000000,
+        "optimal": 700000
       },
       "languageMaximumCosts": [
         {
@@ -646,45 +1021,103 @@
     {
       "id": 7,
       "slug": "guest-path-firewall",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 7873808,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 7873808,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 7873808,
           "unroundedInstructionBudget": 8267499,
           "roundingQuantum": 500000,
           "instructionBudget": 8500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 75111,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 78867,
-          "roundingQuantum": 5000,
-          "instructionBudget": 80000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1089195,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1089195,
+          "unroundedInstructionBudget": 1143655,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 30945,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 32493,
-          "roundingQuantum": 5000,
-          "instructionBudget": 35000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 30945,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 361535,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 75111,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1089195,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1556786",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 408657,
+          "roundingQuantum": 50000,
+          "instructionBudget": 450000
         }
       },
       "instructionBudgets": {
         "baseline": 8500000,
-        "efficient": 80000,
-        "optimal": 35000
+        "efficient": 1500000,
+        "optimal": 450000
       },
       "languageMaximumCosts": [
         {
@@ -750,45 +1183,103 @@
     {
       "id": 8,
       "slug": "mounted-directory-baseline",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 9800908,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 9800908,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 9800908,
           "unroundedInstructionBudget": 10290954,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 81206,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 85267,
-          "roundingQuantum": 5000,
-          "instructionBudget": 90000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1488031,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1488031,
+          "unroundedInstructionBudget": 1562433,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 48840,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 51282,
-          "roundingQuantum": 5000,
-          "instructionBudget": 55000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 48840,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 826572,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 81206,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1488031,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2444649",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 641721,
+          "roundingQuantum": 50000,
+          "instructionBudget": 650000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 90000,
-        "optimal": 55000
+        "efficient": 2000000,
+        "optimal": 650000
       },
       "languageMaximumCosts": [
         {
@@ -854,45 +1345,103 @@
     {
       "id": 9,
       "slug": "sparse-file-quota",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 9443727,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 9443727,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 9443727,
           "unroundedInstructionBudget": 9915914,
           "roundingQuantum": 500000,
           "instructionBudget": 10000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 173322,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 181989,
-          "roundingQuantum": 50000,
-          "instructionBudget": 200000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1762101,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1762101,
+          "unroundedInstructionBudget": 1850207,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 117061,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 122915,
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 117061,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 1018027,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 173322,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1762101,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "3070511",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 806010,
           "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "instructionBudget": 850000
         }
       },
       "instructionBudgets": {
         "baseline": 10000000,
-        "efficient": 200000,
-        "optimal": 150000
+        "efficient": 2000000,
+        "optimal": 850000
       },
       "languageMaximumCosts": [
         {
@@ -958,45 +1507,103 @@
     {
       "id": 10,
       "slug": "all-or-nothing-output-collection",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 8757062,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 8757062,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 8757062,
           "unroundedInstructionBudget": 9194916,
           "roundingQuantum": 500000,
           "instructionBudget": 9500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 97899,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 102794,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1245588,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1245588,
+          "unroundedInstructionBudget": 1307868,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 56276,
-          "measuredWorstCaseIds": [
-            "adversarial-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 59090,
-          "roundingQuantum": 5000,
-          "instructionBudget": 60000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 56276,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 644967,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 97899,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1245588,
+              "measuredWorstCaseIds": [
+                "adversarial-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2044730",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 536742,
+          "roundingQuantum": 50000,
+          "instructionBudget": 550000
         }
       },
       "instructionBudgets": {
         "baseline": 9500000,
-        "efficient": 150000,
-        "optimal": 60000
+        "efficient": 1500000,
+        "optimal": 550000
       },
       "languageMaximumCosts": [
         {
@@ -1062,45 +1669,103 @@
     {
       "id": 11,
       "slug": "mount-tree-conflicts",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 11666110,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 11666110,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 11666110,
           "unroundedInstructionBudget": 12249416,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 61634,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 64716,
-          "roundingQuantum": 5000,
-          "instructionBudget": 65000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 665787,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 665787,
+          "unroundedInstructionBudget": 699077,
+          "roundingQuantum": 50000,
+          "instructionBudget": 700000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 12673,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 13307,
-          "roundingQuantum": 5000,
-          "instructionBudget": 15000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 12673,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 269608,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 61634,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 665787,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1009702",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 265047,
+          "roundingQuantum": 50000,
+          "instructionBudget": 300000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 65000,
-        "optimal": 15000
+        "efficient": 700000,
+        "optimal": 300000
       },
       "languageMaximumCosts": [
         {
@@ -1166,45 +1831,103 @@
     {
       "id": 12,
       "slug": "bounded-tar-stream",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "python",
-          "measuredWorstCaseCost": 1706532690,
-          "measuredWorstCaseIds": [
-            "adversarial-bigint-metadata"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "python",
+              "measuredWorstCaseCost": 1706532690,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-metadata"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1706532690,
           "unroundedInstructionBudget": 1791859325,
           "roundingQuantum": 500000000,
           "instructionBudget": 2000000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 76153,
-          "measuredWorstCaseIds": [
-            "adversarial-bigint-metadata"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 79961,
-          "roundingQuantum": 5000,
-          "instructionBudget": 80000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1293453,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-metadata"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1293453,
+          "unroundedInstructionBudget": 1358126,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 42484,
-          "measuredWorstCaseIds": [
-            "adversarial-bigint-metadata"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 44609,
-          "roundingQuantum": 5000,
-          "instructionBudget": 45000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 42484,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-metadata"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 777937,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-metadata"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 76153,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-metadata"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1293453,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-metadata"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2190027",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 574883,
+          "roundingQuantum": 50000,
+          "instructionBudget": 600000
         }
       },
       "instructionBudgets": {
         "baseline": 2000000000,
-        "efficient": 80000,
-        "optimal": 45000
+        "efficient": 1500000,
+        "optimal": 600000
       },
       "languageMaximumCosts": [
         {
@@ -1270,45 +1993,103 @@
     {
       "id": 13,
       "slug": "build-fingerprint",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 7145009,
-          "measuredWorstCaseIds": [
-            "sample-03"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 7145009,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 7145009,
           "unroundedInstructionBudget": 7502260,
           "roundingQuantum": 500000,
           "instructionBudget": 8000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 72656,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 76289,
-          "roundingQuantum": 5000,
-          "instructionBudget": 80000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1230543,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1230543,
+          "unroundedInstructionBudget": 1292071,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 55133,
-          "measuredWorstCaseIds": [
-            "sample-03"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 57890,
-          "roundingQuantum": 5000,
-          "instructionBudget": 60000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 55133,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 471377,
+              "measuredWorstCaseIds": [
+                "adversarial-long-metadata"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 72656,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1230543,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1829709",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 480299,
+          "roundingQuantum": 50000,
+          "instructionBudget": 500000
         }
       },
       "instructionBudgets": {
         "baseline": 8000000,
-        "efficient": 80000,
-        "optimal": 60000
+        "efficient": 1500000,
+        "optimal": 500000
       },
       "languageMaximumCosts": [
         {
@@ -1374,45 +2155,103 @@
     {
       "id": 14,
       "slug": "runtime-bundle-encoding",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 7110142,
-          "measuredWorstCaseIds": [
-            "adversarial-punctuation-order"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 7110142,
+              "measuredWorstCaseIds": [
+                "adversarial-punctuation-order"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 7110142,
           "unroundedInstructionBudget": 7465650,
           "roundingQuantum": 500000,
           "instructionBudget": 7500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 85752,
-          "measuredWorstCaseIds": [
-            "adversarial-punctuation-order"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 90040,
-          "roundingQuantum": 5000,
-          "instructionBudget": 95000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1277462,
+              "measuredWorstCaseIds": [
+                "adversarial-punctuation-order"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1277462,
+          "unroundedInstructionBudget": 1341336,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 81318,
-          "measuredWorstCaseIds": [
-            "adversarial-punctuation-order"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 85384,
-          "roundingQuantum": 5000,
-          "instructionBudget": 90000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 81318,
+              "measuredWorstCaseIds": [
+                "adversarial-punctuation-order"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 373109,
+              "measuredWorstCaseIds": [
+                "adversarial-punctuation-order"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 85752,
+              "measuredWorstCaseIds": [
+                "adversarial-punctuation-order"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1277462,
+              "measuredWorstCaseIds": [
+                "adversarial-punctuation-order"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1817641",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 477131,
+          "roundingQuantum": 50000,
+          "instructionBudget": 500000
         }
       },
       "instructionBudgets": {
         "baseline": 7500000,
-        "efficient": 95000,
-        "optimal": 90000
+        "efficient": 1500000,
+        "optimal": 500000
       },
       "languageMaximumCosts": [
         {
@@ -1478,45 +2317,103 @@
     {
       "id": 15,
       "slug": "dirty-build-nodes",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 7053151,
-          "measuredWorstCaseIds": [
-            "adversarial-nonnumeric-dag"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 7053151,
+              "measuredWorstCaseIds": [
+                "adversarial-nonnumeric-dag"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 7053151,
           "unroundedInstructionBudget": 7405809,
           "roundingQuantum": 500000,
           "instructionBudget": 7500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 124607,
-          "measuredWorstCaseIds": [
-            "adversarial-nonnumeric-dag"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 130838,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1341257,
+              "measuredWorstCaseIds": [
+                "adversarial-nonnumeric-dag"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1341257,
+          "unroundedInstructionBudget": 1408320,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 46215,
-          "measuredWorstCaseIds": [
-            "adversarial-nonnumeric-dag"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 48526,
-          "roundingQuantum": 5000,
-          "instructionBudget": 50000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 46215,
+              "measuredWorstCaseIds": [
+                "adversarial-nonnumeric-dag"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 669888,
+              "measuredWorstCaseIds": [
+                "adversarial-nonnumeric-dag"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 124607,
+              "measuredWorstCaseIds": [
+                "adversarial-nonnumeric-dag"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1341257,
+              "measuredWorstCaseIds": [
+                "adversarial-nonnumeric-dag"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2181967",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 572767,
+          "roundingQuantum": 50000,
+          "instructionBudget": 600000
         }
       },
       "instructionBudgets": {
         "baseline": 7500000,
-        "efficient": 150000,
-        "optimal": 50000
+        "efficient": 1500000,
+        "optimal": 600000
       },
       "languageMaximumCosts": [
         {
@@ -1582,45 +2479,103 @@
     {
       "id": 16,
       "slug": "exact-dependency-cache",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 10693696,
-          "measuredWorstCaseIds": [
-            "adversarial-word-boundary"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 10693696,
+              "measuredWorstCaseIds": [
+                "adversarial-word-boundary"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 10693696,
           "unroundedInstructionBudget": 11228381,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "c",
-          "measuredWorstCaseCost": 148072,
-          "measuredWorstCaseIds": [
-            "adversarial-word-boundary"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 155476,
-          "roundingQuantum": 50000,
-          "instructionBudget": 200000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 4659743,
+              "measuredWorstCaseIds": [
+                "adversarial-word-boundary"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 4659743,
+          "unroundedInstructionBudget": 4892731,
+          "roundingQuantum": 500000,
+          "instructionBudget": 5000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "rust",
-          "measuredWorstCaseCost": 139033,
-          "measuredWorstCaseIds": [
-            "adversarial-word-boundary"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 145985,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 148072,
+              "measuredWorstCaseIds": [
+                "adversarial-word-boundary"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 3330031,
+              "measuredWorstCaseIds": [
+                "adversarial-word-boundary"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 139033,
+              "measuredWorstCaseIds": [
+                "adversarial-word-boundary"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 4659743,
+              "measuredWorstCaseIds": [
+                "adversarial-word-boundary"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "8276879",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 2172681,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2500000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 200000,
-        "optimal": 150000
+        "efficient": 5000000,
+        "optimal": 2500000
       },
       "languageMaximumCosts": [
         {
@@ -1686,45 +2641,103 @@
     {
       "id": 17,
       "slug": "graph-blob-lru",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 11683298,
-          "measuredWorstCaseIds": [
-            "adversarial-zero-dedup-eviction"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 11683298,
+              "measuredWorstCaseIds": [
+                "adversarial-zero-dedup-eviction"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 11683298,
           "unroundedInstructionBudget": 12267463,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 105965,
-          "measuredWorstCaseIds": [
-            "adversarial-zero-dedup-eviction"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 111264,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1923419,
+              "measuredWorstCaseIds": [
+                "adversarial-zero-dedup-eviction"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1923419,
+          "unroundedInstructionBudget": 2019590,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 70748,
-          "measuredWorstCaseIds": [
-            "adversarial-zero-dedup-eviction"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 74286,
-          "roundingQuantum": 5000,
-          "instructionBudget": 75000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 70748,
+              "measuredWorstCaseIds": [
+                "adversarial-zero-dedup-eviction"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 954984,
+              "measuredWorstCaseIds": [
+                "adversarial-zero-dedup-eviction"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 105965,
+              "measuredWorstCaseIds": [
+                "adversarial-zero-dedup-eviction"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1923419,
+              "measuredWorstCaseIds": [
+                "adversarial-zero-dedup-eviction"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "3055116",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 801968,
+          "roundingQuantum": 50000,
+          "instructionBudget": 850000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 150000,
-        "optimal": 75000
+        "efficient": 2500000,
+        "optimal": 850000
       },
       "languageMaximumCosts": [
         {
@@ -1790,45 +2803,103 @@
     {
       "id": 18,
       "slug": "worker-generations",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 6365830,
-          "measuredWorstCaseIds": [
-            "adversarial-state-preservation"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 6365830,
+              "measuredWorstCaseIds": [
+                "adversarial-state-preservation"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 6365830,
           "unroundedInstructionBudget": 6684122,
           "roundingQuantum": 500000,
           "instructionBudget": 7000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 90944,
-          "measuredWorstCaseIds": [
-            "adversarial-state-preservation"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 95492,
-          "roundingQuantum": 5000,
-          "instructionBudget": 100000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1278253,
+              "measuredWorstCaseIds": [
+                "adversarial-state-preservation"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1278253,
+          "unroundedInstructionBudget": 1342166,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 63911,
-          "measuredWorstCaseIds": [
-            "adversarial-state-preservation"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 67107,
-          "roundingQuantum": 5000,
-          "instructionBudget": 70000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 63911,
+              "measuredWorstCaseIds": [
+                "adversarial-state-preservation"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 593389,
+              "measuredWorstCaseIds": [
+                "adversarial-state-preservation"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 90944,
+              "measuredWorstCaseIds": [
+                "adversarial-state-preservation"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1278253,
+              "measuredWorstCaseIds": [
+                "adversarial-state-preservation"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2026497",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 531956,
+          "roundingQuantum": 50000,
+          "instructionBudget": 550000
         }
       },
       "instructionBudgets": {
         "baseline": 7000000,
-        "efficient": 100000,
-        "optimal": 70000
+        "efficient": 1500000,
+        "optimal": 550000
       },
       "languageMaximumCosts": [
         {
@@ -1894,45 +2965,103 @@
     {
       "id": 19,
       "slug": "reproducible-build-order",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "python",
-          "measuredWorstCaseCost": 173017791,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "python",
+              "measuredWorstCaseCost": 173017791,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 173017791,
           "unroundedInstructionBudget": 181668681,
           "roundingQuantum": 50000000,
           "instructionBudget": 200000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 86704,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 91040,
-          "roundingQuantum": 5000,
-          "instructionBudget": 95000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 923531,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 923531,
+          "unroundedInstructionBudget": 969708,
+          "roundingQuantum": 50000,
+          "instructionBudget": 1000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 27021,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 28373,
-          "roundingQuantum": 5000,
-          "instructionBudget": 30000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 27021,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 294012,
+              "measuredWorstCaseIds": [
+                "adversarial-dangling-before-cycle"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 86704,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 923531,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1331268",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 349458,
+          "roundingQuantum": 50000,
+          "instructionBudget": 350000
         }
       },
       "instructionBudgets": {
         "baseline": 200000000,
-        "efficient": 95000,
-        "optimal": 30000
+        "efficient": 1000000,
+        "optimal": 350000
       },
       "languageMaximumCosts": [
         {
@@ -1998,45 +3127,103 @@
     {
       "id": 20,
       "slug": "offline-dependency-bundle",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 9384688,
-          "measuredWorstCaseIds": [
-            "adversarial-bigint-dedup"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 9384688,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-dedup"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 9384688,
           "unroundedInstructionBudget": 9853923,
           "roundingQuantum": 500000,
           "instructionBudget": 10000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 103271,
-          "measuredWorstCaseIds": [
-            "adversarial-bigint-dedup"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 108435,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1218418,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-dedup"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1218418,
+          "unroundedInstructionBudget": 1279339,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 39092,
-          "measuredWorstCaseIds": [
-            "adversarial-bigint-dedup"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 41047,
-          "roundingQuantum": 5000,
-          "instructionBudget": 45000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 39092,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-dedup"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 694489,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-dedup"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 103271,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-dedup"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1218418,
+              "measuredWorstCaseIds": [
+                "adversarial-bigint-dedup"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2055270",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 539509,
+          "roundingQuantum": 50000,
+          "instructionBudget": 550000
         }
       },
       "instructionBudgets": {
         "baseline": 10000000,
-        "efficient": 150000,
-        "optimal": 45000
+        "efficient": 1500000,
+        "optimal": 550000
       },
       "languageMaximumCosts": [
         {
@@ -2102,45 +3289,103 @@
     {
       "id": 21,
       "slug": "compiler-race",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 7896507,
-          "measuredWorstCaseIds": [
-            "adversarial-join-kind-generation"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 7896507,
+              "measuredWorstCaseIds": [
+                "adversarial-join-kind-generation"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 7896507,
           "unroundedInstructionBudget": 8291333,
           "roundingQuantum": 500000,
           "instructionBudget": 8500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 166272,
-          "measuredWorstCaseIds": [
-            "adversarial-join-kind-generation"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 174586,
-          "roundingQuantum": 50000,
-          "instructionBudget": 200000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1503737,
+              "measuredWorstCaseIds": [
+                "adversarial-join-kind-generation"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1503737,
+          "unroundedInstructionBudget": 1578924,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 86345,
-          "measuredWorstCaseIds": [
-            "adversarial-join-kind-generation"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 90663,
-          "roundingQuantum": 5000,
-          "instructionBudget": 95000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 86345,
+              "measuredWorstCaseIds": [
+                "adversarial-join-kind-generation"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 540247,
+              "measuredWorstCaseIds": [
+                "adversarial-join-kind-generation"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 166272,
+              "measuredWorstCaseIds": [
+                "adversarial-join-kind-generation"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1503737,
+              "measuredWorstCaseIds": [
+                "adversarial-join-kind-generation"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2296601",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 602858,
+          "roundingQuantum": 50000,
+          "instructionBudget": 650000
         }
       },
       "instructionBudgets": {
         "baseline": 8500000,
-        "efficient": 200000,
-        "optimal": 95000
+        "efficient": 2000000,
+        "optimal": 650000
       },
       "languageMaximumCosts": [
         {
@@ -2206,45 +3451,110 @@
     {
       "id": 22,
       "slug": "submission-conveyor",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 6918751,
-          "measuredWorstCaseIds": [
-            "adversarial-future-cancel-lazy-queue"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 6918751,
+              "measuredWorstCaseIds": [
+                "adversarial-future-cancel-lazy-queue"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 6918751,
+              "measuredWorstCaseIds": [
+                "adversarial-future-cancel-lazy-queue"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 6918751,
           "unroundedInstructionBudget": 7264689,
           "roundingQuantum": 500000,
           "instructionBudget": 7500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 141073,
-          "measuredWorstCaseIds": [
-            "adversarial-future-cancel-lazy-queue"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 148127,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1247136,
+              "measuredWorstCaseIds": [
+                "adversarial-future-cancel-lazy-queue"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1247136,
+          "unroundedInstructionBudget": 1309493,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 68708,
-          "measuredWorstCaseIds": [
-            "adversarial-future-cancel-lazy-queue"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 72144,
-          "roundingQuantum": 5000,
-          "instructionBudget": 75000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 68708,
+              "measuredWorstCaseIds": [
+                "adversarial-future-cancel-lazy-queue"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 520480,
+              "measuredWorstCaseIds": [
+                "adversarial-future-cancel-lazy-queue"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 141073,
+              "measuredWorstCaseIds": [
+                "adversarial-future-cancel-lazy-queue"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1247136,
+              "measuredWorstCaseIds": [
+                "adversarial-future-cancel-lazy-queue"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1977397",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 519067,
+          "roundingQuantum": 50000,
+          "instructionBudget": 550000
         }
       },
       "instructionBudgets": {
         "baseline": 7500000,
-        "efficient": 150000,
-        "optimal": 75000
+        "efficient": 1500000,
+        "optimal": 550000
       },
       "languageMaximumCosts": [
         {
@@ -2310,45 +3620,110 @@
     {
       "id": 23,
       "slug": "storage-evacuation",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 7355317,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 7355317,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 7355317,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 7355317,
           "unroundedInstructionBudget": 7723083,
           "roundingQuantum": 500000,
           "instructionBudget": 8000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 109272,
-          "measuredWorstCaseIds": [
-            "adversarial-policy-ties-overshoot"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 114736,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1303575,
+              "measuredWorstCaseIds": [
+                "adversarial-policy-ties-overshoot"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1303575,
+          "unroundedInstructionBudget": 1368754,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 52044,
-          "measuredWorstCaseIds": [
-            "adversarial-policy-ties-overshoot"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 54647,
-          "roundingQuantum": 5000,
-          "instructionBudget": 55000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 52044,
+              "measuredWorstCaseIds": [
+                "adversarial-policy-ties-overshoot"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 645826,
+              "measuredWorstCaseIds": [
+                "adversarial-policy-ties-overshoot"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 109272,
+              "measuredWorstCaseIds": [
+                "adversarial-policy-ties-overshoot"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1303575,
+              "measuredWorstCaseIds": [
+                "adversarial-policy-ties-overshoot"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2110717",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 554064,
+          "roundingQuantum": 50000,
+          "instructionBudget": 600000
         }
       },
       "instructionBudgets": {
         "baseline": 8000000,
-        "efficient": 150000,
-        "optimal": 55000
+        "efficient": 1500000,
+        "optimal": 600000
       },
       "languageMaximumCosts": [
         {
@@ -2414,45 +3789,103 @@
     {
       "id": 24,
       "slug": "judge-ledger",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 12403466,
-          "measuredWorstCaseIds": [
-            "adversarial-independent-null"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 12403466,
+              "measuredWorstCaseIds": [
+                "adversarial-independent-null"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 12403466,
           "unroundedInstructionBudget": 13023640,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 215716,
-          "measuredWorstCaseIds": [
-            "adversarial-independent-null"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 226502,
-          "roundingQuantum": 50000,
-          "instructionBudget": 250000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 2224853,
+              "measuredWorstCaseIds": [
+                "adversarial-independent-null"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 2224853,
+          "unroundedInstructionBudget": 2336096,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 130045,
-          "measuredWorstCaseIds": [
-            "adversarial-independent-null"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 136548,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 130045,
+              "measuredWorstCaseIds": [
+                "adversarial-independent-null"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 1265599,
+              "measuredWorstCaseIds": [
+                "adversarial-independent-null"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 215716,
+              "measuredWorstCaseIds": [
+                "adversarial-independent-null"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 2224853,
+              "measuredWorstCaseIds": [
+                "adversarial-independent-null"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "3836213",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 1007006,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 250000,
-        "optimal": 150000
+        "efficient": 2500000,
+        "optimal": 1500000
       },
       "languageMaximumCosts": [
         {
@@ -2518,45 +3951,103 @@
     {
       "id": 25,
       "slug": "seven-matchers",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 704417185,
-          "measuredWorstCaseIds": [
-            "adversarial-linear-dedup"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 704417185,
+              "measuredWorstCaseIds": [
+                "adversarial-linear-dedup"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 704417185,
           "unroundedInstructionBudget": 739638045,
           "roundingQuantum": 50000000,
           "instructionBudget": 750000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "c",
-          "measuredWorstCaseCost": 1308561,
-          "measuredWorstCaseIds": [
-            "adversarial-linear-dedup"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 1373990,
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 7698122,
+              "measuredWorstCaseIds": [
+                "adversarial-linear-dedup"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 7698122,
+          "unroundedInstructionBudget": 8083029,
           "roundingQuantum": 500000,
-          "instructionBudget": 1500000
+          "instructionBudget": 8500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "rust",
-          "measuredWorstCaseCost": 1284380,
-          "measuredWorstCaseIds": [
-            "adversarial-linear-dedup"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 1348599,
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 1308561,
+              "measuredWorstCaseIds": [
+                "adversarial-linear-dedup"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 1789084,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 1284380,
+              "measuredWorstCaseIds": [
+                "adversarial-linear-dedup"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 7698122,
+              "measuredWorstCaseIds": [
+                "adversarial-linear-dedup"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "12080147",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 3171039,
           "roundingQuantum": 500000,
-          "instructionBudget": 1500000
+          "instructionBudget": 3500000
         }
       },
       "instructionBudgets": {
         "baseline": 750000000,
-        "efficient": 1500000,
-        "optimal": 1500000
+        "efficient": 8500000,
+        "optimal": 3500000
       },
       "languageMaximumCosts": [
         {
@@ -2622,45 +4113,103 @@
     {
       "id": 26,
       "slug": "bidirectional-pipes",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 8189183,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 8189183,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 8189183,
           "unroundedInstructionBudget": 8598643,
           "roundingQuantum": 500000,
           "instructionBudget": 9000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 49303,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 51769,
-          "roundingQuantum": 5000,
-          "instructionBudget": 55000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 938423,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 938423,
+          "unroundedInstructionBudget": 985345,
+          "roundingQuantum": 50000,
+          "instructionBudget": 1000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 24313,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 25529,
-          "roundingQuantum": 5000,
-          "instructionBudget": 30000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 24313,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 318609,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 49303,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 938423,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1330648",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 349296,
+          "roundingQuantum": 50000,
+          "instructionBudget": 350000
         }
       },
       "instructionBudgets": {
         "baseline": 9000000,
-        "efficient": 55000,
-        "optimal": 30000
+        "efficient": 1000000,
+        "optimal": 350000
       },
       "languageMaximumCosts": [
         {
@@ -2726,45 +4275,103 @@
     {
       "id": 27,
       "slug": "chunk-independent-random",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 6898962,
-          "measuredWorstCaseIds": [
-            "adversarial-direct-stream-boundaries"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 6898962,
+              "measuredWorstCaseIds": [
+                "adversarial-direct-stream-boundaries"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 6898962,
           "unroundedInstructionBudget": 7243911,
           "roundingQuantum": 500000,
           "instructionBudget": 7500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 75997,
-          "measuredWorstCaseIds": [
-            "adversarial-direct-stream-boundaries"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 79797,
-          "roundingQuantum": 5000,
-          "instructionBudget": 80000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 923818,
+              "measuredWorstCaseIds": [
+                "adversarial-direct-stream-boundaries"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 923818,
+          "unroundedInstructionBudget": 970009,
+          "roundingQuantum": 50000,
+          "instructionBudget": 1000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 32153,
-          "measuredWorstCaseIds": [
-            "adversarial-direct-stream-boundaries"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 33761,
-          "roundingQuantum": 5000,
-          "instructionBudget": 35000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 32153,
+              "measuredWorstCaseIds": [
+                "adversarial-direct-stream-boundaries"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 455739,
+              "measuredWorstCaseIds": [
+                "adversarial-direct-stream-boundaries"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 75997,
+              "measuredWorstCaseIds": [
+                "adversarial-direct-stream-boundaries"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 923818,
+              "measuredWorstCaseIds": [
+                "adversarial-direct-stream-boundaries"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1487707",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 390524,
+          "roundingQuantum": 50000,
+          "instructionBudget": 400000
         }
       },
       "instructionBudgets": {
         "baseline": 7500000,
-        "efficient": 80000,
-        "optimal": 35000
+        "efficient": 1000000,
+        "optimal": 400000
       },
       "languageMaximumCosts": [
         {
@@ -2830,45 +4437,103 @@
     {
       "id": 28,
       "slug": "canonical-replay-bundle",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 10148123,
-          "measuredWorstCaseIds": [
-            "adversarial-missing-after-large-prefix"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 10148123,
+              "measuredWorstCaseIds": [
+                "adversarial-missing-after-large-prefix"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 10148123,
           "unroundedInstructionBudget": 10655530,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 207313,
-          "measuredWorstCaseIds": [
-            "adversarial-missing-after-large-prefix"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 217679,
-          "roundingQuantum": 50000,
-          "instructionBudget": 250000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 2786912,
+              "measuredWorstCaseIds": [
+                "adversarial-missing-after-large-prefix"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 2786912,
+          "unroundedInstructionBudget": 2926258,
+          "roundingQuantum": 500000,
+          "instructionBudget": 3000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 101900,
-          "measuredWorstCaseIds": [
-            "adversarial-missing-after-large-prefix"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 106995,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 101900,
+              "measuredWorstCaseIds": [
+                "adversarial-missing-after-large-prefix"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 2692609,
+              "measuredWorstCaseIds": [
+                "adversarial-missing-after-large-prefix"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 207313,
+              "measuredWorstCaseIds": [
+                "adversarial-missing-after-large-prefix"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 2786912,
+              "measuredWorstCaseIds": [
+                "adversarial-missing-after-large-prefix"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "5788734",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 1519543,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 250000,
-        "optimal": 150000
+        "efficient": 3000000,
+        "optimal": 2000000
       },
       "languageMaximumCosts": [
         {
@@ -2934,45 +4599,110 @@
     {
       "id": 29,
       "slug": "source-tree-evidence",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 6243880,
-          "measuredWorstCaseIds": [
-            "adversarial-component-prefix-sort"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 6243880,
+              "measuredWorstCaseIds": [
+                "adversarial-component-prefix-sort"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 6243880,
+              "measuredWorstCaseIds": [
+                "adversarial-component-prefix-sort"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 6243880,
           "unroundedInstructionBudget": 6556074,
           "roundingQuantum": 500000,
           "instructionBudget": 7000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 89343,
-          "measuredWorstCaseIds": [
-            "adversarial-component-prefix-sort"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 93811,
-          "roundingQuantum": 5000,
-          "instructionBudget": 95000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 835628,
+              "measuredWorstCaseIds": [
+                "adversarial-component-prefix-sort"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 835628,
+          "unroundedInstructionBudget": 877410,
+          "roundingQuantum": 50000,
+          "instructionBudget": 900000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 50289,
-          "measuredWorstCaseIds": [
-            "adversarial-component-prefix-sort"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 52804,
-          "roundingQuantum": 5000,
-          "instructionBudget": 55000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 50289,
+              "measuredWorstCaseIds": [
+                "adversarial-component-prefix-sort"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 326090,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 89343,
+              "measuredWorstCaseIds": [
+                "adversarial-component-prefix-sort"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 835628,
+              "measuredWorstCaseIds": [
+                "adversarial-component-prefix-sort"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1301350",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 341605,
+          "roundingQuantum": 50000,
+          "instructionBudget": 350000
         }
       },
       "instructionBudgets": {
         "baseline": 7000000,
-        "efficient": 95000,
-        "optimal": 55000
+        "efficient": 900000,
+        "optimal": 350000
       },
       "languageMaximumCosts": [
         {
@@ -3038,45 +4768,110 @@
     {
       "id": 30,
       "slug": "cross-host-matrix",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 9751200,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 9751200,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 9751200,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 9751200,
           "unroundedInstructionBudget": 10238760,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 192167,
-          "measuredWorstCaseIds": [
-            "sample-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 201776,
-          "roundingQuantum": 50000,
-          "instructionBudget": 250000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1586210,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1586210,
+          "unroundedInstructionBudget": 1665521,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 90542,
-          "measuredWorstCaseIds": [
-            "adversarial-difference-accounting"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 95070,
-          "roundingQuantum": 5000,
-          "instructionBudget": 100000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 90542,
+              "measuredWorstCaseIds": [
+                "adversarial-difference-accounting"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 777560,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 192167,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1586210,
+              "measuredWorstCaseIds": [
+                "sample-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2646479",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 694701,
+          "roundingQuantum": 50000,
+          "instructionBudget": 700000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 250000,
-        "optimal": 100000
+        "efficient": 2000000,
+        "optimal": 700000
       },
       "languageMaximumCosts": [
         {
@@ -3142,45 +4937,110 @@
     {
       "id": 31,
       "slug": "compile-critical-path",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 12677157,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 12677157,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 12677157,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 12677157,
           "unroundedInstructionBudget": 13311015,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 117446,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 123319,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 2076995,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 2076995,
+          "unroundedInstructionBudget": 2180845,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 55254,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 58017,
-          "roundingQuantum": 5000,
-          "instructionBudget": 60000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 55254,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 1337038,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 117446,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 2076995,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "3586733",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 941518,
+          "roundingQuantum": 50000,
+          "instructionBudget": 950000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 150000,
-        "optimal": 60000
+        "efficient": 2500000,
+        "optimal": 950000
       },
       "languageMaximumCosts": [
         {
@@ -3246,45 +5106,110 @@
     {
       "id": 32,
       "slug": "conflict-package-cover",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 11140259,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 11140259,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 11140259,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 11140259,
           "unroundedInstructionBudget": 11697272,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 98766,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 103705,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1092722,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1092722,
+          "unroundedInstructionBudget": 1147359,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 23534,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 24711,
-          "roundingQuantum": 5000,
-          "instructionBudget": 25000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 23534,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 492894,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 98766,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1092722,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1707916",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 448328,
+          "roundingQuantum": 50000,
+          "instructionBudget": 450000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 150000,
-        "optimal": 25000
+        "efficient": 1500000,
+        "optimal": 450000
       },
       "languageMaximumCosts": [
         {
@@ -3350,45 +5275,103 @@
     {
       "id": 33,
       "slug": "toolchain-mirror-network",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 10971464,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 10971464,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 10971464,
           "unroundedInstructionBudget": 11520038,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 70137,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 73644,
-          "roundingQuantum": 5000,
-          "instructionBudget": 75000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1490051,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1490051,
+          "unroundedInstructionBudget": 1564554,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 40319,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 42335,
-          "roundingQuantum": 5000,
-          "instructionBudget": 45000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 40319,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 1048993,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 70137,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1490051,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2649500",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 695494,
+          "roundingQuantum": 50000,
+          "instructionBudget": 700000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 75000,
-        "optimal": 45000
+        "efficient": 2000000,
+        "optimal": 700000
       },
       "languageMaximumCosts": [
         {
@@ -3454,45 +5437,103 @@
     {
       "id": 34,
       "slug": "capability-cut",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 14595565,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 14595565,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 14595565,
           "unroundedInstructionBudget": 15325344,
           "roundingQuantum": 5000000,
           "instructionBudget": 20000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 142994,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 150144,
-          "roundingQuantum": 50000,
-          "instructionBudget": 200000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1588697,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1588697,
+          "unroundedInstructionBudget": 1668132,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 44610,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 46841,
-          "roundingQuantum": 5000,
-          "instructionBudget": 50000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 44610,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 776641,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 142994,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1588697,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2552942",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 670148,
+          "roundingQuantum": 50000,
+          "instructionBudget": 700000
         }
       },
       "instructionBudgets": {
         "baseline": 20000000,
-        "efficient": 200000,
-        "optimal": 50000
+        "efficient": 2000000,
+        "optimal": 700000
       },
       "languageMaximumCosts": [
         {
@@ -3558,45 +5599,110 @@
     {
       "id": 35,
       "slug": "wait-for-cycles",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 14549352,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 14549352,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 14549352,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 14549352,
           "unroundedInstructionBudget": 15276820,
           "roundingQuantum": 5000000,
           "instructionBudget": 20000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 219898,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 230893,
-          "roundingQuantum": 50000,
-          "instructionBudget": 250000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1679488,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1679488,
+          "unroundedInstructionBudget": 1763463,
+          "roundingQuantum": 500000,
+          "instructionBudget": 2000000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 63380,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 66549,
-          "roundingQuantum": 5000,
-          "instructionBudget": 70000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 63380,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 753254,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 219898,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1679488,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2716020",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 712956,
+          "roundingQuantum": 50000,
+          "instructionBudget": 750000
         }
       },
       "instructionBudgets": {
         "baseline": 20000000,
-        "efficient": 250000,
-        "optimal": 70000
+        "efficient": 2000000,
+        "optimal": 750000
       },
       "languageMaximumCosts": [
         {
@@ -3662,45 +5768,110 @@
     {
       "id": 36,
       "slug": "artifact-cache-knapsack",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 7392875,
-          "measuredWorstCaseIds": [
-            "sample-03"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 7392875,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 7392875,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 7392875,
           "unroundedInstructionBudget": 7762519,
           "roundingQuantum": 500000,
           "instructionBudget": 8000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 41622,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 43704,
-          "roundingQuantum": 5000,
-          "instructionBudget": 45000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 958000,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 958000,
+          "unroundedInstructionBudget": 1005900,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 19089,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 20044,
-          "roundingQuantum": 5000,
-          "instructionBudget": 25000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 19089,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 451489,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 41622,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 958000,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1470200",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 385928,
+          "roundingQuantum": 50000,
+          "instructionBudget": 400000
         }
       },
       "instructionBudgets": {
         "baseline": 8000000,
-        "efficient": 45000,
-        "optimal": 25000
+        "efficient": 1500000,
+        "optimal": 400000
       },
       "languageMaximumCosts": [
         {
@@ -3766,45 +5937,103 @@
     {
       "id": 37,
       "slug": "dependency-tree-knapsack",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 11496460,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 11496460,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 11496460,
           "unroundedInstructionBudget": 12071283,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 126253,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 132566,
-          "roundingQuantum": 50000,
-          "instructionBudget": 150000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1425154,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1425154,
+          "unroundedInstructionBudget": 1496412,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 37909,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 39805,
-          "roundingQuantum": 5000,
-          "instructionBudget": 40000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 37909,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 731845,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 126253,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1425154,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2321161",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 609305,
+          "roundingQuantum": 50000,
+          "instructionBudget": 650000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 150000,
-        "optimal": 40000
+        "efficient": 1500000,
+        "optimal": 650000
       },
       "languageMaximumCosts": [
         {
@@ -3870,45 +6099,103 @@
     {
       "id": 38,
       "slug": "conformance-feature-coverage",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "javascript",
-          "measuredWorstCaseCost": 13840542,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 13840542,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 13840542,
           "unroundedInstructionBudget": 14532570,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 81938,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 86035,
-          "roundingQuantum": 5000,
-          "instructionBudget": 90000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1316608,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1316608,
+          "unroundedInstructionBudget": 1382439,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 39043,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 40996,
-          "roundingQuantum": 5000,
-          "instructionBudget": 45000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 39043,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 650715,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 81938,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1316608,
+              "measuredWorstCaseIds": [
+                "sample-03"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "2088304",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 548180,
+          "roundingQuantum": 50000,
+          "instructionBudget": 550000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 90000,
-        "optimal": 45000
+        "efficient": 1500000,
+        "optimal": 550000
       },
       "languageMaximumCosts": [
         {
@@ -3974,45 +6261,110 @@
     {
       "id": 39,
       "slug": "calibration-multiple-choice-knapsack",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 8955406,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 8955406,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 8955406,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 8955406,
           "unroundedInstructionBudget": 9403177,
           "roundingQuantum": 500000,
           "instructionBudget": 9500000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 67747,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 71135,
-          "roundingQuantum": 5000,
-          "instructionBudget": 75000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1174637,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1174637,
+          "unroundedInstructionBudget": 1233369,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 31743,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 33331,
-          "roundingQuantum": 5000,
-          "instructionBudget": 35000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 31743,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 600739,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 67747,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1174637,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1874866",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 492153,
+          "roundingQuantum": 50000,
+          "instructionBudget": 500000
         }
       },
       "instructionBudgets": {
         "baseline": 9500000,
-        "efficient": 75000,
-        "optimal": 35000
+        "efficient": 1500000,
+        "optimal": 500000
       },
       "languageMaximumCosts": [
         {
@@ -4078,45 +6430,110 @@
     {
       "id": 40,
       "slug": "dual-quota-output-knapsack",
-      "policyWitnesses": {
+      "policyDerivations": {
         "baseline": {
-          "rank": 7,
-          "language": "typescript",
-          "measuredWorstCaseCost": 9686223,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "all-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
           ],
+          "witnesses": [
+            {
+              "language": "javascript",
+              "measuredWorstCaseCost": 9686223,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "typescript",
+              "measuredWorstCaseCost": 9686223,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 9686223,
           "unroundedInstructionBudget": 10170535,
           "roundingQuantum": 5000000,
           "instructionBudget": 15000000
         },
         "efficient": {
-          "rank": 2,
-          "language": "rust",
-          "measuredWorstCaseCost": 66827,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-maximum",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 70169,
-          "roundingQuantum": 5000,
-          "instructionBudget": 75000
+          "witnesses": [
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1175395,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCost": 1175395,
+          "unroundedInstructionBudget": 1234165,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
         },
         "optimal": {
-          "rank": 1,
-          "language": "c",
-          "measuredWorstCaseCost": 27614,
-          "measuredWorstCaseIds": [
-            "adversarial-blind-01"
+          "kind": "compiled-language-average",
+          "languages": [
+            "c",
+            "cpp",
+            "rust",
+            "go"
           ],
-          "unroundedInstructionBudget": 28995,
-          "roundingQuantum": 5000,
-          "instructionBudget": 30000
+          "contributors": [
+            {
+              "language": "c",
+              "measuredWorstCaseCost": 27614,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "cpp",
+              "measuredWorstCaseCost": 593407,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "rust",
+              "measuredWorstCaseCost": 66827,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            },
+            {
+              "language": "go",
+              "measuredWorstCaseCost": 1175395,
+              "measuredWorstCaseIds": [
+                "adversarial-blind-01"
+              ]
+            }
+          ],
+          "measuredWorstCaseCostNumerator": "1863243",
+          "measuredWorstCaseCostDenominator": 4,
+          "unroundedInstructionBudget": 489102,
+          "roundingQuantum": 50000,
+          "instructionBudget": 500000
         }
       },
       "instructionBudgets": {
         "baseline": 15000000,
-        "efficient": 75000,
-        "optimal": 30000
+        "efficient": 1500000,
+        "optimal": 500000
       },
       "languageMaximumCosts": [
         {

@@ -96,7 +96,7 @@
     "lint": "eslint .",
     "assets:og": "node scripts/render-og.mjs",
     "problems:generate": "node scripts/generate-judge-problems.mjs",
-    "problems:verify": "node scripts/generate-judge-problems.mjs --check",
+    "problems:verify": "node --test tools/derive_cost_policies.test.mjs scripts/problem-schema.test.mjs && node tools/derive_cost_policies.mjs && node scripts/generate-judge-problems.mjs --check",
     "library:build": "node scripts/build-library.mjs",
     "library:verify": "pnpm run contract:verify && pnpm run package-manager:verify && pnpm run docs:verify && pnpm run github:verify && pnpm run conformance:verify && pnpm run licenses:verify && pnpm run runtime:licenses:verify && pnpm run toolchain:verify && pnpm run wasmer-sdk:verify && node scripts/verify-library.mjs && node scripts/verify-library-nodenext.mjs",
     "prepack": "pnpm run library:build && pnpm run library:verify",

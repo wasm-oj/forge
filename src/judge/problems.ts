@@ -32,7 +32,7 @@ export interface ProblemScoringPolicy {
 export interface ProblemScoring {
   readonly maximumPoints: 100;
   readonly calibration: {
-    readonly method: "forge-v1-reference-order-statistics-rounded-v1";
+    readonly method: "forge-v1-compiled-average-optimal-rounded-v1";
     readonly profiles: Readonly<Record<string, string>>;
   };
   readonly policies: readonly ProblemScoringPolicy[];

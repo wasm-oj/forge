@@ -71,7 +71,7 @@
     "costMetric": "baseline-normalized-net",
     "calibration": {
       "status": "measured",
-      "method": "forge-v1-reference-order-statistics-rounded-v1",
+      "method": "forge-v1-compiled-average-optimal-rounded-v1",
       "profiles": {
         "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
         "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -103,7 +103,7 @@
         },
         "points": 30,
         "limits": {
-          "instructionBudget": 150000,
+          "instructionBudget": 1500000,
           "memoryLimitBytes": 402653184
         }
       },
@@ -115,7 +115,7 @@
         },
         "points": 50,
         "limits": {
-          "instructionBudget": 50000,
+          "instructionBudget": 600000,
           "memoryLimitBytes": 268435456
         }
       }
