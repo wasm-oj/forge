@@ -1,8 +1,10 @@
 # All-or-Nothing Output Collection
 
-Stdout and stderr have already consumed `U` bytes together. The judge now collects `N` output files in UTF-8 byte lexicographic order of their paths. Every path is ASCII, so this is ordinary bytewise lexicographic order; when one string is a prefix of another, the shorter string comes first.
+A WASM OJ collects output files after the submitted program exits, but a file's metadata and its actual contents may no longer agree during collection. If quota validation used metadata first and the subsequent read returned a different length, a TOCTOU problem would result. Output files must also share the same byte budget already used by stdout and stderr.
 
-Each file record contains `path metadataLength actualLength`. Before collecting a file, compare the two lengths. A difference is a TOCTOU mismatch between metadata and the actual read. Only when they match may `metadataLength` be added to the shared byte budget.
+To keep results independent of file-enumeration order, the `N` output files must be processed in UTF-8 byte lexicographic order of their paths. Every path is ASCII, so this is ordinary bytewise lexicographic order; when one string is a prefix of another, the shorter string comes first. Stdout and stderr have already consumed `U` bytes together.
+
+Each file record contains `path metadataLength actualLength`. Before processing a file, compare the two lengths. A difference is a TOCTOU mismatch between metadata and the actual read. Only when they match may `metadataLength` be added to the shared byte budget.
 
 Every budget query independently starts with no files collected but `U` bytes already used, and processes files in canonical order:
 
@@ -11,7 +13,7 @@ Every budget query independently starts with no files collected but `U` bytes al
 3. Otherwise, if adding the file would exceed the budget, fail for quota at that path.
 4. Otherwise, include the complete file and continue.
 
-Collection is all-or-nothing: a failure returns no partial file collection. Input budgets are guaranteed to be nondecreasing.
+Collection has all-or-nothing semantics: a failure returns no partial file collection. Input budgets are guaranteed to be nondecreasing.
 
 ## Input
 

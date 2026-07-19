@@ -1,6 +1,10 @@
 # 可重現的套件建置順序
 
-離線 toolchain 要依 dependency graph 建置套件。為跨 host 可重現，任何時刻若有多個 dependency 都已完成的套件，必須選 package name ASCII 字典序最小者。
+一套可離線使用的 WASM OJ toolchain，必須先按照 dependency graph 建置其中的套件。同一張 graph 往往有多個合法順序；如果每台 host 任意選擇下一個可建置套件，產生的 artifact 與建置紀錄就可能無法逐位元重現。
+
+因此我們制定一條 deterministic 規則：任何時刻若有多個套件的 dependencies 都已完成，必須選 package name 依 ASCII 字典序最小者。套件 `a` 依賴 `b` 時，`b` 必須先於 `a` 建置。
+
+lockfile 本身也可能損壞。若 dependency edge 的任一端不在已知 package 清單中，該 edge 是 dangling；如果所有端點都有效，但相依關係無法完成全部套件，則 graph 含有 cycle。請依題目指定的錯誤優先順序驗證資料，或產生唯一的建置順序。
 
 ## 輸入
 

@@ -1,12 +1,14 @@
 # Eight-Stage Compiler
 
-Browser compiler workers are used in generations. Every successfully completed output-ready stage consumes one unit of lifetime budget. One generation has at most `B` units and can serve only one toolchain family. Assign builds in arrival order:
+Starting a toolchain for every in-browser build would impose unnecessary cost on a WASM OJ, so we want to reuse workers. A worker cannot accept jobs forever, however, because accumulated state and resource usage would become difficult to control. The coordinator therefore manages workers in generations and gives each generation a lifetime budget.
+
+A supported build contains at most eight output-ready stages. Every stage completed successfully consumes one unit of budget. A generation may consume at most `B` units and may serve only one toolchain family. Assign builds in arrival order according to these rules:
 
 - `stages=0` is a complete cache hit. Output `CACHE`; do not create, switch, or consume the current worker.
 - If `stages>8` or `stages>B`, output `REJECT`. A rejection does not change the current worker.
 - Every other build must use the **current** generation. If none exists, the family differs, or remaining budget is insufficient, create the next generation and assign the build to it.
 
-Generation IDs start at 1 and increase consecutively. Once the coordinator leaves an old generation, it is never reused, even if it has remaining budget; the coordinator has only one active worker.
+Generation IDs start at 1 and increase consecutively. The coordinator keeps only one active worker, so once it leaves an old generation, that generation is never reused even if it still has budget remaining.
 
 ## Input
 

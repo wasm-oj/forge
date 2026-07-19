@@ -1,6 +1,10 @@
 # 離線依賴行李箱
 
-Lockfile 的多個 package 可以指向相同內容 digest；離線 bundle 必須為每個**唯一 required digest** 恰好提供一份 payload，不能缺少或多帶，size 也必須相符。相同 digest 的 package 宣告不同 size 代表 lockfile 自相矛盾。
+為了讓 WASM OJ 的離線 toolchain 能在瀏覽器中直接載入，我們需要把 lockfile 要求的依賴與實際 payload 一起封裝，不必等到執行時才連線下載。直接按照 package 數量複製檔案會浪費空間，因為不同 package 可能指向相同的內容 digest。
+
+bundle 因此以 digest 去除重複內容。對 lockfile 中每個**唯一 required digest**，bundle 必須恰好提供一份 payload：不能缺少、不能多帶，payload size 也必須與宣告相符。即使 payload size 為零，它仍是一個需要驗證的 digest。
+
+驗證前還要處理兩種內部矛盾：多個 package 若為同一 digest 宣告不同 size，表示 lockfile 衝突；bundle 若重複列出同一 digest，則 payload 不再是唯一。當錯誤不只一種時，必須使用題目指定的類別優先順序；同類別內則選 ASCII 字典序最小的 digest。
 
 ## 輸入
 

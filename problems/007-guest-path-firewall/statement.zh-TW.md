@@ -1,6 +1,8 @@
 # Guest Path 防火牆
 
-你收到 `N` 個不可信的 absolute guest path。對每個 path 依從左到右的順序套用 POSIX 式 lexical normalization：
+WASM OJ 允許使用者程式存取受隔離的 guest 檔案系統，但它提供的 path 不能直接交給主機處理。重複分隔符、`.` 與 `..` 可能讓表面不同的字串指向同一位置，甚至嘗試越過 guest root。為了在任何實際檔案存取前得到一致結果，我們先做純 lexical normalization。
+
+你會收到 `N` 個不可信的 absolute guest path。對每個 path，由左到右依序處理 segment，套用以下 POSIX 式規則：
 
 - 空 segment（重複 `/` 或開頭、結尾的 `/`）忽略；
 - segment `.` 忽略；
@@ -8,7 +10,9 @@
 - 若遇到 `..` 時沒有普通 segment 可移除，path 曾嘗試穿越 guest root，結果為 `INVALID`。一旦發生，即使後面又回到 root 也仍為無效。
 - 其他 segment（包含 `...`）都是普通 segment，大小寫不做轉換。
 
-合法時輸出唯一 canonical absolute path：只使用單一 `/` 分隔，不含 `.`、`..` 或尾斜線；沒有普通 segment 時輸出 `/`。
+對合法 path，輸出唯一的 canonical absolute path：segment 之間只使用單一 `/`，不含 `.`、`..` 或尾斜線；若沒有普通 segment，輸出 `/`。
+
+這個結果只由輸入字串決定，不需要也不得查詢主機檔案系統。
 
 ## 輸入
 

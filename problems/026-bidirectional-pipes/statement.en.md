@@ -1,6 +1,8 @@
 # Bidirectional Interactive Pipes
 
-Processes A and B communicate through two pipes, `A→B` and `B→A`, each of capacity `C`. Each process has a sequence of actions:
+An interactive problem requires a WASM OJ to drive the participant program and the interactor together. They exchange data through capacity-limited pipes. Unless blocking, closure, and scheduling order are modeled precisely, different hosts could produce different deadlock or failure verdicts for the same interaction.
+
+Call the two processes A and B. They communicate through `A→B` and `B→A`, two pipes that each have capacity `C`. Each process has a sequence of actions:
 
 - `W k`: atomically write to the outgoing pipe. The action completes only when at least `k` capacity remains; otherwise it blocks.
 - `R k`: atomically read from the incoming pipe. The action completes only when at least `k` bytes are present. If fewer bytes are present and the incoming pipe is closed, it immediately fails; otherwise it blocks.
@@ -10,9 +12,9 @@ When a process finishes its final action, its outgoing pipe also closes automati
 
 ### Deterministic Scheduler
 
-In each round, attempt A's next action once, then B's next action once. Skip a process that is already finished. A blocked attempt changes no state, but the other process is still attempted. If a read definitely fails, stop immediately and do not attempt the other process in that round.
+To make the simulation reproducible, the scheduler uses fixed rounds: attempt A's next action once, then B's next action once. Skip a process that is already finished. A blocked attempt changes no state, but the other process is still attempted. If a read definitely produces `FAILURE`, stop immediately and do not attempt the other process in that round.
 
-If both processes finish, the result is `SUCCESS`. If one complete round finishes no action and causes no failure, the result is `DEADLOCK`. Both pipes are initially empty. An empty action sequence is already finished initially and has its outgoing pipe closed.
+If both processes finish, the result is `SUCCESS`. If one complete round finishes no action and causes no `FAILURE`, the result is `DEADLOCK`. Both pipes are initially empty. A process with an empty action sequence is already finished initially and has its outgoing pipe closed.
 
 ## Input
 

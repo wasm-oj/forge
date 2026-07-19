@@ -1,8 +1,12 @@
 # Toolchain Mirror Network
 
-Host 1 already has the toolchain. An undirected link `u v cost` can transfer the toolchain once between its two hosts: as soon as either endpoint has the toolchain, the selected link can give it to the other endpoint. Choose links so that every host eventually receives the toolchain while minimizing total cost.
+While designing a distributed WASM OJ, we needed every execution host to receive the same compiler toolchain. Having every host download directly from central storage would duplicate bandwidth and could turn one source into a deployment bottleneck, so we allow a host that already has the toolchain to forward it to another host.
 
-After the links are selected, transfers may occur in any order reachable from host 1. Thus the requirement is equivalent to selecting a connected subgraph spanning every host.
+Transfer costs differ between hosts: some links stay within one data center, while others cross regions. Initially only host `1` has the toolchain. We must first choose which transfer links to use and can then distribute the toolchain in any feasible order.
+
+An undirected link `u v cost` can transfer the toolchain once between its two hosts. As soon as either endpoint has the toolchain, the selected link can give it to the other endpoint. After the links are selected, transfers may occur in any order reachable from host `1`.
+
+Choose links so that every host eventually receives the toolchain while minimizing the total cost of the selected links. Equivalently, the selected links must form a connected subgraph spanning every host.
 
 ## Input
 

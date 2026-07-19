@@ -1,8 +1,12 @@
 # 逐步放寬的 Cost Budget
 
-一個工作流程依序包含 `N` 個 stage，第 `i` 個 stage 需要 `cost_i` 點 instruction cost。執行時不能跳過 stage：若要完成第 `k` 個 stage，就必須先完成前 `k-1` 個 stage。
+在設計 WASM OJ 時，我們需要限制使用者程式可以消耗的計算資源。單純使用實際執行時間並不理想：同一份程式在不同瀏覽器、裝置或系統負載下，可能得到差異很大的結果。因此，我們選擇記錄 WebAssembly 執行過程中的 instruction cost，讓資源限制更穩定，也更容易重現。
 
-現在有 `Q` 個逐步放寬的 budget `budget_1, budget_2, ..., budget_Q`，保證它們不遞減。每個 budget 都是對同一份工作流程的獨立評估。對每個 budget，請輸出最多能完整執行多少個開頭連續的 stage；也就是找出最大的 `k`，使得：
+一次完整的判題流程可以拆成 `N` 個依序執行的 stage。第 `i` 個 stage 需要 `cost_i` 點 instruction cost。後面的 stage 依賴前面的執行結果，因此不能跳過中間步驟；若要完成第 `k` 個 stage，就必須先完成前 `k-1` 個 stage。
+
+在決定正式使用哪個 cost limit 前，我們準備了 `Q` 個逐步放寬的候選 budget `budget_1, budget_2, ..., budget_Q`，並保證它們不遞減。每個 budget 都會從第一個 stage 開始，獨立評估同一份工作流程。
+
+對每個 `budget_j`，請輸出最多能完整執行多少個開頭連續的 stage；也就是找出最大的 `k`，使得：
 
 ```text
 cost_1 + cost_2 + ... + cost_k <= budget_j

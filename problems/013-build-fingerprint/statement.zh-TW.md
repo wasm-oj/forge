@@ -1,8 +1,12 @@
 # Build Fingerprint
 
-真正的 build digest 會對一份 canonical preimage 做雜湊。本題不要求實作 SHA-256；請輸出該 canonical preimage 的 token 表示。
+在 WASM OJ 中，相同的原始碼與編譯設定應該命中同一份 build cache，而任何會改變產物的輸入都必須產生不同的識別。若 fingerprint 取決於檔案被列舉的順序，同一個專案只因輸入順序不同就會重複編譯；因此，我們需要先定義唯一的 canonical preimage。
 
-專案有 `N` 個檔案，每個檔案有唯一 path 與已算好的 digest。每次 build 提供 compiler、target、optimization、dependency digest，以及一組順序任意的檔案編號。canonical 表示保留四個 metadata 的輸入順序，檔案則依 path 的 ASCII 字典序排列。
+真正的 build digest 會對這份 canonical preimage 做雜湊。本題不要求實作 SHA-256，也不把雜湊函式本身當成門檻；你要輸出的是 canonical preimage 的 token 表示。
+
+專案有 `N` 個檔案，每個檔案都有唯一 path 與已算好的 digest。每次 build 會提供 compiler、target、optimization、dependency digest，以及一組順序任意的檔案編號。
+
+canonical 表示保留上述四個 metadata 欄位的輸入順序，檔案部分則依 path 的 ASCII 字典序排列。請根據這項規格產生可供後續雜湊的唯一 token 序列。
 
 ## 輸入
 

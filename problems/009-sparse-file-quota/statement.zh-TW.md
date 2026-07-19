@@ -1,14 +1,14 @@
 # 稀疏檔案不是免費的
 
-VFS 中有 `F` 個已存在的空檔案，各自有 logical size 與 cursor，初始皆為 `0`。所有檔案的 logical size 總和不得超過 byte quota `B`。即使中間沒有真正寫入，sparse hole 仍計入 logical size 與 quota。
+替 WASM OJ 實作 VFS byte quota 時，只計算實際寫入的 payload 並不安全。程式可以先把 cursor 移到很遠的位置，再寫入少量資料，形成很大的 sparse hole。即使中間沒有真正寫入，這段範圍仍會擴張檔案的 logical size，因此必須占用相同的 quota。
 
-依序執行 `N` 個操作：
+VFS 中有 `F` 個已存在的空檔案。每個檔案都有 logical size 與 cursor，兩者初始皆為 `0`；所有檔案的 logical size 總和不得超過 byte quota `B`。請依序執行 `N` 個操作：
 
 - `SEEK x position`：將檔案 `x` 的 cursor 設為絕對位置；可超過 EOF，且不改變 size。
 - `WRITE x length`：若 `length>0`，候選新 size 是 `max(oldSize,cursor+length)`；若 `length=0`，size 與 cursor 都不變。非零 write 成功後 cursor 增加 `length`。
 - `TRUNCATE x size`：候選新 size 精確等於 `size`；cursor 不變，即使它落在新 EOF 之後。
 
-SEEK 永遠成功。WRITE／TRUNCATE 若候選的全檔案 logical size 總和超過 `B`，輸出 quota error，且該操作對 size、cursor 與 peak 都完全沒有影響；否則一次提交。
+`SEEK` 永遠成功。`WRITE` 或 `TRUNCATE` 必須先以候選狀態檢查全體檔案的 logical size 總和；若總和超過 `B`，輸出 quota error，且該操作對 size、cursor 與 peak 都完全沒有影響。只有通過配額檢查時，所有變更才一次提交。
 
 ## 輸入
 

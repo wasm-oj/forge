@@ -1,8 +1,12 @@
 # Dependency-Aware Cache Knapsack
 
-There are `N` cache artifacts forming a dependency forest. Node `i` has direct prerequisite `parent_i`; `parent_i = 0` means it has no prerequisite. Retaining node `i` requires retaining its parent and every ancestor up to the root. A selection without this dependency closure is invalid.
+While designing cache cleanup for a WASM OJ compiler, we could not compare artifacts only by their individual sizes and values. Some cached results are derived from other artifacts. Keeping a derived result after deleting a prerequisite needed to rebuild or validate it would leave an incomplete cache entry that cannot be reused safely.
 
-Every node has a cache size and a value. Choose a dependency-closed subset with total size at most `C` and maximum total value. The empty subset is valid. Output only the maximum value.
+We restrict these dependencies to a dependency forest. Each artifact has at most one direct prerequisite, but retaining any node requires retaining its entire ancestor chain up to a root.
+
+There are `N` cache artifacts. Node `i` has direct prerequisite `parent_i`; `parent_i = 0` means it has no prerequisite. Every node has a cache size and a reuse value, and the available capacity is `C`.
+
+Choose a dependency-closed subset with total size at most `C` and maximum total value. Any selection missing a required ancestor is invalid. The empty subset is valid. Output only the maximum value.
 
 ## Input
 

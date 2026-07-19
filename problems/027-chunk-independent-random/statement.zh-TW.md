@@ -1,6 +1,10 @@
 # 分塊無關的確定性亂數
 
-系統的概念亂數串前 S bytes 來自 startup stream，之後改由 user stream 從 offset 0 開始。Q 次 `random_get` 依序消耗 `k_i` bytes；你要輸出每次呼叫所得區塊的第一與最後一個 byte，而不能把可能極長的中間內容全部產生。
+`random_get` 若直接依賴 host 的亂數來源，同一份 WASM OJ submission 就可能無法 deterministic replay。我們也不能讓結果取決於 runtime 如何把讀取拆成 chunks：無論一次要求多少 bytes，每個全域位置都必須對應到唯一且可直接計算的值。
+
+系統把概念上的亂數序列分成兩段。前 `S` bytes 來自 startup stream；之後改用 user stream，並從該 stream 的 offset 0 開始。`Q` 次 `random_get` 依序消耗 `k_i` bytes，前一次呼叫結束的位置就是下一次的起點。
+
+為了檢查分塊後的端點，請輸出每次呼叫所得區塊的第一個與最後一個 byte。區塊可能非常長，因此題目只要求這兩個位置，而不要求產生中間的全部內容。
 
 對 seed `s` 的 stream，offset x 的 byte 定義如下（所有算術先模 `2^64`）：
 
@@ -12,7 +16,7 @@ w = z xor (z >> 31)
 byte(x) = (w >> (8 * (x mod 8))) & 255
 ```
 
-位移為 unsigned logical shift；word 內採 little-endian byte 順序。全域位置 p 若 `p<S`，使用 startup seed 與 offset p；否則使用 user seed 與 offset `p-S`。
+位移為 unsigned logical shift；word 內採 little-endian byte 順序。全域位置 `p` 若 `p<S`，使用 startup seed 與 offset `p`；否則使用 user seed 與 offset `p-S`。
 
 ## 輸入
 

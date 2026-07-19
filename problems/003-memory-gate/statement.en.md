@@ -1,16 +1,18 @@
 # 64 KiB Memory Gate
 
-A module declares one or more linear memories indexed from `1` through `N`. Every page is exactly `65536` bytes. Judge policy allows at most `C` pages per memory and does not support Memory64.
+Before a WASM OJ loads a submitted module, it must inspect every linear-memory declaration. The in-browser runtime can accept only controlled 32-bit memories. A module that requests unsupported Memory64, or whose initial capacity already exceeds policy, must be rejected before allocation is attempted.
 
-Each declaration is `kind initial maximum`, where `kind` is `32` or `64`. `maximum=-1` means that no maximum was declared; otherwise it is the declared page count. A declaration is invalid if any of the following holds:
+A module declares one or more linear memories indexed from `1` through `N`, and every page is exactly `65536` bytes. Policy allows at most `C` pages per memory and does not support Memory64. Each declaration is written as `kind initial maximum`, where `kind` is `32` or `64`. `maximum=-1` means that no maximum was declared; otherwise it is the declared page count.
+
+A declaration is invalid if any of the following holds:
 
 1. `kind=64`;
 2. a maximum is present and `maximum < initial`;
 3. `initial > C`.
 
-For a valid declaration, its rewritten maximum is `C` when no maximum was declared, and `min(maximum,C)` otherwise.
+A declaration that passes validation must also be rewritten into a policy-bounded form. Its rewritten maximum is `C` when no maximum was declared, and `min(maximum,C)` otherwise.
 
-Each query gives an interval `[l,r]`. If it contains an invalid declaration, output `REJECT i`, where `i` must be the smallest invalid index in the interval. Otherwise output `ACCEPT initialBytes maximumBytes`, the interval sums of initial and rewritten-maximum page counts, respectively, each multiplied by `65536`.
+The system performs policy checks on several intervals of declarations. Each query gives `[l,r]`. If the interval contains an invalid declaration, output `REJECT i`, where `i` must be the smallest invalid index in the interval. Otherwise output `ACCEPT initialBytes maximumBytes`: the sums of initial and rewritten-maximum page counts in the interval, respectively, each multiplied by `65536`.
 
 ## Input
 

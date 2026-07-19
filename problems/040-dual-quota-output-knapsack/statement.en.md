@@ -1,6 +1,10 @@
 # Dual-Quota Output Collection
 
-A submission produces `N` optional output bundles. Bundle `i` consumes `bytes_i` bytes of shared output space and `entries_i` VFS entries, and has diagnostic importance `value_i`. Bundles are indivisible and cannot be selected more than once.
+While designing failure diagnostics for a WASM OJ, we wanted to retain stdout, error logs, coverage data, and other outputs that help users understand why a submission failed. Output stored in the browser is constrained in two ways: file contents must stay within a shared byte quota, and the number of virtual-file-system entries must also remain bounded.
+
+One submission may produce several optional diagnostic bundles. Each bundle has its own space requirement, entry count, and diagnostic importance. A bundle is useful only when retained in full, so it cannot be partially selected.
+
+There are `N` optional bundles. Bundle `i` consumes `bytes_i` bytes of shared output space and `entries_i` VFS entries, and has diagnostic importance `value_i`. Each bundle is indivisible and cannot be selected more than once.
 
 The system permits at most `B` bytes and `I` entries. Choose any subset that stays within both quotas and maximizes total importance. The empty subset is valid. Output only the maximum importance, not the subset.
 

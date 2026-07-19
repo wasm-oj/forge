@@ -1,6 +1,8 @@
 # Canonical Replay Bundle
 
-A textual replay bundle contains `B` blob records followed by `R` manifest references. A blob record has the form `digest declared actual`; a reference contains only a digest. Each digest is a precomputed, collision-free, eight-character lowercase hexadecimal token. You do not need to implement hashing.
+For a WASM OJ execution to be replayed in another environment, its blobs and manifest references must be packaged as portable, verifiable text. If the same information can be represented with different orders or duplicates, two hosts may produce different bundle bytes even though they saved equivalent content, making replay and content addressing unreliable.
+
+The bundle must therefore have one canonical representation. A textual replay bundle contains `B` blob records followed by `R` manifest references. A blob record has the form `digest declared actual`; a reference contains only a digest. Each digest is a precomputed, collision-free, eight-character lowercase hexadecimal token. You do not need to implement hashing.
 
 A bundle is canonical only if all of the following conditions hold:
 
@@ -9,7 +11,7 @@ A bundle is canonical only if all of the following conditions hold:
 3. reference digests are strictly increasing;
 4. every reference digest occurs among the blobs.
 
-If the bundle is invalid, report only the first error phase in the order above. Within a phase, report the smallest 1-indexed record position. The possible forms are `INVALID BLOB_ORDER i`, `INVALID LENGTH i`, `INVALID REF_ORDER i`, and `INVALID MISSING i`. For an ordering error, `i` is the first record whose digest is not greater than the previous digest, so `i >= 2`.
+The validator must produce deterministic diagnostics. If the bundle is invalid, report only the first error phase in the order above. Within a phase, report the smallest 1-indexed record position. The possible forms are `INVALID BLOB_ORDER i`, `INVALID LENGTH i`, `INVALID REF_ORDER i`, and `INVALID MISSING i`. For an ordering error, `i` is the first record whose digest is not greater than the previous digest, so `i >= 2`.
 
 If the bundle is valid, output `VALID total`, where `total` is the sum of the actual lengths of all referenced blobs. Unreferenced blobs do not contribute.
 

@@ -1,17 +1,21 @@
 # 512-Byte Archive
 
-A low-level parser has converted a dependency archive into header events. Perform a final safety check **without expanding any payload**. Every event occupies one 512-byte header, followed by `size` payload bytes and zero padding to a multiple of 512. Therefore the next event offset is:
+A WASM OJ needs to accept dependency archives for problems or programs, but it cannot safely expand unknown contents first and decide whether they were valid afterward. To reject damaged or unsupported structures before allocating extraction space, a low-level parser has already converted the archive into header events. The remaining safety check must be performed **without expanding any payload**.
+
+Every event occupies one 512-byte header, followed by `size` payload bytes and zero padding to a multiple of 512. Therefore the offset of the next event is:
 
 `offset + 512 + ceil(size / 512) * 512`.
 
-Event types are:
+Event types and their meanings are:
 
 - `F`: a regular file; counts toward both the file count and extracted bytes.
 - `D`: a directory; `size` must be 0.
 - `G`, `P`: GNU long-path or PAX path metadata. `name` overrides the path of the next `F/D`, and `size` must equal the ASCII byte length of `name` plus one. Metadata may not appear while previous metadata is still waiting to be consumed.
 - Any other uppercase letter is unsupported.
 
-Each event also provides stored and calculated checksums, which must match. A valid path is nonempty, relative, and canonical: it neither begins nor ends with `/`; every segment contains only lowercase letters, digits, `.`, `_`, and `-`, and no segment is `.` or `..`. When metadata is pending, the next `F/D` uses the metadata `name` as its effective path and ignores its own header `name`.
+Each event also provides a stored checksum and a calculated checksum, which must match. A valid path must be nonempty, relative, and canonical: it neither begins nor ends with `/`; every segment contains only lowercase letters, digits, `.`, `_`, and `-`, and no segment is `.` or `..`.
+
+When metadata is pending, the next `F/D` uses the metadata `name` as its effective path and ignores its own header `name`. Validate the event stream under these rules without reading or expanding any payload.
 
 ## Input
 

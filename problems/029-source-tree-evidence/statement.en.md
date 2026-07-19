@@ -1,6 +1,8 @@
 # Source Tree Evidence
 
-Given a collection of source-tree records, construct the unique canonical provenance manifest. The evidence subtree itself must be excluded so that the evidence does not recursively contain itself.
+A reproducible WASM OJ build record needs a provenance manifest that describes the source tree compilation actually observed. The manifest must cover regular files, symbolic links, and tombstones for deleted items without depending on the order in which the tree happened to be scanned.
+
+The provenance evidence is itself written back into that tree. If the evidence directory were included in its own manifest, the content would depend recursively on itself, and generating one report could change the next. The designated evidence subtree must therefore be excluded completely when constructing the canonical manifest.
 
 The first line names the evidence root path `E`. Records have three forms:
 
@@ -10,7 +12,7 @@ The first line names the evidence root path `E`. Records have three forms:
 
 Each digest is a precomputed eight-character lowercase hexadecimal token. All paths are normalized and pairwise distinct. Exclude a record if its path is exactly `E` or begins with `E/`. For example, when `E` is `proof`, `proof/a` is excluded but `proof2/a` is not.
 
-Sort all remaining records by strictly increasing UTF-8 bytes of `path`. The allowed input characters are ASCII, so this is ordinary ASCII lexicographic order. Every field other than record order must be reproduced exactly.
+Sort all remaining records by strictly increasing UTF-8 bytes of `path` to obtain the unique order. The allowed input characters are ASCII, so this is ordinary ASCII lexicographic order. Every field other than record order must be reproduced exactly.
 
 ## Input
 

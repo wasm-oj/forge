@@ -1,12 +1,14 @@
 # Recent Submission Reuse
 
-A judge receives `N` submissions in chronological order. Submission `i` has a lowercase hexadecimal fingerprint. It is a **reuse hit** if the same exact fingerprint appeared at an index in
+While designing a short-term compilation cache for a WASM OJ, we wanted to avoid compiling the same source repeatedly within a short period. Every submission has a fingerprint. If the exact fingerprint was processed recently, the previous result can be reused. The cache retains only a bounded recent history, however, so an older submission can no longer produce a hit.
+
+The system receives `N` submissions in chronological order. Submission `i` has a lowercase hexadecimal fingerprint. Only the previous `K` submissions are recent enough, so submission `i` is a **reuse hit** if the same exact fingerprint appeared at an index in
 
 ```text
 [max(1, i - K), i - 1].
 ```
 
-In other words, only the previous `K` submissions are recent enough. Fingerprints are exact tokens, not hexadecimal numbers, so `0` and `00` are different. When `K = 0`, the interval is empty and every submission is a miss.
+Fingerprints are exact tokens, not hexadecimal numbers, so `0` and `00` are different. When `K = 0`, the interval is empty and every submission is a miss. A hit still becomes part of the recent history for later submissions.
 
 Count the total number of reuse hits.
 

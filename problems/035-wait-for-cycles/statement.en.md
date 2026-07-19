@@ -1,8 +1,12 @@
 # Wait-For Cycles
 
-There are `N` processes that have not yet been released. A directed release edge `u v` means that once `u` is released, it can send an event that releases `v`. Release events continue propagating along edges. You may also inject an external wake event into any process.
+While designing the interactive-program runtime for a WASM OJ, we needed to handle processes that wait for events from one another. Releasing one process may let it wake other processes, but a group whose first event can only come from within the same group may otherwise remain stalled forever.
 
-Two processes belong to the same mutually waiting group if each is reachable from the other. A strongly connected component containing a directed cycle is a **wait-cycle group**: every SCC of size greater than one qualifies, while a singleton qualifies only if it has a self-loop.
+To diagnose this situation, we want both to list the groups that contain an actual wait cycle and to determine the minimum number of external wake events needed for release events to reach the entire system.
+
+There are `N` processes that have not yet been released. A directed release edge `u v` means that once `u` is released, it can send an event that releases `v`. Release events continue propagating along edges. You may also inject external wake events, each into any process.
+
+Two processes belong to the same mutually waiting group if each is reachable from the other. A strongly connected component containing a directed cycle is a **wait-cycle group**: every SCC of size greater than `1` qualifies, while a singleton qualifies only if it has a self-loop.
 
 List every wait-cycle group and compute the minimum number of external wake events required to release all processes. One wake may target any process. Release propagates throughout its SCC and then downstream along condensation edges.
 

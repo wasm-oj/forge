@@ -14,7 +14,7 @@ describe.runIf(runIntegration)("published wasm-oj/problems collection", () => {
     });
     expect(collection.origin).toBe("network");
     expect(collection.index.problems).toHaveLength(45);
-    expect(collection.index.revision).toBe("e2d84a37f927aafbfbda779d05b5c2a5ede94e0f7780472ff4c95da11e18ae03");
+    expect(collection.index.revision).toBe("a885b7381f7dafe2e8ba45df9735a6f498ce2b50291f1d61de230510202babc2");
     const problems = await Promise.all(collection.index.problems.map((entry) => collection.loadProblem(entry.id)));
     expect(problems.map((problem) => problem.number)).toEqual(Array.from({ length: 45 }, (_, index) => index + 1));
     expect(problems[0]).toMatchObject({ number: 1, id: "progressive-cost-budget", track: { en: "Foundations" } });

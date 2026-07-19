@@ -1,8 +1,12 @@
 # 切斷危險 Capability
 
-函式呼叫圖是一張 directed graph。若從任一公開 entry function 能沿呼叫邊到達任一 dangerous function，sandbox 就可能觸及 network/thread/process capability。
+在設計 WASM OJ 的 capability sandbox 時，只檢查模組直接 import 了哪些 API 並不夠。公開 entry function 可能經過多層 helper calls，間接到達能建立 network、thread 或 process 的函式；只要存在這樣的呼叫路徑，使用者程式就仍可能觸及不允許的 capability。
 
-你可以封鎖函式 `i`，代價為 `cost[i]`；封鎖會移除該函式及所有 incident call edges。Entry 與 dangerous function 也允許封鎖。求讓所有 entry 到 dangerous 的路徑都消失所需的最小總代價。
+我們可以在載入模組時封鎖特定函式，但不同函式的封鎖代價不同：有些函式容易替換，有些則會連帶停用大量正常功能。因此目標不是封鎖最多函式，而是以最小代價切斷所有危險路徑。
+
+將函式呼叫關係表示成一張 directed graph。若從任一公開 entry function 能沿 call edges 到達任一 dangerous function，就存在危險路徑。封鎖函式 `i` 的代價為 `cost[i]`，並會移除該函式及所有 incident call edges；entry functions 與 dangerous functions 本身也允許被封鎖。
+
+請求出讓所有 entry 到 dangerous 的路徑都消失所需的最小總代價。
 
 ## 輸入
 

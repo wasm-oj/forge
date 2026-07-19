@@ -1,10 +1,12 @@
 # Three-Stream Shared Output Pool
 
-The judge receives `N` write events in chronological order. Each event writes to `O` (stdout), `E` (stderr), or `F` (the output-file collection), but all three destinations share one byte budget.
+While designing output limits for a WASM OJ, we found that stdout, stderr, and output files cannot have unrelated allowances. Otherwise, a program could use all three streams at once and multiply the intended total output. The three destinations must therefore share one byte budget and consume it in the order in which writes actually occur.
 
-For every independent query, replay all events from an empty pool. A write may be retained partially: if only `x` bytes remain, retain the first `x` bytes of that event, fill the pool, and record this event as the first failure. Once the pool is full, later events are not processed.
+One execution produces `N` write events in chronological order. Each event writes to `O` (stdout), `E` (stderr), or `F` (the output-file collection). To study the effect of different limits, the system independently replays the same events under several budgets; the output pool starts empty for every query.
 
-The input guarantees that query budgets are nondecreasing. Output the first event that cannot be retained in full and the number of bytes actually retained for each stream.
+A write may retain only its beginning. If only `x` bytes remain in the pool, retain the first `x` bytes of that event, fill the pool, and record this event as the first failure. Once the output pool is full, no later event is processed.
+
+The input guarantees that query budgets are nondecreasing. For each budget, output the first event that cannot be retained in full and the number of bytes actually retained for each of the three streams.
 
 ## Input
 

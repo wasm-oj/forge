@@ -1,8 +1,12 @@
 # 精確依賴快取
 
-編譯器記錄每個 translation unit（TU）實際讀過哪些 header。每輪修改若包含 TU 讀過的至少一個 header，該 TU 就 cache miss；否則 hit。每輪結束後所有 miss 都已重編，因此下一輪重新從乾淨 baseline 開始。
+WASM OJ 的瀏覽器內編譯快取，首先要避免「只要一個 header 改變，就重新編譯所有 translation unit（TU）」的情況。這種保守作法雖然安全，卻會浪費大量 instruction cost，也會讓只改動一個小檔案的使用者等待完整重建。
 
-給定固定的精確依賴關係與多輪 header 修改集合，輸出每輪 cache miss 的 TU 數量。
+因此，編譯器會記錄每個 TU 在編譯時**實際讀過**哪些 header。當一輪修改包含某個 TU 讀過的至少一個 header 時，該 TU 才會 cache miss；如果修改集合與它的精確依賴完全沒有交集，就能沿用原本的編譯結果。
+
+為了評估一系列獨立的編輯情境，每輪結束後都視為所有 miss 已完成重編，所以下一輪重新從乾淨 baseline 開始，而不是累積前幾輪的修改狀態。
+
+給定固定的 TU 與 header 依賴關係，以及多輪 changed-header 集合，請輸出每一輪會 cache miss 的 TU 數量。
 
 ## 輸入
 

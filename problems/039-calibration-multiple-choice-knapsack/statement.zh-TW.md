@@ -1,8 +1,12 @@
 # Calibration 實驗排程
 
-有 `G` 個 calibration profile。profile `g` 提供 `K_g` 種互斥測量方案，每個方案有執行時間與可信度收益。同一 profile 最多選一種方案，也可以完全跳過；不同 profile 的選擇互不排斥。
+在設計 WASM OJ 的 instruction cost calibration 時，我們需要定期測量不同語言與 toolchain profile。對同一個 profile，可以選擇快速但證據較少的測量方案，也可以投入更多時間執行較完整的 benchmark；這些方案代表同一次 calibration 的替代做法，不能同時採用。
 
-在總時間上限 `C` 內，最大化可信度總和。方案不可切割或重複，只輸出最大值，空排程合法。
+發布前可用的校準時間有限，因此我們可能跳過某些 profile，也可能為不同 profile 選擇不同深度的測量。不同 profile 之間互不排斥，但所有實驗的執行時間必須共享同一個總上限。
+
+共有 `G` 個 calibration profiles。Profile `g` 提供 `K_g` 種互斥測量方案，每個方案都有執行時間與可信度收益。同一個 profile 最多選擇一種方案，也可以完全跳過。
+
+請在總時間上限 `C` 內，最大化所選方案的可信度總和。方案不可切割或重複，空排程合法；只需輸出最大值。
 
 ## 輸入
 

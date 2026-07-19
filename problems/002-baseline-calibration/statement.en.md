@@ -1,8 +1,12 @@
 # Empty-Program Baseline Calibration
 
-The judge measures the cost of an empty program under `P` compilation profiles. Each profile is expected to have exactly one observation for every seed from `1` through `S`. A profile's baseline may be published only if every seed is present and all observed costs are identical.
+When measuring instruction cost in a WASM OJ, the compiler and execution environment introduce fixed overhead of their own. Charging this overhead directly to the submitted program would make compilation profiles difficult to compare fairly. We therefore run an empty program first and establish a deductible baseline for each profile.
 
-The same `(profile, seed)` pair appears at most once, but observations may arrive in any order. For each raw-cost query, output `INVALID` if the profile has no publishable baseline. Otherwise, output the baseline and the net cost after subtracting it. Net cost may not be negative, so it is defined as `max(0, raw-baseline)`.
+A baseline may be published only when its measurements are complete and reproducible. The system observes `P` compilation profiles, and each profile is expected to have exactly one result for every seed from `1` through `S`. A profile has a publishable baseline only if every seed is present and all observed costs are identical.
+
+Measurements may arrive in any order, but the same `(profile, seed)` pair appears at most once in the input. Each later query supplies a profile and a raw cost so that the submitted program's cost can be computed after removing the environmental baseline.
+
+If the profile has no publishable baseline, output `INVALID`. Otherwise, output the baseline and the net cost. Net cost may not be negative, so it is defined as `max(0, raw-baseline)`.
 
 ## Input
 

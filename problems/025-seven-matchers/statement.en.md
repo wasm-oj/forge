@@ -1,6 +1,8 @@
 # Seven Answer Matchers
 
-Each query provides expected and actual token arrays and selects a matcher. `n` and `m` may be zero; the corresponding data line is then empty.
+Answer validation in a WASM OJ cannot assume that “correct” always means two outputs are byte-for-byte identical. Some problems care about one complete string, some ignore set order, some preserve multiplicity, and others compare numeric tolerance or a collection of output files.
+
+The system therefore provides seven matchers so that every problem can select its exact judging semantics. Each query contains expected and actual token arrays and chooses one matcher. `n` and `m` may be zero; the corresponding data line is then empty.
 
 - `EXACT`: concatenate all tokens on each side **without separators**, then compare the two strings.
 - `LINES`: token `#` represents an empty line. Remove all trailing `#` tokens from each array, then compare item by item.

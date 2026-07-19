@@ -1,6 +1,10 @@
 # Offline Dependency Suitcase
 
-Several lockfile packages may refer to the same content digest. An offline bundle must provide exactly one payload for every **unique required digest**: none may be missing or extra, and every size must match. If packages declare different sizes for the same digest, the lockfile contradicts itself.
+To let an offline WASM OJ toolchain load directly in the browser, we need to package the dependencies required by its lockfile together with their payloads instead of downloading them at execution time. Copying one file per package would waste space because different packages may refer to the same content digest.
+
+The bundle therefore deduplicates content by digest. It must provide exactly one payload for every **unique required digest** in the lockfile: none may be missing, none may be extra, and every payload size must match its declaration. A zero-size payload still represents a digest that must be validated.
+
+Two internal contradictions must also be handled. If several packages declare different sizes for one digest, the lockfile conflicts with itself. If the bundle lists one digest more than once, its payload is no longer unique. When several error kinds apply, use the category priority specified below; within one category, choose the ASCII-lexicographically smallest digest.
 
 ## Input
 

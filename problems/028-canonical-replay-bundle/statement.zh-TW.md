@@ -1,6 +1,8 @@
 # 唯一的 Replay Bundle
 
-一個文字化 replay bundle 包含 B 筆 blob record 與 R 個 manifest reference。blob 行為 `digest declared actual`；reference 行只有 digest。digest 是已計算完成且不碰撞的 8 位 lowercase hexadecimal token，本題不要求實作雜湊。
+一次 WASM OJ 執行若要能在其他環境 replay，就需要把它依賴的 blobs 與 manifest references 封裝成可攜、可驗證的文字資料。如果相同內容可以用不同排列或重複表示，兩台 host 即使保存相同資訊，也可能產生不同的 bundle bytes，讓重現與內容定址變得不可靠。
+
+因此 bundle 必須採用唯一的 canonical 表示。一個文字化 replay bundle 先包含 `B` 筆 blob records，再包含 `R` 個 manifest references。blob 行為 `digest declared actual`；reference 行只有 digest。digest 是已計算完成且不碰撞的 8 位 lowercase hexadecimal token，本題不要求實作雜湊。
 
 Canonical bundle 必須同時滿足：
 
@@ -9,9 +11,9 @@ Canonical bundle 必須同時滿足：
 3. reference digest 嚴格遞增；
 4. 每個 reference 都能在 blobs 中找到。
 
-若無效，依上述 phase 順序只輸出第一種錯誤；同一 phase 取最小 1-indexed record 位置。錯誤格式為 `INVALID BLOB_ORDER i`、`INVALID LENGTH i`、`INVALID REF_ORDER i` 或 `INVALID MISSING i`。順序錯誤的位置 i 指第一個不大於前一筆的 record（所以 i≥2）。
+驗證器必須提供 deterministic 診斷。若 bundle 無效，依上述 phase 順序只輸出第一種錯誤；同一 phase 取最小 1-indexed record 位置。錯誤格式為 `INVALID BLOB_ORDER i`、`INVALID LENGTH i`、`INVALID REF_ORDER i` 或 `INVALID MISSING i`。順序錯誤的位置 `i` 指第一個不大於前一筆的 record（所以 `i≥2`）。
 
-若有效，輸出 `VALID total`，其中 total 是所有被 reference 的 blob actual length 總和；未引用 blob 不計。
+若有效，輸出 `VALID total`，其中 `total` 是所有被 reference 的 blob actual length 總和；未引用 blob 不計。
 
 ## 輸入
 

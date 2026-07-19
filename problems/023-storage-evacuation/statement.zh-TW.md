@@ -1,21 +1,21 @@
 # 瀏覽器儲存疏散令
 
-cache 目前保存 `N` 個不可分割的項目。邏輯 cache 上限為 `C` bytes；瀏覽器目前可用空間為 `A` bytes，而系統要求至少保留 `R` bytes 可用空間。
+WASM OJ 在瀏覽器中保存編譯 artifact 與測試資料時，同時受到兩種限制：cache 自己設定的邏輯容量，以及瀏覽器還需要為其他功能保留的可用空間。當任一限制被突破，storage manager 就必須從 cache 中疏散項目。
 
-若項目總大小為 `T`，必須釋放至少
+目前 cache 保存 `N` 個不可分割的項目，邏輯上限為 `C` bytes。瀏覽器目前可用空間為 `A` bytes，而系統要求疏散後至少保留 `R` bytes 可用空間。若所有項目的總大小為 `T`，必須釋放至少
 
 `need = max(0, T - C, R - A)`
 
-bytes。若 `need` 大於 `T`，疏散不可能完成。
+bytes。若 `need` 大於 `T`，即使刪除全部 cache 內容也無法達成要求，因此疏散不可能完成。
 
-每個項目有 `size priority lastUsed participant key`。固定淘汰順序為：
+為了讓相同狀態在不同裝置上得到可重現的結果，淘汰不是任意選擇能湊足空間的組合。每個項目有 `size priority lastUsed participant key`，固定順序為：
 
 1. `priority` 較小者先；
 2. 同 priority 時，`lastUsed` 較小（較舊）者先；
 3. 再依 participant 的 ASCII 字典序；
 4. 最後依 key 的 ASCII 字典序。
 
-依此順序刪除完整項目，直到已釋放量第一次不少於 need。這個規則是政策，不得另選「剛好湊滿」的組合。
+依此順序刪除完整項目，直到已釋放量第一次不少於 `need`。這個規則是 storage policy，不得另選「剛好湊滿」的組合。
 
 ## 輸入
 

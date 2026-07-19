@@ -1,6 +1,10 @@
 # A Header Changed: What Must Be Rebuilt?
 
-The build graph is a DAG. An edge `u v` means that node `v`'s artifact directly depends on node `u`. When a node changes, that node and every node that depends on it directly or indirectly become dirty. Given all nodes changed in one batch, output every dirty node.
+A WASM OJ build cache avoids rebuilding every intermediate artifact for each submission, but only if it never reuses a stale result. When a shared header, generated file, or other build node changes, every artifact that depends on it must be invalidated. Nodes unrelated to the change should remain available in the cache.
+
+We represent these relationships as a build graph. The graph is a DAG, and an edge `u v` means that node `v`'s artifact directly depends on node `u`. When a node changes, that node becomes dirty, as does every node that depends on it directly or indirectly.
+
+One file update may change several nodes at once. Given every node changed in the same batch, output all nodes that must be considered dirty.
 
 ## Input
 

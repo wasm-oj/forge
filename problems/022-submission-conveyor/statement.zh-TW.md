@@ -1,12 +1,14 @@
 # Submission 輸送帶
 
-Judge 同一時間只執行一份 submission，其餘依加入順序排隊。所有事件已排成確定的全序。
+WASM OJ 的 submission 排程器若只有一個 execution slot，同一時間就最多執行一份 submission，其餘工作依加入順序等待。除了正常完成以外，使用者也可能取消正在執行或仍在排隊的 submission，因此 scheduler 必須在每個事件後維持明確的 active 狀態與等待數量。
+
+所有事件已排成確定的全序。submission 一旦正常完成或被取消，就進入 terminal 狀態，不會再次執行。處理以下事件：
 
 - `A id`：加入從未出現過的 submission。若當下沒有 active submission，它立刻成為 active；否則排到隊尾。
 - `C id`：取消該 id。若它正在等待或執行，狀態變成 terminal；否則不做事。若 active 被取消，立即啟動仍在等待者中最早加入的一份。
 - `E`：active submission 正常結束並成為 terminal；若沒有 active 則不做事。之後同樣啟動最早等待者。
 
-取消等待者不改變其他等待者的相對順序。
+若 active submission 離開系統，scheduler 必須立即啟動仍在等待者中最早加入的一份。取消等待者不改變其他等待者的相對順序；對尚未加入或已 terminal 的 id 取消則不影響任何狀態。
 
 ## 輸入
 

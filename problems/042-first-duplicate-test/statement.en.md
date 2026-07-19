@@ -1,8 +1,10 @@
 # First Duplicate Test
 
-A judge receives `N` test-case fingerprints in arrival order. Each fingerprint is a non-empty lowercase hexadecimal token. Two fingerprints are equal only when their token strings are exactly equal: for example, `0` and `00` are different fingerprints.
+While designing the problem-import pipeline for a WASM OJ, we needed to prevent the same test case from being added more than once. Every test already has a fingerprint before entering storage, so full file contents do not need to be compared again. For reproducible diagnostics, however, we want not only to detect a duplicate but also to identify the earliest duplicate and its original source.
 
-Find the earliest arrival that duplicates an earlier fingerprint. More precisely, find the smallest index `i` for which there is an index `j < i` with the same fingerprint, and report `i` together with the earliest such index `j` for that fingerprint. Indices are one-based.
+The system receives `N` test-case fingerprints in arrival order. Each fingerprint is a non-empty lowercase hexadecimal token. Fingerprints are compared as exact token strings, not as hexadecimal numbers: for example, `0` and `00` are different fingerprints.
+
+Find the earliest arrival that duplicates an earlier fingerprint. More precisely, find the smallest index `i` for which an index `j < i` has the same fingerprint, and report `i` together with the earliest such index `j` for that fingerprint. All indices are one-based.
 
 If every fingerprint is distinct, report `NONE`.
 

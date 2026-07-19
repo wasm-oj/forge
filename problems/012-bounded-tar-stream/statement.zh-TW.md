@@ -1,17 +1,21 @@
 # 512-byte 封存檔
 
-依賴封存檔已被底層解析器轉成 header 事件；你要在**不展開 payload** 的前提下做最後一道安全檢查。每筆事件佔一個 512-byte header，之後緊接 `size` bytes payload，再補零到 512 的倍數。因此下一筆 offset 為：
+WASM OJ 需要接收題目或程式的依賴封存檔，但不能先完整展開未知內容，再判斷它是否安全。為了在配置解壓空間以前拒絕損壞或不受支援的結構，底層解析器已把封存檔轉成 header 事件；現在要在**不展開 payload** 的前提下完成最後一道檢查。
+
+每筆事件占一個 512-byte header，之後緊接 `size` bytes payload，再補零到 512 的倍數。因此下一筆事件的 offset 為：
 
 `offset + 512 + ceil(size / 512) * 512`。
 
-事件種類如下：
+事件種類及其語意如下：
 
 - `F`：一般檔案；計入檔案數與解壓 bytes。
 - `D`：目錄；`size` 必須為 0。
 - `G`、`P`：GNU long-path 或 PAX path metadata。`name` 是下一筆 `F/D` 的覆寫路徑，且 `size` 必須等於 `name` 的 ASCII byte 長度加一。尚有 metadata 等待使用時不得再出現 metadata。
 - 其他大寫字母：不支援。
 
-每筆另給 stored 與 calculated checksum，兩者必須相等。有效路徑是非空、相對且 canonical：不得以 `/` 開頭或結尾；segment 只含小寫字母、數字、`.`、`_`、`-`，且不得為 `.` 或 `..`。若有 metadata，下一筆 `F/D` 的有效路徑採 metadata 的 `name`；header 自己的 `name` 被忽略。
+每筆事件另給 stored checksum 與 calculated checksum，兩者必須相等。有效路徑必須非空、相對且 canonical：不得以 `/` 開頭或結尾；每個 segment 只含小寫字母、數字、`.`、`_`、`-`，且不得為 `.` 或 `..`。
+
+若有 metadata 等待使用，下一筆 `F/D` 的有效路徑採用 metadata 的 `name`，並忽略該 header 自己的 `name`。請依這些規則驗證事件串流，而不讀取或展開任何 payload。
 
 ## 輸入
 

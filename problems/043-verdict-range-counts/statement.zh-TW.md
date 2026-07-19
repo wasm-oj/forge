@@ -1,8 +1,10 @@
 # 判決區間計數
 
-一場 contest 依 case index 記錄 `N` 個判題結果。每個字元是 `A`（Accepted）、`W`（Wrong Answer）、`R`（Runtime Error）或 `T`（Time Limit）。
+在設計 WASM OJ 的判題結果分析介面時，我們希望使用者能快速檢查一段連續測資的失敗分布。例如，他們可能只想查看壓力測試區段中出現多少次 Runtime Error，或比較前後兩組 cases 的 Wrong Answer 數量。
 
-你要回答 `Q` 個靜態區間查詢。查詢 `L R V` 要求閉區間 `[L, R]` 內 verdict `V` 的出現次數。索引從 `1` 開始，紀錄在所有查詢期間不會改變。
+一次 submission 已經依 case index 記錄了 `N` 個 verdicts。每個 verdict 以一個字元表示：`A` 代表 Accepted、`W` 代表 Wrong Answer、`R` 代表 Runtime Error、`T` 代表 Time Limit。分析期間這份紀錄不會再改變。
+
+你需要回答 `Q` 個靜態區間查詢。查詢 `L R V` 要求閉區間 `[L, R]` 內 verdict `V` 的出現次數。所有 index 從 `1` 開始。
 
 ## 輸入
 

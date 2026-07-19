@@ -1,6 +1,8 @@
 # Judge 總帳區間查詢
 
-每個 case 依序記錄 `verdict cost time memory vfs`。verdict 以整數表示：`0=AC, 1=WA, 2=RE, 3=TLE`。四個 metric 若不可用，以 `-1` 表示。
+一份 submission 的最終 verdict 不足以呈現所有診斷資訊，因此 WASM OJ 的判題結果介面也要讓使用者檢查某一段 test cases 的執行摘要。不同檢視模式可能跑完整區間，也可能在第一個失敗 case 立刻停止；兩者實際納入統計的範圍並不相同。
+
+每個 case 依序記錄 `verdict cost time memory vfs`。verdict 以整數表示：`0=AC, 1=WA, 2=RE, 3=TLE`。四個 metric 若無法取得，以 `-1` 表示。現在需要回答多個區間查詢，重現介面在不同 fail-fast 設定下應顯示的摘要。
 
 每個查詢 `l r f` 要聚合 1-indexed 閉區間 `[l,r]`：
 

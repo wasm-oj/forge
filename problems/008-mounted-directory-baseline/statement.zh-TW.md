@@ -1,10 +1,12 @@
 # 目錄樹的掛載基線
 
-Judge 啟動前要掛載 `M` 個唯讀輸入檔，並預先建立 `O` 個大小為零的輸出檔。為了避免字串解析干擾，canonical absolute path 以正整數 segment 表示：`k s1 ... sk` 代表 `/s1/.../sk`，最後一個 segment 是檔名，前面都是父目錄。
+每次啟動 WASM OJ 的隔離執行環境前，我們都要先掛載測試輸入，並建立題目允許產生的輸出檔。這些初始化資源在使用者程式開始執行前就已占用 VFS 配額，因此不能把它們誤算成程式執行期間才增加的用量。我們需要先建立一份可重現的掛載 baseline。
 
-所有必要父目錄都要自動建立且只計一次；guest root `/` 永遠存在並消耗一個 inode。每個檔案也各消耗一個 inode。baseline bytes 只包含唯讀輸入檔的 logical size，預建輸出檔大小為零。
+環境會掛載 `M` 個唯讀輸入檔，並預先建立 `O` 個大小為零的輸出檔。為了把問題集中在目錄樹的資源計算，canonical absolute path 以正整數 segment 表示：`k s1 ... sk` 代表 `/s1/.../sk`；最後一個 segment 是檔名，前面都是父目錄。
 
-系統準備以 byte quota `B` 與 inode quota `I` 封存這個基線。請計算 baseline，並判斷能否封存。
+掛載時，所有必要父目錄都要自動建立，但同一個目錄無論被多少檔案共用都只計一次。guest root `/` 永遠存在並消耗一個 inode，每個檔案也各消耗一個 inode。baseline bytes 只包含唯讀輸入檔的 logical size；預建輸出檔的大小為零。
+
+系統準備以 byte quota `B` 與 inode quota `I` 封存這個 baseline。請計算 baseline 的 bytes 與 inode 用量，並判斷它能否在兩種配額下完成封存。
 
 ## 輸入
 

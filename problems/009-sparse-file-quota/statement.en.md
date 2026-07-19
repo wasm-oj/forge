@@ -1,14 +1,14 @@
 # Sparse Files Are Not Free
 
-A VFS contains `F` existing empty files. Each has a logical size and a cursor, both initially `0`. The sum of all logical file sizes may not exceed byte quota `B`. Sparse holes count toward logical size and quota even though their contents are not physically written.
+When implementing a VFS byte quota for a WASM OJ, counting only payload bytes actually written is unsafe. A program can move its cursor far ahead and then write a small amount of data, creating a large sparse hole. Even though the intervening range is not physically written, it still expands the file's logical size and must consume the same quota.
 
-Execute `N` operations in order:
+The VFS contains `F` existing empty files. Each file has a logical size and a cursor, both initially `0`, and the sum of all logical file sizes may not exceed byte quota `B`. Execute `N` operations in order:
 
 - `SEEK x position`: set file `x`'s cursor to an absolute position. It may be beyond EOF and does not change the size.
 - `WRITE x length`: if `length>0`, the candidate new size is `max(oldSize,cursor+length)`; if `length=0`, both size and cursor remain unchanged. After a successful nonzero write, advance the cursor by `length`.
 - `TRUNCATE x size`: the candidate new size is exactly `size`. The cursor is unchanged, even if it lies beyond the new EOF.
 
-`SEEK` always succeeds. If the candidate sum of all logical file sizes for a `WRITE` or `TRUNCATE` would exceed `B`, output a quota error and leave size, cursor, and peak usage entirely unchanged. Otherwise commit all changes atomically.
+`SEEK` always succeeds. A `WRITE` or `TRUNCATE` must first check the candidate sum of logical sizes across all files. If that sum would exceed `B`, output a quota error and leave size, cursor, and peak usage entirely unchanged. Only an operation that passes the quota check commits all of its changes atomically.
 
 ## Input
 

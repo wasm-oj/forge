@@ -1,8 +1,12 @@
 # Minimum Conflict Package Isolation
 
-A runtime contains two kinds of packages: npm packages on the left and native packages on the right. Each conflict edge means that its two endpoints cannot both remain available. Isolating a package removes every conflict incident to it.
+While designing the runtime package environment for a WASM OJ, we needed to combine npm packages from the JavaScript ecosystem with lower-level native packages. Some cross-ecosystem combinations compete for the same symbols, expose incompatible ABIs, or require conflicting runtime capabilities, so both packages in such a pair cannot remain available together.
 
-Find the minimum number of packages that must be isolated to eliminate all conflicts. Output only the minimum size; an optimal set need not be unique.
+Resolving conflicts one at a time would miss an important effect: isolating one package removes every conflict involving it. We therefore want an isolation plan that removes as few packages as possible while leaving the remaining packages mutually usable.
+
+Model the `L` npm packages as vertices on the left and the `R` native packages as vertices on the right. Every conflict edge connects one left package to one right package and means that its endpoints cannot both remain available. Isolating either endpoint eliminates that conflict, and isolating a package eliminates all incident conflicts.
+
+Find the minimum number of packages that must be isolated to eliminate every conflict. Output only the minimum size; an optimal set need not be unique, so the set itself is not required.
 
 ## Input
 

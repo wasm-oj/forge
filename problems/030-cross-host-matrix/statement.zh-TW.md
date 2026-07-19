@@ -1,14 +1,16 @@
 # 跨 Host 一致性矩陣
 
-第一個 host 是 baseline。每個 host 記錄一個**有序** case 序列；每個 case 有 id、runtime，及按 dotted path 嚴格遞增的 transcript fields。runtime 不屬於 deterministic transcript。
+同一組 WASM OJ calibration cases 在不同 host 上執行時，必須產生相同的 deterministic transcript，否則量測結果不能直接比較。執行時間可以因裝置而異，因此只用來彙整效能；case 的順序、欄位集合與欄位值則必須與基準環境一致。
 
-對每個非 baseline host：
+輸入中的第一個 host 是 baseline。每個 host 記錄一個**有序** case 序列；每個 case 有 id、runtime，以及按 dotted path 嚴格遞增的 transcript fields。runtime 不屬於 deterministic transcript。
+
+對每個非 baseline host，依輸入順序進行以下比較：
 
 1. 若 case id 序列（包含長度）與 baseline 不完全相同，輸出 `HOST name CASE_ORDER`，且不比較 fields。
 2. 否則找出每個 case 中所有不同 dotted path：path 只存在一側，或兩側 value 不同，都算一次。依 baseline case 順序、再依 path ASCII 字典序輸出。
 3. 無差異輸出 `HOST name OK`；有差異輸出 `HOST name k p1 ... pk`，其中輸出 path 為 `caseId.fieldPath`。
 
-若所有非 baseline host 都 OK，再為每個 baseline case 輸出所有 H 個 runtime 的 lower median：排序後 index `floor((H-1)/2)`，格式 `MEDIAN caseId value`。若任一 host 不一致，不輸出任何 median。
+只有當所有非 baseline host 都為 `OK`，效能資料才可視為來自同一份 deterministic 工作。此時再為每個 baseline case 輸出所有 `H` 個 runtime 的 lower median：排序後取 index `floor((H-1)/2)`，格式為 `MEDIAN caseId value`。若任一 host 不一致，不輸出任何 median。
 
 ## 輸入
 
