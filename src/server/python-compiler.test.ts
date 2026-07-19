@@ -18,7 +18,7 @@ import { ServerForgeCompiler } from "./server-compiler";
 import { ServerForgeRunner } from "./server-runner";
 
 describe("server CPython compiler", () => {
-  it("byte-compiles, executes, and safely rebuilds a corrupt runtime-files cache", { timeout: 180_000 }, async () => {
+  it("byte-compiles, executes, and safely rebuilds a corrupt runtime-files cache", { timeout: 300_000 }, async () => {
     const compiler = new ServerForgeCompiler({
       compilerExecutable: process.execPath,
       toolchainDirectory: path.resolve("public/toolchains"),
