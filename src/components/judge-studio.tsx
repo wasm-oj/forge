@@ -32,6 +32,7 @@ import {
   Zap,
 } from "lucide-react";
 import type * as Monaco from "monaco-editor";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CompileCoordinator } from "@/src/compiler/coordinator";
 import { projectBuildIdentity, projectCacheKey } from "@/src/core/hash";
@@ -57,6 +58,13 @@ import { registerToolchainCache } from "@/src/storage/service-worker";
 import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
 import { ProblemMarkdown } from "@/src/components/problem-markdown";
 import { CaseScoreDetails } from "@/src/components/case-score-details";
+import {
+  clampBottomPanelHeight,
+  DEFAULT_BOTTOM_PANEL_HEIGHT,
+  maximumBottomPanelHeight,
+  MIN_BOTTOM_PANEL_HEIGHT,
+  resizedBottomPanelHeight,
+} from "@/src/components/judge-panel-layout";
 import { assertProblemCostProfile, scoreProblemResults } from "@/src/judge/problem-scoring";
 import {
   broadestPolicy,
@@ -81,6 +89,12 @@ type BusyAction = "build" | "run" | "judge" | "cache" | undefined;
 type DifficultyFilter = "all" | ProblemDifficulty;
 type CompileAheadState = "idle" | "scheduled" | "compiling" | "ready" | "error";
 type ProblemPane = "statement" | "editorial";
+
+interface PanelResizeSession {
+  pointerId: number;
+  startHeight: number;
+  startPointerY: number;
+}
 
 interface LogEntry {
   id: string;
@@ -211,6 +225,9 @@ export function JudgeStudio() {
   const [judgeSession, setJudgeSession] = useState<JudgeUiSession>();
   const [selectedCaseNumber, setSelectedCaseNumber] = useState<number>();
   const [bottomTab, setBottomTab] = useState<BottomTab>("judge");
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(DEFAULT_BOTTOM_PANEL_HEIGHT);
+  const [bottomPanelMaximum, setBottomPanelMaximum] = useState(DEFAULT_BOTTOM_PANEL_HEIGHT);
+  const [resizingBottomPanel, setResizingBottomPanel] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");
@@ -222,11 +239,13 @@ export function JudgeStudio() {
   const runnerRef = useRef<BrowserForgeRunner | undefined>(undefined);
   const storageCoordinatorRef = useRef<ForgeStorageCoordinator | undefined>(undefined);
   const projectRef = useRef(project);
+  const editorStackRef = useRef<HTMLElement | null>(null);
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | undefined>(undefined);
   const monacoRef = useRef<typeof Monaco | undefined>(undefined);
   const revealRef = useRef<{ line: number; column: number } | undefined>(undefined);
   const judgingRef = useRef(false);
   const cancelledRef = useRef(false);
+  const panelResizeRef = useRef<PanelResizeSession | undefined>(undefined);
 
   const activeProblem = useMemo(() => {
     const problem = problemById(problemId);
@@ -255,6 +274,81 @@ export function JudgeStudio() {
   const addLog = useCallback((stream: LogEntry["stream"], text: string) => {
     if (!text) return;
     setLogs((current) => [...current, { id: crypto.randomUUID(), stream, text }]);
+  }, []);
+
+  const measureBottomPanel = useCallback(() => {
+    const stack = editorStackRef.current;
+    if (!stack) return;
+    const stackHeight = stack.getBoundingClientRect().height;
+    const maximum = maximumBottomPanelHeight(stackHeight);
+    setBottomPanelMaximum(maximum);
+    setBottomPanelHeight((current) => clampBottomPanelHeight(stackHeight, current));
+  }, []);
+
+  useEffect(() => {
+    const stack = editorStackRef.current;
+    if (!stack) return;
+    const observer = new ResizeObserver(measureBottomPanel);
+    observer.observe(stack);
+    measureBottomPanel();
+    return () => observer.disconnect();
+  }, [measureBottomPanel]);
+
+  const stopBottomPanelResize = useCallback((target?: HTMLDivElement, pointerId?: number) => {
+    if (target && pointerId !== undefined && target.hasPointerCapture(pointerId)) {
+      target.releasePointerCapture(pointerId);
+    }
+    panelResizeRef.current = undefined;
+    setResizingBottomPanel(false);
+    editorRef.current?.layout();
+  }, []);
+
+  const startBottomPanelResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    panelResizeRef.current = {
+      pointerId: event.pointerId,
+      startHeight: bottomPanelHeight,
+      startPointerY: event.clientY,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setResizingBottomPanel(true);
+    event.preventDefault();
+  }, [bottomPanelHeight]);
+
+  const moveBottomPanelResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const resize = panelResizeRef.current;
+    const stack = editorStackRef.current;
+    if (!resize || resize.pointerId !== event.pointerId || !stack) return;
+    setBottomPanelHeight(resizedBottomPanelHeight(
+      stack.getBoundingClientRect().height,
+      resize.startHeight,
+      resize.startPointerY,
+      event.clientY,
+    ));
+  }, []);
+
+  const resizeBottomPanelFromKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const stack = editorStackRef.current;
+    if (!stack) return;
+    const stackHeight = stack.getBoundingClientRect().height;
+    const step = event.shiftKey ? 64 : 24;
+    let requestedHeight: number | undefined;
+    if (event.key === "ArrowUp") requestedHeight = bottomPanelHeight + step;
+    if (event.key === "ArrowDown") requestedHeight = bottomPanelHeight - step;
+    if (event.key === "Home") requestedHeight = MIN_BOTTOM_PANEL_HEIGHT;
+    if (event.key === "End") requestedHeight = maximumBottomPanelHeight(stackHeight);
+    if (requestedHeight === undefined) return;
+    event.preventDefault();
+    setBottomPanelHeight(clampBottomPanelHeight(stackHeight, requestedHeight));
+  }, [bottomPanelHeight]);
+
+  const resetBottomPanelHeight = useCallback(() => {
+    const stack = editorStackRef.current;
+    if (!stack) return;
+    setBottomPanelHeight(clampBottomPanelHeight(
+      stack.getBoundingClientRect().height,
+      DEFAULT_BOTTOM_PANEL_HEIGHT,
+    ));
   }, []);
 
   useEffect(() => {
@@ -897,7 +991,11 @@ export function JudgeStudio() {
           </div>
         </article>
 
-        <section className="editor-stack judge-editor-stack">
+        <section
+          className={`editor-stack judge-editor-stack ${resizingBottomPanel ? "resizing-bottom-panel" : ""}`}
+          ref={editorStackRef}
+          style={{ "--judge-bottom-panel-height": `${bottomPanelHeight}px` } as CSSProperties}
+        >
           <div className="editor-tabs file-tabs">
             {project.files.map((file) => (
               <div className={`file-tab ${file.path === project.activeFile ? "active" : ""}`} key={file.path}>
@@ -944,6 +1042,27 @@ export function JudgeStudio() {
                 }}
               />
             )}
+          </div>
+
+          <div
+            className="bottom-panel-resizer"
+            role="separator"
+            aria-label={problemLocale === "zh-TW" ? "調整編輯器與下方面板高度" : "Resize editor and bottom panel"}
+            aria-orientation="horizontal"
+            aria-valuemin={MIN_BOTTOM_PANEL_HEIGHT}
+            aria-valuemax={bottomPanelMaximum}
+            aria-valuenow={bottomPanelHeight}
+            tabIndex={0}
+            title={problemLocale === "zh-TW" ? "拖曳或使用方向鍵調整高度；雙擊重設" : "Drag or use arrow keys to resize; double-click to reset"}
+            onDoubleClick={resetBottomPanelHeight}
+            onKeyDown={resizeBottomPanelFromKeyboard}
+            onPointerDown={startBottomPanelResize}
+            onPointerMove={moveBottomPanelResize}
+            onPointerUp={(event) => stopBottomPanelResize(event.currentTarget, event.pointerId)}
+            onPointerCancel={(event) => stopBottomPanelResize(event.currentTarget, event.pointerId)}
+            onLostPointerCapture={() => stopBottomPanelResize()}
+          >
+            <span aria-hidden="true" />
           </div>
 
           <section className="bottom-panel">
