@@ -132,24 +132,24 @@ function policyFailure(
   if (evaluation.earned) return locale === "zh-TW" ? "已取得" : "Earned";
   if (!testCase.metrics) {
     return !testCase.outputAccepted
-      ? (locale === "zh-TW" ? "metrics 不可用 · 輸出未通過" : "metrics unavailable · output failed")
-      : (locale === "zh-TW" ? "metrics 不可用" : "metrics unavailable");
+      ? (locale === "zh-TW" ? "資源指標不可用 · 輸出未通過" : "metrics unavailable · output failed")
+      : (locale === "zh-TW" ? "資源指標不可用" : "metrics unavailable");
   }
   const reasons: string[] = [];
   if (testCase.metrics.cost === null) {
-    reasons.push(locale === "zh-TW" ? "cost 不可用" : "cost unavailable");
+    reasons.push(locale === "zh-TW" ? "指令成本不可用" : "cost unavailable");
   } else if (!evaluation.costPassed) {
-    reasons.push(locale === "zh-TW" ? "cost 超標" : "cost over");
+    reasons.push(locale === "zh-TW" ? "指令成本超標" : "cost over");
   }
   if (testCase.metrics.memoryBytes === null) {
-    reasons.push(locale === "zh-TW" ? "memory 不可用" : "memory unavailable");
+    reasons.push(locale === "zh-TW" ? "記憶體用量不可用" : "memory unavailable");
   } else if (!evaluation.memoryPassed) {
-    reasons.push(locale === "zh-TW" ? "memory 超標" : "memory over");
+    reasons.push(locale === "zh-TW" ? "記憶體用量超標" : "memory over");
   }
   if (evaluation.logicalTimePassed === false) {
     reasons.push(testCase.metrics.logicalTimeNs === null
-      ? (locale === "zh-TW" ? "logical time 不可用" : "logical time unavailable")
-      : (locale === "zh-TW" ? "logical time 超標" : "logical time over"));
+      ? (locale === "zh-TW" ? "邏輯時間不可用" : "logical time unavailable")
+      : (locale === "zh-TW" ? "邏輯時間超標" : "logical time over"));
   }
   if (!testCase.outputAccepted) reasons.push(locale === "zh-TW" ? "輸出未通過" : "output failed");
   return [...new Set(reasons)].join(" · ");
@@ -162,7 +162,7 @@ function nextThresholdMessage(
 ): string {
   if (!testCase.outputAccepted) {
     return locale === "zh-TW"
-      ? "輸出必須先完全正確，資源 policy 才會給分。"
+      ? "輸出必須先完全正確，資源政策才會給分。"
       : "Output must be correct before any resource policy awards points.";
   }
   const nextPolicy = problem.scoring.policies.find((policy) => (
@@ -170,15 +170,15 @@ function nextThresholdMessage(
   ));
   if (!nextPolicy) {
     return locale === "zh-TW"
-      ? "這個 case 已通過所有 policy，取得滿分。"
+      ? "這筆測資已通過所有政策，取得滿分。"
       : "This case passes every policy and earns full points.";
   }
   if (!testCase.metrics) {
-    return locale === "zh-TW" ? "沒有足夠 metrics 計算下一個門檻。" : "Metrics are unavailable for the next threshold.";
+    return locale === "zh-TW" ? "沒有足夠的資源指標可計算下一個門檻。" : "Metrics are unavailable for the next threshold.";
   }
   const gaps: string[] = [];
   if (testCase.metrics.cost !== null && testCase.metrics.cost > nextPolicy.limits.instructionBudget) {
-    gaps.push(`${locale === "zh-TW" ? "cost 再降低" : "reduce cost by"} ${formatInteger(
+    gaps.push(`${locale === "zh-TW" ? "指令成本再降低" : "reduce cost by"} ${formatInteger(
       testCase.metrics.cost - nextPolicy.limits.instructionBudget,
       locale,
     )}`);
@@ -187,7 +187,7 @@ function nextThresholdMessage(
     testCase.metrics.memoryBytes !== null
     && testCase.metrics.memoryBytes > nextPolicy.limits.memoryLimitBytes
   ) {
-    gaps.push(`${locale === "zh-TW" ? "memory 再降低" : "reduce memory by"} ${formatBytes(
+    gaps.push(`${locale === "zh-TW" ? "記憶體用量再降低" : "reduce memory by"} ${formatBytes(
       testCase.metrics.memoryBytes - nextPolicy.limits.memoryLimitBytes,
       locale,
     )}`);
@@ -197,7 +197,7 @@ function nextThresholdMessage(
     && testCase.metrics.logicalTimeNs !== null
     && testCase.metrics.logicalTimeNs > nextPolicy.limits.logicalTimeLimitMs * 1_000_000
   ) {
-    gaps.push(`${locale === "zh-TW" ? "logical time 再降低" : "reduce logical time by"} ${formatMilliseconds(
+    gaps.push(`${locale === "zh-TW" ? "邏輯時間再降低" : "reduce logical time by"} ${formatMilliseconds(
       testCase.metrics.logicalTimeNs - nextPolicy.limits.logicalTimeLimitMs * 1_000_000,
       locale,
     )}`);
@@ -233,41 +233,43 @@ export function CaseScoreDetails({
     value: policy.limits.memoryLimitBytes,
   }));
   return (
-    <section className="case-score-details" aria-label={locale === "zh-TW" ? "Case 計分細節" : "Case scoring details"}>
+    <section className="case-score-details" aria-label={locale === "zh-TW" ? "測資計分細節" : "Case scoring details"}>
       <header>
         <div>
-          <strong>Case {String(testCase.number).padStart(2, "0")}</strong>
+          <strong>{locale === "zh-TW" ? "測資" : "Case"} {String(testCase.number).padStart(2, "0")}</strong>
           <span>{locale === "zh-TW" ? "計分細節" : "scoring details"}</span>
         </div>
-        <b>{testCase.points ?? 0} / {problem.scoring.maximumPoints} pts</b>
+        <b>{testCase.points ?? 0} / {problem.scoring.maximumPoints} {locale === "zh-TW" ? "分" : "pts"}</b>
       </header>
       <p className="next-threshold-message">{nextThresholdMessage(problem, testCase, locale)}</p>
       <div className="case-metric-cards">
         <div>
-          <span>{locale === "zh-TW" ? "Net instruction cost" : "Net instruction cost"}</span>
+          <span>{locale === "zh-TW" ? "淨指令成本" : "Net instruction cost"}</span>
           <strong>{metrics?.cost === null || metrics?.cost === undefined ? "—" : formatInteger(metrics.cost, locale)}</strong>
           <small>
             {metrics?.rawCost === null || metrics?.rawCost === undefined
-              ? (locale === "zh-TW" ? "raw cost 不可用" : "raw cost unavailable")
-              : `raw ${formatInteger(metrics.rawCost, locale)} − baseline ${formatInteger(metrics.baselineCost, locale)}`}
+              ? (locale === "zh-TW" ? "原始指令成本不可用" : "raw cost unavailable")
+              : locale === "zh-TW"
+                ? `原始 ${formatInteger(metrics.rawCost, locale)} − 基準 ${formatInteger(metrics.baselineCost, locale)}`
+                : `raw ${formatInteger(metrics.rawCost, locale)} − baseline ${formatInteger(metrics.baselineCost, locale)}`}
           </small>
         </div>
         <div>
-          <span>{locale === "zh-TW" ? "Peak linear memory" : "Peak linear memory"}</span>
+          <span>{locale === "zh-TW" ? "線性記憶體峰值" : "Peak linear memory"}</span>
           <strong>{metrics?.memoryBytes === null || metrics?.memoryBytes === undefined ? "—" : formatBytes(metrics.memoryBytes, locale)}</strong>
           <small>{locale === "zh-TW" ? "runtime 回報的峰值" : "runtime-reported peak"}</small>
         </div>
         {metrics?.logicalTimeNs !== null && metrics?.logicalTimeNs !== undefined && (
           <div>
-            <span>Logical time</span>
+            <span>{locale === "zh-TW" ? "邏輯時間" : "Logical time"}</span>
             <strong>{formatMilliseconds(metrics.logicalTimeNs, locale)}</strong>
-            <small>{locale === "zh-TW" ? "deterministic virtual time" : "deterministic virtual time"}</small>
+            <small>{locale === "zh-TW" ? "可重現虛擬時間" : "deterministic virtual time"}</small>
           </div>
         )}
       </div>
       <div className="case-score-axes">
         <ResourceAxis
-          title={locale === "zh-TW" ? "Instruction cost 門檻" : "Instruction cost thresholds"}
+          title={locale === "zh-TW" ? "指令成本門檻" : "Instruction cost thresholds"}
           value={metrics?.cost ?? null}
           thresholds={costThresholds}
           locale={locale}
@@ -275,7 +277,7 @@ export function CaseScoreDetails({
           logarithmic
         />
         <ResourceAxis
-          title={locale === "zh-TW" ? "Memory 門檻" : "Memory thresholds"}
+          title={locale === "zh-TW" ? "記憶體門檻" : "Memory thresholds"}
           value={metrics?.memoryBytes ?? null}
           thresholds={memoryThresholds}
           locale={locale}
