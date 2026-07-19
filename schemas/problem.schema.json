@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wasm-oj.dev/schemas/problem-v3.json",
+  "title": "WASM OJ problem manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "slug",
+    "title",
+    "difficulty",
+    "tags",
+    "files",
+    "scoring",
+    "complexities"
+  ],
+  "properties": {
+    "schema": { "const": "wasm-oj-problem-v3" },
+    "id": { "type": "integer", "minimum": 1, "maximum": 40 },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "title": { "$ref": "#/$defs/localizedText" },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+    "tags": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankTrimmed" }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statements",
+        "editorials",
+        "validator",
+        "generator",
+        "oracle",
+        "solutions",
+        "tests"
+      ],
+      "properties": {
+        "statements": { "$ref": "#/$defs/localizedFiles" },
+        "editorials": { "$ref": "#/$defs/localizedFiles" },
+        "validator": { "$ref": "#/$defs/relativePath" },
+        "generator": { "$ref": "#/$defs/relativePath" },
+        "oracle": { "$ref": "#/$defs/relativePath" },
+        "solutions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "c",
+            "cpp",
+            "rust",
+            "go",
+            "python",
+            "javascript",
+            "typescript"
+          ],
+          "properties": {
+            "c": { "$ref": "#/$defs/relativePath" },
+            "cpp": { "$ref": "#/$defs/relativePath" },
+            "rust": { "$ref": "#/$defs/relativePath" },
+            "go": { "$ref": "#/$defs/relativePath" },
+            "python": { "$ref": "#/$defs/relativePath" },
+            "javascript": { "$ref": "#/$defs/relativePath" },
+            "typescript": { "$ref": "#/$defs/relativePath" }
+          }
+        },
+        "tests": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind", "input", "output"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+              "kind": { "enum": ["sample", "adversarial", "regression"] },
+              "input": { "$ref": "#/$defs/relativePath" },
+              "output": { "$ref": "#/$defs/relativePath" }
+            }
+          }
+        }
+      }
+    },
+    "scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "caseSet",
+        "caseAggregation",
+        "maximumPoints",
+        "costContract",
+        "costModel",
+        "costMetric",
+        "calibration",
+        "policies",
+        "safetyLimits"
+      ],
+      "properties": {
+        "mode": { "const": "per-case-cumulative-policies" },
+        "caseSet": { "const": "all-manifest-tests" },
+        "caseAggregation": { "const": "equal-weight-average" },
+        "maximumPoints": { "const": 100 },
+        "costContract": { "const": "wasm-oj-forge-v1" },
+        "costModel": { "const": "weighted" },
+        "costMetric": { "const": "baseline-normalized-net" },
+        "calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "method", "profiles"],
+          "properties": {
+            "status": { "const": "measured" },
+            "method": { "const": "forge-v1-reference-order-statistics-rounded-v1" },
+            "profiles": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "c",
+                "cpp",
+                "rust",
+                "go",
+                "python",
+                "javascript",
+                "typescript"
+              ],
+              "properties": {
+                "c": { "$ref": "#/$defs/nonBlankTrimmed" },
+                "cpp": { "$ref": "#/$defs/nonBlankTrimmed" },
+                "rust": { "$ref": "#/$defs/nonBlankTrimmed" },
+                "go": { "$ref": "#/$defs/nonBlankTrimmed" },
+                "python": { "$ref": "#/$defs/nonBlankTrimmed" },
+                "javascript": { "$ref": "#/$defs/nonBlankTrimmed" },
+                "typescript": { "$ref": "#/$defs/nonBlankTrimmed" }
+              }
+            }
+          }
+        },
+        "policies": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "title", "points", "limits"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+            "title": { "$ref": "#/$defs/localizedText" },
+              "points": { "type": "integer", "minimum": 1, "maximum": 100 },
+              "limits": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["instructionBudget", "memoryLimitBytes"],
+                "properties": {
+                  "instructionBudget": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "memoryLimitBytes": {
+                    "type": "integer",
+                    "minimum": 65536,
+                    "maximum": 4294967296,
+                    "multipleOf": 65536
+                  },
+                  "logicalTimeLimitMs": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254
+                  }
+                }
+              }
+            }
+          }
+        },
+        "safetyLimits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["wallTimeLimitMs"],
+          "properties": {
+            "wallTimeLimitMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 600000
+            }
+          }
+        }
+      }
+    },
+    "complexities": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "time", "space", "accepted"],
+        "properties": {
+          "name": { "$ref": "#/$defs/localizedText" },
+          "time": { "$ref": "#/$defs/nonBlankTrimmed" },
+          "space": { "$ref": "#/$defs/nonBlankTrimmed" },
+          "accepted": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\/$)[^\\u0000]+$"
+    },
+    "nonBlankTrimmed": {
+      "type": "string",
+      "pattern": "^(?:\\S|\\S[\\s\\S]*\\S)$"
+    },
+    "localizedFiles": {
+      "type": "object",
+      "minProperties": 2,
+      "required": ["zh-TW", "en"],
+      "properties": {
+        "zh-TW": { "$ref": "#/$defs/relativePath" },
+        "en": { "$ref": "#/$defs/relativePath" }
+      },
+      "propertyNames": {
+        "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/relativePath" }
+    },
+    "localizedText": {
+      "type": "object",
+      "minProperties": 2,
+      "required": ["zh-TW", "en"],
+      "properties": {
+        "zh-TW": { "$ref": "#/$defs/nonBlankTrimmed" },
+        "en": { "$ref": "#/$defs/nonBlankTrimmed" }
+      },
+      "propertyNames": {
+        "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/nonBlankTrimmed" }
+    }
+  }
+}

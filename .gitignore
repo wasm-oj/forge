@@ -10,5 +10,7 @@ public/toolchains/*.forge-chunk-*
 coverage/
 .forge-library-build-*/
 **/target/
+__pycache__/
+*.pyc
 *.tsbuildinfo
 .DS_Store

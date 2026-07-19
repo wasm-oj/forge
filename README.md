@@ -4,7 +4,7 @@
 [![npm](https://img.shields.io/npm/v/%40wasm-oj%2Fforge)](https://www.npmjs.com/package/@wasm-oj/forge)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-WASM OJ Forge is a local-first compiler, deterministic runner, and online-judge library. It is the experimental successor to WASM-OJ's `compilet` and `wark`. In the browser deployment, source compilation, linking, execution, diagnostics, and all 20 original problems stay on the device. Compiler and language-runtime packages execute under the Wasmer JavaScript SDK; submitted programs execute under a portable Rust/Wasmer runtime core compiled for both WebAssembly and native server hosts.
+WASM OJ Forge is a local-first compiler, deterministic runner, and online-judge library. It is the experimental successor to WASM-OJ's `compilet` and `wark`. In the browser deployment, source compilation, linking, execution, diagnostics, and all 40 original problems stay on the device. Compiler and language-runtime packages execute under the Wasmer JavaScript SDK; submitted programs execute under a portable Rust/Wasmer runtime core compiled for both WebAssembly and native server hosts.
 
 All production compatibility is governed by one `wasm-oj-forge-v1` contract. It
 jointly versions compilation, execution, determinism, metering, artifacts,
@@ -13,7 +13,7 @@ compiler/determinism/resource/judge counters. See [versioning policy](docs/versi
 
 ## Judge experience
 
-- Browse and filter 20 progressively harder Traditional Chinese problems.
+- Browse and filter 40 progressively harder systems-algorithm problems in Traditional Chinese or English.
 - Work in C, C++, Rust, Go, Python, JavaScript, or TypeScript with Monaco and multi-file projects.
 - Build once, run the sample, then execute each judge case locally through Wasmer.
 - Compare normalized stdout, surface compile/runtime/time-limit/wrong-answer verdicts, and retain solved progress in browser storage.
@@ -21,30 +21,21 @@ compiler/determinism/resource/judge counters. See [versioning policy](docs/versi
 
 Because the judge is completely local, its test data can be inspected by a determined user. This is an explicit privacy and learning tradeoff: the product is for practice and self-verification, not cheat-resistant competition.
 
-## The 20-problem track
+## The 40-problem systems track
 
-| # | Problem | Topic | Difficulty |
-| --- | --- | --- | --- |
-| 01 | 兩數的本機握手 | Basic I/O | Easy |
-| 02 | 三站溫差 | Conditions | Easy |
-| 03 | 秒數時鐘 | Arithmetic | Easy |
-| 04 | 閏年守門員 | Conditions | Easy |
-| 05 | 一到 N 的捷徑 | Mathematics | Easy |
-| 06 | 階乘尾端的零 | Number theory | Easy |
-| 07 | 歐幾里得的節拍 | GCD | Easy |
-| 08 | 最早的共同週期 | LCM | Easy |
-| 09 | 質數守門員 | Primality | Medium |
-| 10 | 數字鏡像 | Digit processing | Medium |
-| 11 | 數位能量 | Digit processing | Medium |
-| 12 | Collatz 計步器 | Simulation | Medium |
-| 13 | 十億階 Fibonacci | Fast doubling | Hard |
-| 14 | 模數引擎 | Binary exponentiation | Medium |
-| 15 | 串流最高點 | Streaming | Medium |
-| 16 | 能量帳本 | Prefix sums | Medium |
-| 17 | 最長上升航段 | Linear scan | Medium |
-| 18 | 一次交易 | Greedy | Medium |
-| 19 | 多數訊號 | Boyer–Moore | Hard |
-| 20 | 最大連續能量 | Dynamic programming | Hard |
+The repository-root [`catalog.json`](catalog.json) is the canonical discovery
+entry point. It names all 40 manifests, the default locale, and the complete
+locale set. Every manifest explicitly names its localized title, statement,
+editorial, seven reference solutions, tests, and cumulative cost/memory scoring
+policies. The browser bundle is generated deterministically from those files by
+`scripts/generate-judge-problems.mjs`; CI rejects a stale generated catalog.
+See the [problem catalog contract](docs/problem-catalog.md) for discovery,
+localization, generation, and cumulative scoring behavior.
+
+The track progresses from metering, baseline normalization, memory and VFS
+accounting through build graphs, caches, scheduling and deterministic replay,
+then finishes with graph algorithms and several knapsack variants. No original
+20-problem fixture or compatibility catalog remains.
 
 ## Language support
 

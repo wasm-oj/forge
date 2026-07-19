@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wasm-oj.dev/schemas/catalog-v2.json",
+  "title": "WASM OJ problem catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "problemSchema", "localization", "problems"],
+  "properties": {
+    "schema": { "const": "wasm-oj-catalog-v2" },
+    "problemSchema": { "const": "wasm-oj-problem-v3" },
+    "localization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaultLocale", "supportedLocales"],
+      "properties": {
+        "defaultLocale": { "const": "zh-TW" },
+        "supportedLocales": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "zh-TW" },
+            { "const": "en" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        }
+      }
+    },
+    "problems": {
+      "type": "array",
+      "minItems": 40,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "slug", "manifest"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1, "maximum": 40 },
+          "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "manifest": {
+            "type": "string",
+            "pattern": "^problems/[0-9]{3}-[a-z0-9]+(?:-[a-z0-9]+)*/problem\\.json$"
+          }
+        }
+      }
+    }
+  }
+}

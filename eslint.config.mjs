@@ -12,7 +12,9 @@ export default defineConfig([
     "dist/**",
     "lib/**",
     "public/toolchains/**",
+    "problems/**",
     "src/runner/generated/**",
+    "src/judge/problems.generated.ts",
     "next-env.d.ts",
   ]),
 ]);

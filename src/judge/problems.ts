@@ -1,444 +1,84 @@
+import { GENERATED_PROBLEMS } from "./problems.generated";
+
+export const PROBLEM_LOCALES = ["zh-TW", "en"] as const;
+export type ProblemLocale = typeof PROBLEM_LOCALES[number];
+export const DEFAULT_PROBLEM_LOCALE: ProblemLocale = "zh-TW";
+
 export type ProblemDifficulty = "easy" | "medium" | "hard";
+export type ProblemCaseKind = "sample" | "adversarial" | "regression";
+
+export type LocalizedText = Readonly<Record<ProblemLocale, string>>;
 
 export interface JudgeCase {
-  input: string;
-  output: string;
+  readonly id: string;
+  readonly kind: ProblemCaseKind;
+  readonly input: string;
+  readonly output: string;
 }
 
-export interface ProblemExample extends JudgeCase {
-  explanation: string;
+export interface ProblemPolicyLimits {
+  readonly instructionBudget: number;
+  readonly memoryLimitBytes: number;
+  readonly logicalTimeLimitMs?: number;
+}
+
+export interface ProblemScoringPolicy {
+  readonly id: string;
+  readonly title: LocalizedText;
+  readonly points: number;
+  readonly limits: ProblemPolicyLimits;
+}
+
+export interface ProblemScoring {
+  readonly maximumPoints: 100;
+  readonly calibration: {
+    readonly method: "forge-v1-reference-order-statistics-rounded-v1";
+    readonly profiles: Readonly<Record<string, string>>;
+  };
+  readonly policies: readonly ProblemScoringPolicy[];
+  readonly safetyLimits: { readonly wallTimeLimitMs: number };
+}
+
+export interface ProblemComplexity {
+  readonly name: LocalizedText;
+  readonly time: string;
+  readonly space: string;
+  readonly accepted: boolean;
 }
 
 export interface JudgeProblem {
-  id: string;
-  number: number;
-  title: string;
-  difficulty: ProblemDifficulty;
-  category: string;
-  summary: string;
-  description: string[];
-  input: string;
-  output: string;
-  constraints: string[];
-  examples: ProblemExample[];
-  judgeCases: JudgeCase[];
-  instructionBudget: number;
+  readonly id: string;
+  readonly number: number;
+  readonly title: LocalizedText;
+  readonly difficulty: ProblemDifficulty;
+  readonly tags: readonly string[];
+  readonly statement: LocalizedText;
+  readonly editorial: LocalizedText;
+  readonly judgeCases: readonly JudgeCase[];
+  readonly scoring: ProblemScoring;
+  readonly complexities: readonly ProblemComplexity[];
 }
 
-const LOCAL_INSTRUCTION_BUDGET = 10_000_000_000;
-
-export const PROBLEMS: JudgeProblem[] = [
-  {
-    id: "sum-pair",
-    number: 1,
-    title: "兩數的本機握手",
-    difficulty: "easy",
-    category: "基本輸入輸出",
-    summary: "讀入兩個整數並輸出它們的總和。",
-    description: ["這是 WASM OJ Forge 的起點。從標準輸入讀取兩個整數 a 與 b，計算 a + b。", "答案可能超過 32 位元有號整數，請使用 64 位元整數。"],
-    input: "一行包含兩個整數 a、b，以空白分隔。",
-    output: "輸出一個整數，表示 a + b。",
-    constraints: ["-10⁹ ≤ a, b ≤ 10⁹"],
-    examples: [{ input: "7 35\n", output: "42\n", explanation: "7 + 35 = 42。" }],
-    judgeCases: [
-      { input: "7 35\n", output: "42\n" },
-      { input: "-8 3\n", output: "-5\n" },
-      { input: "0 0\n", output: "0\n" },
-      { input: "1000000000 1000000000\n", output: "2000000000\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "temperature-span",
-    number: 2,
-    title: "三站溫差",
-    difficulty: "easy",
-    category: "條件判斷",
-    summary: "找出三個溫度中的最大值與最小值之差。",
-    description: ["三座觀測站各回報一個整數溫度。請計算最高溫與最低溫之間的差。"],
-    input: "一行包含三個整數 t1、t2、t3。",
-    output: "輸出 max(t1, t2, t3) - min(t1, t2, t3)。",
-    constraints: ["-10⁴ ≤ ti ≤ 10⁴"],
-    examples: [{ input: "5 13 -2\n", output: "15\n", explanation: "最高溫 13、最低溫 -2，溫差為 15。" }],
-    judgeCases: [
-      { input: "5 13 -2\n", output: "15\n" },
-      { input: "0 0 0\n", output: "0\n" },
-      { input: "-10 -3 -20\n", output: "17\n" },
-      { input: "100 -100 25\n", output: "200\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "seconds-clock",
-    number: 3,
-    title: "秒數時鐘",
-    difficulty: "easy",
-    category: "算術",
-    summary: "把總秒數拆成時、分、秒。",
-    description: ["給定從零開始累計的秒數 s，請換算成小時、分鐘與秒。小時不需要對 24 取餘數。"],
-    input: "一行包含非負整數 s。",
-    output: "依序輸出 h、m、s，以空白分隔；其中 0 ≤ m, s < 60。",
-    constraints: ["0 ≤ s ≤ 359999"],
-    examples: [{ input: "3661\n", output: "1 1 1\n", explanation: "3661 秒等於 1 小時 1 分 1 秒。" }],
-    judgeCases: [
-      { input: "3661\n", output: "1 1 1\n" },
-      { input: "0\n", output: "0 0 0\n" },
-      { input: "3599\n", output: "0 59 59\n" },
-      { input: "359999\n", output: "99 59 59\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "leap-year",
-    number: 4,
-    title: "閏年守門員",
-    difficulty: "easy",
-    category: "條件判斷",
-    summary: "依照公曆規則判斷指定年份是否為閏年。",
-    description: ["年份可被 400 整除時是閏年；否則可被 100 整除時不是閏年；其餘可被 4 整除的年份是閏年。"],
-    input: "一行包含整數 year。",
-    output: "若為閏年輸出 YES，否則輸出 NO。",
-    constraints: ["1 ≤ year ≤ 9999"],
-    examples: [{ input: "2000\n", output: "YES\n", explanation: "2000 可被 400 整除。" }],
-    judgeCases: [
-      { input: "2000\n", output: "YES\n" },
-      { input: "1900\n", output: "NO\n" },
-      { input: "2024\n", output: "YES\n" },
-      { input: "2023\n", output: "NO\n" },
-      { input: "2400\n", output: "YES\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "range-sum",
-    number: 5,
-    title: "一到 N 的捷徑",
-    difficulty: "easy",
-    category: "數學",
-    summary: "計算 1 + 2 + … + n，不可逐項模擬大輸入。",
-    description: ["給定非負整數 n，計算從 1 到 n 的整數總和。n = 0 時答案為 0。", "請留意乘法中間值的整數範圍。"],
-    input: "一行包含整數 n。",
-    output: "輸出 1 + 2 + … + n。",
-    constraints: ["0 ≤ n ≤ 10⁹"],
-    examples: [{ input: "10\n", output: "55\n", explanation: "1 到 10 的總和是 55。" }],
-    judgeCases: [
-      { input: "10\n", output: "55\n" },
-      { input: "0\n", output: "0\n" },
-      { input: "1\n", output: "1\n" },
-      { input: "123456\n", output: "7620753696\n" },
-      { input: "1000000000\n", output: "500000000500000000\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "factorial-zeros",
-    number: 6,
-    title: "階乘尾端的零",
-    difficulty: "easy",
-    category: "數論",
-    summary: "計算 n! 的十進位表示最後有幾個連續的零。",
-    description: ["尾端的零來自因數 10。由於階乘中的因數 2 比 5 多，只要統計所有 5 的冪次貢獻。", "請勿實際計算 n!。"],
-    input: "一行包含整數 n。",
-    output: "輸出 n! 尾端連續零的數量。",
-    constraints: ["0 ≤ n ≤ 10⁹"],
-    examples: [{ input: "25\n", output: "6\n", explanation: "25! 中有 5、10、15、20 各貢獻一個 5，25 額外再貢獻一個。" }],
-    judgeCases: [
-      { input: "25\n", output: "6\n" },
-      { input: "0\n", output: "0\n" },
-      { input: "10\n", output: "2\n" },
-      { input: "100\n", output: "24\n" },
-      { input: "1000000000\n", output: "249999998\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "greatest-common-divisor",
-    number: 7,
-    title: "歐幾里得的節拍",
-    difficulty: "easy",
-    category: "數論",
-    summary: "使用輾轉相除法求兩個正整數的最大公因數。",
-    description: ["給定兩個正整數 a、b，求能同時整除兩者的最大正整數。"],
-    input: "一行包含兩個正整數 a、b。",
-    output: "輸出 gcd(a, b)。",
-    constraints: ["1 ≤ a, b ≤ 10¹⁸"],
-    examples: [{ input: "48 18\n", output: "6\n", explanation: "48 與 18 的最大公因數是 6。" }],
-    judgeCases: [
-      { input: "48 18\n", output: "6\n" },
-      { input: "17 13\n", output: "1\n" },
-      { input: "270 192\n", output: "6\n" },
-      { input: "1000000000000 250000000000\n", output: "250000000000\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "least-common-multiple",
-    number: 8,
-    title: "最早的共同週期",
-    difficulty: "easy",
-    category: "數論",
-    summary: "求兩個正整數的最小公倍數。",
-    description: ["給定兩個正整數 a、b，求同時是 a 與 b 倍數的最小正整數。", "建議先除以最大公因數，再做乘法以降低溢位風險。"],
-    input: "一行包含兩個正整數 a、b。",
-    output: "輸出 lcm(a, b)。",
-    constraints: ["1 ≤ a, b ≤ 10⁹", "答案不超過 10¹⁸"],
-    examples: [{ input: "12 18\n", output: "36\n", explanation: "36 是 12 與 18 最小的共同倍數。" }],
-    judgeCases: [
-      { input: "12 18\n", output: "36\n" },
-      { input: "21 6\n", output: "42\n" },
-      { input: "1 999999937\n", output: "999999937\n" },
-      { input: "1000000000 999999999\n", output: "999999999000000000\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "prime-gate",
-    number: 9,
-    title: "質數守門員",
-    difficulty: "medium",
-    category: "數論",
-    summary: "判斷一個整數是否只有 1 與自身兩個正因數。",
-    description: ["給定整數 n，判斷它是否為質數。只需要檢查不超過平方根的可能因數。"],
-    input: "一行包含整數 n。",
-    output: "若 n 是質數輸出 YES，否則輸出 NO。",
-    constraints: ["1 ≤ n ≤ 2³¹ - 1"],
-    examples: [{ input: "97\n", output: "YES\n", explanation: "97 沒有 1 與 97 以外的正因數。" }],
-    judgeCases: [
-      { input: "97\n", output: "YES\n" },
-      { input: "1\n", output: "NO\n" },
-      { input: "2\n", output: "YES\n" },
-      { input: "221\n", output: "NO\n" },
-      { input: "2147483647\n", output: "YES\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "reverse-number",
-    number: 10,
-    title: "數字鏡像",
-    difficulty: "medium",
-    category: "數字處理",
-    summary: "反轉非負整數的十進位數字順序。",
-    description: ["將 n 的十進位數字反向排列。反轉後產生的前導零不需要輸出。", "n = 0 時輸出 0。"],
-    input: "一行包含非負整數 n。",
-    output: "輸出反轉後的整數。",
-    constraints: ["0 ≤ n ≤ 10¹⁸", "反轉後的值不超過 64 位元有號整數"],
-    examples: [{ input: "12030\n", output: "3021\n", explanation: "反向為 03021，作為整數輸出 3021。" }],
-    judgeCases: [
-      { input: "12030\n", output: "3021\n" },
-      { input: "0\n", output: "0\n" },
-      { input: "7\n", output: "7\n" },
-      { input: "1000000000000000000\n", output: "1\n" },
-      { input: "9081726354\n", output: "4536271809\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "digit-sum",
-    number: 11,
-    title: "數位能量",
-    difficulty: "medium",
-    category: "數字處理",
-    summary: "計算非負整數所有十進位數字的總和。",
-    description: ["給定非負整數 n，將每一位數字相加。"],
-    input: "一行包含非負整數 n。",
-    output: "輸出 n 的數位總和。",
-    constraints: ["0 ≤ n ≤ 10¹⁸"],
-    examples: [{ input: "12345\n", output: "15\n", explanation: "1 + 2 + 3 + 4 + 5 = 15。" }],
-    judgeCases: [
-      { input: "12345\n", output: "15\n" },
-      { input: "0\n", output: "0\n" },
-      { input: "999999999999999999\n", output: "162\n" },
-      { input: "1000000000000000000\n", output: "1\n" },
-      { input: "9081726354\n", output: "45\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "collatz-steps",
-    number: 12,
-    title: "Collatz 計步器",
-    difficulty: "medium",
-    category: "模擬",
-    summary: "反覆套用奇偶規則，計算抵達 1 所需的步數。",
-    description: ["從正整數 n 開始：若 n 為偶數，令 n = n / 2；若 n 為奇數，令 n = 3n + 1。", "計算第一次抵達 1 前共執行幾次轉換。"],
-    input: "一行包含正整數 n。",
-    output: "輸出抵達 1 所需的步數。",
-    constraints: ["1 ≤ n ≤ 10⁶", "過程中的數值保證不超過 64 位元有號整數"],
-    examples: [{ input: "6\n", output: "8\n", explanation: "6 → 3 → 10 → 5 → 16 → 8 → 4 → 2 → 1，共 8 步。" }],
-    judgeCases: [
-      { input: "6\n", output: "8\n" },
-      { input: "1\n", output: "0\n" },
-      { input: "3\n", output: "7\n" },
-      { input: "27\n", output: "111\n" },
-      { input: "1000000\n", output: "152\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "fibonacci-mod",
-    number: 13,
-    title: "十億階 Fibonacci",
-    difficulty: "hard",
-    category: "快速倍增",
-    summary: "計算極大索引的 Fibonacci 數對 1,000,000,007 取餘數。",
-    description: ["定義 F0 = 0、F1 = 1，且 Fn = F(n-1) + F(n-2)。", "n 可達十億，線性迴圈不足以通過；請使用矩陣快速冪或快速倍增法。"],
-    input: "一行包含非負整數 n。",
-    output: "輸出 Fn mod 1,000,000,007。",
-    constraints: ["0 ≤ n ≤ 10⁹"],
-    examples: [{ input: "10\n", output: "55\n", explanation: "第 10 個 Fibonacci 數是 55。" }],
-    judgeCases: [
-      { input: "10\n", output: "55\n" },
-      { input: "0\n", output: "0\n" },
-      { input: "1\n", output: "1\n" },
-      { input: "50\n", output: "586268941\n" },
-      { input: "1000000000\n", output: "21\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "modular-power",
-    number: 14,
-    title: "模數引擎",
-    difficulty: "medium",
-    category: "快速冪",
-    summary: "以二進位快速冪計算 a 的 b 次方對 m 取餘數。",
-    description: ["直接計算 a^b 會溢位且過慢。請在每次乘法後取餘數，並以 b 的二進位表示將複雜度降至 O(log b)。"],
-    input: "一行包含三個整數 a、b、m。",
-    output: "輸出 a^b mod m。",
-    constraints: ["0 ≤ a ≤ 10⁹", "0 ≤ b ≤ 10¹⁸", "1 ≤ m ≤ 10⁹ + 7", "測資保證 64 位元乘法可安全計算取模前中間值"],
-    examples: [{ input: "2 10 1000\n", output: "24\n", explanation: "2¹⁰ = 1024，對 1000 取餘數為 24。" }],
-    judgeCases: [
-      { input: "2 10 1000\n", output: "24\n" },
-      { input: "7 0 13\n", output: "1\n" },
-      { input: "3 45 100\n", output: "43\n" },
-      { input: "123456789 987654321 1000000007\n", output: "652541198\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "stream-maximum",
-    number: 15,
-    title: "串流最高點",
-    difficulty: "medium",
-    category: "串流處理",
-    summary: "找出序列最大值及它第一次出現的位置。",
-    description: ["資料只能由左至右讀取一次。找出最大值，並回報它第一次出現的 1-based 位置。"],
-    input: "第一個整數為 n，接著有 n 個整數 a1…an；空白與換行等價。",
-    output: "輸出最大值與第一次出現的位置，以空白分隔。",
-    constraints: ["1 ≤ n ≤ 200000", "-10¹⁸ ≤ ai ≤ 10¹⁸"],
-    examples: [{ input: "5\n3 9 1 9 2\n", output: "9 2\n", explanation: "最大值 9 首次出現在第 2 個位置。" }],
-    judgeCases: [
-      { input: "5\n3 9 1 9 2\n", output: "9 2\n" },
-      { input: "1\n-7\n", output: "-7 1\n" },
-      { input: "6\n4 4 4 4 4 4\n", output: "4 1\n" },
-      { input: "7\n-10 -5 -8 -5 -3 -3 -9\n", output: "-3 5\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "energy-ledger",
-    number: 16,
-    title: "能量帳本",
-    difficulty: "medium",
-    category: "前綴和",
-    summary: "一次掃描計算最終能量與過程中的最低能量。",
-    description: ["系統初始能量為 0，依序套用 n 筆正負變化量。請輸出最終能量，以及包含初始狀態在內曾出現的最低能量。"],
-    input: "第一個整數為 n，接著有 n 個整數 d1…dn。",
-    output: "輸出 final 與 minimum，以空白分隔。",
-    constraints: ["1 ≤ n ≤ 200000", "-10⁹ ≤ di ≤ 10⁹", "所有前綴和都在 64 位元有號整數範圍內"],
-    examples: [{ input: "5\n3 -5 4 -2 1\n", output: "1 -2\n", explanation: "能量依序為 0、3、-2、2、0、1；最低為 -2。" }],
-    judgeCases: [
-      { input: "5\n3 -5 4 -2 1\n", output: "1 -2\n" },
-      { input: "3\n1 2 3\n", output: "6 0\n" },
-      { input: "4\n-1 -1 -1 -1\n", output: "-4 -4\n" },
-      { input: "1\n0\n", output: "0 0\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "increasing-run",
-    number: 17,
-    title: "最長上升航段",
-    difficulty: "medium",
-    category: "線性掃描",
-    summary: "找出最長的連續嚴格遞增子陣列長度。",
-    description: ["給定整數序列，找出最長的連續區段，使區段中每個值都嚴格大於前一個值。", "注意這是連續區段，不是可以跳過元素的子序列。"],
-    input: "第一個整數為 n，接著有 n 個整數 a1…an。",
-    output: "輸出最長連續嚴格遞增區段的長度。",
-    constraints: ["1 ≤ n ≤ 200000", "-10¹⁸ ≤ ai ≤ 10¹⁸"],
-    examples: [{ input: "8\n1 2 3 2 3 4 5 1\n", output: "4\n", explanation: "最長區段是 2、3、4、5，長度為 4。" }],
-    judgeCases: [
-      { input: "8\n1 2 3 2 3 4 5 1\n", output: "4\n" },
-      { input: "1\n42\n", output: "1\n" },
-      { input: "6\n6 5 4 3 2 1\n", output: "1\n" },
-      { input: "7\n-3 -2 -1 0 2 2 3\n", output: "5\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "single-trade",
-    number: 18,
-    title: "一次交易",
-    difficulty: "medium",
-    category: "貪心",
-    summary: "在只能先買後賣一次的限制下求最大獲利。",
-    description: ["依時間順序給定商品價格。你可以選擇某天買入、之後某天賣出，且最多完成一次交易。", "若無法獲利，輸出 0。"],
-    input: "第一個整數為 n，接著有 n 個非負整數價格 p1…pn。",
-    output: "輸出最大可能獲利。",
-    constraints: ["1 ≤ n ≤ 200000", "0 ≤ pi ≤ 10⁹"],
-    examples: [{ input: "6\n7 1 5 3 6 4\n", output: "5\n", explanation: "在價格 1 時買入、價格 6 時賣出，獲利 5。" }],
-    judgeCases: [
-      { input: "6\n7 1 5 3 6 4\n", output: "5\n" },
-      { input: "5\n7 6 4 3 1\n", output: "0\n" },
-      { input: "1\n9\n", output: "0\n" },
-      { input: "7\n2 4 1 10 3 12 0\n", output: "11\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "majority-signal",
-    number: 19,
-    title: "多數訊號",
-    difficulty: "hard",
-    category: "Boyer–Moore",
-    summary: "只用常數額外空間找出出現超過一半的元素。",
-    description: ["序列中保證存在一個出現次數嚴格大於 n / 2 的整數。請找出它。", "目標是單次掃描與 O(1) 額外空間。"],
-    input: "第一個整數為 n，接著有 n 個整數 a1…an。",
-    output: "輸出保證存在的多數元素。",
-    constraints: ["1 ≤ n ≤ 200000", "-10⁹ ≤ ai ≤ 10⁹", "多數元素保證存在"],
-    examples: [{ input: "7\n2 2 1 2 3 2 2\n", output: "2\n", explanation: "2 出現 5 次，超過 7 / 2。" }],
-    judgeCases: [
-      { input: "7\n2 2 1 2 3 2 2\n", output: "2\n" },
-      { input: "1\n-5\n", output: "-5\n" },
-      { input: "9\n1 1 2 2 2 2 2 1 2\n", output: "2\n" },
-      { input: "5\n0 0 0 1 2\n", output: "0\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-  {
-    id: "maximum-subarray",
-    number: 20,
-    title: "最大連續能量",
-    difficulty: "hard",
-    category: "動態規劃",
-    summary: "求非空連續子陣列能取得的最大總和。",
-    description: ["給定正負整數序列，選擇至少一個連續元素，使總和最大。", "請以線性時間完成；全為負數時仍必須選擇一個元素。"],
-    input: "第一個整數為 n，接著有 n 個整數 a1…an。",
-    output: "輸出任一非空連續子陣列的最大總和。",
-    constraints: ["1 ≤ n ≤ 200000", "-10⁹ ≤ ai ≤ 10⁹", "答案在 64 位元有號整數範圍內"],
-    examples: [{ input: "9\n-2 1 -3 4 -1 2 1 -5 4\n", output: "6\n", explanation: "連續區段 4、-1、2、1 的總和為 6。" }],
-    judgeCases: [
-      { input: "9\n-2 1 -3 4 -1 2 1 -5 4\n", output: "6\n" },
-      { input: "1\n-7\n", output: "-7\n" },
-      { input: "5\n1 2 3 4 5\n", output: "15\n" },
-      { input: "6\n-1 -2 -3 -4 -5 -6\n", output: "-1\n" },
-      { input: "8\n5 -2 3 -10 7 8 -1 4\n", output: "18\n" },
-    ],
-    instructionBudget: LOCAL_INSTRUCTION_BUDGET,
-  },
-];
+export const PROBLEMS: readonly JudgeProblem[] = GENERATED_PROBLEMS;
 
 export function problemById(id: string): JudgeProblem | undefined {
   return PROBLEMS.find((problem) => problem.id === id);
+}
+
+export function problemText(problem: JudgeProblem, locale: ProblemLocale) {
+  return {
+    title: problem.title[locale],
+    statement: problem.statement[locale],
+    editorial: problem.editorial[locale],
+  };
+}
+
+export function sampleCases(problem: JudgeProblem): readonly JudgeCase[] {
+  return problem.judgeCases.filter((testCase) => testCase.kind === "sample");
+}
+
+export function broadestPolicy(problem: JudgeProblem): ProblemScoringPolicy {
+  const policy = problem.scoring.policies[0];
+  if (!policy) throw new Error(`Problem '${problem.id}' has no scoring policy.`);
+  return policy;
 }

@@ -1,0 +1,4183 @@
+{
+  "schema": "wasm-oj-derived-cost-policies-v1",
+  "method": "forge-v1-reference-order-statistics-rounded-v1",
+  "sourceEvidence": "calibration/forge-v1/reference-costs.json",
+  "sourceEvidenceSha256": "83ba7f0d1ab6134bd6e8a9ad714a3142d162d4ea8bdfa1681939ec45e823701c",
+  "basis": "language-worst-cost-order-statistics-over-all-manifest-tests",
+  "headroom": {
+    "numerator": 105,
+    "denominator": 100
+  },
+  "rounding": {
+    "mode": "ceiling",
+    "quantumFormula": "5 * 10^(decimalDigits(unroundedInstructionBudget) - 2)",
+    "appliesFromDecimalDigits": 3
+  },
+  "policyRanks": {
+    "baseline": 7,
+    "efficient": 2,
+    "optimal": 1
+  },
+  "problems": [
+    {
+      "id": 1,
+      "slug": "weighted-opcode-scale",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "python",
+          "measuredWorstCaseCost": 33754674,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 35442408,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 40000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 162858,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 171001,
+          "roundingQuantum": 50000,
+          "instructionBudget": 200000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 65896,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 69191,
+          "roundingQuantum": 5000,
+          "instructionBudget": 70000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 40000000,
+        "efficient": 200000,
+        "optimal": 70000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 65896,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 162858,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 1142329,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1474233,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9358758,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9509565,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 33754674,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 2,
+      "slug": "baseline-calibration",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 9010448,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 9460971,
+          "roundingQuantum": 500000,
+          "instructionBudget": 9500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 95808,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 100599,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 56678,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 59512,
+          "roundingQuantum": 5000,
+          "instructionBudget": 60000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 9500000,
+        "efficient": 150000,
+        "optimal": 60000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 56678,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 95808,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 1158113,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1767681,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2942719,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 8818386,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9010448,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 3,
+      "slug": "memory-gate",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 9484637,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 9958869,
+          "roundingQuantum": 500000,
+          "instructionBudget": 10000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 114257,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 119970,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 70550,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 74078,
+          "roundingQuantum": 5000,
+          "instructionBudget": 75000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 10000000,
+        "efficient": 150000,
+        "optimal": 75000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 70550,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 114257,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 973973,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1666976,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3131402,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9313854,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9484637,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 4,
+      "slug": "shared-output-pool",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 8597999,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 9027899,
+          "roundingQuantum": 500000,
+          "instructionBudget": 9500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 145815,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 153106,
+          "roundingQuantum": 50000,
+          "instructionBudget": 200000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 76576,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 80405,
+          "roundingQuantum": 5000,
+          "instructionBudget": 85000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 9500000,
+        "efficient": 200000,
+        "optimal": 85000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 76576,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 145815,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 890836,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1386242,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2937672,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 8404810,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 8597999,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 5,
+      "slug": "transactional-vfs-quota",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 11220926,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 11781973,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 119075,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 125029,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 90022,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 94524,
+          "roundingQuantum": 5000,
+          "instructionBudget": 95000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 150000,
+        "optimal": 95000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 90022,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 119075,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 1139544,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 2071419,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3715363,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 11037860,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 11220926,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 6,
+      "slug": "logical-poll-clock",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "python",
+          "measuredWorstCaseCost": 141895993,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 148990793,
+          "roundingQuantum": 50000000,
+          "instructionBudget": 150000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 123042,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 129195,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 75700,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 79485,
+          "roundingQuantum": 5000,
+          "instructionBudget": 80000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 150000000,
+        "efficient": 150000,
+        "optimal": 80000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 75700,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 123042,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 748697,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1690803,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 10995268,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 11228418,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 141895993,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 7,
+      "slug": "guest-path-firewall",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 7873808,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 8267499,
+          "roundingQuantum": 500000,
+          "instructionBudget": 8500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 75111,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 78867,
+          "roundingQuantum": 5000,
+          "instructionBudget": 80000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 30945,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 32493,
+          "roundingQuantum": 5000,
+          "instructionBudget": 35000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 8500000,
+        "efficient": 80000,
+        "optimal": 35000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 30945,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 75111,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 361535,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1089195,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2482224,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 7807653,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 7873808,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 8,
+      "slug": "mounted-directory-baseline",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 9800908,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 10290954,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 81206,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 85267,
+          "roundingQuantum": 5000,
+          "instructionBudget": 90000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 48840,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 51282,
+          "roundingQuantum": 5000,
+          "instructionBudget": 55000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 90000,
+        "optimal": 55000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 48840,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 81206,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 826572,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1488031,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3895717,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9729898,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9800908,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 9,
+      "slug": "sparse-file-quota",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 9443727,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 9915914,
+          "roundingQuantum": 500000,
+          "instructionBudget": 10000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 173322,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 181989,
+          "roundingQuantum": 50000,
+          "instructionBudget": 200000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 117061,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 122915,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 10000000,
+        "efficient": 200000,
+        "optimal": 150000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 117061,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 173322,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 1018027,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1762101,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3274804,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9285631,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9443727,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 10,
+      "slug": "all-or-nothing-output-collection",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 8757062,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 9194916,
+          "roundingQuantum": 500000,
+          "instructionBudget": 9500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 97899,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 102794,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 56276,
+          "measuredWorstCaseIds": [
+            "adversarial-01"
+          ],
+          "unroundedInstructionBudget": 59090,
+          "roundingQuantum": 5000,
+          "instructionBudget": 60000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 9500000,
+        "efficient": 150000,
+        "optimal": 60000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 56276,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 97899,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 644967,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1245588,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3157264,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 8637481,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 8757062,
+          "maximumCaseIds": [
+            "adversarial-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 11,
+      "slug": "mount-tree-conflicts",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 11666110,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 12249416,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 61634,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 64716,
+          "roundingQuantum": 5000,
+          "instructionBudget": 65000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 12673,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 13307,
+          "roundingQuantum": 5000,
+          "instructionBudget": 15000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 65000,
+        "optimal": 15000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 12673,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 61634,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 269608,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 665787,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 6961520,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 11623346,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 11666110,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 12,
+      "slug": "bounded-tar-stream",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "python",
+          "measuredWorstCaseCost": 1706532690,
+          "measuredWorstCaseIds": [
+            "adversarial-bigint-metadata"
+          ],
+          "unroundedInstructionBudget": 1791859325,
+          "roundingQuantum": 500000000,
+          "instructionBudget": 2000000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 76153,
+          "measuredWorstCaseIds": [
+            "adversarial-bigint-metadata"
+          ],
+          "unroundedInstructionBudget": 79961,
+          "roundingQuantum": 5000,
+          "instructionBudget": 80000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 42484,
+          "measuredWorstCaseIds": [
+            "adversarial-bigint-metadata"
+          ],
+          "unroundedInstructionBudget": 44609,
+          "roundingQuantum": 5000,
+          "instructionBudget": 45000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 2000000000,
+        "efficient": 80000,
+        "optimal": 45000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 42484,
+          "maximumCaseIds": [
+            "adversarial-bigint-metadata"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 76153,
+          "maximumCaseIds": [
+            "adversarial-bigint-metadata"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 777937,
+          "maximumCaseIds": [
+            "adversarial-bigint-metadata"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1293453,
+          "maximumCaseIds": [
+            "adversarial-bigint-metadata"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9504035,
+          "maximumCaseIds": [
+            "adversarial-bigint-metadata"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9643294,
+          "maximumCaseIds": [
+            "adversarial-bigint-metadata"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 1706532690,
+          "maximumCaseIds": [
+            "adversarial-bigint-metadata"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 13,
+      "slug": "build-fingerprint",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 7145009,
+          "measuredWorstCaseIds": [
+            "sample-03"
+          ],
+          "unroundedInstructionBudget": 7502260,
+          "roundingQuantum": 500000,
+          "instructionBudget": 8000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 72656,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 76289,
+          "roundingQuantum": 5000,
+          "instructionBudget": 80000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 55133,
+          "measuredWorstCaseIds": [
+            "sample-03"
+          ],
+          "unroundedInstructionBudget": 57890,
+          "roundingQuantum": 5000,
+          "instructionBudget": 60000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 8000000,
+        "efficient": 80000,
+        "optimal": 60000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 55133,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 72656,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 471377,
+          "maximumCaseIds": [
+            "adversarial-long-metadata"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1230543,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2932188,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 7069986,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 7145009,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 14,
+      "slug": "runtime-bundle-encoding",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 7110142,
+          "measuredWorstCaseIds": [
+            "adversarial-punctuation-order"
+          ],
+          "unroundedInstructionBudget": 7465650,
+          "roundingQuantum": 500000,
+          "instructionBudget": 7500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 85752,
+          "measuredWorstCaseIds": [
+            "adversarial-punctuation-order"
+          ],
+          "unroundedInstructionBudget": 90040,
+          "roundingQuantum": 5000,
+          "instructionBudget": 95000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 81318,
+          "measuredWorstCaseIds": [
+            "adversarial-punctuation-order"
+          ],
+          "unroundedInstructionBudget": 85384,
+          "roundingQuantum": 5000,
+          "instructionBudget": 90000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 7500000,
+        "efficient": 95000,
+        "optimal": 90000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 81318,
+          "maximumCaseIds": [
+            "adversarial-punctuation-order"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 85752,
+          "maximumCaseIds": [
+            "adversarial-punctuation-order"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 373109,
+          "maximumCaseIds": [
+            "adversarial-punctuation-order"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1277462,
+          "maximumCaseIds": [
+            "adversarial-punctuation-order"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2910325,
+          "maximumCaseIds": [
+            "adversarial-punctuation-order"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 7013180,
+          "maximumCaseIds": [
+            "adversarial-punctuation-order"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 7110142,
+          "maximumCaseIds": [
+            "adversarial-punctuation-order"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 15,
+      "slug": "dirty-build-nodes",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 7053151,
+          "measuredWorstCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ],
+          "unroundedInstructionBudget": 7405809,
+          "roundingQuantum": 500000,
+          "instructionBudget": 7500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 124607,
+          "measuredWorstCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ],
+          "unroundedInstructionBudget": 130838,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 46215,
+          "measuredWorstCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ],
+          "unroundedInstructionBudget": 48526,
+          "roundingQuantum": 5000,
+          "instructionBudget": 50000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 7500000,
+        "efficient": 150000,
+        "optimal": 50000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 46215,
+          "maximumCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 124607,
+          "maximumCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 669888,
+          "maximumCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1341257,
+          "maximumCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2954625,
+          "maximumCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 7000593,
+          "maximumCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 7053151,
+          "maximumCaseIds": [
+            "adversarial-nonnumeric-dag"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 16,
+      "slug": "exact-dependency-cache",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 10693696,
+          "measuredWorstCaseIds": [
+            "adversarial-word-boundary"
+          ],
+          "unroundedInstructionBudget": 11228381,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "c",
+          "measuredWorstCaseCost": 148072,
+          "measuredWorstCaseIds": [
+            "adversarial-word-boundary"
+          ],
+          "unroundedInstructionBudget": 155476,
+          "roundingQuantum": 50000,
+          "instructionBudget": 200000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "rust",
+          "measuredWorstCaseCost": 139033,
+          "measuredWorstCaseIds": [
+            "adversarial-word-boundary"
+          ],
+          "unroundedInstructionBudget": 145985,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 200000,
+        "optimal": 150000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "rust",
+          "maximumCost": 139033,
+          "maximumCaseIds": [
+            "adversarial-word-boundary"
+          ]
+        },
+        {
+          "language": "c",
+          "maximumCost": 148072,
+          "maximumCaseIds": [
+            "adversarial-word-boundary"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 3330031,
+          "maximumCaseIds": [
+            "adversarial-word-boundary"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 4604074,
+          "maximumCaseIds": [
+            "adversarial-word-boundary"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 4659743,
+          "maximumCaseIds": [
+            "adversarial-word-boundary"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 10649694,
+          "maximumCaseIds": [
+            "adversarial-word-boundary"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 10693696,
+          "maximumCaseIds": [
+            "adversarial-word-boundary"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 17,
+      "slug": "graph-blob-lru",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 11683298,
+          "measuredWorstCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ],
+          "unroundedInstructionBudget": 12267463,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 105965,
+          "measuredWorstCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ],
+          "unroundedInstructionBudget": 111264,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 70748,
+          "measuredWorstCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ],
+          "unroundedInstructionBudget": 74286,
+          "roundingQuantum": 5000,
+          "instructionBudget": 75000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 150000,
+        "optimal": 75000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 70748,
+          "maximumCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 105965,
+          "maximumCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 954984,
+          "maximumCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1923419,
+          "maximumCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 5120114,
+          "maximumCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 11518152,
+          "maximumCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 11683298,
+          "maximumCaseIds": [
+            "adversarial-zero-dedup-eviction"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 18,
+      "slug": "worker-generations",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 6365830,
+          "measuredWorstCaseIds": [
+            "adversarial-state-preservation"
+          ],
+          "unroundedInstructionBudget": 6684122,
+          "roundingQuantum": 500000,
+          "instructionBudget": 7000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 90944,
+          "measuredWorstCaseIds": [
+            "adversarial-state-preservation"
+          ],
+          "unroundedInstructionBudget": 95492,
+          "roundingQuantum": 5000,
+          "instructionBudget": 100000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 63911,
+          "measuredWorstCaseIds": [
+            "adversarial-state-preservation"
+          ],
+          "unroundedInstructionBudget": 67107,
+          "roundingQuantum": 5000,
+          "instructionBudget": 70000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 7000000,
+        "efficient": 100000,
+        "optimal": 70000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 63911,
+          "maximumCaseIds": [
+            "adversarial-state-preservation"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 90944,
+          "maximumCaseIds": [
+            "adversarial-state-preservation"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 593389,
+          "maximumCaseIds": [
+            "adversarial-state-preservation"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1278253,
+          "maximumCaseIds": [
+            "adversarial-state-preservation"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2676940,
+          "maximumCaseIds": [
+            "adversarial-state-preservation"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 6358994,
+          "maximumCaseIds": [
+            "adversarial-state-preservation"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 6365830,
+          "maximumCaseIds": [
+            "adversarial-state-preservation"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 19,
+      "slug": "reproducible-build-order",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "python",
+          "measuredWorstCaseCost": 173017791,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 181668681,
+          "roundingQuantum": 50000000,
+          "instructionBudget": 200000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 86704,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 91040,
+          "roundingQuantum": 5000,
+          "instructionBudget": 95000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 27021,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 28373,
+          "roundingQuantum": 5000,
+          "instructionBudget": 30000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 200000000,
+        "efficient": 95000,
+        "optimal": 30000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 27021,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 86704,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 294012,
+          "maximumCaseIds": [
+            "adversarial-dangling-before-cycle"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 923531,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9505131,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9771569,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 173017791,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 20,
+      "slug": "offline-dependency-bundle",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 9384688,
+          "measuredWorstCaseIds": [
+            "adversarial-bigint-dedup"
+          ],
+          "unroundedInstructionBudget": 9853923,
+          "roundingQuantum": 500000,
+          "instructionBudget": 10000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 103271,
+          "measuredWorstCaseIds": [
+            "adversarial-bigint-dedup"
+          ],
+          "unroundedInstructionBudget": 108435,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 39092,
+          "measuredWorstCaseIds": [
+            "adversarial-bigint-dedup"
+          ],
+          "unroundedInstructionBudget": 41047,
+          "roundingQuantum": 5000,
+          "instructionBudget": 45000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 10000000,
+        "efficient": 150000,
+        "optimal": 45000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 39092,
+          "maximumCaseIds": [
+            "adversarial-bigint-dedup"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 103271,
+          "maximumCaseIds": [
+            "adversarial-bigint-dedup"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 694489,
+          "maximumCaseIds": [
+            "adversarial-bigint-dedup"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1218418,
+          "maximumCaseIds": [
+            "adversarial-bigint-dedup"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3519874,
+          "maximumCaseIds": [
+            "adversarial-bigint-dedup"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9288737,
+          "maximumCaseIds": [
+            "adversarial-bigint-dedup"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9384688,
+          "maximumCaseIds": [
+            "adversarial-bigint-dedup"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 21,
+      "slug": "compiler-race",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 7896507,
+          "measuredWorstCaseIds": [
+            "adversarial-join-kind-generation"
+          ],
+          "unroundedInstructionBudget": 8291333,
+          "roundingQuantum": 500000,
+          "instructionBudget": 8500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 166272,
+          "measuredWorstCaseIds": [
+            "adversarial-join-kind-generation"
+          ],
+          "unroundedInstructionBudget": 174586,
+          "roundingQuantum": 50000,
+          "instructionBudget": 200000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 86345,
+          "measuredWorstCaseIds": [
+            "adversarial-join-kind-generation"
+          ],
+          "unroundedInstructionBudget": 90663,
+          "roundingQuantum": 5000,
+          "instructionBudget": 95000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 8500000,
+        "efficient": 200000,
+        "optimal": 95000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 86345,
+          "maximumCaseIds": [
+            "adversarial-join-kind-generation"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 166272,
+          "maximumCaseIds": [
+            "adversarial-join-kind-generation"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 540247,
+          "maximumCaseIds": [
+            "adversarial-join-kind-generation"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1503737,
+          "maximumCaseIds": [
+            "adversarial-join-kind-generation"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3268075,
+          "maximumCaseIds": [
+            "adversarial-join-kind-generation"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 7637614,
+          "maximumCaseIds": [
+            "adversarial-join-kind-generation"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 7896507,
+          "maximumCaseIds": [
+            "adversarial-join-kind-generation"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 22,
+      "slug": "submission-conveyor",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 6918751,
+          "measuredWorstCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ],
+          "unroundedInstructionBudget": 7264689,
+          "roundingQuantum": 500000,
+          "instructionBudget": 7500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 141073,
+          "measuredWorstCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ],
+          "unroundedInstructionBudget": 148127,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 68708,
+          "measuredWorstCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ],
+          "unroundedInstructionBudget": 72144,
+          "roundingQuantum": 5000,
+          "instructionBudget": 75000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 7500000,
+        "efficient": 150000,
+        "optimal": 75000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 68708,
+          "maximumCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 141073,
+          "maximumCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 520480,
+          "maximumCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1247136,
+          "maximumCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2704680,
+          "maximumCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 6918751,
+          "maximumCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 6918751,
+          "maximumCaseIds": [
+            "adversarial-future-cancel-lazy-queue"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 23,
+      "slug": "storage-evacuation",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 7355317,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 7723083,
+          "roundingQuantum": 500000,
+          "instructionBudget": 8000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 109272,
+          "measuredWorstCaseIds": [
+            "adversarial-policy-ties-overshoot"
+          ],
+          "unroundedInstructionBudget": 114736,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 52044,
+          "measuredWorstCaseIds": [
+            "adversarial-policy-ties-overshoot"
+          ],
+          "unroundedInstructionBudget": 54647,
+          "roundingQuantum": 5000,
+          "instructionBudget": 55000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 8000000,
+        "efficient": 150000,
+        "optimal": 55000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 52044,
+          "maximumCaseIds": [
+            "adversarial-policy-ties-overshoot"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 109272,
+          "maximumCaseIds": [
+            "adversarial-policy-ties-overshoot"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 645826,
+          "maximumCaseIds": [
+            "adversarial-policy-ties-overshoot"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1303575,
+          "maximumCaseIds": [
+            "adversarial-policy-ties-overshoot"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3378021,
+          "maximumCaseIds": [
+            "adversarial-policy-ties-overshoot"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 7355317,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 7355317,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 24,
+      "slug": "judge-ledger",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 12403466,
+          "measuredWorstCaseIds": [
+            "adversarial-independent-null"
+          ],
+          "unroundedInstructionBudget": 13023640,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 215716,
+          "measuredWorstCaseIds": [
+            "adversarial-independent-null"
+          ],
+          "unroundedInstructionBudget": 226502,
+          "roundingQuantum": 50000,
+          "instructionBudget": 250000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 130045,
+          "measuredWorstCaseIds": [
+            "adversarial-independent-null"
+          ],
+          "unroundedInstructionBudget": 136548,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 250000,
+        "optimal": 150000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 130045,
+          "maximumCaseIds": [
+            "adversarial-independent-null"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 215716,
+          "maximumCaseIds": [
+            "adversarial-independent-null"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 1265599,
+          "maximumCaseIds": [
+            "adversarial-independent-null"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 2224853,
+          "maximumCaseIds": [
+            "adversarial-independent-null"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 5400372,
+          "maximumCaseIds": [
+            "adversarial-independent-null"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 12345762,
+          "maximumCaseIds": [
+            "adversarial-independent-null"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 12403466,
+          "maximumCaseIds": [
+            "adversarial-independent-null"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 25,
+      "slug": "seven-matchers",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 704417185,
+          "measuredWorstCaseIds": [
+            "adversarial-linear-dedup"
+          ],
+          "unroundedInstructionBudget": 739638045,
+          "roundingQuantum": 50000000,
+          "instructionBudget": 750000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "c",
+          "measuredWorstCaseCost": 1308561,
+          "measuredWorstCaseIds": [
+            "adversarial-linear-dedup"
+          ],
+          "unroundedInstructionBudget": 1373990,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "rust",
+          "measuredWorstCaseCost": 1284380,
+          "measuredWorstCaseIds": [
+            "adversarial-linear-dedup"
+          ],
+          "unroundedInstructionBudget": 1348599,
+          "roundingQuantum": 500000,
+          "instructionBudget": 1500000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 750000000,
+        "efficient": 1500000,
+        "optimal": 1500000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "rust",
+          "maximumCost": 1284380,
+          "maximumCaseIds": [
+            "adversarial-linear-dedup"
+          ]
+        },
+        {
+          "language": "c",
+          "maximumCost": 1308561,
+          "maximumCaseIds": [
+            "adversarial-linear-dedup"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 1789084,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 7698122,
+          "maximumCaseIds": [
+            "adversarial-linear-dedup"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 230007923,
+          "maximumCaseIds": [
+            "adversarial-linear-dedup"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 704063521,
+          "maximumCaseIds": [
+            "adversarial-linear-dedup"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 704417185,
+          "maximumCaseIds": [
+            "adversarial-linear-dedup"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 26,
+      "slug": "bidirectional-pipes",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 8189183,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 8598643,
+          "roundingQuantum": 500000,
+          "instructionBudget": 9000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 49303,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 51769,
+          "roundingQuantum": 5000,
+          "instructionBudget": 55000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 24313,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 25529,
+          "roundingQuantum": 5000,
+          "instructionBudget": 30000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 9000000,
+        "efficient": 55000,
+        "optimal": 30000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 24313,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 49303,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 318609,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 938423,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2967963,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 8153419,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 8189183,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 27,
+      "slug": "chunk-independent-random",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 6898962,
+          "measuredWorstCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ],
+          "unroundedInstructionBudget": 7243911,
+          "roundingQuantum": 500000,
+          "instructionBudget": 7500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 75997,
+          "measuredWorstCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ],
+          "unroundedInstructionBudget": 79797,
+          "roundingQuantum": 5000,
+          "instructionBudget": 80000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 32153,
+          "measuredWorstCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ],
+          "unroundedInstructionBudget": 33761,
+          "roundingQuantum": 5000,
+          "instructionBudget": 35000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 7500000,
+        "efficient": 80000,
+        "optimal": 35000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 32153,
+          "maximumCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 75997,
+          "maximumCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 455739,
+          "maximumCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 923818,
+          "maximumCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3518268,
+          "maximumCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 6827003,
+          "maximumCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 6898962,
+          "maximumCaseIds": [
+            "adversarial-direct-stream-boundaries"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 28,
+      "slug": "canonical-replay-bundle",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 10148123,
+          "measuredWorstCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ],
+          "unroundedInstructionBudget": 10655530,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 207313,
+          "measuredWorstCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ],
+          "unroundedInstructionBudget": 217679,
+          "roundingQuantum": 50000,
+          "instructionBudget": 250000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 101900,
+          "measuredWorstCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ],
+          "unroundedInstructionBudget": 106995,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 250000,
+        "optimal": 150000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 101900,
+          "maximumCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 207313,
+          "maximumCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 2692609,
+          "maximumCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 2786912,
+          "maximumCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3194051,
+          "maximumCaseIds": [
+            "adversarial-total-boundary"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 10122324,
+          "maximumCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 10148123,
+          "maximumCaseIds": [
+            "adversarial-missing-after-large-prefix"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 29,
+      "slug": "source-tree-evidence",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 6243880,
+          "measuredWorstCaseIds": [
+            "adversarial-component-prefix-sort"
+          ],
+          "unroundedInstructionBudget": 6556074,
+          "roundingQuantum": 500000,
+          "instructionBudget": 7000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 89343,
+          "measuredWorstCaseIds": [
+            "adversarial-component-prefix-sort"
+          ],
+          "unroundedInstructionBudget": 93811,
+          "roundingQuantum": 5000,
+          "instructionBudget": 95000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 50289,
+          "measuredWorstCaseIds": [
+            "adversarial-component-prefix-sort"
+          ],
+          "unroundedInstructionBudget": 52804,
+          "roundingQuantum": 5000,
+          "instructionBudget": 55000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 7000000,
+        "efficient": 95000,
+        "optimal": 55000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 50289,
+          "maximumCaseIds": [
+            "adversarial-component-prefix-sort"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 89343,
+          "maximumCaseIds": [
+            "adversarial-component-prefix-sort"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 326090,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 835628,
+          "maximumCaseIds": [
+            "adversarial-component-prefix-sort"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2564553,
+          "maximumCaseIds": [
+            "adversarial-component-prefix-sort"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 6243880,
+          "maximumCaseIds": [
+            "adversarial-component-prefix-sort"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 6243880,
+          "maximumCaseIds": [
+            "adversarial-component-prefix-sort"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 30,
+      "slug": "cross-host-matrix",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 9751200,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 10238760,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 192167,
+          "measuredWorstCaseIds": [
+            "sample-01"
+          ],
+          "unroundedInstructionBudget": 201776,
+          "roundingQuantum": 50000,
+          "instructionBudget": 250000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 90542,
+          "measuredWorstCaseIds": [
+            "adversarial-difference-accounting"
+          ],
+          "unroundedInstructionBudget": 95070,
+          "roundingQuantum": 5000,
+          "instructionBudget": 100000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 250000,
+        "optimal": 100000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 90542,
+          "maximumCaseIds": [
+            "adversarial-difference-accounting"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 192167,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 777560,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1586210,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3942827,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9751200,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9751200,
+          "maximumCaseIds": [
+            "sample-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 31,
+      "slug": "compile-critical-path",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 12677157,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 13311015,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 117446,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 123319,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 55254,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 58017,
+          "roundingQuantum": 5000,
+          "instructionBudget": 60000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 150000,
+        "optimal": 60000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 55254,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 117446,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 1337038,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 2076995,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3677051,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 12677157,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 12677157,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 32,
+      "slug": "conflict-package-cover",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 11140259,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 11697272,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 98766,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 103705,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 23534,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 24711,
+          "roundingQuantum": 5000,
+          "instructionBudget": 25000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 150000,
+        "optimal": 25000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 23534,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 98766,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 492894,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1092722,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 3881293,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 11140259,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 11140259,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 33,
+      "slug": "toolchain-mirror-network",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 10971464,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 11520038,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 70137,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 73644,
+          "roundingQuantum": 5000,
+          "instructionBudget": 75000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 40319,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 42335,
+          "roundingQuantum": 5000,
+          "instructionBudget": 45000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 75000,
+        "optimal": 45000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 40319,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 70137,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 1048993,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1490051,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2965933,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 10938289,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 10971464,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 34,
+      "slug": "capability-cut",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 14595565,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 15325344,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 20000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 142994,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 150144,
+          "roundingQuantum": 50000,
+          "instructionBudget": 200000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 44610,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 46841,
+          "roundingQuantum": 5000,
+          "instructionBudget": 50000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 20000000,
+        "efficient": 200000,
+        "optimal": 50000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 44610,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 142994,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 776641,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1588697,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 6950836,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 14352169,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 14595565,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 35,
+      "slug": "wait-for-cycles",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 14549352,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 15276820,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 20000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 219898,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 230893,
+          "roundingQuantum": 50000,
+          "instructionBudget": 250000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 63380,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 66549,
+          "roundingQuantum": 5000,
+          "instructionBudget": 70000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 20000000,
+        "efficient": 250000,
+        "optimal": 70000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 63380,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 219898,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 753254,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1679488,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 5392782,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 14549352,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 14549352,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 36,
+      "slug": "artifact-cache-knapsack",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 7392875,
+          "measuredWorstCaseIds": [
+            "sample-03"
+          ],
+          "unroundedInstructionBudget": 7762519,
+          "roundingQuantum": 500000,
+          "instructionBudget": 8000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 41622,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 43704,
+          "roundingQuantum": 5000,
+          "instructionBudget": 45000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 19089,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 20044,
+          "roundingQuantum": 5000,
+          "instructionBudget": 25000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 8000000,
+        "efficient": 45000,
+        "optimal": 25000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 19089,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 41622,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 451489,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 958000,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2694864,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 7392875,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 7392875,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 37,
+      "slug": "dependency-tree-knapsack",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 11496460,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 12071283,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 126253,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 132566,
+          "roundingQuantum": 50000,
+          "instructionBudget": 150000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 37909,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 39805,
+          "roundingQuantum": 5000,
+          "instructionBudget": 40000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 150000,
+        "optimal": 40000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 37909,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 126253,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 731845,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1425154,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 4715390,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 11436409,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 11496460,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 38,
+      "slug": "conformance-feature-coverage",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "javascript",
+          "measuredWorstCaseCost": 13840542,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 14532570,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 81938,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 86035,
+          "roundingQuantum": 5000,
+          "instructionBudget": 90000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 39043,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 40996,
+          "roundingQuantum": 5000,
+          "instructionBudget": 45000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 90000,
+        "optimal": 45000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 39043,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 81938,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 650715,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1316608,
+          "maximumCaseIds": [
+            "sample-03"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 7849250,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 13744787,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 13840542,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 39,
+      "slug": "calibration-multiple-choice-knapsack",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 8955406,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 9403177,
+          "roundingQuantum": 500000,
+          "instructionBudget": 9500000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 67747,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 71135,
+          "roundingQuantum": 5000,
+          "instructionBudget": 75000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 31743,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 33331,
+          "roundingQuantum": 5000,
+          "instructionBudget": 35000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 9500000,
+        "efficient": 75000,
+        "optimal": 35000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 31743,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 67747,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 600739,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1174637,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 2932513,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 8955406,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 8955406,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    },
+    {
+      "id": 40,
+      "slug": "dual-quota-output-knapsack",
+      "policyWitnesses": {
+        "baseline": {
+          "rank": 7,
+          "language": "typescript",
+          "measuredWorstCaseCost": 9686223,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 10170535,
+          "roundingQuantum": 5000000,
+          "instructionBudget": 15000000
+        },
+        "efficient": {
+          "rank": 2,
+          "language": "rust",
+          "measuredWorstCaseCost": 66827,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 70169,
+          "roundingQuantum": 5000,
+          "instructionBudget": 75000
+        },
+        "optimal": {
+          "rank": 1,
+          "language": "c",
+          "measuredWorstCaseCost": 27614,
+          "measuredWorstCaseIds": [
+            "adversarial-blind-01"
+          ],
+          "unroundedInstructionBudget": 28995,
+          "roundingQuantum": 5000,
+          "instructionBudget": 30000
+        }
+      },
+      "instructionBudgets": {
+        "baseline": 15000000,
+        "efficient": 75000,
+        "optimal": 30000
+      },
+      "languageMaximumCosts": [
+        {
+          "language": "c",
+          "maximumCost": 27614,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "rust",
+          "maximumCost": 66827,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "cpp",
+          "maximumCost": 593407,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "go",
+          "maximumCost": 1175395,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "python",
+          "maximumCost": 4068267,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "javascript",
+          "maximumCost": 9686223,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        },
+        {
+          "language": "typescript",
+          "maximumCost": 9686223,
+          "maximumCaseIds": [
+            "adversarial-blind-01"
+          ]
+        }
+      ],
+      "costProfiles": {
+        "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
+        "rust": "wasm-oj-forge-cost:contract-1:rust:wasip1:release:content-cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887.765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee.14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21:weighted",
+        "go": "wasm-oj-forge-cost:contract-1:go:wasip1:release:content-70a7e359884b09b2e1a622d6ac5cd6e31c334aab519e6dd80dff5e040a9e09e4.c3a97934b6a83fefdea5c31f99141f70f76189eedc9ec0fa9ccd41302e50963b.20bd57867439708500216da85e5c87e7f253bc797bb50873dc08981afc4d9e1a.78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68.0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a.9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201.2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580:weighted",
+        "python": "wasm-oj-forge-cost:contract-1:python:wasip1:release:content-f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5.67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86.ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161.8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba:weighted",
+        "javascript": "wasm-oj-forge-cost:contract-1:javascript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted",
+        "typescript": "wasm-oj-forge-cost:contract-1:typescript:wasip1:release:content-287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7.5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582:weighted"
+      }
+    }
+  ]
+}

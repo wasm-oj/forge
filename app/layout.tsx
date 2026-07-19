@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
     forwardedProtocol: requestHeaders.get("x-forwarded-proto"),
     host: requestHeaders.get("host"),
   });
-  const description = "A private, fully in-browser online judge with 20 original challenges and six Wasmer-powered languages.";
+  const description = "A private, fully in-browser online judge with 40 original challenges and seven Wasmer-powered languages.";
   return {
     metadataBase,
     title: "WASM OJ Forge",
@@ -22,14 +22,14 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: { icon: "/favicon.svg" },
     openGraph: {
       title: "WASM OJ Forge",
-      description: "20 challenges. Six languages. Zero code uploads.",
+      description: "40 challenges. Seven languages. Zero code uploads.",
       type: "website",
       images: [{ url: new URL("/og.png", metadataBase).toString(), width: 1200, height: 630, alt: "WASM OJ Forge — deterministic browser-local compilation and judging" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "WASM OJ Forge",
-      description: "20 challenges. Six languages. Zero code uploads.",
+      description: "40 challenges. Seven languages. Zero code uploads.",
       images: [new URL("/og.png", metadataBase).toString()],
     },
   };

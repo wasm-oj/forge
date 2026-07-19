@@ -48,7 +48,6 @@ import { createJudgeExecutor, JudgeEngine, type JudgeCaseResult, type JudgeCaseV
 import { FORGE_CONTRACT_VERSION } from "@/src/core/contract";
 import { textMatcher } from "@/src/judge/spec";
 import { normalizeOutput } from "@/src/judge/normalization";
-import { PROBLEMS, problemById, type JudgeProblem, type ProblemDifficulty } from "@/src/judge/problems";
 import { createJudgeProject, judgeProjectId, problemIdFromProject } from "@/src/judge/project";
 import { BrowserForgeCompiler } from "@/src/runtime/compiler-client";
 import { BrowserForgeRunner } from "@/src/runtime/runner-client";
@@ -56,6 +55,20 @@ import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, loadLat
 import { createDefaultBrowserStorageCoordinator, type ForgeStorageCoordinator } from "@/src/storage/coordinator";
 import { registerToolchainCache } from "@/src/storage/service-worker";
 import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
+import { ProblemMarkdown } from "@/src/components/problem-markdown";
+import { assertProblemCostProfile, scoreProblemResults } from "@/src/judge/problem-scoring";
+import {
+  broadestPolicy,
+  DEFAULT_PROBLEM_LOCALE,
+  PROBLEM_LOCALES,
+  PROBLEMS,
+  problemById,
+  problemText,
+  sampleCases,
+  type JudgeProblem,
+  type ProblemDifficulty,
+  type ProblemLocale,
+} from "@/src/judge/problems";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 const SITES_CHUNK_MANIFEST_URL = process.env.NODE_ENV === "production"
@@ -66,6 +79,7 @@ type BottomTab = "judge" | "diagnostics" | "output" | "console";
 type BusyAction = "build" | "run" | "judge" | "cache" | undefined;
 type DifficultyFilter = "all" | ProblemDifficulty;
 type CompileAheadState = "idle" | "scheduled" | "compiling" | "ready" | "error";
+type ProblemPane = "statement" | "editorial";
 
 interface LogEntry {
   id: string;
@@ -84,6 +98,7 @@ const MONACO_LANGUAGE: Record<BuiltinLanguage, string> = {
 };
 
 const VALID_PROBLEM_IDS = new Set(PROBLEMS.map((problem) => problem.id));
+const INITIAL_PROBLEM = PROBLEMS[0];
 
 function cleanPath(path: string): string | undefined {
   const normalized = path.trim().replaceAll("\\", "/").replace(/^\.\//, "");
@@ -104,6 +119,7 @@ function formatDuration(milliseconds: number): string {
 
 function submissionVerdictFromContract(verdict: JudgeCaseVerdict | "accepted"): JudgeUiCaseResult["verdict"] {
   if (verdict === "accepted" || verdict === "wrong-answer") return verdict;
+  if (verdict === "judge-error") return "judge-error";
   if (verdict === "instruction-limit" || verdict === "logical-time-limit" || verdict === "wall-time-limit") return "time-limit";
   return "runtime-error";
 }
@@ -157,8 +173,11 @@ function languageTone(language: Language): string {
   return ({ c: "tone-c", cpp: "tone-cpp", rust: "tone-rust", python: "tone-python", javascript: "tone-js", typescript: "tone-ts" } as Record<string, string>)[language] ?? "tone-js";
 }
 
-function difficultyLabel(difficulty: ProblemDifficulty): string {
-  return ({ easy: "入門", medium: "進階", hard: "挑戰" })[difficulty];
+function difficultyLabel(difficulty: ProblemDifficulty, locale: ProblemLocale): string {
+  const labels = locale === "zh-TW"
+    ? { easy: "入門", medium: "進階", hard: "挑戰" }
+    : { easy: "Easy", medium: "Medium", hard: "Hard" };
+  return labels[difficulty];
 }
 
 function verdictLabel(verdict: SubmissionVerdict): string {
@@ -168,15 +187,17 @@ function verdictLabel(verdict: SubmissionVerdict): string {
     "wrong-answer": "Wrong Answer",
     "runtime-error": "Runtime Error",
     "time-limit": "Time Limit",
+    "judge-error": "Judge Error",
     "compile-error": "Compile Error",
     cancelled: "已取消",
   })[verdict];
 }
 
 export function JudgeStudio() {
-  const initialProblem = PROBLEMS[0];
-  const [project, setProject] = useState<Project>(() => createJudgeProject(initialProblem, "c"));
-  const [problemId, setProblemId] = useState(initialProblem.id);
+  const [project, setProject] = useState<Project>(() => createJudgeProject(INITIAL_PROBLEM, "c"));
+  const [problemId, setProblemId] = useState(INITIAL_PROBLEM.id);
+  const [problemLocale, setProblemLocale] = useState<ProblemLocale>(DEFAULT_PROBLEM_LOCALE);
+  const [problemPane, setProblemPane] = useState<ProblemPane>("statement");
   const [filter, setFilter] = useState<DifficultyFilter>("all");
   const [solved, setSolved] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
@@ -205,7 +226,13 @@ export function JudgeStudio() {
   const judgingRef = useRef(false);
   const cancelledRef = useRef(false);
 
-  const activeProblem = problemById(problemId) ?? initialProblem;
+  const activeProblem = useMemo(() => {
+    const problem = problemById(problemId);
+    if (!problem) throw new Error(`Unknown problem id '${problemId}'.`);
+    return problem;
+  }, [problemId]);
+  const activeProblemText = problemText(activeProblem, problemLocale);
+  const activeBaseline = broadestPolicy(activeProblem);
   const activeFile = useMemo(
     () => project.files.find((file) => file.path === project.activeFile) ?? project.files[0],
     [project],
@@ -502,8 +529,10 @@ export function JudgeStudio() {
         setBottomTab("console");
         setLogs([]);
       }
-      addLog("system", `執行範例輸入 · ${activeProblem.title}`);
-      const result = await runner.run(runnable, { ...project.config, stdin: activeProblem.examples[0].input });
+      const sample = sampleCases(activeProblem)[0];
+      if (!sample) throw new Error(`Problem '${activeProblem.id}' has no sample case.`);
+      addLog("system", `執行範例輸入 · ${activeProblem.title[problemLocale]}`);
+      const result = await runner.run(runnable, { ...project.config, stdin: sample.input });
       const cost = result.metrics.cost === null
         ? "cost unavailable"
         : `${result.metrics.cost.toLocaleString()} net weighted ops (${result.metrics.rawCost?.toLocaleString()} raw − ${result.metrics.baselineCost.toLocaleString()} baseline)`;
@@ -513,7 +542,7 @@ export function JudgeStudio() {
     } finally {
       setBusy(undefined);
     }
-  }, [activeProblem, addLog, artifact, doBuild, project]);
+  }, [activeProblem, addLog, artifact, doBuild, problemLocale, project]);
 
   const doJudge = useCallback(async () => {
     const runner = runnerRef.current;
@@ -550,6 +579,8 @@ export function JudgeStudio() {
         }
       }
       setBusy("judge");
+      assertProblemCostProfile(activeProblem, projectLanguage, runnable.costProfile);
+      const baseline = broadestPolicy(activeProblem);
       const cases: JudgeUiCaseResult[] = [];
       const judging = new JudgeEngine(createJudgeExecutor({
         run: (buildArtifact, run) => runner.run(buildArtifact, {
@@ -565,10 +596,10 @@ export function JudgeStudio() {
       }));
       const result = await judging.judge(runnable, {
         version: FORGE_CONTRACT_VERSION,
-        failFast: true,
-        cases: activeProblem.judgeCases.map((test, index) => ({
+        failFast: false,
+        cases: activeProblem.judgeCases.map((test) => ({
           kind: "batch" as const,
-          id: `case-${index + 1}`,
+          id: test.id,
           input: { kind: "inline" as const, value: test.input },
           matcher: textMatcher(test.output, "lines"),
           args: project.config.args,
@@ -576,7 +607,12 @@ export function JudgeStudio() {
           determinism: project.config.determinism,
           resources: {
             ...project.config.resources,
-            instructionBudget: activeProblem.instructionBudget,
+            instructionBudget: baseline.limits.instructionBudget,
+            memoryLimitBytes: baseline.limits.memoryLimitBytes,
+            wallTimeLimitMs: activeProblem.scoring.safetyLimits.wallTimeLimitMs,
+            ...(baseline.limits.logicalTimeLimitMs === undefined
+              ? {}
+              : { logicalTimeLimitMs: baseline.limits.logicalTimeLimitMs }),
           },
         })),
       }, {
@@ -600,24 +636,48 @@ export function JudgeStudio() {
           });
         },
       });
+      const score = scoreProblemResults(activeProblem, projectLanguage, result.cases);
+      const scoredCases = cases.map((testCase, index) => ({
+        ...testCase,
+        points: score.cases[index].points,
+        passedPolicyIds: score.cases[index].passedPolicyIds,
+      }));
       const verdict = cancelledRef.current ? "cancelled" : submissionVerdictFromContract(result.verdict);
       const finished: JudgeUiSession = {
         problemId: activeProblem.id,
         verdict,
         completed: cases.length,
         total: activeProblem.judgeCases.length,
-        cases,
+        cases: scoredCases,
         durationMs: performance.now() - started,
+        score: {
+          numerator: score.numerator,
+          denominator: score.denominator,
+          points: score.points,
+          maximumPoints: score.maximumPoints,
+        },
       };
       setJudgeSession(finished);
-      if (verdict === "accepted") {
+      if (verdict === "accepted" && score.points === score.maximumPoints) {
         setSolved((current) => new Set([...current, activeProblem.id]));
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addLog("stderr", message);
+      setJudgeSession({
+        problemId: activeProblem.id,
+        verdict: "judge-error",
+        completed: 0,
+        total: activeProblem.judgeCases.length,
+        cases: [],
+        durationMs: performance.now() - started,
+        message,
+      });
     } finally {
       judgingRef.current = false;
       setBusy(undefined);
     }
-  }, [activeProblem, artifact, doBuild, project]);
+  }, [activeProblem, addLog, artifact, doBuild, project, projectLanguage]);
 
   const cancel = useCallback(() => {
     cancelledRef.current = true;
@@ -700,11 +760,24 @@ export function JudgeStudio() {
 
         <div className="problem-switcher">
           <span className="problem-switcher-number">#{String(activeProblem.number).padStart(2, "0")}</span>
-          <span>{activeProblem.title}</span>
-          <span className={`difficulty-pill ${activeProblem.difficulty}`}>{difficultyLabel(activeProblem.difficulty)}</span>
+          <span>{activeProblemText.title}</span>
+          <span className={`difficulty-pill ${activeProblem.difficulty}`}>{difficultyLabel(activeProblem.difficulty, problemLocale)}</span>
         </div>
 
         <div className="topbar-actions">
+          <label className="compact-select">
+            <select
+              value={problemLocale}
+              onChange={(event) => setProblemLocale(event.target.value as ProblemLocale)}
+              aria-label="Problem language"
+              disabled={Boolean(busy)}
+            >
+              {PROBLEM_LOCALES.map((locale) => (
+                <option value={locale} key={locale}>{locale === "zh-TW" ? "繁中" : "English"}</option>
+              ))}
+            </select>
+            <ChevronDown size={12} />
+          </label>
           <label className="compact-select language-select">
             <span className={`language-dot ${languageTone(project.config.language)}`} />
             <select
@@ -745,7 +818,7 @@ export function JudgeStudio() {
           <div className="difficulty-filter" aria-label="題目難度篩選">
             {(["all", "easy", "medium", "hard"] as const).map((value) => (
               <button className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>
-                {value === "all" ? "全部" : difficultyLabel(value)}
+                {value === "all" ? (problemLocale === "zh-TW" ? "全部" : "All") : difficultyLabel(value, problemLocale)}
               </button>
             ))}
           </div>
@@ -760,8 +833,8 @@ export function JudgeStudio() {
                 <span className={`problem-state ${solved.has(problem.id) ? "solved" : ""}`}>
                   {solved.has(problem.id) ? <Check size={12} /> : String(problem.number).padStart(2, "0")}
                 </span>
-                <span className="problem-row-copy"><strong>{problem.title}</strong><small>{problem.category}</small></span>
-                <span className={`difficulty-dot ${problem.difficulty}`} title={difficultyLabel(problem.difficulty)} />
+                <span className="problem-row-copy"><strong>{problem.title[problemLocale]}</strong><small>{problem.tags.join(" · ")}</small></span>
+                <span className={`difficulty-dot ${problem.difficulty}`} title={difficultyLabel(problem.difficulty, problemLocale)} />
               </button>
             ))}
           </div>
@@ -774,44 +847,37 @@ export function JudgeStudio() {
         <article className="problem-statement">
           <div className="statement-kicker">
             <span>PROBLEM {String(activeProblem.number).padStart(2, "0")}</span>
-            <span>{activeProblem.category}</span>
+            <span>{activeProblem.tags.join(" · ")}</span>
           </div>
-          <h1>{activeProblem.title}</h1>
-          <p className="problem-summary">{activeProblem.summary}</p>
+          <h1>{activeProblemText.title}</h1>
           <div className="problem-metrics">
-            <span><Gauge size={13} />{difficultyLabel(activeProblem.difficulty)}</span>
-            <span><Zap size={13} />Net weighted-cost budget {activeProblem.instructionBudget.toLocaleString()} / case</span>
+            <span><Gauge size={13} />{difficultyLabel(activeProblem.difficulty, problemLocale)}</span>
+            <span><Zap size={13} />Baseline cost {activeBaseline.limits.instructionBudget.toLocaleString()} / case</span>
             <span><Box size={13} />{activeProblem.judgeCases.length} cases</span>
           </div>
-          <section className="statement-section">
-            <h2>題目敘述</h2>
-            {activeProblem.description.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-          </section>
-          <section className="statement-section">
-            <h2>輸入</h2>
-            <p>{activeProblem.input}</p>
-          </section>
-          <section className="statement-section">
-            <h2>輸出</h2>
-            <p>{activeProblem.output}</p>
-          </section>
-          <section className="statement-section">
-            <h2>限制</h2>
-            <ul>{activeProblem.constraints.map((constraint) => <li key={constraint}>{constraint}</li>)}</ul>
-          </section>
-          {activeProblem.examples.map((example, index) => (
-            <section className="statement-section example-section" key={index}>
-              <h2>範例 {index + 1}</h2>
-              <div className="example-grid">
-                <div><span>INPUT</span><pre>{example.input}</pre></div>
-                <div><span>OUTPUT</span><pre>{example.output}</pre></div>
+          <div className="problem-policy-grid" aria-label="Cumulative scoring policies">
+            {activeProblem.scoring.policies.map((policy) => (
+              <div key={policy.id}>
+                <span>{policy.title[problemLocale]}</span>
+                <strong>+{policy.points} pts</strong>
+                <small>{policy.limits.instructionBudget.toLocaleString()} cost · {formatBytes(policy.limits.memoryLimitBytes)}</small>
               </div>
-              <p className="example-note">{example.explanation}</p>
-            </section>
-          ))}
+            ))}
+          </div>
+          <div className="problem-document-tabs">
+            <button className={problemPane === "statement" ? "active" : ""} onClick={() => setProblemPane("statement")}>
+              {problemLocale === "zh-TW" ? "題目敘述" : "Statement"}
+            </button>
+            <button className={problemPane === "editorial" ? "active" : ""} onClick={() => setProblemPane("editorial")}>
+              {problemLocale === "zh-TW" ? "題解" : "Editorial"}
+            </button>
+          </div>
+          <ProblemMarkdown markdown={problemPane === "statement" ? activeProblemText.statement : activeProblemText.editorial} />
           <div className="local-judge-note">
             <LockKeyhole size={15} />
-            <p><strong>本機判題邊界</strong>完整離線判題代表測資存在瀏覽器內，適合練習與自我驗證，不宣稱能防止使用者檢視測資。</p>
+            {problemLocale === "zh-TW"
+              ? <p><strong>本機判題邊界</strong>完整離線判題代表測資存在瀏覽器內，適合練習與自我驗證，不宣稱能防止使用者檢視測資。</p>
+              : <p><strong>Local judging boundary</strong>Offline judging keeps tests in the browser. It is intended for practice and self-verification, not for hiding tests from the user.</p>}
           </div>
         </article>
 
@@ -892,7 +958,15 @@ export function JudgeStudio() {
                   <div className="judge-results">
                     <div className={`verdict-banner ${judgeSession.verdict}`}>
                       <span className="verdict-icon">{judgeSession.verdict === "accepted" ? <Award size={19} /> : judgeSession.verdict === "running" ? <span className="spinner" /> : <TriangleAlert size={18} />}</span>
-                      <div><strong>{verdictLabel(judgeSession.verdict)}</strong><span>{judgeSession.completed} / {judgeSession.total} cases · {formatDuration(judgeSession.durationMs)}</span></div>
+                      <div>
+                        <strong>{verdictLabel(judgeSession.verdict)}</strong>
+                        <span>
+                          {judgeSession.completed} / {judgeSession.total} cases
+                          {judgeSession.score ? ` · ${judgeSession.score.points.toFixed(2)} / ${judgeSession.score.maximumPoints} points` : ""}
+                          {` · ${formatDuration(judgeSession.durationMs)}`}
+                        </span>
+                        {judgeSession.message && <span>{judgeSession.message}</span>}
+                      </div>
                     </div>
                     {judgeSession.verdict === "compile-error" && <button className="judge-link" onClick={() => setBottomTab("diagnostics")}>查看編譯診斷 →</button>}
                     <div className="case-list">
@@ -900,7 +974,10 @@ export function JudgeStudio() {
                         <div className={`case-row ${test.verdict}`} key={test.number}>
                           <span className="case-status">{test.verdict === "accepted" ? <CheckCircle2 size={15} /> : <X size={15} />}</span>
                           <strong>Case {String(test.number).padStart(2, "0")}</strong>
-                          <span>{test.verdict === "accepted" ? "Accepted" : verdictLabel(test.verdict)}</span>
+                          <span>
+                            {test.verdict === "accepted" ? "Accepted" : verdictLabel(test.verdict)}
+                            {test.points === undefined ? "" : ` · ${test.points} pts`}
+                          </span>
                           <time>{formatDuration(test.durationMs)}</time>
                           {test.verdict !== "accepted" && (
                             <div className="case-diff">

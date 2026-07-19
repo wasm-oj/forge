@@ -1,0 +1,5 @@
+3 1
+src/z.c aaaaaaaa
+src/a.c bbbbbbbb
+inc/x.h cccccccc
+clang wasm32 o2 deadbeef 3 1 3 2

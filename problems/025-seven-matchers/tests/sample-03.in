@@ -1,0 +1,10 @@
+3
+SET 0 1
+
+x
+MULTISET 3 3
+z z a
+z a z
+FILESET 1 1
+x@deadbeef
+x@deadc0de

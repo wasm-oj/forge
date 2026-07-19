@@ -1,0 +1,8 @@
+7 proof
+F proof2/a 0 1 00000000
+D proof
+L proof/x target
+F a 1 2 abcdef01
+D proofish
+L z foo/bar
+F proof/deep/x 0 0 ffffffff

@@ -37,7 +37,7 @@ The UI sends immutable requests to dedicated compiler and runner module Workers.
 
 ## Local judging
 
-The catalog is a static, typed set of 20 original problems. Every problem defines its statement, input/output contract, constraints, examples, deterministic weighted-cost budget, and at least four judge cases. Fixture tests run independent reference solvers against every expected output.
+The repository-root catalog is the canonical, API-addressable set of 40 original problems. Each manifest localizes titles, statements, editorials, policy names, and complexity-path names in Traditional Chinese and English; it also explicitly declares all test and seven-language reference-solution paths. A deterministic generator produces the browser's typed catalog and a freshness gate rejects drift. Every case runs once under the broadest cost/memory limits, then the same correctness result and Forge metrics are evaluated against cumulative partial-credit policies.
 
 A submission compiles once. For each case, `JudgeEngine` resolves `JudgeCaseSpec.input` and creates an independent `RunConfig`; it does not mutate the compiled project or its build configuration. Output comparison normalizes CRLF and trailing whitespace while preserving leading whitespace. The first wrong answer, non-zero exit, timeout, or runtime failure ends the submission. Accepted problem IDs persist in localStorage; per-problem, per-language drafts persist in IndexedDB.
 
