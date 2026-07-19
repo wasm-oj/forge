@@ -96,7 +96,7 @@
     "lint": "eslint .",
     "assets:og": "node scripts/render-og.mjs",
     "problems:generate": "node scripts/generate-judge-problems.mjs",
-    "problems:verify": "node --test tools/derive_cost_policies.test.mjs scripts/problem-schema.test.mjs && node tools/derive_cost_policies.mjs && node scripts/generate-judge-problems.mjs --check",
+    "problems:verify": "node --test tools/derive_cost_policies.test.mjs scripts/problem-schema.test.mjs scripts/learning-path.test.mjs && node tools/derive_cost_policies.mjs && node scripts/generate-judge-problems.mjs --check",
     "problems:remote:verify": "FORGE_RUN_PROBLEM_COLLECTION_INTEGRATION=1 vitest run --config vitest.config.ts src/judge/problem-collection.integration.test.ts --reporter=verbose",
     "library:build": "node scripts/build-library.mjs",
     "library:verify": "pnpm run contract:verify && pnpm run package-manager:verify && pnpm run docs:verify && pnpm run github:verify && pnpm run conformance:verify && pnpm run licenses:verify && pnpm run runtime:licenses:verify && pnpm run toolchain:verify && pnpm run wasmer-sdk:verify && node scripts/verify-library.mjs && node scripts/verify-library-nodenext.mjs",

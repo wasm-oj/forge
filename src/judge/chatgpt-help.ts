@@ -7,7 +7,7 @@ import {
   type ProblemLocale,
 } from "./problem-model";
 
-const CHATGPT_URL = "https://chat.openai.com/";
+export const CHATGPT_HOME_URL = "https://chatgpt.com/";
 
 const LANGUAGE_DETAILS: Record<BuiltinLanguage, { label: string; markdown: string }> = {
   c: { label: "C", markdown: "c" },
@@ -70,14 +70,4 @@ export function buildChatGptProblemPrompt(
     "## Code Template",
     `\`\`\`${languageDetails.markdown}\n${starter}\n\`\`\``,
   ].join("\n\n");
-}
-
-export function buildChatGptProblemUrl(
-  problem: JudgeProblem,
-  locale: ProblemLocale,
-  language: BuiltinLanguage,
-): string {
-  const url = new URL(CHATGPT_URL);
-  url.searchParams.set("q", buildChatGptProblemPrompt(problem, locale, language));
-  return url.toString();
 }

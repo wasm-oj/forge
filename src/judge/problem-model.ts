@@ -48,6 +48,8 @@ export interface JudgeProblem {
   readonly id: string;
   readonly number: number;
   readonly title: LocalizedText;
+  readonly trackId: string;
+  readonly track: LocalizedText;
   readonly difficulty: ProblemDifficulty;
   readonly tags: readonly string[];
   readonly statement: LocalizedText;
@@ -61,6 +63,8 @@ export interface JudgeProblemSummary {
   readonly id: string;
   readonly number: number;
   readonly title: LocalizedText;
+  readonly trackId: string;
+  readonly track: LocalizedText;
   readonly difficulty: ProblemDifficulty;
   readonly tags: readonly string[];
   readonly caseCount: number;

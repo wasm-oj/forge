@@ -4,9 +4,11 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
+import { applyLearningPath } from "./learning-path.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CATALOG_PATH = path.join(ROOT, "catalog.json");
+const LEARNING_PATH_PATH = path.join(ROOT, "learning-path.json");
 const OUTPUT_PATH = path.join(ROOT, "src/judge/problems.generated.ts");
 const CATALOG_SCHEMA_PATH = path.join(ROOT, "schemas/problem-catalog.schema.json");
 const PROBLEM_SCHEMA_PATH = path.join(ROOT, "schemas/problem.schema.json");
@@ -308,9 +310,11 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const validators = await loadSchemaValidators();
   const catalog = await loadCatalog(validators.catalog);
-  const problems = await Promise.all(
+  const canonicalProblems = await Promise.all(
     catalog.problems.map((entry, index) => loadProblem(entry, index + 1, validators.problem)),
   );
+  const learningPath = await readJson(LEARNING_PATH_PATH, "learning-path.json");
+  const problems = applyLearningPath(learningPath, canonicalProblems);
   const output = render(problems);
   if (options.check) {
     let current;

@@ -15,8 +15,8 @@ import {
   type ProblemScoringPolicy,
 } from "./problem-model";
 
-export const BROWSER_COLLECTION_SCHEMA = "wasm-oj-browser-collection-v2";
-export const BROWSER_PROBLEM_SCHEMA = "wasm-oj-browser-problem-v2";
+export const BROWSER_COLLECTION_SCHEMA = "wasm-oj-browser-collection-v3";
+export const BROWSER_PROBLEM_SCHEMA = "wasm-oj-browser-problem-v3";
 export const PROBLEM_COLLECTION_SOURCE_KEY = "wasm-oj-forge-v1:problem-collection-source";
 export const DEFAULT_PROBLEM_COLLECTION_SOURCE = Object.freeze({
   provider: "github",
@@ -29,7 +29,7 @@ export const DEFAULT_PROBLEM_COLLECTION_SOURCE = Object.freeze({
 const INDEX_MAX_BYTES = 512 * 1024;
 const BUNDLE_MAX_BYTES = 32 * 1024 * 1024;
 const MAX_PROBLEMS = 1_000;
-const CACHE_NAME = "wasm-oj-verified-problem-collections-v2";
+const CACHE_NAME = "wasm-oj-verified-problem-collections-v3";
 const LANGUAGES = ["c", "cpp", "rust", "go", "python", "javascript", "typescript"] as const;
 const POLICY_IDS = ["baseline", "efficient", "optimal"] as const;
 const CALIBRATION_METHOD = "forge-v1-compiled-average-optimal-rounded-v1";
@@ -177,6 +177,8 @@ export function parseProblemBundle(
     || problem.judgeCases.length !== expected.caseCount
     || !sameStringArray(problem.tags, expected.tags)
     || !sameLocalizedText(problem.title, expected.title)
+    || problem.trackId !== expected.trackId
+    || !sameLocalizedText(problem.track, expected.track)
   ) {
     throw schemaError(`Problem bundle '${expected.id}' disagrees with its collection index entry.`);
   }
@@ -349,7 +351,7 @@ function parseCollectionEntry(
   bundlePaths: Set<string>,
   bundleDigests: Set<string>,
 ): ProblemCollectionEntry {
-  if (!isRecord(value) || !hasExactKeys(value, ["id", "number", "title", "difficulty", "tags", "caseCount", "bundle"])) {
+  if (!isRecord(value) || !hasExactKeys(value, ["id", "number", "title", "trackId", "track", "difficulty", "tags", "caseCount", "bundle"])) {
     throw schemaError(`Problem collection entry ${expectedNumber} has an invalid shape.`);
   }
   if (value.number !== expectedNumber || typeof value.id !== "string" || !ID_PATTERN.test(value.id) || ids.has(value.id)) {
@@ -358,6 +360,9 @@ function parseCollectionEntry(
   ids.add(value.id);
   const difficulty = parseDifficulty(value.difficulty, `problem '${value.id}'`);
   const tags = parseTags(value.tags, `problem '${value.id}'`);
+  if (typeof value.trackId !== "string" || !ID_PATTERN.test(value.trackId)) {
+    throw schemaError(`Problem '${value.id}' has an invalid track ID.`);
+  }
   if (!Number.isSafeInteger(value.caseCount) || (value.caseCount as number) < 1 || (value.caseCount as number) > 10_000) {
     throw schemaError(`Problem '${value.id}' has an invalid case count.`);
   }
@@ -383,6 +388,8 @@ function parseCollectionEntry(
     id: value.id,
     number: expectedNumber,
     title: parseLocalizedText(value.title, `problem '${value.id}' title`),
+    trackId: value.trackId,
+    track: parseLocalizedText(value.track, `problem '${value.id}' track`),
     difficulty,
     tags,
     caseCount: value.caseCount as number,
@@ -391,7 +398,7 @@ function parseCollectionEntry(
 }
 
 function parseJudgeProblem(value: unknown): JudgeProblem {
-  if (!isRecord(value) || !hasExactKeys(value, ["id", "number", "title", "difficulty", "tags", "statement", "editorial", "judgeCases", "scoring", "complexities"])) {
+  if (!isRecord(value) || !hasExactKeys(value, ["id", "number", "title", "trackId", "track", "difficulty", "tags", "statement", "editorial", "judgeCases", "scoring", "complexities"])) {
     throw schemaError("The judge problem has an invalid shape.");
   }
   if (typeof value.id !== "string" || !ID_PATTERN.test(value.id) || !Number.isSafeInteger(value.number) || (value.number as number) < 1) {
@@ -399,6 +406,10 @@ function parseJudgeProblem(value: unknown): JudgeProblem {
   }
   const id = value.id;
   const title = parseLocalizedText(value.title, `problem '${id}' title`);
+  if (typeof value.trackId !== "string" || !ID_PATTERN.test(value.trackId)) {
+    throw schemaError(`Problem '${id}' has an invalid track ID.`);
+  }
+  const track = parseLocalizedText(value.track, `problem '${id}' track`);
   const statement = parseLocalizedText(value.statement, `problem '${id}' statement`, false);
   const editorial = parseLocalizedText(value.editorial, `problem '${id}' editorial`, false);
   const difficulty = parseDifficulty(value.difficulty, `problem '${id}'`);
@@ -423,7 +434,7 @@ function parseJudgeProblem(value: unknown): JudgeProblem {
   }
   const complexities = value.complexities.map((complexity, index) => parseComplexity(complexity, id, index));
   if (!complexities.at(-1)?.accepted) throw schemaError(`Problem '${id}' must end with its accepted complexity.`);
-  return { id, number: value.number as number, title, difficulty, tags, statement, editorial, judgeCases, scoring, complexities };
+  return { id, number: value.number as number, title, trackId: value.trackId, track, difficulty, tags, statement, editorial, judgeCases, scoring, complexities };
 }
 
 function parseScoring(value: unknown, problemId: string): JudgeProblem["scoring"] {

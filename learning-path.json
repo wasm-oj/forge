@@ -1,0 +1,111 @@
+{
+  "schema": "wasm-oj-learning-path-v1",
+  "localization": {
+    "defaultLocale": "zh-TW",
+    "supportedLocales": [
+      "zh-TW",
+      "en"
+    ]
+  },
+  "tracks": [
+    {
+      "id": "foundations",
+      "title": {
+        "zh-TW": "入門基礎",
+        "en": "Foundations"
+      },
+      "problems": [
+        "progressive-cost-budget",
+        "verdict-range-counts",
+        "first-duplicate-test",
+        "recent-submission-reuse",
+        "slowest-k-cases"
+      ]
+    },
+    {
+      "id": "resource-limits",
+      "title": {
+        "zh-TW": "計量與資源限制",
+        "en": "Metering & Resource Limits"
+      },
+      "problems": [
+        "weighted-opcode-scale",
+        "baseline-calibration",
+        "memory-gate",
+        "shared-output-pool",
+        "transactional-vfs-quota",
+        "sparse-file-quota",
+        "storage-evacuation"
+      ]
+    },
+    {
+      "id": "filesystem-packaging",
+      "title": {
+        "zh-TW": "檔案系統與封裝",
+        "en": "Filesystems & Packaging"
+      },
+      "problems": [
+        "guest-path-firewall",
+        "mounted-directory-baseline",
+        "mount-tree-conflicts",
+        "bounded-tar-stream",
+        "all-or-nothing-output-collection",
+        "build-fingerprint",
+        "runtime-bundle-encoding",
+        "source-tree-evidence",
+        "canonical-replay-bundle"
+      ]
+    },
+    {
+      "id": "build-scheduling-cache",
+      "title": {
+        "zh-TW": "編譯、排程與快取",
+        "en": "Build, Scheduling & Caching"
+      },
+      "problems": [
+        "reproducible-build-order",
+        "dirty-build-nodes",
+        "compile-critical-path",
+        "worker-generations",
+        "compiler-race",
+        "submission-conveyor",
+        "offline-dependency-bundle",
+        "exact-dependency-cache",
+        "graph-blob-lru",
+        "judge-ledger",
+        "seven-matchers",
+        "bidirectional-pipes",
+        "logical-poll-clock",
+        "chunk-independent-random",
+        "cross-host-matrix"
+      ]
+    },
+    {
+      "id": "graph-algorithms",
+      "title": {
+        "zh-TW": "圖論演算法",
+        "en": "Graph Algorithms"
+      },
+      "problems": [
+        "toolchain-mirror-network",
+        "wait-for-cycles",
+        "conflict-package-cover",
+        "capability-cut"
+      ]
+    },
+    {
+      "id": "knapsack-selection",
+      "title": {
+        "zh-TW": "背包與集合最佳化",
+        "en": "Knapsack & Selection"
+      },
+      "problems": [
+        "artifact-cache-knapsack",
+        "calibration-multiple-choice-knapsack",
+        "dependency-tree-knapsack",
+        "dual-quota-output-knapsack",
+        "conformance-feature-coverage"
+      ]
+    }
+  ]
+}
