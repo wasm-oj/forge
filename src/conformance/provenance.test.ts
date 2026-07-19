@@ -9,7 +9,7 @@ import { sourceTreeProvenance } from "./provenance";
 const execFileAsync = promisify(execFile);
 
 describe("sourceTreeProvenance", () => {
-  it("deterministically binds the current tracked and untracked source tree", async () => {
+  it("deterministically binds the current staged source tree", async () => {
     const first = await sourceTreeProvenance();
     const second = await sourceTreeProvenance();
     expect(second).toEqual(first);
@@ -30,6 +30,8 @@ describe("sourceTreeProvenance", () => {
       await writeFile(path.join(root, "docs/conformance-report.md"), "different generated report\n");
       expect(await sourceTreeProvenance(root)).toEqual(first);
       await writeFile(path.join(root, "source.ts"), "export const value = 2;\n");
+      await expect(sourceTreeProvenance(root)).rejects.toThrow("Stage every source change");
+      await execFileAsync("git", ["add", "source.ts"], { cwd: root });
       expect((await sourceTreeProvenance(root)).sha256).not.toBe(first.sha256);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -44,6 +46,7 @@ describe("sourceTreeProvenance", () => {
       await execFileAsync("git", ["init", "--quiet"], { cwd: root });
       await execFileAsync("git", ["add", "source.ts"], { cwd: root });
       const first = await sourceTreeProvenance(root);
+      await execFileAsync("git", ["config", "core.filemode", "false"], { cwd: root });
       await chmod(source, 0o755);
       expect(await sourceTreeProvenance(root)).toEqual(first);
       await execFileAsync("git", ["update-index", "--chmod=+x", "source.ts"], { cwd: root });
