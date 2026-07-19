@@ -37,6 +37,14 @@ export interface JudgeUiSession {
 
 export const JUDGE_PROGRESS_KEY = `${FORGE_CONTRACT_ID}:judge-progress`;
 
+export function judgeProgressKey(collectionKey: string): string {
+  return `${JUDGE_PROGRESS_KEY}:${encodeURIComponent(collectionKey)}`;
+}
+
+export function judgeProblemProgressId(problemId: string, bundleSha256: string): string {
+  return `${problemId}@${bundleSha256}`;
+}
+
 export function decodeSolvedProgress(raw: string | null, validIds: ReadonlySet<string>): Set<string> {
   if (!raw) return new Set();
   const parsed: unknown = JSON.parse(raw);

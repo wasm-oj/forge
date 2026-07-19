@@ -41,7 +41,8 @@ import { isBuiltinLanguage, LANGUAGES, type BuildArtifact, type BuiltinLanguage,
 import { extensionLanguage, languageLabel, TOOLCHAINS } from "@/src/core/toolchains";
 import {
   decodeSolvedProgress,
-  JUDGE_PROGRESS_KEY,
+  judgeProblemProgressId,
+  judgeProgressKey,
   type JudgeUiCaseResult,
   type JudgeUiSession,
   type SubmissionVerdict,
@@ -50,11 +51,11 @@ import { createJudgeExecutor, JudgeEngine, type JudgeCaseResult, type JudgeCaseV
 import { FORGE_CONTRACT_VERSION } from "@/src/core/contract";
 import { textMatcher } from "@/src/judge/spec";
 import { normalizeOutput } from "@/src/judge/normalization";
-import { createJudgeProject, judgeProjectId, problemIdFromProject } from "@/src/judge/project";
+import { createJudgeProject, judgeProjectId, latestJudgeProjectForCollection, problemIdentityFromProject } from "@/src/judge/project";
 import { buildChatGptProblemUrl } from "@/src/judge/chatgpt-help";
 import { BrowserForgeCompiler } from "@/src/runtime/compiler-client";
 import { BrowserForgeRunner } from "@/src/runtime/runner-client";
-import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, loadLatestProject, saveArtifact, saveProject } from "@/src/storage/database";
+import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, saveArtifact, saveProject } from "@/src/storage/database";
 import { createDefaultBrowserStorageCoordinator, type ForgeStorageCoordinator } from "@/src/storage/coordinator";
 import { registerToolchainCache } from "@/src/storage/service-worker";
 import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
@@ -68,7 +69,16 @@ import {
   resizedBottomPanelHeight,
 } from "@/src/components/judge-panel-layout";
 import { assertProblemCostProfile, scoreProblemResults } from "@/src/judge/problem-scoring";
-import { loadBrowserProblemCatalog } from "@/src/judge/problem-catalog-loader";
+import {
+  DEFAULT_PROBLEM_COLLECTION_SOURCE,
+  PROBLEM_COLLECTION_SOURCE_KEY,
+  clearProblemCollectionCache,
+  loadProblemCollection,
+  normalizeProblemCollectionSource,
+  type GithubProblemCollectionSource,
+  type LoadedProblemCollection,
+  type ProblemCollectionEntry,
+} from "@/src/judge/problem-catalog-loader";
 import {
   broadestPolicy,
   DEFAULT_PROBLEM_LOCALE,
@@ -206,48 +216,182 @@ function verdictLabel(verdict: SubmissionVerdict): string {
   })[verdict];
 }
 
-export function JudgeStudioLoader() {
-  const [problems, setProblems] = useState<readonly JudgeProblem[]>();
+interface ProblemSourceDraft {
+  owner: string;
+  repository: string;
+  ref: string;
+  indexPath: string;
+}
+
+function sourceDraft(source: GithubProblemCollectionSource): ProblemSourceDraft {
+  return {
+    owner: source.owner,
+    repository: source.repository,
+    ref: source.ref,
+    indexPath: source.indexPath,
+  };
+}
+
+interface StoredProblemCollectionSource {
+  source: GithubProblemCollectionSource;
+  error?: string;
+}
+
+function storedProblemCollectionSource(): StoredProblemCollectionSource {
+  if (typeof window === "undefined") return { source: DEFAULT_PROBLEM_COLLECTION_SOURCE };
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(PROBLEM_COLLECTION_SOURCE_KEY);
+  } catch (reason) {
+    return {
+      source: DEFAULT_PROBLEM_COLLECTION_SOURCE,
+      error: `無法讀取題庫來源設定：${reason instanceof Error ? reason.message : String(reason)}`,
+    };
+  }
+  if (!raw) return { source: DEFAULT_PROBLEM_COLLECTION_SOURCE };
+  try {
+    return { source: normalizeProblemCollectionSource(JSON.parse(raw) as unknown) };
+  } catch (reason) {
+    return {
+      source: DEFAULT_PROBLEM_COLLECTION_SOURCE,
+      error: `儲存的題庫來源設定無效：${reason instanceof Error ? reason.message : String(reason)}`,
+    };
+  }
+}
+
+interface ProblemSourceFormProps {
+  source: GithubProblemCollectionSource;
+  disabled?: boolean;
+  onApply(source: GithubProblemCollectionSource): void;
+}
+
+function ProblemSourceForm({ source, disabled, onApply }: ProblemSourceFormProps) {
+  const [draft, setDraft] = useState<ProblemSourceDraft>(() => sourceDraft(source));
   const [error, setError] = useState<string>();
 
+  const apply = () => {
+    try {
+      const normalized = normalizeProblemCollectionSource({ provider: "github", ...draft });
+      setError(undefined);
+      onApply(normalized);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  };
+
+  return (
+    <div className="problem-source-form">
+      <div className="form-grid">
+        <label className="form-field"><span>GitHub owner</span><input value={draft.owner} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, owner: event.target.value }))} /></label>
+        <label className="form-field"><span>Repository</span><input value={draft.repository} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, repository: event.target.value }))} /></label>
+      </div>
+      <div className="form-grid">
+        <label className="form-field"><span>Branch / tag / commit</span><input value={draft.ref} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, ref: event.target.value }))} /></label>
+        <label className="form-field"><span>Collection index</span><input value={draft.indexPath} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, indexPath: event.target.value }))} /></label>
+      </div>
+      {error && <p className="problem-source-error" role="alert">{error}</p>}
+      <div className="problem-source-actions">
+        <button type="button" disabled={disabled} onClick={() => {
+          setDraft(sourceDraft(DEFAULT_PROBLEM_COLLECTION_SOURCE));
+          setError(undefined);
+        }}>使用預設值</button>
+        <button type="button" className="problem-source-apply" disabled={disabled} onClick={apply}>載入並驗證題庫</button>
+      </div>
+    </div>
+  );
+}
+
+interface ProblemCollectionSession {
+  collection: LoadedProblemCollection;
+  initialProblem: JudgeProblem;
+}
+
+export function JudgeStudioLoader() {
+  const [storedSource] = useState<StoredProblemCollectionSource>(storedProblemCollectionSource);
+  const [source, setSource] = useState<GithubProblemCollectionSource>(storedSource.source);
+  const [session, setSession] = useState<ProblemCollectionSession>();
+  const [error, setError] = useState<string | undefined>(storedSource.error);
+  const [blockedByStoredConfiguration, setBlockedByStoredConfiguration] = useState(Boolean(storedSource.error));
+  const [retry, setRetry] = useState(0);
+
   useEffect(() => {
+    if (blockedByStoredConfiguration) return;
     const controller = new AbortController();
-    void loadBrowserProblemCatalog(controller.signal).then(setProblems).catch((reason: unknown) => {
+    void (async () => {
+      const collection = await loadProblemCollection(source, { signal: controller.signal });
+      const first = collection.index.problems[0];
+      if (!first) throw new Error("The verified problem collection is empty.");
+      const initialProblem = await collection.loadProblem(first.id, controller.signal);
+      if (!controller.signal.aborted) setSession({ collection, initialProblem });
+    })().catch((reason: unknown) => {
+      if (controller.signal.aborted) return;
       if (reason instanceof DOMException && reason.name === "AbortError") return;
       setError(reason instanceof Error ? reason.message : String(reason));
     });
     return () => controller.abort();
+  }, [blockedByStoredConfiguration, retry, source]);
+
+  const changeSource = useCallback((next: GithubProblemCollectionSource) => {
+    localStorage.setItem(PROBLEM_COLLECTION_SOURCE_KEY, JSON.stringify(next));
+    setSession(undefined);
+    setError(undefined);
+    setBlockedByStoredConfiguration(false);
+    setSource(next);
+    setRetry((value) => value + 1);
+  }, []);
+
+  const retrySource = useCallback(() => {
+    setSession(undefined);
+    setError(undefined);
+    setBlockedByStoredConfiguration(false);
+    setRetry((value) => value + 1);
   }, []);
 
   if (error) {
     return (
-      <main className="problem-catalog-status" role="alert">
+      <main className="problem-catalog-status problem-source-recovery" role="alert">
         <TriangleAlert size={22} />
+        <strong>無法驗證設定的題庫</strong>
         <span>{error}</span>
+        <ProblemSourceForm key={JSON.stringify(source)} source={source} onApply={changeSource} />
+        <button type="button" className="problem-source-retry" onClick={retrySource}>重試目前來源</button>
       </main>
     );
   }
-  if (!problems) {
+  if (!session) {
     return (
       <main className="problem-catalog-status" aria-live="polite">
         <ShieldCheck size={22} />
-        <span>Loading verified problem catalog…</span>
+        <span>Loading and verifying problem collection…</span>
       </main>
     );
   }
-  return <JudgeStudio problems={problems} />;
+  return (
+    <JudgeStudio
+      key={`${session.collection.sourceKey}:${session.collection.index.revision}`}
+      collection={session.collection}
+      initialProblem={session.initialProblem}
+      onProblemCollectionSourceChange={changeSource}
+    />
+  );
 }
 
 interface JudgeStudioProps {
-  problems: readonly JudgeProblem[];
+  collection: LoadedProblemCollection;
+  initialProblem: JudgeProblem;
+  onProblemCollectionSourceChange(source: GithubProblemCollectionSource): void;
 }
 
-export function JudgeStudio({ problems }: JudgeStudioProps) {
-  const initialProblem = problems[0];
-  if (!initialProblem) throw new Error("The browser problem catalog is empty.");
-  const validProblemIds = useMemo(() => new Set(problems.map((problem) => problem.id)), [problems]);
-  const [project, setProject] = useState<Project>(() => createJudgeProject(initialProblem, "c"));
-  const [problemId, setProblemId] = useState(initialProblem.id);
+export function JudgeStudio({ collection, initialProblem, onProblemCollectionSourceChange }: JudgeStudioProps) {
+  const problems = collection.index.problems;
+  const initialProblemEntry = problems.find((problem) => problem.id === initialProblem.id);
+  if (!initialProblemEntry) throw new Error(`Initial problem '${initialProblem.id}' is absent from its collection index.`);
+  const problemDigests = useMemo(() => new Map(problems.map((problem) => [problem.id, problem.bundle.sha256])), [problems]);
+  const validProgressIds = useMemo(() => new Set(problems.map((problem) => judgeProblemProgressId(problem.id, problem.bundle.sha256))), [problems]);
+  const progressKey = useMemo(() => judgeProgressKey(collection.sourceKey), [collection.sourceKey]);
+  const [project, setProject] = useState<Project>(() => createJudgeProject(collection.sourceKey, initialProblemEntry.bundle.sha256, initialProblem, "c"));
+  const [activeProblem, setActiveProblem] = useState(initialProblem);
+  const [loadingProblemId, setLoadingProblemId] = useState<string>();
   const [problemLocale, setProblemLocale] = useState<ProblemLocale>(DEFAULT_PROBLEM_LOCALE);
   const [problemPane, setProblemPane] = useState<ProblemPane>("statement");
   const [filter, setFilter] = useState<DifficultyFilter>("all");
@@ -284,12 +428,13 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
   const cancelledRef = useRef(false);
   const panelResizeRef = useRef<PanelResizeSession | undefined>(undefined);
 
-  const activeProblem = useMemo(() => {
-    const problem = problems.find((candidate) => candidate.id === problemId);
-    if (!problem) throw new Error(`Unknown problem id '${problemId}'.`);
-    return problem;
-  }, [problemId, problems]);
   const activeProblemText = problemText(activeProblem, problemLocale);
+  const activeProblemEntry = useMemo(() => {
+    const entry = problems.find((problem) => problem.id === activeProblem.id);
+    if (!entry) throw new Error(`Active problem '${activeProblem.id}' is absent from its collection index.`);
+    return entry;
+  }, [activeProblem.id, problems]);
+  const activeProgressId = judgeProblemProgressId(activeProblem.id, activeProblemEntry.bundle.sha256);
   const activeBaseline = broadestPolicy(activeProblem);
   const activeFile = useMemo(
     () => project.files.find((file) => file.path === project.activeFile) ?? project.files[0],
@@ -425,25 +570,34 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
         await storageCoordinator.requestPersistence();
         if (disposed) return;
         try {
-          setSolved(decodeSolvedProgress(localStorage.getItem(JUDGE_PROGRESS_KEY), validProblemIds));
+          setSolved(decodeSolvedProgress(localStorage.getItem(progressKey), validProgressIds));
         } catch (error) {
-          localStorage.removeItem(JUDGE_PROGRESS_KEY);
+          localStorage.removeItem(progressKey);
           addLog("stderr", error instanceof Error ? error.message : String(error));
         }
-        const restored = await loadLatestProject();
+        const restored = latestJudgeProjectForCollection(
+          await listProjects(),
+          collection.sourceKey,
+          problemDigests,
+        );
         if (disposed) return;
-        const restoredProblemId = restored ? problemIdFromProject(restored) : undefined;
-        const restoredProblem = restoredProblemId
-          ? problems.find((candidate) => candidate.id === restoredProblemId)
+        const restoredIdentity = restored ? problemIdentityFromProject(restored, collection.sourceKey) : undefined;
+        const restoredSummary = restoredIdentity
+          ? problems.find((candidate) => candidate.id === restoredIdentity.problemId && candidate.bundle.sha256 === restoredIdentity.bundleSha256)
           : undefined;
+        const restoredProblem = restoredSummary
+          ? await collection.loadProblem(restoredSummary.id)
+          : undefined;
+        if (disposed) return;
         if (
           restored
+          && restoredSummary
           && restoredProblem
           && isBuiltinLanguage(restored.config.language)
-          && restored.id === judgeProjectId(restoredProblem.id, restored.config.language)
+          && restored.id === judgeProjectId(collection.sourceKey, restoredSummary.bundle.sha256, restoredProblem.id, restored.config.language)
         ) {
           setProject(restored);
-          setProblemId(restoredProblem.id);
+          setActiveProblem(restoredProblem);
         }
         const storageReport = await storageCoordinator.estimate();
         if (disposed) return;
@@ -463,7 +617,7 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
       compilation?.dispose();
       runner?.dispose();
     };
-  }, [addLog, problems, validProblemIds]);
+  }, [addLog, collection, problemDigests, problems, progressKey, validProgressIds]);
 
   useEffect(() => {
     if (!hydrated || !runtimeReady) return;
@@ -500,8 +654,8 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(JUDGE_PROGRESS_KEY, JSON.stringify([...solved].sort()));
-  }, [hydrated, solved]);
+    localStorage.setItem(progressKey, JSON.stringify([...solved].sort()));
+  }, [hydrated, progressKey, solved]);
 
   const applyMarkers = useCallback(() => {
     const monaco = monacoRef.current;
@@ -598,24 +752,35 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
     }));
   }, [activeFile, updateProject]);
 
-  const openWorkspace = useCallback(async (problem: JudgeProblem, language: BuiltinLanguage) => {
-    if (busy) return;
-    await saveProject(project);
-    const drafts = await listProjects();
-    const id = judgeProjectId(problem.id, language);
-    const draft = drafts.find((candidate) => candidate.id === id);
-    compileCoordinatorRef.current?.restart();
-    runnerRef.current?.restart();
-    setRuntimeReady(true);
-    setProject(draft ?? createJudgeProject(problem, language));
-    setProblemId(problem.id);
-    setArtifact(undefined);
-    setDiagnostics([]);
-    setLogs([]);
-    setJudgeSession(undefined);
-    setSelectedCaseNumber(undefined);
-    setBottomTab("judge");
-  }, [busy, project]);
+  const openWorkspace = useCallback(async (summary: ProblemCollectionEntry, language: BuiltinLanguage) => {
+    if (busy || loadingProblemId) return;
+    setLoadingProblemId(summary.id);
+    try {
+      await saveProject(project);
+      const problem = summary.id === activeProblem.id
+        ? activeProblem
+        : await collection.loadProblem(summary.id);
+      const drafts = await listProjects();
+      const id = judgeProjectId(collection.sourceKey, summary.bundle.sha256, problem.id, language);
+      const draft = drafts.find((candidate) => candidate.id === id);
+      compileCoordinatorRef.current?.restart();
+      runnerRef.current?.restart();
+      setRuntimeReady(true);
+      setProject(draft ?? createJudgeProject(collection.sourceKey, summary.bundle.sha256, problem, language));
+      setActiveProblem(problem);
+      setArtifact(undefined);
+      setDiagnostics([]);
+      setLogs([]);
+      setJudgeSession(undefined);
+      setSelectedCaseNumber(undefined);
+      setBottomTab("judge");
+    } catch (error) {
+      addLog("stderr", error instanceof Error ? error.message : String(error));
+      setBottomTab("console");
+    } finally {
+      setLoadingProblemId(undefined);
+    }
+  }, [activeProblem, addLog, busy, collection, loadingProblemId, project]);
 
   const doBuild = useCallback(async (allowCache = true): Promise<BuildArtifact | undefined> => {
     const compilation = compileCoordinatorRef.current;
@@ -812,7 +977,7 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
       };
       setJudgeSession(finished);
       if (verdict === "accepted" && score.points === score.maximumPoints) {
-        setSolved((current) => new Set([...current, activeProblem.id]));
+        setSolved((current) => new Set([...current, activeProgressId]));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -830,7 +995,7 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
       judgingRef.current = false;
       setBusy(undefined);
     }
-  }, [activeProblem, addLog, artifact, doBuild, project, projectLanguage]);
+  }, [activeProblem, activeProgressId, addLog, artifact, doBuild, project, projectLanguage]);
 
   const cancel = useCallback(() => {
     cancelledRef.current = true;
@@ -887,12 +1052,13 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
       await Promise.all([
         compilerRef.current?.clearToolchainCache(),
         runner?.clearRuntimeCache(),
+        clearProblemCollectionCache(),
       ]);
       await storageCoordinatorRef.current?.clear();
       setArtifact(undefined);
       const storageReport = await storageCoordinatorRef.current?.estimate();
       if (storageReport) setStorage({ usage: storageReport.usage, quota: storageReport.quota });
-      addLog("system", "已清除本機工具鏈回應與建置產物");
+      addLog("system", "已清除本機題庫、工具鏈回應與建置產物快取");
     } finally {
       setBusy(undefined);
     }
@@ -923,7 +1089,7 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
               value={problemLocale}
               onChange={(event) => setProblemLocale(event.target.value as ProblemLocale)}
               aria-label="Problem language"
-              disabled={Boolean(busy)}
+              disabled={Boolean(busy || loadingProblemId)}
             >
               {PROBLEM_LOCALES.map((locale) => (
                 <option value={locale} key={locale}>{locale === "zh-TW" ? "繁中" : "English"}</option>
@@ -935,16 +1101,16 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
             <span className={`language-dot ${languageTone(project.config.language)}`} />
             <select
               value={project.config.language}
-              onChange={(event) => void openWorkspace(activeProblem, event.target.value as BuiltinLanguage)}
+              onChange={(event) => void openWorkspace(activeProblemEntry, event.target.value as BuiltinLanguage)}
               aria-label="解題語言"
-              disabled={Boolean(busy)}
+              disabled={Boolean(busy || loadingProblemId)}
             >
               {LANGUAGES.map((language) => <option value={language} key={language}>{languageLabel(language)}</option>)}
             </select>
             <ChevronDown size={12} />
           </label>
           <label className="compact-select">
-            <select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")} aria-label="編譯目標" disabled={Boolean(busy)}>
+            <select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")} aria-label="編譯目標" disabled={Boolean(busy || loadingProblemId)}>
               {activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}
             </select>
             <ChevronDown size={12} />
@@ -980,11 +1146,11 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
               <button
                 className={`problem-row ${problem.id === activeProblem.id ? "active" : ""}`}
                 onClick={() => void openWorkspace(problem, projectLanguage)}
-                disabled={Boolean(busy)}
+                disabled={Boolean(busy || loadingProblemId)}
                 key={problem.id}
               >
-                <span className={`problem-state ${solved.has(problem.id) ? "solved" : ""}`}>
-                  {solved.has(problem.id) ? <Check size={12} /> : String(problem.number).padStart(2, "0")}
+                <span className={`problem-state ${solved.has(judgeProblemProgressId(problem.id, problem.bundle.sha256)) ? "solved" : ""}`}>
+                  {solved.has(judgeProblemProgressId(problem.id, problem.bundle.sha256)) ? <Check size={12} /> : String(problem.number).padStart(2, "0")}
                 </span>
                 <span className="problem-row-copy"><strong>{problem.title[problemLocale]}</strong><small>{problem.tags.join(" · ")}</small></span>
                 <span className={`difficulty-dot ${problem.difficulty}`} title={difficultyLabel(problem.difficulty, problemLocale)} />
@@ -994,6 +1160,13 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
           <div className="privacy-card judge-privacy">
             <ShieldCheck size={16} />
             <div><strong>100% in browser</strong><span>程式碼、測資與判題結果只留在此裝置。</span></div>
+          </div>
+          <div className="collection-source-card" title={collection.sourceKey}>
+            <Package size={14} />
+            <div>
+              <strong>{collection.source.owner}/{collection.source.repository}</strong>
+              <span>{collection.source.ref} · {collection.origin === "network" ? "verified online" : "verified cache"}</span>
+            </div>
           </div>
         </aside>
 
@@ -1088,6 +1261,7 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
                   minimap: { enabled: false },
                   padding: { top: 14, bottom: 14 },
                   renderLineHighlight: "all",
+                  readOnly: Boolean(loadingProblemId),
                   scrollBeyondLastLine: false,
                   smoothScrolling: true,
                   tabSize: 4,
@@ -1249,6 +1423,22 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
         <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
           <aside className="settings-drawer" aria-label="本機 Judge 設定">
             <div className="drawer-heading"><div><span>LOCAL JUDGE</span><h2>編譯與執行設定</h2></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label="關閉設定"><X size={16} /></button></div>
+            <section className="problem-source-section" aria-labelledby="problem-source-heading">
+              <div className="problem-source-heading">
+                <div><span>PROBLEM COLLECTION</span><strong id="problem-source-heading">遠端題庫來源</strong></div>
+                <code>{collection.index.revision.slice(0, 12)}</code>
+              </div>
+              <p>只先載入索引；選題時才下載並驗證該題的 SHA-256 bundle。設定會保存在此瀏覽器。</p>
+              <ProblemSourceForm
+                source={collection.source}
+                disabled={Boolean(busy || loadingProblemId)}
+                onApply={(next) => {
+                  void saveProject(project).then(() => onProblemCollectionSourceChange(next)).catch((error: unknown) => {
+                    addLog("stderr", error instanceof Error ? error.message : String(error));
+                  });
+                }}
+              />
+            </section>
             <div className="toolchain-card">
               <span className={`toolchain-mark ${languageTone(project.config.language)}`}>{languageIcon(project.config.language)}</span>
               <div><strong>{activeToolchain.label}</strong><p>{activeToolchain.note}</p></div>
@@ -1285,7 +1475,7 @@ export function JudgeStudio({ problems }: JudgeStudioProps) {
             {project.config.language === "go" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Standard Go / wasip1</strong> 使用標準 <code>Go 1.26.5</code> compiler、linker 與相符的 349-package standard library，全程在 Wasmer 內產生 WASI P1；Go modules 可使用 Forge 統一 lock/cache API。</p></div>}
             <div className="local-judge-note drawer-judge-note"><LockKeyhole size={15} /><p><strong>不防作弊</strong>完全本機的測資一定能被檢視；這是刻意的隱私與教學取捨。</p></div>
             <div className="cache-section"><div><strong>本機快取</strong><span>{formatBytes(storage.usage)} / {storage.quota ? formatBytes(storage.quota) : "browser quota"}</span></div><button onClick={() => void clearCaches()} disabled={Boolean(busy)}><RotateCcw size={13} /> 清除快取</button></div>
-            <div className="drawer-footer"><ShieldCheck size={14} /><span>只下載工具鏈套件；提交程式碼、stdin、測資與產物不會上傳。</span></div>
+            <div className="drawer-footer"><ShieldCheck size={14} /><span>只下載經驗證的題庫與工具鏈套件；提交程式碼、stdin、判題結果與產物不會上傳。</span></div>
           </aside>
         </div>
       )}

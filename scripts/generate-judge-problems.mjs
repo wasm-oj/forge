@@ -8,7 +8,6 @@ import Ajv2020 from "ajv/dist/2020.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CATALOG_PATH = path.join(ROOT, "catalog.json");
 const OUTPUT_PATH = path.join(ROOT, "src/judge/problems.generated.ts");
-const BROWSER_OUTPUT_PATH = path.join(ROOT, "public/problems/catalog.json");
 const CATALOG_SCHEMA_PATH = path.join(ROOT, "schemas/problem-catalog.schema.json");
 const PROBLEM_SCHEMA_PATH = path.join(ROOT, "schemas/problem.schema.json");
 const LOCALES = Object.freeze(["zh-TW", "en"]);
@@ -22,7 +21,6 @@ const LANGUAGES = Object.freeze([
   "typescript",
 ]);
 const POLICY_IDS = Object.freeze(["baseline", "efficient", "optimal"]);
-const BROWSER_SCHEMA = "wasm-oj-browser-problems-v1";
 
 function fail(message) {
   throw new Error(message);
@@ -299,10 +297,6 @@ function render(problems) {
   ].join("\n");
 }
 
-function renderBrowserCatalog(problems) {
-  return `${JSON.stringify({ schema: BROWSER_SCHEMA, problems })}\n`;
-}
-
 async function atomicWrite(file, output) {
   await mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.tmp-${process.pid}`;
@@ -318,29 +312,21 @@ async function main() {
     catalog.problems.map((entry, index) => loadProblem(entry, index + 1, validators.problem)),
   );
   const output = render(problems);
-  const browserOutput = renderBrowserCatalog(problems);
   if (options.check) {
     let current;
-    let currentBrowser;
     try {
-      [current, currentBrowser] = await Promise.all([
-        readFile(OUTPUT_PATH, "utf8"),
-        readFile(BROWSER_OUTPUT_PATH, "utf8"),
-      ]);
+      current = await readFile(OUTPUT_PATH, "utf8");
     } catch {
-      fail("generated TypeScript or browser problem catalog is missing; run pnpm problems:generate");
+      fail("generated TypeScript problem fixture is missing; run pnpm problems:generate");
     }
-    if (current !== output || currentBrowser !== browserOutput) {
-      fail("generated TypeScript or browser problem catalog is stale; run pnpm problems:generate");
+    if (current !== output) {
+      fail("generated TypeScript problem fixture is stale; run pnpm problems:generate");
     }
-    console.log("verified generated Forge catalog for 45 localized problems");
+    console.log("verified generated Forge problem fixture for 45 localized problems");
     return;
   }
-  await Promise.all([
-    atomicWrite(OUTPUT_PATH, output),
-    atomicWrite(BROWSER_OUTPUT_PATH, browserOutput),
-  ]);
-  console.log("generated Forge catalog for 45 localized problems");
+  await atomicWrite(OUTPUT_PATH, output);
+  console.log("generated Forge problem fixture for 45 localized problems");
 }
 
 await main();

@@ -57,6 +57,15 @@ export interface JudgeProblem {
   readonly complexities: readonly ProblemComplexity[];
 }
 
+export interface JudgeProblemSummary {
+  readonly id: string;
+  readonly number: number;
+  readonly title: LocalizedText;
+  readonly difficulty: ProblemDifficulty;
+  readonly tags: readonly string[];
+  readonly caseCount: number;
+}
+
 export function problemText(problem: JudgeProblem, locale: ProblemLocale) {
   return {
     title: problem.title[locale],

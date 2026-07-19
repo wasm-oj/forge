@@ -23,14 +23,14 @@ Because the judge is completely local, its test data can be inspected by a deter
 
 ## The 45-problem systems track
 
-The repository-root [`catalog.json`](catalog.json) is the canonical discovery
-entry point. It names all 45 manifests, the default locale, and the complete
-locale set. Every manifest explicitly names its localized title, statement,
-editorial, seven reference solutions, tests, and cumulative cost/memory scoring
-policies. `scripts/generate-judge-problems.mjs` deterministically materializes
-both the typed library fixture and the browser's same-origin static catalog;
-CI rejects either output when stale. Keeping the 45-problem payload outside the
-server Worker also preserves the deployment provider's code-size boundary.
+The canonical collection is published independently at
+[`wasm-oj/problems`](https://github.com/wasm-oj/problems). Its small browser index
+lists localized titles and integrity-addressed per-problem bundles. Forge loads
+that index by default, downloads a full bundle only when the learner opens a
+problem, verifies its exact byte length and SHA-256 digest, then caches it by
+content hash. The GitHub owner, repository, ref, and index path are user
+configurable. The local generated TypeScript catalog remains a deterministic
+development/test fixture; it is not the browser's runtime data source.
 See the [problem catalog contract](docs/problem-catalog.md) for discovery,
 localization, generation, and cumulative scoring behavior.
 
