@@ -10,6 +10,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  CircleHelp,
   CircleStop,
   Clock3,
   Code2,
@@ -46,7 +47,6 @@ import {
   judgeProgressKey,
   type JudgeUiCaseResult,
   type JudgeUiSession,
-  type SubmissionVerdict,
 } from "@/src/judge/judge";
 import { createJudgeExecutor, JudgeEngine, type JudgeCaseResult, type JudgeCaseVerdict } from "@/src/judge/engine";
 import { FORGE_CONTRACT_VERSION } from "@/src/core/contract";
@@ -62,6 +62,20 @@ import { registerToolchainCache } from "@/src/storage/service-worker";
 import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
 import { ProblemMarkdown } from "@/src/components/problem-markdown";
 import { CaseScoreDetails } from "@/src/components/case-score-details";
+import {
+  executionTerminationLabel,
+  judgeUiText,
+  localizedWorkerProgress,
+  readJudgeUiLocale,
+  toolchainNote,
+  verdictLabel,
+  writeJudgeUiLocale,
+} from "@/src/components/judge-ui-i18n";
+import {
+  completeJudgeOnboarding,
+  isJudgeOnboardingComplete,
+  JudgeOnboarding,
+} from "@/src/components/judge-onboarding";
 import {
   clampBottomPanelHeight,
   DEFAULT_BOTTOM_PANEL_HEIGHT,
@@ -212,23 +226,7 @@ function languageTone(language: Language): string {
 }
 
 function difficultyLabel(difficulty: ProblemDifficulty, locale: ProblemLocale): string {
-  const labels = locale === "zh-TW"
-    ? { easy: "入門", medium: "進階", hard: "挑戰" }
-    : { easy: "Easy", medium: "Medium", hard: "Hard" };
-  return labels[difficulty];
-}
-
-function verdictLabel(verdict: SubmissionVerdict): string {
-  return ({
-    running: "判題中",
-    accepted: "Accepted",
-    "wrong-answer": "Wrong Answer",
-    "runtime-error": "Runtime Error",
-    "time-limit": "Time Limit",
-    "judge-error": "Judge Error",
-    "compile-error": "Compile Error",
-    cancelled: "已取消",
-  })[verdict];
+  return judgeUiText(locale).difficulty[difficulty];
 }
 
 interface ProblemSourceDraft {
@@ -249,7 +247,10 @@ function sourceDraft(source: GithubProblemCollectionSource): ProblemSourceDraft 
 
 interface StoredProblemCollectionSource {
   source: GithubProblemCollectionSource;
-  error?: string;
+  error?: {
+    kind: "read" | "invalid";
+    detail: string;
+  };
 }
 
 function storedProblemCollectionSource(): StoredProblemCollectionSource {
@@ -260,7 +261,10 @@ function storedProblemCollectionSource(): StoredProblemCollectionSource {
   } catch (reason) {
     return {
       source: DEFAULT_PROBLEM_COLLECTION_SOURCE,
-      error: `無法讀取題庫來源設定：${reason instanceof Error ? reason.message : String(reason)}`,
+      error: {
+        kind: "read",
+        detail: reason instanceof Error ? reason.message : String(reason),
+      },
     };
   }
   if (!raw) return { source: DEFAULT_PROBLEM_COLLECTION_SOURCE };
@@ -269,20 +273,25 @@ function storedProblemCollectionSource(): StoredProblemCollectionSource {
   } catch (reason) {
     return {
       source: DEFAULT_PROBLEM_COLLECTION_SOURCE,
-      error: `儲存的題庫來源設定無效：${reason instanceof Error ? reason.message : String(reason)}`,
+      error: {
+        kind: "invalid",
+        detail: reason instanceof Error ? reason.message : String(reason),
+      },
     };
   }
 }
 
 interface ProblemSourceFormProps {
   source: GithubProblemCollectionSource;
+  locale: ProblemLocale;
   disabled?: boolean;
   onApply(source: GithubProblemCollectionSource): void;
 }
 
-function ProblemSourceForm({ source, disabled, onApply }: ProblemSourceFormProps) {
+function ProblemSourceForm({ source, locale, disabled, onApply }: ProblemSourceFormProps) {
   const [draft, setDraft] = useState<ProblemSourceDraft>(() => sourceDraft(source));
   const [error, setError] = useState<string>();
+  const text = judgeUiText(locale).source;
 
   const apply = () => {
     try {
@@ -297,20 +306,20 @@ function ProblemSourceForm({ source, disabled, onApply }: ProblemSourceFormProps
   return (
     <div className="problem-source-form">
       <div className="form-grid">
-        <label className="form-field"><span>GitHub owner</span><input value={draft.owner} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, owner: event.target.value }))} /></label>
-        <label className="form-field"><span>Repository</span><input value={draft.repository} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, repository: event.target.value }))} /></label>
+        <label className="form-field"><span>{text.owner}</span><input value={draft.owner} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, owner: event.target.value }))} /></label>
+        <label className="form-field"><span>{text.repository}</span><input value={draft.repository} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, repository: event.target.value }))} /></label>
       </div>
       <div className="form-grid">
-        <label className="form-field"><span>Branch / tag / commit</span><input value={draft.ref} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, ref: event.target.value }))} /></label>
-        <label className="form-field"><span>Collection index</span><input value={draft.indexPath} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, indexPath: event.target.value }))} /></label>
+        <label className="form-field"><span>{text.ref}</span><input value={draft.ref} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, ref: event.target.value }))} /></label>
+        <label className="form-field"><span>{text.index}</span><input value={draft.indexPath} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, indexPath: event.target.value }))} /></label>
       </div>
-      {error && <p className="problem-source-error" role="alert">{error}</p>}
+      {error && <p className="problem-source-error" role="alert">{text.invalid(error)}</p>}
       <div className="problem-source-actions">
         <button type="button" disabled={disabled} onClick={() => {
           setDraft(sourceDraft(DEFAULT_PROBLEM_COLLECTION_SOURCE));
           setError(undefined);
-        }}>使用預設值</button>
-        <button type="button" className="problem-source-apply" disabled={disabled} onClick={apply}>載入並驗證題庫</button>
+        }}>{text.useDefault}</button>
+        <button type="button" className="problem-source-apply" disabled={disabled} onClick={apply}>{text.apply}</button>
       </div>
     </div>
   );
@@ -323,11 +332,27 @@ interface ProblemCollectionSession {
 
 export function JudgeStudioLoader() {
   const [storedSource] = useState<StoredProblemCollectionSource>(storedProblemCollectionSource);
+  const [problemLocale, setProblemLocale] = useState<ProblemLocale>(() => {
+    if (typeof window === "undefined") return DEFAULT_PROBLEM_LOCALE;
+    try {
+      return readJudgeUiLocale(localStorage);
+    } catch {
+      return DEFAULT_PROBLEM_LOCALE;
+    }
+  });
   const [source, setSource] = useState<GithubProblemCollectionSource>(storedSource.source);
   const [session, setSession] = useState<ProblemCollectionSession>();
-  const [error, setError] = useState<string | undefined>(storedSource.error);
+  const [error, setError] = useState<{
+    kind: "read" | "invalid" | "load";
+    detail: string;
+  } | undefined>(storedSource.error);
   const [blockedByStoredConfiguration, setBlockedByStoredConfiguration] = useState(Boolean(storedSource.error));
   const [retry, setRetry] = useState(0);
+  const text = judgeUiText(problemLocale);
+
+  useEffect(() => {
+    document.documentElement.lang = problemLocale === "zh-TW" ? "zh-Hant" : "en";
+  }, [problemLocale]);
 
   useEffect(() => {
     if (blockedByStoredConfiguration) return;
@@ -341,7 +366,7 @@ export function JudgeStudioLoader() {
     })().catch((reason: unknown) => {
       if (controller.signal.aborted) return;
       if (reason instanceof DOMException && reason.name === "AbortError") return;
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError({ kind: "load", detail: reason instanceof Error ? reason.message : String(reason) });
     });
     return () => controller.abort();
   }, [blockedByStoredConfiguration, retry, source]);
@@ -362,14 +387,33 @@ export function JudgeStudioLoader() {
     setRetry((value) => value + 1);
   }, []);
 
+  const changeProblemLocale = useCallback((locale: ProblemLocale) => {
+    setProblemLocale(locale);
+    writeJudgeUiLocale(localStorage, locale);
+  }, []);
+
+  const errorMessage = error?.kind === "read"
+    ? text.loader.sourceReadFailed(error.detail)
+    : error?.kind === "invalid"
+      ? text.loader.sourceInvalid(error.detail)
+      : error ? text.loader.loadFailed(error.detail) : undefined;
+
   if (error) {
     return (
       <main className="problem-catalog-status problem-source-recovery" role="alert">
+        <label className="problem-source-locale">
+          <span>{text.topbar.interfaceLanguage}</span>
+          <select value={problemLocale} onChange={(event) => changeProblemLocale(event.target.value as ProblemLocale)}>
+            {PROBLEM_LOCALES.map((locale) => (
+              <option value={locale} key={locale}>{judgeUiText(locale).localeName}</option>
+            ))}
+          </select>
+        </label>
         <TriangleAlert size={22} />
-        <strong>無法驗證設定的題庫</strong>
-        <span>{error}</span>
-        <ProblemSourceForm key={JSON.stringify(source)} source={source} onApply={changeSource} />
-        <button type="button" className="problem-source-retry" onClick={retrySource}>重試目前來源</button>
+        <strong>{text.loader.failed}</strong>
+        <span>{errorMessage}</span>
+        <ProblemSourceForm key={JSON.stringify(source)} source={source} locale={problemLocale} onApply={changeSource} />
+        <button type="button" className="problem-source-retry" onClick={retrySource}>{text.loader.retry}</button>
       </main>
     );
   }
@@ -377,7 +421,7 @@ export function JudgeStudioLoader() {
     return (
       <main className="problem-catalog-status" aria-live="polite">
         <ShieldCheck size={22} />
-        <span>Loading and verifying problem collection…</span>
+        <span>{text.loader.loading}</span>
       </main>
     );
   }
@@ -386,6 +430,8 @@ export function JudgeStudioLoader() {
       key={`${session.collection.sourceKey}:${session.collection.index.revision}`}
       collection={session.collection}
       initialProblem={session.initialProblem}
+      problemLocale={problemLocale}
+      onProblemLocaleChange={changeProblemLocale}
       onProblemCollectionSourceChange={changeSource}
     />
   );
@@ -394,10 +440,18 @@ export function JudgeStudioLoader() {
 interface JudgeStudioProps {
   collection: LoadedProblemCollection;
   initialProblem: JudgeProblem;
+  problemLocale: ProblemLocale;
+  onProblemLocaleChange(locale: ProblemLocale): void;
   onProblemCollectionSourceChange(source: GithubProblemCollectionSource): void;
 }
 
-export function JudgeStudio({ collection, initialProblem, onProblemCollectionSourceChange }: JudgeStudioProps) {
+export function JudgeStudio({
+  collection,
+  initialProblem,
+  problemLocale,
+  onProblemLocaleChange,
+  onProblemCollectionSourceChange,
+}: JudgeStudioProps) {
   const problems = collection.index.problems;
   const initialProblemEntry = problems.find((problem) => problem.id === initialProblem.id);
   if (!initialProblemEntry) throw new Error(`Initial problem '${initialProblem.id}' is absent from its collection index.`);
@@ -407,14 +461,13 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   const [project, setProject] = useState<Project>(() => createJudgeProject(collection.sourceKey, initialProblemEntry.bundle.sha256, initialProblem, "c"));
   const [activeProblem, setActiveProblem] = useState(initialProblem);
   const [loadingProblemId, setLoadingProblemId] = useState<string>();
-  const [problemLocale, setProblemLocale] = useState<ProblemLocale>(DEFAULT_PROBLEM_LOCALE);
   const [problemPane, setProblemPane] = useState<ProblemPane>("statement");
   const [filter, setFilter] = useState<DifficultyFilter>("all");
   const [problemSearch, setProblemSearch] = useState("");
   const [solved, setSolved] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
   const [runtimeReady, setRuntimeReady] = useState(false);
-  const [progress, setProgress] = useState<WorkerProgress>({ phase: "initializing", label: "啟動 Wasmer runtime", progress: 0 });
+  const [progress, setProgress] = useState<WorkerProgress>({ phase: "initializing", label: "Starting Wasmer runtime", progress: 0 });
   const [busy, setBusy] = useState<BusyAction>();
   const [artifact, setArtifact] = useState<BuildArtifact>();
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
@@ -434,6 +487,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   const [bottomPanelMaximum, setBottomPanelMaximum] = useState(DEFAULT_BOTTOM_PANEL_HEIGHT);
   const [resizingBottomPanel, setResizingBottomPanel] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");
   const [storage, setStorage] = useState({ usage: 0, quota: 0 });
@@ -451,6 +505,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   const judgingRef = useRef(false);
   const cancelledRef = useRef(false);
   const panelResizeRef = useRef<PanelResizeSession | undefined>(undefined);
+  const text = judgeUiText(problemLocale);
 
   const activeProblemText = problemText(activeProblem, problemLocale);
   const activeProblemEntry = useMemo(() => {
@@ -514,6 +569,25 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     if (!text) return;
     setLogs((current) => [...current, { id: crypto.randomUUID(), stream, text }]);
   }, []);
+
+  const dismissOnboarding = useCallback(() => {
+    try {
+      completeJudgeOnboarding(localStorage);
+    } catch (error) {
+      addLog("stderr", text.logs.onboardingSaveFailed(error instanceof Error ? error.message : String(error)));
+    }
+    setOnboardingOpen(false);
+  }, [addLog, text]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      setOnboardingOpen(!isJudgeOnboardingComplete(localStorage));
+    } catch (error) {
+      addLog("stderr", text.logs.onboardingReadFailed(error instanceof Error ? error.message : String(error)));
+      setOnboardingOpen(true);
+    }
+  }, [addLog, hydrated, text]);
 
   const measureBottomPanel = useCallback(() => {
     const stack = editorStackRef.current;
@@ -737,11 +811,11 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
       localStorage.setItem(activeSelfTestKey, encodeSelfTestCases(selfTests));
     } catch (error) {
       notification = window.setTimeout(() => {
-        addLog("stderr", `無法儲存自行測試：${error instanceof Error ? error.message : String(error)}`);
+        addLog("stderr", text.logs.selfTestSaveFailed(error instanceof Error ? error.message : String(error)));
       }, 0);
     }
     return () => { if (notification !== undefined) window.clearTimeout(notification); };
-  }, [activeSelfTestKey, addLog, loadedSelfTestKey, selfTests]);
+  }, [activeSelfTestKey, addLog, loadedSelfTestKey, selfTests, text]);
 
   const applyMarkers = useCallback(() => {
     const monaco = monacoRef.current;
@@ -881,14 +955,14 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     setLogs([]);
     const started = performance.now();
     try {
-      addLog("system", `build ${project.name} · ${languageLabel(project.config.language)} → ${project.config.target.toUpperCase()}`);
+      addLog("system", text.logs.buildStarted(project.name, languageLabel(project.config.language), project.config.target.toUpperCase()));
       const result = await compilation.compile(project, { cache: allowCache });
       setDiagnostics(result.diagnostics);
       if (result.stdout) addLog("stdout", result.stdout);
       if (result.stderr) addLog("stderr", result.stderr);
       if (!result.success || !result.artifact) {
         setCompileAhead("error");
-        addLog("system", `建置失敗 · ${Math.round(performance.now() - started)} ms`);
+        addLog("system", text.logs.buildFailed(Math.round(performance.now() - started)));
         setBottomTab("diagnostics");
         return undefined;
       }
@@ -897,10 +971,10 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
       const storageReport = await storageCoordinatorRef.current?.maintain();
       if (storageReport) setStorage({ usage: storageReport.after.usage, quota: storageReport.after.quota });
       if (result.cacheHit) {
-        addLog("system", `從本機建置快取載入 ${result.artifact.name} · ${formatBytes(result.artifact.size)}`);
-        setProgress({ phase: "packaging", label: "命中建置快取", progress: 1 });
+        addLog("system", text.logs.cacheLoaded(result.artifact.name, formatBytes(result.artifact.size)));
+        setProgress({ phase: "packaging", label: "Build cache hit", progress: 1 });
       } else {
-        addLog("system", `完成 ${result.artifact.name} · ${formatBytes(result.artifact.size)} · ${Math.round(result.artifact.durationMs)} ms`);
+        addLog("system", text.logs.buildComplete(result.artifact.name, formatBytes(result.artifact.size), Math.round(result.artifact.durationMs)));
       }
       return result.artifact;
     } catch (error) {
@@ -910,7 +984,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     } finally {
       setBusy(undefined);
     }
-  }, [addLog, project]);
+  }, [addLog, project, text]);
 
   const updateSelfTest = (id: string, update: Partial<Pick<SelfTestCase, "name" | "input">>) => {
     setSelfTests((current) => current.map((testCase) => (
@@ -934,7 +1008,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     if (available < 1) return;
     const additions = sampleCases(activeProblem).slice(0, available).map((sample, index) => ({
       id: `sample-${crypto.randomUUID()}`,
-      name: `${problemLocale === "zh-TW" ? "範例" : "Sample"} ${index + 1}`,
+      name: text.selfTest.sampleName(index + 1),
       input: sample.input,
     }));
     if (additions.length === 0) return;
@@ -977,26 +1051,28 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
         setSelectedSelfTestId(testCase.id);
         setProgress({
           phase: "running",
-          label: `自行測試 ${index + 1} / ${requested.length}`,
+          label: `Self Test ${index + 1} / ${requested.length}`,
           progress: index / requested.length,
         });
-        addLog("system", `run ${testCase.name.trim() || `Case ${index + 1}`}`);
+        addLog("system", text.logs.runStarted(testCase.name.trim() || text.selfTest.caseName(index + 1)));
         const result = await runner.run(runnable, { ...project.config, stdin: testCase.input });
         setSelfTestResults((current) => [
           ...current.filter((candidate) => candidate.caseId !== testCase.id),
           { caseId: testCase.id, run: result },
         ]);
-        const cost = result.metrics.cost === null ? "cost unavailable" : `${result.metrics.cost.toLocaleString()} cost`;
-        addLog("system", `${result.termination} · exit ${result.code} · ${cost} · ${formatDuration(result.durationMs)}`);
+        const cost = result.metrics.cost === null
+          ? text.logs.costUnavailable
+          : text.logs.cost(result.metrics.cost.toLocaleString());
+        addLog("system", `${executionTerminationLabel(problemLocale, result.termination)} · ${text.selfTest.exit} ${result.code} · ${cost} · ${formatDuration(result.durationMs)}`);
       }
-      setProgress({ phase: "running", label: "自行測試完成", progress: 1 });
+      setProgress({ phase: "running", label: "Self Test complete", progress: 1 });
     } catch (error) {
       if (!cancelledRef.current) addLog("stderr", error instanceof Error ? error.message : String(error));
     } finally {
       setRunningSelfTestId(undefined);
       setBusy(undefined);
     }
-  }, [addLog, artifact, doBuild, project, selfTests]);
+  }, [addLog, artifact, doBuild, problemLocale, project, selfTests, text]);
 
   const doJudge = useCallback(async () => {
     const runner = runnerRef.current;
@@ -1078,7 +1154,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
           cases.push(displayJudgeCase(contractCase, index, expected));
           setProgress({
             phase: "running",
-            label: `本機測資 ${completed} / ${total}`,
+            label: `Local cases ${completed} / ${total}`,
             progress: completed / total,
           });
           setJudgeSession({
@@ -1149,8 +1225,8 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     setBusy(undefined);
     setRunningSelfTestId(undefined);
     setJudgeSession((current) => current?.verdict === "running" ? { ...current, verdict: "cancelled" } : current);
-    addLog("system", "已取消操作並重啟 ForgeCompiler／ForgeRunner Workers");
-  }, [addLog]);
+    addLog("system", text.logs.cancelled);
+  }, [addLog, text]);
 
   const chooseTarget = (target: "wasip1" | "wasix") => {
     if (target === project.config.target) return;
@@ -1170,7 +1246,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   };
 
   const removeFile = (path: string) => {
-    if (project.files.length === 1 || !window.confirm(`從本機專案刪除 ${path}？`)) return;
+    if (project.files.length === 1 || !window.confirm(text.editor.deleteFileConfirm(path))) return;
     updateProject((current) => {
       const files = current.files.filter((file) => file.path !== path);
       const active = current.activeFile === path ? files[0].path : current.activeFile;
@@ -1203,14 +1279,14 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
       setArtifact(undefined);
       const storageReport = await storageCoordinatorRef.current?.estimate();
       if (storageReport) setStorage({ usage: storageReport.usage, quota: storageReport.quota });
-      addLog("system", "已清除本機題庫、工具鏈回應與建置產物快取");
+      addLog("system", text.logs.cachesCleared);
     } finally {
       setBusy(undefined);
     }
   };
 
   if (!hydrated) {
-    return <main className="boot-screen"><div className="boot-mark"><Zap size={20} /></div><p>開啟本機 Judge workspace</p></main>;
+    return <main className="boot-screen"><div className="boot-mark"><Zap size={20} /></div><p>{text.boot}</p></main>;
   }
 
   return (
@@ -1232,12 +1308,12 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
           <label className="compact-select">
             <select
               value={problemLocale}
-              onChange={(event) => setProblemLocale(event.target.value as ProblemLocale)}
-              aria-label="Problem language"
+              onChange={(event) => onProblemLocaleChange(event.target.value as ProblemLocale)}
+              aria-label={text.topbar.interfaceLanguage}
               disabled={Boolean(busy || loadingProblemId)}
             >
               {PROBLEM_LOCALES.map((locale) => (
-                <option value={locale} key={locale}>{locale === "zh-TW" ? "繁中" : "English"}</option>
+                <option value={locale} key={locale}>{judgeUiText(locale).localeName}</option>
               ))}
             </select>
             <ChevronDown size={12} />
@@ -1247,7 +1323,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
             <select
               value={project.config.language}
               onChange={(event) => void openWorkspace(activeProblemEntry, event.target.value as BuiltinLanguage)}
-              aria-label="解題語言"
+              aria-label={text.topbar.solutionLanguage}
               disabled={Boolean(busy || loadingProblemId)}
             >
               {LANGUAGES.map((language) => <option value={language} key={language}>{languageLabel(language)}</option>)}
@@ -1255,19 +1331,20 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
             <ChevronDown size={12} />
           </label>
           <label className="compact-select">
-            <select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")} aria-label="編譯目標" disabled={Boolean(busy || loadingProblemId)}>
+            <select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")} aria-label={text.topbar.compilationTarget} disabled={Boolean(busy || loadingProblemId)}>
               {activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}
             </select>
             <ChevronDown size={12} />
           </label>
-          <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="專案設定"><Settings2 size={16} /></button>
+          <button className="icon-button" onClick={() => setOnboardingOpen(true)} aria-label={text.topbar.openGuide} title={text.topbar.guide}><CircleHelp size={16} /></button>
+          <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label={text.topbar.projectSettings}><Settings2 size={16} /></button>
           {busy ? (
-            <button className="stop-button" onClick={cancel}><CircleStop size={14} /> 停止</button>
+            <button className="stop-button" onClick={cancel}><CircleStop size={14} /> {text.topbar.stop}</button>
           ) : (
             <>
-              <button className="build-button" onClick={() => void doBuild(false)} disabled={!runtimeReady}><Hammer size={14} /> 建置</button>
-              <button className="sample-button" onClick={() => setBottomTab("tests")} disabled={!runtimeReady}><Play size={14} /> 自行測試</button>
-              <button className="submit-button" onClick={() => void doJudge()} disabled={!runtimeReady}><Send size={14} /> 提交判題</button>
+              <button className="build-button" onClick={() => void doBuild(false)} disabled={!runtimeReady}><Hammer size={14} /> {text.topbar.build}</button>
+              <button className="sample-button" onClick={() => setBottomTab("tests")} disabled={!runtimeReady}><Play size={14} /> {text.topbar.selfTest}</button>
+              <button className="submit-button" onClick={() => void doJudge()} disabled={!runtimeReady}><Send size={14} /> {text.topbar.submit}</button>
             </>
           )}
         </div>
@@ -1276,13 +1353,13 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
       <section className="judge-workspace">
         <aside className="problem-catalog">
           <div className="catalog-heading">
-            <div><span>CHALLENGES</span><strong>{solved.size} / {problems.length}</strong></div>
+            <div><span>{text.catalog.heading.toUpperCase()}</span><strong>{solved.size} / {problems.length}</strong></div>
             <div className="catalog-progress"><span style={{ width: `${(solved.size / problems.length) * 100}%` }} /></div>
           </div>
-          <div className="difficulty-filter" aria-label="題目難度篩選">
+          <div className="difficulty-filter" aria-label={text.catalog.difficultyFilter}>
             {(["all", "easy", "medium", "hard"] as const).map((value) => (
               <button className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>
-                {value === "all" ? (problemLocale === "zh-TW" ? "全部" : "All") : difficultyLabel(value, problemLocale)}
+                {value === "all" ? text.catalog.all : difficultyLabel(value, problemLocale)}
               </button>
             ))}
           </div>
@@ -1292,11 +1369,11 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
               type="search"
               value={problemSearch}
               onChange={(event) => setProblemSearch(event.target.value)}
-              placeholder={problemLocale === "zh-TW" ? "搜尋題號、標題、標籤…" : "Search number, title, tag…"}
-              aria-label={problemLocale === "zh-TW" ? "搜尋題目" : "Search problems"}
+              placeholder={text.catalog.searchPlaceholder}
+              aria-label={text.catalog.search}
             />
             {problemSearch && (
-              <button type="button" onClick={() => setProblemSearch("")} aria-label={problemLocale === "zh-TW" ? "清除搜尋" : "Clear search"}>
+              <button type="button" onClick={() => setProblemSearch("")} aria-label={text.catalog.clearSearch}>
                 <X size={12} />
               </button>
             )}
@@ -1324,68 +1401,58 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
             {groupedProblems.length === 0 && (
               <div className="catalog-empty">
                 <Search size={16} />
-                <span>{problemLocale === "zh-TW" ? "找不到符合條件的題目" : "No matching problems"}</span>
+                <span>{text.catalog.empty}</span>
               </div>
             )}
-          </div>
-          <div className="privacy-card judge-privacy">
-            <ShieldCheck size={16} />
-            <div><strong>100% in browser</strong><span>程式碼、測資與判題結果只留在此裝置。</span></div>
           </div>
           <div className="collection-source-card" title={collection.sourceKey}>
             <Package size={14} />
             <div>
               <strong>{collection.source.owner}/{collection.source.repository}</strong>
-              <span>{collection.source.ref} · {collection.origin === "network" ? "verified online" : "verified cache"}</span>
+              <span>{collection.source.ref} · {collection.origin === "network" ? text.catalog.verifiedOnline : text.catalog.verifiedCache}</span>
             </div>
           </div>
         </aside>
 
         <article className="problem-statement">
           <div className="statement-kicker">
-            <span>PROBLEM {String(activeProblem.number).padStart(2, "0")}</span>
+            <span>{text.statement.problem.toUpperCase()} {String(activeProblem.number).padStart(2, "0")}</span>
             <span>{activeProblem.track[problemLocale]} · {activeProblem.tags.join(" · ")}</span>
           </div>
           <h1>{activeProblemText.title}</h1>
           <div className="problem-metrics">
             <span><Gauge size={13} />{difficultyLabel(activeProblem.difficulty, problemLocale)}</span>
-            <span><Zap size={13} />Baseline cost {activeBaseline.limits.instructionBudget.toLocaleString()} / case</span>
-            <span><Box size={13} />{activeProblem.judgeCases.length} cases</span>
+            <span><Zap size={13} />{text.statement.baselineCost} {activeBaseline.limits.instructionBudget.toLocaleString()} · {text.statement.perCase}</span>
+            <span><Box size={13} />{text.statement.cases(activeProblem.judgeCases.length)}</span>
           </div>
-          <div className="problem-policy-grid" aria-label="Cumulative scoring policies">
+          <div className="problem-policy-grid" aria-label={text.statement.scoringPolicies}>
             {activeProblem.scoring.policies.map((policy) => (
               <div key={policy.id}>
                 <span>{policy.title[problemLocale]}</span>
-                <strong>+{policy.points} pts</strong>
-                <small>{policy.limits.instructionBudget.toLocaleString()} cost · {formatBytes(policy.limits.memoryLimitBytes)}</small>
+                <strong>+{policy.points} {text.statement.pointsShort}</strong>
+                <small>{policy.limits.instructionBudget.toLocaleString()} {text.statement.costUnit} · {formatBytes(policy.limits.memoryLimitBytes)}</small>
               </div>
             ))}
           </div>
           <div className="problem-document-tabs">
             <button className={problemPane === "statement" ? "active" : ""} onClick={() => setProblemPane("statement")}>
-              {problemLocale === "zh-TW" ? "題目敘述" : "Statement"}
+              {text.statement.statement}
             </button>
             <button className={problemPane === "editorial" ? "active" : ""} onClick={() => setProblemPane("editorial")}>
-              {problemLocale === "zh-TW" ? "題解" : "Editorial"}
+              {text.statement.editorial}
             </button>
             <a
               className="ask-chatgpt-button"
               href={chatGptProblemUrl}
               target="_blank"
               rel="noopener noreferrer"
-              title={problemLocale === "zh-TW" ? "以題目連結與目前語言模板詢問 ChatGPT" : "Ask ChatGPT with the problem link and current language template"}
+              title={text.statement.askChatGptTitle}
             >
               <MessageCircle size={13} />
-              {problemLocale === "zh-TW" ? "詢問 ChatGPT" : "Ask ChatGPT"}
+              {text.statement.askChatGpt}
             </a>
           </div>
           <ProblemMarkdown markdown={problemPane === "statement" ? activeProblemText.statement : activeProblemText.editorial} />
-          <div className="local-judge-note">
-            <LockKeyhole size={15} />
-            {problemLocale === "zh-TW"
-              ? <p><strong>本機判題邊界</strong>完整離線判題代表測資存在瀏覽器內，適合練習與自我驗證，不宣稱能防止使用者檢視測資。</p>
-              : <p><strong>Local judging boundary</strong>Offline judging keeps tests in the browser. It is intended for practice and self-verification, not for hiding tests from the user.</p>}
-          </div>
         </article>
 
         <section
@@ -1400,19 +1467,19 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                   <span className={`file-icon ${languageTone(file.language)}`}>{languageIcon(file.language)}</span>
                   {file.path.split("/").at(-1)}
                 </button>
-                {project.files.length > 1 && <button className="file-tab-close" onClick={() => removeFile(file.path)} aria-label={`刪除 ${file.path}`}><X size={11} /></button>}
+                {project.files.length > 1 && <button className="file-tab-close" onClick={() => removeFile(file.path)} aria-label={text.editor.deleteFile(file.path)}><X size={11} /></button>}
               </div>
             ))}
             {newFileOpen ? (
               <form className="tab-new-file" onSubmit={(event) => { event.preventDefault(); addFile(); }}>
-                <input autoFocus value={newFilePath} onChange={(event) => setNewFilePath(event.target.value)} placeholder="src/helper.c" aria-label="新檔案路徑" />
-                <button type="submit" aria-label="建立檔案"><Check size={12} /></button>
-                <button type="button" onClick={() => setNewFileOpen(false)} aria-label="取消"><X size={12} /></button>
+                <input autoFocus value={newFilePath} onChange={(event) => setNewFilePath(event.target.value)} placeholder="src/helper.c" aria-label={text.editor.newFilePath} />
+                <button type="submit" aria-label={text.editor.createFile}><Check size={12} /></button>
+                <button type="button" onClick={() => setNewFileOpen(false)} aria-label={text.editor.cancel}><X size={12} /></button>
               </form>
             ) : (
-              <button className="bare-button add-file-tab" onClick={() => setNewFileOpen(true)} aria-label="新增檔案"><Plus size={14} /></button>
+              <button className="bare-button add-file-tab" onClick={() => setNewFileOpen(true)} aria-label={text.editor.addFile}><Plus size={14} /></button>
             )}
-            <div className="editor-actions"><button className="bare-button" onClick={() => setSettingsOpen(true)} aria-label="開啟編譯設定"><Settings2 size={14} /></button></div>
+            <div className="editor-actions"><button className="bare-button" onClick={() => setSettingsOpen(true)} aria-label={text.editor.openCompilationSettings}><Settings2 size={14} /></button></div>
           </div>
           <div className="editor-surface">
             {activeFile && (
@@ -1445,13 +1512,13 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
           <div
             className="bottom-panel-resizer"
             role="separator"
-            aria-label={problemLocale === "zh-TW" ? "調整編輯器與下方面板高度" : "Resize editor and bottom panel"}
+            aria-label={text.editor.resizePanel}
             aria-orientation="horizontal"
             aria-valuemin={MIN_BOTTOM_PANEL_HEIGHT}
             aria-valuemax={bottomPanelMaximum}
             aria-valuenow={bottomPanelHeight}
             tabIndex={0}
-            title={problemLocale === "zh-TW" ? "拖曳或使用方向鍵調整高度；雙擊重設" : "Drag or use arrow keys to resize; double-click to reset"}
+            title={text.editor.resizePanelHint}
             onDoubleClick={resetBottomPanelHeight}
             onKeyDown={resizeBottomPanelFromKeyboard}
             onPointerDown={startBottomPanelResize}
@@ -1466,29 +1533,29 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
           <section className="bottom-panel">
             <div className="bottom-tabs">
               <button className={bottomTab === "judge" ? "active" : ""} onClick={() => setBottomTab("judge")}>
-                判題結果 {judgeSession && <span className={`verdict-mini ${judgeSession.verdict}`}>{judgeSession.completed}/{judgeSession.total}</span>}
+                {text.panel.judgeResults} {judgeSession && <span className={`verdict-mini ${judgeSession.verdict}`}>{judgeSession.completed}/{judgeSession.total}</span>}
               </button>
               <button className={bottomTab === "tests" ? "active" : ""} onClick={() => setBottomTab("tests")}>
-                自行測試 <span className="test-count-badge">{selfTestResults.length}/{selfTests.length}</span>
+                {text.panel.selfTest} <span className="test-count-badge">{selfTestResults.length}/{selfTests.length}</span>
               </button>
               <button className={bottomTab === "diagnostics" ? "active" : ""} onClick={() => setBottomTab("diagnostics")}>
-                Diagnostics {diagnostics.length > 0 && <span className="count-badge">{diagnostics.length}</span>}
+                {text.panel.diagnostics} {diagnostics.length > 0 && <span className="count-badge">{diagnostics.length}</span>}
               </button>
-              <button className={bottomTab === "output" ? "active" : ""} onClick={() => setBottomTab("output")}>Output</button>
+              <button className={bottomTab === "output" ? "active" : ""} onClick={() => setBottomTab("output")}>{text.panel.output}</button>
               <div className="panel-status">
-                {busy && <><span className="spinner" />{progress.label}</>}
-                {!busy && compileAhead === "scheduled" && <>背景編譯已排程</>}
-                {!busy && compileAhead === "compiling" && <><span className="spinner" />背景預編譯</>}
-                {!busy && compileAhead === "error" && <><TriangleAlert size={13} />等待修正</>}
-                {!busy && compileAhead === "ready" && artifact && <><Check size={13} />預編譯完成 · {formatBytes(artifact.size)}</>}
+                {busy && <><span className="spinner" />{localizedWorkerProgress(progress, problemLocale)}</>}
+                {!busy && compileAhead === "scheduled" && <>{text.panel.compileScheduled}</>}
+                {!busy && compileAhead === "compiling" && <><span className="spinner" />{text.panel.precompiling}</>}
+                {!busy && compileAhead === "error" && <><TriangleAlert size={13} />{text.panel.waitingForFix}</>}
+                {!busy && compileAhead === "ready" && artifact && <><Check size={13} />{text.panel.precompileReady} · {formatBytes(artifact.size)}</>}
                 {!busy && compileAhead === "idle" && artifact && <><Check size={13} />{formatBytes(artifact.size)}</>}
               </div>
-              {artifact && <button className="bare-button panel-download" onClick={() => downloadArtifact(artifact)} aria-label="下載產物"><Download size={14} /></button>}
+              {artifact && <button className="bare-button panel-download" onClick={() => downloadArtifact(artifact)} aria-label={text.panel.downloadArtifact}><Download size={14} /></button>}
             </div>
             <div className="panel-content">
               {bottomTab === "judge" ? (
                 !judgeSession ? (
-                  <div className="empty-panel judge-empty"><Target size={18} /><strong>準備提交</strong><span>程式只會送進此分頁內的 Wasmer runtime。</span></div>
+                  <div className="empty-panel judge-empty"><Target size={18} /><strong>{text.judge.ready}</strong><span>{text.judge.readyDescription}</span></div>
                 ) : (
                   <div className="judge-results">
                     <div className={`verdict-banner ${judgeSession.verdict}`}>
@@ -1498,18 +1565,22 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                           {judgeSession.verdict === "accepted"
                             && judgeSession.score
                             && judgeSession.score.points < judgeSession.score.maximumPoints
-                            ? (problemLocale === "zh-TW" ? "輸出正確 · 部分得分" : "Correct Output · Partial Score")
-                            : verdictLabel(judgeSession.verdict)}
+                            ? text.judge.partialScore
+                            : verdictLabel(problemLocale, judgeSession.verdict)}
                         </strong>
                         <span>
-                          {judgeSession.completed} / {judgeSession.total} cases
-                          {judgeSession.score ? ` · ${judgeSession.score.points.toFixed(2)} / ${judgeSession.score.maximumPoints} points` : ""}
+                          {text.judge.casesAndPoints(
+                            judgeSession.completed,
+                            judgeSession.total,
+                            judgeSession.score?.points,
+                            judgeSession.score?.maximumPoints,
+                          )}
                           {` · ${formatDuration(judgeSession.durationMs)}`}
                         </span>
                         {judgeSession.message && <span>{judgeSession.message}</span>}
                       </div>
                     </div>
-                    {judgeSession.verdict === "compile-error" && <button className="judge-link" onClick={() => setBottomTab("diagnostics")}>查看編譯診斷 →</button>}
+                    {judgeSession.verdict === "compile-error" && <button className="judge-link" onClick={() => setBottomTab("diagnostics")}>{text.judge.viewDiagnostics}</button>}
                     <div className="case-list">
                       {judgeSession.cases.map((test) => (
                         <div
@@ -1523,10 +1594,10 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                             type="button"
                           >
                             <span className="case-status">{test.verdict === "accepted" ? <CheckCircle2 size={15} /> : <X size={15} />}</span>
-                            <strong>Case {String(test.number).padStart(2, "0")}</strong>
+                            <strong>{text.judge.case(test.number)}</strong>
                             <span>
-                              {test.verdict === "accepted" ? (problemLocale === "zh-TW" ? "輸出正確" : "Correct output") : verdictLabel(test.verdict)}
-                              {test.points === undefined ? "" : ` · ${test.points} pts`}
+                              {test.verdict === "accepted" ? text.judge.correctOutput : verdictLabel(problemLocale, test.verdict)}
+                              {test.points === undefined ? "" : ` · ${test.points} ${text.judge.pointsShort}`}
                             </span>
                             <time>{formatDuration(test.durationMs)}</time>
                             {test.metrics && (
@@ -1539,8 +1610,8 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                           </button>
                           {test.verdict !== "accepted" && (
                             <div className="case-diff">
-                              <div><span>EXPECTED</span><pre>{test.expected || "∅"}</pre></div>
-                              <div><span>ACTUAL</span><pre>{test.actual || test.stderr || "∅"}</pre></div>
+                              <div><span>{text.judge.expected}</span><pre>{test.expected || "∅"}</pre></div>
+                              <div><span>{text.judge.actual}</span><pre>{test.actual || test.stderr || "∅"}</pre></div>
                             </div>
                           )}
                         </div>
@@ -1557,16 +1628,16 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                 )
               ) : bottomTab === "tests" ? (
                 <div className="self-test-workbench">
-                  <section className="self-test-cases" aria-label="自行測試輸入">
+                  <section className="self-test-cases" aria-label={text.selfTest.inputRegion}>
                     <header className="self-test-toolbar">
                       <div>
-                        <strong>測試案例</strong>
-                        <span>每筆輸入會使用相同的最新編譯產物依序執行</span>
+                        <strong>{text.selfTest.heading}</strong>
+                        <span>{text.selfTest.description}</span>
                       </div>
                       <div>
-                        <button type="button" onClick={addSampleSelfTests} disabled={Boolean(busy) || selfTests.length >= MAX_SELF_TEST_CASES}>加入範例</button>
-                        <button type="button" onClick={addSelfTest} disabled={Boolean(busy) || selfTests.length >= MAX_SELF_TEST_CASES}><Plus size={12} /> 新增</button>
-                        <button className="self-test-run-all" type="button" onClick={() => void doRunSelfTests(selfTests.map((testCase) => testCase.id))} disabled={Boolean(busy) || !runtimeReady}><Play size={12} /> 全部執行</button>
+                        <button type="button" onClick={addSampleSelfTests} disabled={Boolean(busy) || selfTests.length >= MAX_SELF_TEST_CASES}>{text.selfTest.addSamples}</button>
+                        <button type="button" onClick={addSelfTest} disabled={Boolean(busy) || selfTests.length >= MAX_SELF_TEST_CASES}><Plus size={12} /> {text.selfTest.add}</button>
+                        <button className="self-test-run-all" type="button" onClick={() => void doRunSelfTests(selfTests.map((testCase) => testCase.id))} disabled={Boolean(busy) || !runtimeReady}><Play size={12} /> {text.selfTest.runAll}</button>
                       </div>
                     </header>
                     <div className="self-test-list">
@@ -1592,13 +1663,13 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                               <input
                                 value={testCase.name}
                                 maxLength={80}
-                                aria-label={`測試案例 ${index + 1} 名稱`}
+                                aria-label={text.selfTest.nameLabel(index + 1)}
                                 onFocus={() => setSelectedSelfTestId(testCase.id)}
                                 onChange={(event) => updateSelfTest(testCase.id, { name: event.target.value })}
                                 disabled={Boolean(busy)}
                               />
-                              <button type="button" onClick={() => void doRunSelfTests([testCase.id])} disabled={Boolean(busy) || !runtimeReady} aria-label={`執行 ${testCase.name || `Case ${index + 1}`}`}><Play size={12} /></button>
-                              <button type="button" onClick={() => removeSelfTest(testCase.id)} disabled={Boolean(busy) || selfTests.length === 1} aria-label={`刪除 ${testCase.name || `Case ${index + 1}`}`}><X size={12} /></button>
+                              <button type="button" onClick={() => void doRunSelfTests([testCase.id])} disabled={Boolean(busy) || !runtimeReady} aria-label={text.selfTest.run(testCase.name || text.selfTest.caseName(index + 1))}><Play size={12} /></button>
+                              <button type="button" onClick={() => removeSelfTest(testCase.id)} disabled={Boolean(busy) || selfTests.length === 1} aria-label={text.selfTest.remove(testCase.name || text.selfTest.caseName(index + 1))}><X size={12} /></button>
                             </header>
                             <label>
                               <span>STDIN</span>
@@ -1618,22 +1689,22 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                   </section>
                   <section className="self-test-result" aria-live="polite">
                     <header>
-                      <div><span>RESULT</span><strong>{selectedSelfTest?.name.trim() || "Untitled case"}</strong></div>
+                      <div><span>{text.selfTest.result}</span><strong>{selectedSelfTest?.name.trim() || text.selfTest.untitled}</strong></div>
                       {selectedSelfTestResult && (
                         <span className={selectedSelfTestResult.run.termination === "exited" && selectedSelfTestResult.run.code === 0 ? "success" : "failure"}>
-                          {selectedSelfTestResult.run.termination} · exit {selectedSelfTestResult.run.code}
+                          {executionTerminationLabel(problemLocale, selectedSelfTestResult.run.termination)} · {text.selfTest.exit} {selectedSelfTestResult.run.code}
                         </span>
                       )}
                     </header>
                     {!selectedSelfTestResult ? (
-                      <div className="empty-panel"><Play size={17} /><span>執行選取的案例後，在這裡查看輸出與資源用量</span></div>
+                      <div className="empty-panel"><Play size={17} /><span>{text.selfTest.empty}</span></div>
                     ) : (
                       <div className="self-test-result-body">
                         <div className="self-test-metrics">
-                          <div><span>Duration</span><strong>{formatDuration(selectedSelfTestResult.run.durationMs)}</strong></div>
-                          <div><span>Instruction cost</span><strong>{selectedSelfTestResult.run.metrics.cost?.toLocaleString() ?? "—"}</strong></div>
-                          <div><span>Peak memory</span><strong>{selectedSelfTestResult.run.metrics.memoryBytes === null ? "—" : formatBytes(selectedSelfTestResult.run.metrics.memoryBytes)}</strong></div>
-                          <div><span>Logical time</span><strong>{selectedSelfTestResult.run.metrics.logicalTimeNs === null ? "—" : formatDuration(selectedSelfTestResult.run.metrics.logicalTimeNs / 1_000_000)}</strong></div>
+                          <div><span>{text.selfTest.duration}</span><strong>{formatDuration(selectedSelfTestResult.run.durationMs)}</strong></div>
+                          <div><span>{text.selfTest.instructionCost}</span><strong>{selectedSelfTestResult.run.metrics.cost?.toLocaleString() ?? "—"}</strong></div>
+                          <div><span>{text.selfTest.peakMemory}</span><strong>{selectedSelfTestResult.run.metrics.memoryBytes === null ? "—" : formatBytes(selectedSelfTestResult.run.metrics.memoryBytes)}</strong></div>
+                          <div><span>{text.selfTest.logicalTime}</span><strong>{selectedSelfTestResult.run.metrics.logicalTimeNs === null ? "—" : formatDuration(selectedSelfTestResult.run.metrics.logicalTimeNs / 1_000_000)}</strong></div>
                         </div>
                         <div className="self-test-stream stdout"><span>STDOUT</span><pre>{selectedSelfTestResult.run.stdout || "∅"}</pre></div>
                         {selectedSelfTestResult.run.stderr && <div className="self-test-stream stderr"><span>STDERR</span><pre>{selectedSelfTestResult.run.stderr}</pre></div>}
@@ -1643,7 +1714,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                 </div>
               ) : bottomTab === "diagnostics" ? (
                 diagnostics.length === 0 ? (
-                  <div className="empty-panel"><Check size={17} /><span>沒有編譯診斷</span></div>
+                  <div className="empty-panel"><Check size={17} /><span>{text.empty.diagnostics}</span></div>
                 ) : (
                   <div className="diagnostic-list">
                     {diagnostics.map((diagnostic, index) => (
@@ -1657,7 +1728,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                   </div>
                 )
               ) : logs.length === 0 ? (
-                <div className="empty-panel"><Code2 size={17} /><span>建置或執行後，在這裡查看完整輸出紀錄</span></div>
+                <div className="empty-panel"><Code2 size={17} /><span>{text.empty.output}</span></div>
               ) : (
                 <div className="terminal-output">
                   {logs.map((entry) => <pre className={entry.stream} key={entry.id}>{entry.stream === "system" ? <span className="prompt">› </span> : null}{entry.text}</pre>)}
@@ -1669,27 +1740,30 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
       </section>
 
       <footer className="statusbar">
-        <div><LockKeyhole size={12} />Local judge</div>
+        <div><LockKeyhole size={12} />{text.status.localJudge}</div>
         <div><Package size={12} />{activeToolchain.label} {activeToolchain.version}</div>
-        <div><HardDrive size={12} />{formatBytes(storage.usage)} cached</div>
+        <div><HardDrive size={12} />{text.status.cached(formatBytes(storage.usage))}</div>
         <div className="status-spacer" />
-        <div>{solved.size}/{problems.length} solved</div>
+        <div>{text.status.solved(solved.size, problems.length)}</div>
         <div>{project.config.target.toUpperCase()}</div>
-        <div>Ln {location.line}, Col {location.column}</div>
+        <div>{text.status.cursor(location.line, location.column)}</div>
       </footer>
+
+      {onboardingOpen && <JudgeOnboarding locale={problemLocale} onClose={dismissOnboarding} />}
 
       {settingsOpen && (
         <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
-          <aside className="settings-drawer" aria-label="本機 Judge 設定">
-            <div className="drawer-heading"><div><span>LOCAL JUDGE</span><h2>工作區設定</h2><p>編譯、執行與本機資料各自獨立設定。</p></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label="關閉設定"><X size={16} /></button></div>
+          <aside className="settings-drawer" aria-label={text.settings.ariaLabel}>
+            <div className="drawer-heading"><div><span>{text.settings.eyebrow}</span><h2>{text.settings.title}</h2><p>{text.settings.description}</p></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label={text.settings.close}><X size={16} /></button></div>
             <section className="problem-source-section" aria-labelledby="problem-source-heading">
               <div className="problem-source-heading">
-                <div><span>PROBLEM COLLECTION</span><strong id="problem-source-heading">遠端題庫來源</strong></div>
+                <div><span>{text.settings.collectionEyebrow}</span><strong id="problem-source-heading">{text.settings.collectionTitle}</strong></div>
                 <code>{collection.index.revision.slice(0, 12)}</code>
               </div>
-              <p>只先載入索引；選題時才下載並驗證該題的 SHA-256 bundle。設定會保存在此瀏覽器。</p>
+              <p>{text.settings.collectionDescription}</p>
               <ProblemSourceForm
                 source={collection.source}
+                locale={problemLocale}
                 disabled={Boolean(busy || loadingProblemId)}
                 onApply={(next) => {
                   void saveProject(project).then(() => onProblemCollectionSourceChange(next)).catch((error: unknown) => {
@@ -1699,53 +1773,53 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
               />
             </section>
             <section className="settings-section" aria-labelledby="compile-settings-heading">
-              <header className="settings-section-heading"><span>COMPILATION</span><strong id="compile-settings-heading">編譯設定</strong><p>選擇入口檔、目標 ABI 與最佳化方式。</p></header>
+              <header className="settings-section-heading"><span>{text.settings.compilationEyebrow}</span><strong id="compile-settings-heading">{text.settings.compilationTitle}</strong><p>{text.settings.compilationDescription}</p></header>
               <div className="toolchain-card">
                 <span className={`toolchain-mark ${languageTone(project.config.language)}`}>{languageIcon(project.config.language)}</span>
-                <div><strong>{activeToolchain.label}</strong><p>{activeToolchain.note}</p></div>
+                <div><strong>{activeToolchain.label}</strong><p>{toolchainNote(problemLocale, projectLanguage)}</p></div>
               </div>
-              <label className="form-field"><span>Entry file</span><select value={project.config.entry} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, entry: event.target.value } }))}>{project.files.map((file) => <option key={file.path}>{file.path}</option>)}</select></label>
+              <label className="form-field"><span>{text.settings.entryFile}</span><select value={project.config.entry} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, entry: event.target.value } }))}>{project.files.map((file) => <option key={file.path}>{file.path}</option>)}</select></label>
               <div className="form-grid">
-                <label className="form-field"><span>Target ABI</span><select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")}>{activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}</select></label>
-                <label className="form-field"><span>Profile</span><select value={project.config.optimization} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, optimization: event.target.value as "debug" | "release" } }))}><option value="debug">Debug · -O0</option><option value="release">Release · -O2</option></select></label>
+                <label className="form-field"><span>{text.settings.targetAbi}</span><select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")}>{activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}</select></label>
+                <label className="form-field"><span>{text.settings.profile}</span><select value={project.config.optimization} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, optimization: event.target.value as "debug" | "release" } }))}><option value="debug">Debug · -O0</option><option value="release">Release · -O2</option></select></label>
               </div>
-              {project.config.language === "rust" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Real Rust toolchain</strong> 使用來源可追溯的 <code>rustc 1.91.1-dev</code> WebC 與相符的 standard library，在 Wasmer 內直接產生 WASI P1；Cargo 可使用 Forge 統一 lock/cache API，但目前 editor 尚未把解析後的 crate 掛載進 rustc build。</p></div>}
-              {project.config.language === "go" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Standard Go / wasip1</strong> 使用標準 <code>Go 1.26.5</code> compiler、linker 與相符的 349-package standard library，全程在 Wasmer 內產生 WASI P1；Go modules 可使用 Forge 統一 lock/cache API。</p></div>}
+              {project.config.language === "rust" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>{text.settings.rustToolchainTitle}</strong> {text.settings.rustToolchainNote(activeToolchain.version)}</p></div>}
+              {project.config.language === "go" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>{text.settings.goToolchainTitle}</strong> {text.settings.goToolchainNote(activeToolchain.version)}</p></div>}
             </section>
 
             <section className="settings-section" aria-labelledby="runtime-settings-heading">
-              <header className="settings-section-heading"><span>EXECUTION</span><strong id="runtime-settings-heading">執行限制</strong><p>控制每次自行測試的 deterministic runtime 資源邊界。</p></header>
+              <header className="settings-section-heading"><span>{text.settings.executionEyebrow}</span><strong id="runtime-settings-heading">{text.settings.executionTitle}</strong><p>{text.settings.executionDescription}</p></header>
               <div className="form-grid">
-                <label className="form-field"><span>Net weighted instruction budget</span><input type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1000000" value={project.config.resources.instructionBudget} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, instructionBudget: Number(event.target.value) } }))} /></label>
-                <label className="form-field"><span>Logical time budget (ms)</span><input type="number" min="1" max="9007199254" step="100" value={project.config.resources.logicalTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, logicalTimeLimitMs: Number(event.target.value) } }))} /></label>
+                <label className="form-field"><span>{text.settings.instructionBudget}</span><input type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1000000" value={project.config.resources.instructionBudget} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, instructionBudget: Number(event.target.value) } }))} /></label>
+                <label className="form-field"><span>{text.settings.logicalTimeBudget}</span><input type="number" min="1" max="9007199254" step="100" value={project.config.resources.logicalTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, logicalTimeLimitMs: Number(event.target.value) } }))} /></label>
               </div>
               <div className="form-grid">
-                <label className="form-field"><span>Linear memory (MiB)</span><input type="number" min="1" max="4096" step="1" value={project.config.resources.memoryLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, memoryLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
-                <label className="form-field"><span>Captured output (MiB)</span><input type="number" min="0.0625" max="64" step="0.0625" value={project.config.resources.outputLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, outputLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+                <label className="form-field"><span>{text.settings.linearMemory}</span><input type="number" min="1" max="4096" step="1" value={project.config.resources.memoryLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, memoryLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+                <label className="form-field"><span>{text.settings.capturedOutput}</span><input type="number" min="0.0625" max="64" step="0.0625" value={project.config.resources.outputLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, outputLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
               </div>
               <div className="form-grid">
-                <label className="form-field"><span>Writable VFS (MiB)</span><input type="number" min="0.0625" max="512" step="0.0625" value={project.config.resources.filesystemWriteLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemWriteLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
-                <label className="form-field"><span>Writable VFS entries</span><input type="number" min="1" max="65536" step="1" value={project.config.resources.filesystemEntryLimit} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemEntryLimit: Number(event.target.value) } }))} /></label>
+                <label className="form-field"><span>{text.settings.writableVfs}</span><input type="number" min="0.0625" max="512" step="0.0625" value={project.config.resources.filesystemWriteLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemWriteLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+                <label className="form-field"><span>{text.settings.writableVfsEntries}</span><input type="number" min="1" max="65536" step="1" value={project.config.resources.filesystemEntryLimit} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemEntryLimit: Number(event.target.value) } }))} /></label>
               </div>
-              <label className="form-field"><span>Emergency wall deadline (ms)</span><input type="number" min="1" max="600000" step="100" value={project.config.resources.wallTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, wallTimeLimitMs: Number(event.target.value) } }))} /></label>
-              <div className="profile-notice"><Gauge size={15} /><p><strong>Portable limits</strong> instruction、logical time、memory、output 與 VFS 上限由 runtime 強制執行；wall deadline 只負責終止失控 Worker。</p></div>
+              <label className="form-field"><span>{text.settings.wallDeadline}</span><input type="number" min="1" max="600000" step="100" value={project.config.resources.wallTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, wallTimeLimitMs: Number(event.target.value) } }))} /></label>
+              <div className="profile-notice"><Gauge size={15} /><p><strong>{text.settings.portableLimitsTitle}</strong> {text.settings.portableLimitsNote}</p></div>
             </section>
 
             <section className="settings-section" aria-labelledby="determinism-settings-heading">
-              <header className="settings-section-heading"><span>DETERMINISM</span><strong id="determinism-settings-heading">可重現環境</strong><p>固定隨機來源與虛擬時鐘，讓相同輸入得到相同 transcript。</p></header>
+              <header className="settings-section-heading"><span>{text.settings.determinismEyebrow}</span><strong id="determinism-settings-heading">{text.settings.determinismTitle}</strong><p>{text.settings.determinismDescription}</p></header>
               <div className="form-grid">
-                <label className="form-field"><span>Random seed</span><input type="number" min="0" max="4294967295" step="1" value={project.config.determinism.randomSeed} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, randomSeed: Number(event.target.value) } }))} /></label>
-                <label className="form-field"><span>Clock step (ns)</span><input type="number" min="1" max="1000000000" step="1" value={project.config.determinism.clockStepNs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, clockStepNs: Number(event.target.value) } }))} /></label>
+                <label className="form-field"><span>{text.settings.randomSeed}</span><input type="number" min="0" max="4294967295" step="1" value={project.config.determinism.randomSeed} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, randomSeed: Number(event.target.value) } }))} /></label>
+                <label className="form-field"><span>{text.settings.clockStep}</span><input type="number" min="1" max="1000000000" step="1" value={project.config.determinism.clockStepNs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, clockStepNs: Number(event.target.value) } }))} /></label>
               </div>
-              <label className="form-field"><span>Realtime epoch (Unix ms)</span><input type="number" min="0" max="18446744073000" step="1" value={project.config.determinism.realtimeEpochMs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, realtimeEpochMs: Number(event.target.value) } }))} /></label>
-              <div className="profile-notice"><Clock3 size={15} /><p><strong>Deterministic execution</strong> sleep 與 clock poll 只會快轉虛擬時間，不等待 host；實際執行時間不屬於 deterministic transcript。</p></div>
+              <label className="form-field"><span>{text.settings.realtimeEpoch}</span><input type="number" min="0" max="18446744073000" step="1" value={project.config.determinism.realtimeEpochMs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, realtimeEpochMs: Number(event.target.value) } }))} /></label>
+              <div className="profile-notice"><Clock3 size={15} /><p><strong>{text.settings.deterministicExecutionTitle}</strong> {text.settings.deterministicExecutionNote}</p></div>
             </section>
 
             <section className="settings-section settings-storage-section" aria-labelledby="storage-settings-heading">
-              <header className="settings-section-heading"><span>LOCAL DATA</span><strong id="storage-settings-heading">本機資料與隱私</strong><p>管理裝置上的工具鏈、題庫與建置快取。</p></header>
-              <div className="local-judge-note drawer-judge-note"><LockKeyhole size={15} /><p><strong>不防作弊</strong>完全本機的測資一定能被檢視；這是刻意的隱私與教學取捨。</p></div>
-              <div className="cache-section"><div><strong>本機快取</strong><span>{formatBytes(storage.usage)} / {storage.quota ? formatBytes(storage.quota) : "browser quota"}</span></div><button onClick={() => void clearCaches()} disabled={Boolean(busy)}><RotateCcw size={13} /> 清除快取</button></div>
-              <div className="drawer-footer"><ShieldCheck size={14} /><span>只下載經驗證的題庫與工具鏈；程式碼、自行測試輸入、判題結果與產物不會上傳。</span></div>
+              <header className="settings-section-heading"><span>{text.settings.localDataEyebrow}</span><strong id="storage-settings-heading">{text.settings.localDataTitle}</strong><p>{text.settings.localDataDescription}</p></header>
+              <div className="local-judge-note drawer-judge-note"><LockKeyhole size={15} /><p><strong>{text.settings.noAntiCheatTitle}</strong>{text.settings.noAntiCheatNote}</p></div>
+              <div className="cache-section"><div><strong>{text.settings.localCache}</strong><span>{formatBytes(storage.usage)} / {storage.quota ? formatBytes(storage.quota) : text.settings.browserQuota}</span></div><button onClick={() => void clearCaches()} disabled={Boolean(busy)}><RotateCcw size={13} /> {text.settings.clearCache}</button></div>
+              <div className="drawer-footer"><ShieldCheck size={14} /><span>{text.settings.privacyNote}</span></div>
             </section>
           </aside>
         </div>
