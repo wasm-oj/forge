@@ -4,12 +4,18 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated release tag to resume
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -18,14 +24,26 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     environment: npm
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     permissions:
       contents: write
       id-token: write
       attestations: write
+    defaults:
+      run:
+        working-directory: source
     steps:
+      - name: Check out release automation
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: .release-automation
+          persist-credentials: false
       - name: Check out the release tag and LFS assets
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ env.RELEASE_TAG }}
+          path: source
           fetch-depth: 0
           lfs: true
           persist-credentials: false
@@ -48,57 +66,67 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Run the complete release gate
         run: pnpm run ci:verify
-      - name: Pack and verify the exact release artifact
-        id: package
+      - name: Pack and verify the release candidate
+        id: candidate
         shell: bash
         run: |
           set -euo pipefail
-          release_dir="$RUNNER_TEMP/forge-release"
-          mkdir -p "$release_dir"
-          pnpm pack --pack-destination "$release_dir"
-          mapfile -t tarballs < <(find "$release_dir" -maxdepth 1 -type f -name '*.tgz' -print)
+          candidate_dir="$RUNNER_TEMP/forge-candidate"
+          mkdir -p "$candidate_dir"
+          pnpm pack --pack-destination "$candidate_dir"
+          mapfile -t tarballs < <(find "$candidate_dir" -maxdepth 1 -type f -name '*.tgz' -print)
           test "${#tarballs[@]}" -eq 1
-          pnpm run release:verify "$GITHUB_REF_NAME" "${tarballs[0]}"
+          pnpm run release:verify "$RELEASE_TAG" "${tarballs[0]}"
           echo "tarball=${tarballs[0]}" >> "$GITHUB_OUTPUT"
-          echo "checksum=${tarballs[0]}.sha256" >> "$GITHUB_OUTPUT"
-      - name: Attest the release artifact
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
-        with:
-          subject-path: ${{ steps.package.outputs.tarball }}
-      - name: Create or update the draft GitHub Release
+      - name: Publish candidate and resolve canonical registry artifact
+        id: registry
         env:
-          GH_TOKEN: ${{ github.token }}
-          TARBALL: ${{ steps.package.outputs.tarball }}
-          CHECKSUM: ${{ steps.package.outputs.checksum }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$TARBALL" "$CHECKSUM" --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" "$TARBALL" "$CHECKSUM" \
-              --draft --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
-          fi
-      - name: Publish the verified tarball to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
-          TARBALL: ${{ steps.package.outputs.tarball }}
+          CANDIDATE: ${{ steps.candidate.outputs.tarball }}
         shell: bash
         run: |
           set -euo pipefail
           package_spec="$(node -p "const p=require('./package.json'); p.name+'@'+p.version")"
+          if ! pnpm view "$package_spec" version >/dev/null 2>&1; then
+            pnpm publish "$CANDIDATE" --access public --no-git-checks
+          fi
+
           registry_dir="$RUNNER_TEMP/forge-registry"
+          metadata="$registry_dir/dist.json"
+          tarball="$registry_dir/$(basename "$CANDIDATE")"
           mkdir -p "$registry_dir"
-          if pnpm view "$package_spec" version >/dev/null 2>&1; then
-            pnpm pack "$package_spec" --pack-destination "$registry_dir"
-            mapfile -t published < <(find "$registry_dir" -maxdepth 1 -type f -name '*.tgz' -print)
-            test "${#published[@]}" -eq 1
-            cmp --silent "$TARBALL" "${published[0]}"
+          for attempt in {1..12}; do
+            if pnpm view "$package_spec" dist --json > "$metadata"; then
+              break
+            fi
+            if [ "$attempt" -eq 12 ]; then
+              exit 1
+            fi
+            sleep 5
+          done
+          node ../.release-automation/scripts/download-registry-artifact.mjs "$metadata" "$tarball"
+          node ../.release-automation/scripts/verify-release-artifacts.mjs "$CANDIDATE" "$tarball"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          echo "checksum=$tarball.sha256" >> "$GITHUB_OUTPUT"
+      - name: Attest the canonical registry artifact
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-path: ${{ steps.registry.outputs.tarball }}
+      - name: Create or update the draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARBALL: ${{ steps.registry.outputs.tarball }}
+          CHECKSUM: ${{ steps.registry.outputs.checksum }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$TARBALL" "$CHECKSUM" --clobber
           else
-            pnpm publish "$TARBALL" --access public --no-git-checks
+            gh release create "$RELEASE_TAG" "$TARBALL" "$CHECKSUM" \
+              --draft --verify-tag --generate-notes --title "$RELEASE_TAG"
           fi
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest
