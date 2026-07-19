@@ -13,7 +13,7 @@ compiler/determinism/resource/judge counters. See [versioning policy](docs/versi
 
 ## Judge experience
 
-- Browse and filter 45 progressively harder systems-algorithm problems in Traditional Chinese or English.
+- Browse 45 systems-algorithm problems in a topic-grouped, prerequisite-aware learning path; search by number, title, track, or tag in Traditional Chinese or English.
 - Work in C, C++, Rust, Go, Python, JavaScript, or TypeScript with Monaco and multi-file projects.
 - Build once, run the sample, then execute each judge case locally through Wasmer.
 - Compare normalized stdout, surface compile/runtime/time-limit/wrong-answer verdicts, and retain solved progress in browser storage.
@@ -34,10 +34,11 @@ development/test fixture; it is not the browser's runtime data source.
 See the [problem catalog contract](docs/problem-catalog.md) for discovery,
 localization, generation, and cumulative scoring behavior.
 
-The track progresses from metering, baseline normalization, memory and VFS
-accounting through build graphs, caches, scheduling and deterministic replay,
-then finishes with graph algorithms and several knapsack variants. No original
-20-problem fixture or compatibility catalog remains.
+The learner-facing order starts with five foundations problems, then progresses through metering
+and resource limits, filesystems and packaging, build scheduling and caching, graph algorithms,
+and knapsack variants. Stable source manifest IDs remain unchanged so calibration evidence and
+GitHub API paths do not drift when the pedagogical sequence changes. No original 20-problem
+fixture or compatibility catalog remains.
 
 ## Language support
 

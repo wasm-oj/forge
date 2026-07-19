@@ -26,16 +26,23 @@ slug stays the same.
 
 ## Lazy loading and integrity
 
-The `wasm-oj-browser-collection-v2` index is capped at 512 KiB and contains localized list
-metadata plus one bundle descriptor per problem. Forge renders the challenge list after loading
+The `wasm-oj-browser-collection-v3` index is capped at 512 KiB and contains localized list and
+learning-track metadata plus one bundle descriptor per problem. Forge renders the challenge list after loading
 the index and initially downloads only the first problem. Selecting another problem fetches its
-`wasm-oj-browser-problem-v2` bundle on demand.
+`wasm-oj-browser-problem-v3` bundle on demand.
+
+The canonical repository keeps stable manifest IDs and paths for calibration evidence and API
+consumers. Its separate `learning-path.json` groups problems by topic and orders each group from
+lower prerequisite load to more advanced techniques. The published browser index flattens that
+path into contiguous display numbers and includes each stable track ID and localized track name. Forge groups the
+catalog by those tracks and searches across display number, slug, both localized titles, both
+localized track names, and tags.
 
 Every descriptor declares the exact byte length and lowercase SHA-256 digest. Forge enforces a
 32 MiB per-problem ceiling while streaming the response, verifies the digest over the original
 bytes before UTF-8 decoding or JSON parsing, then validates:
 
-- bundle/index identity, order, title, difficulty, tags, and case count;
+- bundle/index identity, order, title, track ID, localized track, difficulty, tags, and case count;
 - both supported locales for titles, statements, editorials, policy names, and complexities;
 - unique test identities and supported case kinds;
 - exact calibration languages and method;

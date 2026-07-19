@@ -14,13 +14,14 @@ describe.runIf(runIntegration)("published wasm-oj/problems collection", () => {
     });
     expect(collection.origin).toBe("network");
     expect(collection.index.problems).toHaveLength(45);
-    expect(collection.index.revision).toBe("9837a80c2815fe9fdf7e0c21437ec1b8102984b4f2ce6bc47b45c9e1024f959a");
+    expect(collection.index.revision).toBe("8a77d366553153ad10b6536ba0fc642d232c06761d073007626e89fe05fbc037");
     const problems = await Promise.all(collection.index.problems.map((entry) => collection.loadProblem(entry.id)));
     expect(problems.map((problem) => problem.number)).toEqual(Array.from({ length: 45 }, (_, index) => index + 1));
-    expect(problems[0]).toMatchObject({ number: 1, id: "weighted-opcode-scale" });
+    expect(problems[0]).toMatchObject({ number: 1, id: "progressive-cost-budget", track: { en: "Foundations" } });
     expect(problems.at(-1)).toMatchObject({
       number: 45,
-      judgeCases: expect.arrayContaining([expect.objectContaining({ id: "adversarial-01" })]),
+      id: "conformance-feature-coverage",
+      judgeCases: expect.arrayContaining([expect.objectContaining({ id: "adversarial-blind-01" })]),
     });
   }, 30_000);
 });

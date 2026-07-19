@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LANGUAGES } from "../core/types";
-import { buildChatGptProblemPrompt, buildChatGptProblemUrl } from "./chatgpt-help";
+import { CHATGPT_HOME_URL, buildChatGptProblemPrompt } from "./chatgpt-help";
 import { judgeStarterSource } from "./project";
 import { PROBLEM_LOCALES, PROBLEMS, sampleCases } from "./problems";
 
@@ -19,15 +19,14 @@ describe("ChatGPT problem help", () => {
     expect(prompt).toContain(judgeStarterSource(problem, "rust").trimEnd());
   });
 
-  it("builds the requested ChatGPT query URL without losing prompt content", () => {
+  it("keeps the ChatGPT destination separate from the full prompt", () => {
     const problem = PROBLEMS[0];
     const prompt = buildChatGptProblemPrompt(problem, "en", "cpp");
-    const url = new URL(buildChatGptProblemUrl(problem, "en", "cpp"));
+    const url = new URL(CHATGPT_HOME_URL);
 
-    expect(url.origin).toBe("https://chat.openai.com");
+    expect(url.origin).toBe("https://chatgpt.com");
     expect(url.pathname).toBe("/");
-    expect([...url.searchParams.keys()]).toEqual(["q"]);
-    expect(url.searchParams.get("q")).toBe(prompt);
+    expect(url.search).toBe("");
     expect(prompt).toContain(problem.statement.en.trim());
     expect(prompt).toContain("## Current Language: C++");
   });

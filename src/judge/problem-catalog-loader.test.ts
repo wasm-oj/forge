@@ -6,6 +6,7 @@ import {
   DEFAULT_PROBLEM_COLLECTION_SOURCE,
   MemoryProblemCollectionCache,
   ProblemCollectionError,
+  clearProblemCollectionCache,
   githubRawContentUrl,
   loadProblemCollection,
   normalizeProblemCollectionSource,
@@ -28,6 +29,8 @@ async function fixture() {
     id: problem.id,
     number: problem.number,
     title: problem.title,
+    trackId: problem.trackId,
+    track: problem.track,
     difficulty: problem.difficulty,
     tags: problem.tags,
     caseCount: problem.judgeCases.length,
@@ -48,6 +51,17 @@ async function fixture() {
 }
 
 describe("remote problem collection", () => {
+  it("isolates the v3 verified cache namespace from incompatible collection schemas", async () => {
+    const deleteCache = vi.fn(async () => true);
+    vi.stubGlobal("caches", { delete: deleteCache });
+    try {
+      await clearProblemCollectionCache();
+      expect(deleteCache).toHaveBeenCalledWith("wasm-oj-verified-problem-collections-v3");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("loads the small index first and verifies a problem bundle on demand", async () => {
     const data = await fixture();
     const requests: string[] = [];

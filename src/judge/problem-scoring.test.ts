@@ -10,6 +10,8 @@ const problem: JudgeProblem = {
   id: "test-problem",
   number: 1,
   title: { "zh-TW": "測試", en: "Test" },
+  trackId: "foundations",
+  track: { "zh-TW": "入門", en: "Foundations" },
   difficulty: "medium",
   tags: ["test"],
   statement: { "zh-TW": "statement", en: "statement" },
