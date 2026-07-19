@@ -18,6 +18,14 @@ and writes `src/judge/problems.generated.ts`. The generated file is committed so
 the browser bundle has no runtime filesystem dependency. `pnpm problems:verify`
 reconstructs it byte-for-byte and fails when it is stale.
 
+Instruction policies are evidence-derived. For each language, Forge first takes
+the maximum net weighted cost over the complete manifest case set. The optimal
+tier averages the C, C++, Rust, and Go maxima and adds 5%; the efficient tier
+uses the maximum of those four plus 5%; and the baseline tier uses the maximum
+of all seven reference languages plus 5%. Every result is rounded upward by the
+documented decimal quantum. `pnpm problems:verify` recomputes this derivation
+from the content-bound calibration evidence before accepting the catalog.
+
 Every judge case is executed once under the first, broadest resource policy.
 After output matching, Forge evaluates the same normalized cost, peak linear
 memory, and optional logical-time metrics against every cumulative policy. The

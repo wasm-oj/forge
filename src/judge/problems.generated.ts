@@ -52,7 +52,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -84,7 +84,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 200000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -96,7 +96,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 70000,
+            "instructionBudget": 750000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -185,7 +185,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -217,7 +217,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -229,7 +229,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 60000,
+            "instructionBudget": 850000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -318,7 +318,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -350,7 +350,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -362,7 +362,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 75000,
+            "instructionBudget": 750000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -442,7 +442,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -474,7 +474,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 200000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -486,7 +486,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 85000,
+            "instructionBudget": 700000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -575,7 +575,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -607,7 +607,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 2500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -619,7 +619,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 95000,
+            "instructionBudget": 900000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -699,7 +699,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -731,7 +731,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -743,7 +743,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 80000,
+            "instructionBudget": 700000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -823,7 +823,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -855,7 +855,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 80000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -867,7 +867,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 35000,
+            "instructionBudget": 450000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -947,7 +947,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -979,7 +979,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 90000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -991,7 +991,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 55000,
+            "instructionBudget": 650000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -1080,7 +1080,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -1112,7 +1112,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 200000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -1124,7 +1124,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 850000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -1214,7 +1214,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -1246,7 +1246,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -1258,7 +1258,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 60000,
+            "instructionBudget": 550000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -1348,7 +1348,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -1380,7 +1380,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 65000,
+            "instructionBudget": 700000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -1392,7 +1392,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 15000,
+            "instructionBudget": 300000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -1482,7 +1482,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -1514,7 +1514,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 80000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -1526,7 +1526,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 45000,
+            "instructionBudget": 600000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -1606,7 +1606,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -1638,7 +1638,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 80000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -1650,7 +1650,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 60000,
+            "instructionBudget": 500000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -1731,7 +1731,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -1763,7 +1763,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 95000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -1775,7 +1775,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 90000,
+            "instructionBudget": 500000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -1856,7 +1856,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -1888,7 +1888,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -1900,7 +1900,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 50000,
+            "instructionBudget": 600000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -1981,7 +1981,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -2013,7 +2013,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 200000,
+            "instructionBudget": 5000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -2025,7 +2025,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 2500000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -2115,7 +2115,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -2147,7 +2147,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 2500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -2159,7 +2159,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 75000,
+            "instructionBudget": 850000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -2240,7 +2240,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -2272,7 +2272,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 100000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 201326592
           }
         },
@@ -2284,7 +2284,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 70000,
+            "instructionBudget": 550000,
             "memoryLimitBytes": 134217728
           }
         }
@@ -2365,7 +2365,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -2397,7 +2397,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 95000,
+            "instructionBudget": 1000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -2409,7 +2409,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 30000,
+            "instructionBudget": 350000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -2496,7 +2496,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -2528,7 +2528,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -2540,7 +2540,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 45000,
+            "instructionBudget": 550000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -2620,7 +2620,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -2652,7 +2652,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 200000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -2664,7 +2664,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 95000,
+            "instructionBudget": 650000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -2744,7 +2744,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -2776,7 +2776,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -2788,7 +2788,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 75000,
+            "instructionBudget": 550000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -2868,7 +2868,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -2900,7 +2900,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -2912,7 +2912,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 55000,
+            "instructionBudget": 600000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -2992,7 +2992,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -3024,7 +3024,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 250000,
+            "instructionBudget": 2500000,
             "memoryLimitBytes": 805306368
           }
         },
@@ -3036,7 +3036,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 536870912
           }
         }
@@ -3116,7 +3116,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -3148,7 +3148,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 1500000,
+            "instructionBudget": 8500000,
             "memoryLimitBytes": 805306368
           }
         },
@@ -3160,7 +3160,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 1500000,
+            "instructionBudget": 3500000,
             "memoryLimitBytes": 536870912
           }
         }
@@ -3249,7 +3249,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -3281,7 +3281,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 55000,
+            "instructionBudget": 1000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -3293,7 +3293,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 30000,
+            "instructionBudget": 350000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -3373,7 +3373,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -3405,7 +3405,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 80000,
+            "instructionBudget": 1000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -3417,7 +3417,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 35000,
+            "instructionBudget": 400000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -3509,7 +3509,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -3541,7 +3541,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 250000,
+            "instructionBudget": 3000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -3553,7 +3553,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -3633,7 +3633,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -3665,7 +3665,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 95000,
+            "instructionBudget": 900000,
             "memoryLimitBytes": 805306368
           }
         },
@@ -3677,7 +3677,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 55000,
+            "instructionBudget": 350000,
             "memoryLimitBytes": 536870912
           }
         }
@@ -3757,7 +3757,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -3789,7 +3789,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 250000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 805306368
           }
         },
@@ -3801,7 +3801,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 100000,
+            "instructionBudget": 700000,
             "memoryLimitBytes": 536870912
           }
         }
@@ -3881,7 +3881,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -3913,7 +3913,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 2500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -3925,7 +3925,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 60000,
+            "instructionBudget": 950000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -4006,7 +4006,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -4038,7 +4038,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -4050,7 +4050,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 25000,
+            "instructionBudget": 450000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -4140,7 +4140,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -4172,7 +4172,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 75000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -4184,7 +4184,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 45000,
+            "instructionBudget": 700000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -4265,7 +4265,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -4297,7 +4297,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 200000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -4309,7 +4309,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 50000,
+            "instructionBudget": 700000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -4390,7 +4390,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -4422,7 +4422,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 250000,
+            "instructionBudget": 2000000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -4434,7 +4434,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 70000,
+            "instructionBudget": 750000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -4514,7 +4514,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -4546,7 +4546,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 45000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 100663296
           }
         },
@@ -4558,7 +4558,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 25000,
+            "instructionBudget": 400000,
             "memoryLimitBytes": 67108864
           }
         }
@@ -4648,7 +4648,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -4680,7 +4680,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 150000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 402653184
           }
         },
@@ -4692,7 +4692,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 40000,
+            "instructionBudget": 650000,
             "memoryLimitBytes": 268435456
           }
         }
@@ -4781,7 +4781,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -4813,7 +4813,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 90000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 201326592
           }
         },
@@ -4825,7 +4825,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 45000,
+            "instructionBudget": 550000,
             "memoryLimitBytes": 134217728
           }
         }
@@ -4905,7 +4905,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -4937,7 +4937,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 75000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 100663296
           }
         },
@@ -4949,7 +4949,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 35000,
+            "instructionBudget": 500000,
             "memoryLimitBytes": 67108864
           }
         }
@@ -5038,7 +5038,7 @@ export const GENERATED_PROBLEMS = [
     "scoring": {
       "maximumPoints": 100,
       "calibration": {
-        "method": "forge-v1-reference-order-statistics-rounded-v1",
+        "method": "forge-v1-compiled-average-optimal-rounded-v1",
         "profiles": {
           "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
           "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a.21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224.4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029.681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd:weighted",
@@ -5070,7 +5070,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 30,
           "limits": {
-            "instructionBudget": 75000,
+            "instructionBudget": 1500000,
             "memoryLimitBytes": 100663296
           }
         },
@@ -5082,7 +5082,7 @@ export const GENERATED_PROBLEMS = [
           },
           "points": 50,
           "limits": {
-            "instructionBudget": 30000,
+            "instructionBudget": 500000,
             "memoryLimitBytes": 67108864
           }
         }

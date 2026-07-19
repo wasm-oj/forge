@@ -112,6 +112,8 @@ fail closed，不得猜測或換算。
 答案錯誤、runtime failure，或超過最寬鬆 policy 時，該 case 的所有 policy 都不通過。
 Policies 必須由寬到嚴排列，而且每一層至少收緊一個資源；因此通過較嚴格 policy 必然也
 通過其前面的寬鬆 policies。
+本 catalog 的有序 policy ID 固定為 `baseline`、`efficient`、`optimal`；缺少、重複或
+重新排序任何一層都不符合 calibration contract。
 
 Forge contract 1 會在所有函式及 start section 注入 weighted meter。Runner 依 submission
 artifact 的 exact contract、language、target、optimization、compiler/runtime content 與
@@ -154,25 +156,26 @@ UI 如何顯示或四捨五入不屬於 judging contract，且不得回頭影響
 分數，也不得用來比較不同機器上的演算法效率。計算量的主要且可攜式限制永遠是
 `instructionBudget`。
 
-## Measured language-order-statistic policies
+## Measured multi-language policies
 
 40 題使用三層 measured policy：
 
 | Policy | Incremental points | Instruction budget | Memory budget |
 | --- | ---: | ---: | ---: |
-| `baseline` | 20 | 第 7 名（最慢 reference）+ 5% | declared-max review ceiling |
-| `efficient` | 30 | 第 2 名 + 5% | declared-max review ceiling |
-| `optimal` | 50 | 第 1 名（最低成本 reference）+ 5% | declared-max review ceiling |
+| `baseline` | 20 | 七語言 worst-case 的最大值 + 5% | declared-max review ceiling |
+| `efficient` | 30 | C/C++/Rust/Go worst-case 的最大值 + 5% | declared-max review ceiling |
+| `optimal` | 50 | C/C++/Rust/Go worst-case 的算術平均 + 5% | declared-max review ceiling |
 
 校準固定 Forge binary、library、toolchain、`release/wasip1` target 與 deterministic
 configuration，逐一執行每題 `all-manifest-tests` 中的全部 case。對題目 `p` 與語言 `l`：
 
 ```text
 languageWorst[p,l] = max(cost[p,l,case])
-ordered[p]         = sort ascending(languageWorst[p,*])
-rawOptimal[p]      = ceil(ordered[p][1] × 105 / 100)
-rawEfficient[p]    = ceil(ordered[p][2] × 105 / 100)
-rawBaseline[p]     = ceil(ordered[p][7] × 105 / 100)
+compiled[p]        = [languageWorst[p,C], languageWorst[p,C++],
+                      languageWorst[p,Rust], languageWorst[p,Go]]
+rawOptimal[p]      = ceil(sum(compiled[p]) × 105 / (4 × 100))
+rawEfficient[p]    = ceil(max(compiled[p]) × 105 / 100)
+rawBaseline[p]     = ceil(max(languageWorst[p,*]) × 105 / 100)
 quantum(x)         = 5 × 10^(decimalDigits(x) - 2)  when decimalDigits(x) >= 3
 quantum(x)         = 1                               otherwise
 budget(x)          = ceil(x / quantum(x)) × quantum(x)
@@ -181,10 +184,11 @@ efficient[p]       = budget(rawEfficient[p])
 baseline[p]        = budget(rawBaseline[p])
 ```
 
-因此 `optimal` 明確由**成本最低**的 reference language 決定，絕不以最慢語言的 runtime
-overhead 墊高；`efficient` 讓第二低成本的 reference 至少取得 50 分，`baseline` 則保證
-七種官方最佳解至少可取得 20 分。這同時避免慢 runtime 抬高滿分門檻，以及支援語言在
-所有題目完全無分的偏誤。5% 是同一 cost contract 下容納等價實作差異的唯一 headroom；
+因此 `optimal` 不由單一最快語言決定，而是由四種編譯式 reference 的 worst-case cost
+算術平均決定；`efficient` 保證 C、C++、Rust、Go 四種官方最佳解至少取得 50 分，
+`baseline` 則保證七種官方最佳解至少取得 20 分。這同時避免單一 runtime 特性壟斷
+滿分門檻，並維持 `baseline >= efficient >= optimal` 的 relaxed-to-strict 順序。
+5% 是同一 cost contract 下容納等價實作差異的唯一 headroom；
 之後只做單向向上取整，讓第三位起全部為 `0`，且使用 5 倍 decimal quantum，例：
 `28,995 → 30,000`、`10,170,535 → 15,000,000`。取整絕不降低安全下限。
 因 cost 在固定 deterministic profile 下可重現，不加入 wall-time variance。Memory ceiling
@@ -195,7 +199,7 @@ Manifest 以
 ```json
 "calibration": {
   "status": "measured",
-  "method": "forge-v1-reference-order-statistics-rounded-v1",
+  "method": "forge-v1-compiled-average-optimal-rounded-v1",
   "profiles": {
     "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-...:weighted",
     "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-...:weighted"
@@ -208,7 +212,7 @@ Manifest 以
 原始逐案 metrics、source/test digest 與 runtime content digest 位於
 `calibration/forge-v1/reference-costs.json`；機器推導結果位於
 `calibration/forge-v1/derived-policies.json`。`node tools/derive_cost_policies.mjs` 會重新
-雜湊所有 solution 與 test、要求完整 40 × 7 records、重算三層 order-statistic witness，並
+雜湊所有 solution 與 test、要求完整 40 × 7 records、重算三層 multi-language derivation，並
 核對 40 份 manifest。任何輸入或證據改變都 fail closed；要套用經人工審閱的新證據，使用
 `node tools/derive_cost_policies.mjs --write`。
 

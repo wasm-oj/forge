@@ -21,7 +21,7 @@ const problem: JudgeProblem = {
   scoring: {
     maximumPoints: 100,
     calibration: {
-      method: "forge-v1-reference-order-statistics-rounded-v1",
+      method: "forge-v1-compiled-average-optimal-rounded-v1",
       profiles: { c: profile },
     },
     policies: [

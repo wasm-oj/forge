@@ -20,6 +20,7 @@ const LANGUAGES = Object.freeze([
   "javascript",
   "typescript",
 ]);
+const POLICY_IDS = Object.freeze(["baseline", "efficient", "optimal"]);
 
 function fail(message) {
   throw new Error(message);
@@ -214,12 +215,12 @@ async function loadProblem(entry, expectedNumber, validate) {
   if (
     scoring.maximumPoints !== 100
     || calibration.status !== "measured"
-    || calibration.method !== "forge-v1-reference-order-statistics-rounded-v1"
+    || calibration.method !== "forge-v1-compiled-average-optimal-rounded-v1"
   ) {
     fail(`${expectedManifest} has an unsupported scoring contract`);
   }
-  if (!Array.isArray(scoring.policies) || scoring.policies.length < 2) {
-    fail(`${expectedManifest} must declare at least two scoring policies`);
+  if (!Array.isArray(scoring.policies) || scoring.policies.length !== POLICY_IDS.length) {
+    fail(`${expectedManifest} must declare exactly ${POLICY_IDS.join(", ")}`);
   }
   const policies = scoring.policies.map((policy, index) => {
     const record = assertRecord(policy, `${expectedManifest} policy ${index}`);
@@ -230,8 +231,8 @@ async function loadProblem(entry, expectedNumber, validate) {
       limits: record.limits,
     };
   });
-  if (new Set(policies.map((policy) => policy.id)).size !== policies.length) {
-    fail(`${expectedManifest} scoring policy ids must be unique`);
+  if (policies.some((policy, index) => policy.id !== POLICY_IDS[index])) {
+    fail(`${expectedManifest} scoring policies must be exactly ${POLICY_IDS.join(", ")}`);
   }
   if (policies.reduce((sum, policy) => sum + policy.points, 0) !== scoring.maximumPoints) {
     fail(`${expectedManifest} scoring policy points must sum to ${scoring.maximumPoints}`);
