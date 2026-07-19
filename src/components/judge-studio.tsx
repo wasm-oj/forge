@@ -63,6 +63,7 @@ import { configureForgeLanguageServices } from "@/src/editor/forge-language-serv
 import { ProblemMarkdown } from "@/src/components/problem-markdown";
 import { CaseScoreDetails } from "@/src/components/case-score-details";
 import {
+  DEFAULT_JUDGE_UI_LOCALE,
   executionTerminationLabel,
   judgeUiText,
   localizedWorkerProgress,
@@ -97,7 +98,6 @@ import {
 } from "@/src/judge/problem-catalog-loader";
 import {
   broadestPolicy,
-  DEFAULT_PROBLEM_LOCALE,
   PROBLEM_LOCALES,
   problemText,
   sampleCases,
@@ -333,11 +333,11 @@ interface ProblemCollectionSession {
 export function JudgeStudioLoader() {
   const [storedSource] = useState<StoredProblemCollectionSource>(storedProblemCollectionSource);
   const [problemLocale, setProblemLocale] = useState<ProblemLocale>(() => {
-    if (typeof window === "undefined") return DEFAULT_PROBLEM_LOCALE;
+    if (typeof window === "undefined") return DEFAULT_JUDGE_UI_LOCALE;
     try {
       return readJudgeUiLocale(localStorage);
     } catch {
-      return DEFAULT_PROBLEM_LOCALE;
+      return DEFAULT_JUDGE_UI_LOCALE;
     }
   });
   const [source, setSource] = useState<GithubProblemCollectionSource>(storedSource.source);

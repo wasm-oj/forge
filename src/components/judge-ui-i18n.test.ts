@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_JUDGE_UI_LOCALE,
   executionTerminationLabel,
   JUDGE_UI_LOCALE_STORAGE_KEY,
   judgeUiText,
@@ -37,13 +38,14 @@ describe("judge UI localization", () => {
     expect(JSON.stringify(judgeUiText("en"))).not.toMatch(/[\p{Script=Han}]/u);
   });
 
-  it("persists only supported locales and defaults invalid values to Traditional Chinese", () => {
+  it("persists only supported locales and defaults missing or invalid values to English", () => {
     const storage = memoryStorage();
-    expect(readJudgeUiLocale(storage)).toBe("zh-TW");
-
-    writeJudgeUiLocale(storage, "en");
+    expect(DEFAULT_JUDGE_UI_LOCALE).toBe("en");
     expect(readJudgeUiLocale(storage)).toBe("en");
-    expect(readJudgeUiLocale(memoryStorage("fr"))).toBe("zh-TW");
+
+    writeJudgeUiLocale(storage, "zh-TW");
+    expect(readJudgeUiLocale(storage)).toBe("zh-TW");
+    expect(readJudgeUiLocale(memoryStorage("fr"))).toBe("en");
   });
 
   it("localizes verdicts, termination states, and worker progress", () => {
