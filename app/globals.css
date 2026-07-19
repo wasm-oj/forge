@@ -296,7 +296,14 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .local-judge-note p { margin: 0; color: #7f8874; font-size: 9px; line-height: 1.55; }
 .local-judge-note strong { display: block; margin-bottom: 2px; color: #b9ca9f; }
 
-.judge-editor-stack { grid-template-rows: 36px minmax(210px, 1fr) 360px; }
+.editor-stack.judge-editor-stack { grid-template-rows: 36px minmax(210px, 1fr) 7px var(--judge-bottom-panel-height, 360px); }
+.judge-editor-stack.resizing-bottom-panel { cursor: row-resize; user-select: none; }
+.bottom-panel-resizer { position: relative; z-index: 2; display: grid; place-items: center; min-height: 7px; outline: 0; background: #11100e; cursor: row-resize; touch-action: none; }
+.bottom-panel-resizer::before { content: ""; position: absolute; inset: 3px 0 auto; height: 1px; background: var(--line-strong); transition: background-color 120ms ease; }
+.bottom-panel-resizer span { position: relative; width: 38px; height: 3px; border-radius: 2px; background: #38362f; transition: background-color 120ms ease, transform 120ms ease; }
+.bottom-panel-resizer:hover::before, .bottom-panel-resizer:focus-visible::before, .resizing-bottom-panel .bottom-panel-resizer::before { background: #617746; }
+.bottom-panel-resizer:hover span, .bottom-panel-resizer:focus-visible span, .resizing-bottom-panel .bottom-panel-resizer span { background: var(--accent); transform: scaleX(1.15); }
+.bottom-panel-resizer:focus-visible { box-shadow: 0 0 0 1px #7f9a59 inset; }
 .file-tabs { min-width: 0; overflow: hidden; }
 .file-tab { height: 35px; min-width: 110px; max-width: 180px; display: flex; align-items: center; border-right: 1px solid var(--line); background: #141310; }
 .file-tab.active { border-top: 1px solid var(--accent); background: #191814; }
@@ -409,7 +416,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .editor-actions { flex: 1; display: flex; align-items: center; justify-content: flex-end; padding-right: 7px; }
 .editor-surface { position: relative; min-height: 0; background: #151411; }
 
-.bottom-panel { min-height: 0; display: grid; grid-template-rows: 35px minmax(0, 1fr); background: #12110f; border-top: 1px solid var(--line-strong); }
+.bottom-panel { min-height: 0; display: grid; grid-template-rows: 35px minmax(0, 1fr); background: #12110f; }
 .bottom-tabs { display: flex; align-items: stretch; padding: 0 8px; border-bottom: 1px solid #23211d; }
 .bottom-tabs > button:not(.bare-button) { position: relative; height: 35px; padding: 0 10px; border: 0; background: transparent; color: var(--muted); font-size: 10px; font-weight: 650; }
 .bottom-tabs > button:not(.bare-button).active { color: var(--text); }
