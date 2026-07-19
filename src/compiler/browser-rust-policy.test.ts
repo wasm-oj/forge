@@ -24,7 +24,7 @@ describe("browser Rust process budget", () => {
     expect(maximumOutputReadyRustStages(rust)).toBe(OUTPUT_READY_RUST_STAGES_PER_BUILD);
     expect(usesOutputReadyRust(javascript)).toBe(false);
     expect(maximumOutputReadyRustStages(javascript)).toBe(0);
-    expect(MAX_OUTPUT_READY_RUST_STAGES_PER_WORKER).toBe(8);
+    expect(MAX_OUTPUT_READY_RUST_STAGES_PER_WORKER).toBe(4);
     expect(MAX_OUTPUT_READY_RUST_STAGES_PER_WORKER % OUTPUT_READY_RUST_STAGES_PER_BUILD).toBe(0);
   });
 });

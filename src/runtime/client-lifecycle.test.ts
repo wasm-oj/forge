@@ -202,13 +202,13 @@ describe("browser client lifecycle", () => {
     compiler.dispose();
   });
 
-  it("recycles a warm Rust Worker before its fifth two-stage build", async () => {
+  it("recycles a warm Rust Worker before its third two-stage build", async () => {
     const compiler = new BrowserForgeCompiler();
     const firstWorker = workerState.compilers[0]!;
     respondToInitialization(firstWorker);
     await compiler.ready();
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 2; index += 1) {
       const pending = compiler.build(rustProject(), `rust-${index}`);
       await until(() => requestsOfType(firstWorker, "build").length === index + 1);
       respond(firstWorker, {
@@ -219,7 +219,7 @@ describe("browser client lifecycle", () => {
       await expect(pending).resolves.toEqual(failedBuild());
     }
 
-    const fifth = compiler.build(rustProject(), "rust-4");
+    const third = compiler.build(rustProject(), "rust-2");
     await until(() => requestsOfType(firstWorker, "quiesce").length === 1);
     expect(firstWorker.terminated).toBe(false);
     respond(firstWorker, {
@@ -237,7 +237,7 @@ describe("browser client lifecycle", () => {
       result: failedBuild(),
     });
 
-    await expect(fifth).resolves.toEqual(failedBuild());
+    await expect(third).resolves.toEqual(failedBuild());
     expect(workerState.compilers).toHaveLength(2);
     expect(replacement.terminated).toBe(false);
     compiler.dispose();
