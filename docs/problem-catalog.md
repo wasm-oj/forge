@@ -25,5 +25,11 @@ incremental policy points are summed per case and averaged over the complete
 manifest case set. Artifact language and exact cost-profile identity must match
 the manifest calibration before judging begins.
 
+Each completed case retains its exact net, raw, and baseline instruction cost,
+peak linear memory, optional logical time, and the result of every individual
+policy check. The result panel exposes those values, the remaining distance to
+the next cumulative policy, a logarithmic instruction-cost threshold axis, and
+a linear memory threshold axis.
+
 The original handwritten 20-problem catalog and its single fixed instruction
 budget were removed. There is no compatibility reader or fallback fixture path.

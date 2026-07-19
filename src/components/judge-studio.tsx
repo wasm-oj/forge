@@ -56,6 +56,7 @@ import { createDefaultBrowserStorageCoordinator, type ForgeStorageCoordinator } 
 import { registerToolchainCache } from "@/src/storage/service-worker";
 import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
 import { ProblemMarkdown } from "@/src/components/problem-markdown";
+import { CaseScoreDetails } from "@/src/components/case-score-details";
 import { assertProblemCostProfile, scoreProblemResults } from "@/src/judge/problem-scoring";
 import {
   broadestPolicy,
@@ -208,6 +209,7 @@ export function JudgeStudio() {
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [judgeSession, setJudgeSession] = useState<JudgeUiSession>();
+  const [selectedCaseNumber, setSelectedCaseNumber] = useState<number>();
   const [bottomTab, setBottomTab] = useState<BottomTab>("judge");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newFileOpen, setNewFileOpen] = useState(false);
@@ -246,6 +248,9 @@ export function JudgeStudio() {
     () => filter === "all" ? PROBLEMS : PROBLEMS.filter((problem) => problem.difficulty === filter),
     [filter],
   );
+  const selectedCaseResult = judgeSession?.cases.find((testCase) => (
+    testCase.number === selectedCaseNumber
+  )) ?? judgeSession?.cases[0];
 
   const addLog = useCallback((stream: LogEntry["stream"], text: string) => {
     if (!text) return;
@@ -435,6 +440,7 @@ export function JudgeStudio() {
     setProject((current) => ({ ...updater(current), updatedAt: Date.now() }));
     setArtifact(undefined);
     setJudgeSession(undefined);
+    setSelectedCaseNumber(undefined);
   }, []);
 
   const updateRunConfig = useCallback((updater: (current: RunConfig) => RunConfig) => {
@@ -444,6 +450,7 @@ export function JudgeStudio() {
       updatedAt: Date.now(),
     }));
     setJudgeSession(undefined);
+    setSelectedCaseNumber(undefined);
   }, []);
 
   const updateActiveFile = useCallback((content: string | undefined) => {
@@ -469,6 +476,7 @@ export function JudgeStudio() {
     setDiagnostics([]);
     setLogs([]);
     setJudgeSession(undefined);
+    setSelectedCaseNumber(undefined);
     setBottomTab("judge");
   }, [busy, project]);
 
@@ -549,6 +557,7 @@ export function JudgeStudio() {
     if (!runner) return;
     cancelledRef.current = false;
     judgingRef.current = true;
+    setSelectedCaseNumber(undefined);
     const started = performance.now();
     setBottomTab("judge");
     setLogs([]);
@@ -640,8 +649,15 @@ export function JudgeStudio() {
       const scoredCases = cases.map((testCase, index) => ({
         ...testCase,
         points: score.cases[index].points,
+        outputAccepted: score.cases[index].outputAccepted,
         passedPolicyIds: score.cases[index].passedPolicyIds,
+        metrics: score.cases[index].metrics ?? undefined,
+        policyEvaluations: score.cases[index].policyEvaluations,
       }));
+      const detailCase = scoredCases.reduce((lowest, candidate) => (
+        (candidate.points ?? 0) < (lowest.points ?? 0) ? candidate : lowest
+      ));
+      setSelectedCaseNumber(detailCase.number);
       const verdict = cancelledRef.current ? "cancelled" : submissionVerdictFromContract(result.verdict);
       const finished: JudgeUiSession = {
         problemId: activeProblem.id,
@@ -959,7 +975,13 @@ export function JudgeStudio() {
                     <div className={`verdict-banner ${judgeSession.verdict}`}>
                       <span className="verdict-icon">{judgeSession.verdict === "accepted" ? <Award size={19} /> : judgeSession.verdict === "running" ? <span className="spinner" /> : <TriangleAlert size={18} />}</span>
                       <div>
-                        <strong>{verdictLabel(judgeSession.verdict)}</strong>
+                        <strong>
+                          {judgeSession.verdict === "accepted"
+                            && judgeSession.score
+                            && judgeSession.score.points < judgeSession.score.maximumPoints
+                            ? (problemLocale === "zh-TW" ? "輸出正確 · 部分得分" : "Correct Output · Partial Score")
+                            : verdictLabel(judgeSession.verdict)}
+                        </strong>
                         <span>
                           {judgeSession.completed} / {judgeSession.total} cases
                           {judgeSession.score ? ` · ${judgeSession.score.points.toFixed(2)} / ${judgeSession.score.maximumPoints} points` : ""}
@@ -971,14 +993,31 @@ export function JudgeStudio() {
                     {judgeSession.verdict === "compile-error" && <button className="judge-link" onClick={() => setBottomTab("diagnostics")}>查看編譯診斷 →</button>}
                     <div className="case-list">
                       {judgeSession.cases.map((test) => (
-                        <div className={`case-row ${test.verdict}`} key={test.number}>
-                          <span className="case-status">{test.verdict === "accepted" ? <CheckCircle2 size={15} /> : <X size={15} />}</span>
-                          <strong>Case {String(test.number).padStart(2, "0")}</strong>
-                          <span>
-                            {test.verdict === "accepted" ? "Accepted" : verdictLabel(test.verdict)}
-                            {test.points === undefined ? "" : ` · ${test.points} pts`}
-                          </span>
-                          <time>{formatDuration(test.durationMs)}</time>
+                        <div
+                          className={`case-card ${test.verdict} ${selectedCaseResult?.number === test.number ? "selected" : ""}`}
+                          key={test.number}
+                        >
+                          <button
+                            className="case-row"
+                            onClick={() => setSelectedCaseNumber(test.number)}
+                            aria-pressed={selectedCaseResult?.number === test.number}
+                            type="button"
+                          >
+                            <span className="case-status">{test.verdict === "accepted" ? <CheckCircle2 size={15} /> : <X size={15} />}</span>
+                            <strong>Case {String(test.number).padStart(2, "0")}</strong>
+                            <span>
+                              {test.verdict === "accepted" ? (problemLocale === "zh-TW" ? "輸出正確" : "Correct output") : verdictLabel(test.verdict)}
+                              {test.points === undefined ? "" : ` · ${test.points} pts`}
+                            </span>
+                            <time>{formatDuration(test.durationMs)}</time>
+                            {test.metrics && (
+                              <span className="case-metrics-summary">
+                                {test.metrics.cost === null ? "—" : `${test.metrics.cost.toLocaleString()} cost`}
+                                {" · "}
+                                {test.metrics.memoryBytes === null ? "—" : formatBytes(test.metrics.memoryBytes)}
+                              </span>
+                            )}
+                          </button>
                           {test.verdict !== "accepted" && (
                             <div className="case-diff">
                               <div><span>EXPECTED</span><pre>{test.expected || "∅"}</pre></div>
@@ -988,6 +1027,13 @@ export function JudgeStudio() {
                         </div>
                       ))}
                     </div>
+                    {judgeSession.score && selectedCaseResult?.policyEvaluations && (
+                      <CaseScoreDetails
+                        problem={activeProblem}
+                        testCase={selectedCaseResult}
+                        locale={problemLocale}
+                      />
+                    )}
                   </div>
                 )
               ) : bottomTab === "diagnostics" ? (
