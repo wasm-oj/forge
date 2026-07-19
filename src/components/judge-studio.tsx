@@ -37,7 +37,7 @@ import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent a
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CompileCoordinator } from "@/src/compiler/coordinator";
 import { projectBuildIdentity, projectCacheKey } from "@/src/core/hash";
-import { isBuiltinLanguage, LANGUAGES, type BuildArtifact, type BuiltinLanguage, type Diagnostic, type Language, type Project, type ProjectFile, type RunConfig, type WorkerProgress } from "@/src/core/types";
+import { isBuiltinLanguage, LANGUAGES, type BuildArtifact, type BuiltinLanguage, type Diagnostic, type Language, type Project, type ProjectFile, type RunConfig, type RunResult, type WorkerProgress } from "@/src/core/types";
 import { extensionLanguage, languageLabel, TOOLCHAINS } from "@/src/core/toolchains";
 import {
   decodeSolvedProgress,
@@ -89,14 +89,21 @@ import {
   type ProblemDifficulty,
   type ProblemLocale,
 } from "@/src/judge/problem-model";
+import {
+  decodeSelfTestCases,
+  encodeSelfTestCases,
+  MAX_SELF_TEST_CASES,
+  selfTestStorageKey,
+  type SelfTestCase,
+} from "@/src/judge/self-tests";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 const SITES_CHUNK_MANIFEST_URL = process.env.NODE_ENV === "production"
   ? "/toolchains/forge-sites-chunks.json"
   : undefined;
 
-type BottomTab = "judge" | "diagnostics" | "output" | "console";
-type BusyAction = "build" | "run" | "judge" | "cache" | undefined;
+type BottomTab = "judge" | "tests" | "diagnostics" | "output";
+type BusyAction = "build" | "test" | "judge" | "cache" | undefined;
 type DifficultyFilter = "all" | ProblemDifficulty;
 type CompileAheadState = "idle" | "scheduled" | "compiling" | "ready" | "error";
 type ProblemPane = "statement" | "editorial";
@@ -111,6 +118,11 @@ interface LogEntry {
   id: string;
   stream: "system" | "stdout" | "stderr";
   text: string;
+}
+
+interface SelfTestRunResult {
+  readonly caseId: string;
+  readonly run: RunResult;
 }
 
 const MONACO_LANGUAGE: Record<BuiltinLanguage, string> = {
@@ -403,6 +415,14 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   const [artifact, setArtifact] = useState<BuildArtifact>();
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [selfTests, setSelfTests] = useState<SelfTestCase[]>(() => decodeSelfTestCases(
+    null,
+    sampleCases(initialProblem)[0]?.input ?? "",
+  ));
+  const [loadedSelfTestKey, setLoadedSelfTestKey] = useState<string>();
+  const [selectedSelfTestId, setSelectedSelfTestId] = useState("case-1");
+  const [runningSelfTestId, setRunningSelfTestId] = useState<string>();
+  const [selfTestResults, setSelfTestResults] = useState<SelfTestRunResult[]>([]);
   const [judgeSession, setJudgeSession] = useState<JudgeUiSession>();
   const [selectedCaseNumber, setSelectedCaseNumber] = useState<number>();
   const [bottomTab, setBottomTab] = useState<BottomTab>("judge");
@@ -435,6 +455,10 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     return entry;
   }, [activeProblem.id, problems]);
   const activeProgressId = judgeProblemProgressId(activeProblem.id, activeProblemEntry.bundle.sha256);
+  const activeSelfTestKey = useMemo(
+    () => selfTestStorageKey(collection.sourceKey, activeProgressId),
+    [activeProgressId, collection.sourceKey],
+  );
   const activeBaseline = broadestPolicy(activeProblem);
   const activeFile = useMemo(
     () => project.files.find((file) => file.path === project.activeFile) ?? project.files[0],
@@ -456,6 +480,10 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   const selectedCaseResult = judgeSession?.cases.find((testCase) => (
     testCase.number === selectedCaseNumber
   )) ?? judgeSession?.cases[0];
+  const selectedSelfTest = selfTests.find((testCase) => testCase.id === selectedSelfTestId) ?? selfTests[0];
+  const selectedSelfTestResult = selectedSelfTest
+    ? selfTestResults.find((result) => result.caseId === selectedSelfTest.id)
+    : undefined;
 
   const addLog = useCallback((stream: LogEntry["stream"], text: string) => {
     if (!text) return;
@@ -657,6 +685,39 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     localStorage.setItem(progressKey, JSON.stringify([...solved].sort()));
   }, [hydrated, progressKey, solved]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const sampleInput = sampleCases(activeProblem)[0]?.input ?? "";
+      let restored: SelfTestCase[];
+      try {
+        restored = decodeSelfTestCases(localStorage.getItem(activeSelfTestKey), sampleInput);
+      } catch (error) {
+        localStorage.removeItem(activeSelfTestKey);
+        restored = decodeSelfTestCases(null, sampleInput);
+        addLog("stderr", error instanceof Error ? error.message : String(error));
+      }
+      setSelfTests(restored);
+      setSelectedSelfTestId(restored[0].id);
+      setSelfTestResults([]);
+      setRunningSelfTestId(undefined);
+      setLoadedSelfTestKey(activeSelfTestKey);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeProblem, activeSelfTestKey, addLog]);
+
+  useEffect(() => {
+    if (loadedSelfTestKey !== activeSelfTestKey) return;
+    let notification: number | undefined;
+    try {
+      localStorage.setItem(activeSelfTestKey, encodeSelfTestCases(selfTests));
+    } catch (error) {
+      notification = window.setTimeout(() => {
+        addLog("stderr", `無法儲存自行測試：${error instanceof Error ? error.message : String(error)}`);
+      }, 0);
+    }
+    return () => { if (notification !== undefined) window.clearTimeout(notification); };
+  }, [activeSelfTestKey, addLog, loadedSelfTestKey, selfTests]);
+
   const applyMarkers = useCallback(() => {
     const monaco = monacoRef.current;
     if (!monaco) return;
@@ -730,6 +791,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
   const updateProject = useCallback((updater: (current: Project) => Project) => {
     setProject((current) => ({ ...updater(current), updatedAt: Date.now() }));
     setArtifact(undefined);
+    setSelfTestResults([]);
     setJudgeSession(undefined);
     setSelectedCaseNumber(undefined);
   }, []);
@@ -740,6 +802,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
       config: { ...current.config, ...updater(current.config) },
       updatedAt: Date.now(),
     }));
+    setSelfTestResults([]);
     setJudgeSession(undefined);
     setSelectedCaseNumber(undefined);
   }, []);
@@ -771,12 +834,14 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
       setArtifact(undefined);
       setDiagnostics([]);
       setLogs([]);
+      setSelfTestResults([]);
+      setRunningSelfTestId(undefined);
       setJudgeSession(undefined);
       setSelectedCaseNumber(undefined);
       setBottomTab("judge");
     } catch (error) {
       addLog("stderr", error instanceof Error ? error.message : String(error));
-      setBottomTab("console");
+      setBottomTab("output");
     } finally {
       setLoadingProblemId(undefined);
     }
@@ -822,11 +887,54 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     }
   }, [addLog, project]);
 
-  const doRunSample = useCallback(async () => {
+  const updateSelfTest = (id: string, update: Partial<Pick<SelfTestCase, "name" | "input">>) => {
+    setSelfTests((current) => current.map((testCase) => (
+      testCase.id === id ? { ...testCase, ...update } : testCase
+    )));
+    setSelfTestResults((current) => current.filter((result) => result.caseId !== id));
+  };
+
+  const addSelfTest = () => {
+    if (selfTests.length >= MAX_SELF_TEST_CASES) return;
+    const id = `case-${crypto.randomUUID()}`;
+    const names = new Set(selfTests.map((testCase) => testCase.name));
+    let number = selfTests.length + 1;
+    while (names.has(`Case ${number}`)) number += 1;
+    setSelfTests((current) => [...current, { id, name: `Case ${number}`, input: "" }]);
+    setSelectedSelfTestId(id);
+  };
+
+  const addSampleSelfTests = () => {
+    const available = MAX_SELF_TEST_CASES - selfTests.length;
+    if (available < 1) return;
+    const additions = sampleCases(activeProblem).slice(0, available).map((sample, index) => ({
+      id: `sample-${crypto.randomUUID()}`,
+      name: `${problemLocale === "zh-TW" ? "範例" : "Sample"} ${index + 1}`,
+      input: sample.input,
+    }));
+    if (additions.length === 0) return;
+    setSelfTests((current) => [...current, ...additions]);
+    setSelectedSelfTestId(additions[0].id);
+  };
+
+  const removeSelfTest = (id: string) => {
+    if (selfTests.length === 1) return;
+    const index = selfTests.findIndex((testCase) => testCase.id === id);
+    const next = selfTests.filter((testCase) => testCase.id !== id);
+    setSelfTests(next);
+    setSelfTestResults((current) => current.filter((result) => result.caseId !== id));
+    if (selectedSelfTestId === id) setSelectedSelfTestId(next[Math.min(index, next.length - 1)].id);
+  };
+
+  const doRunSelfTests = useCallback(async (caseIds: readonly string[]) => {
     const runner = runnerRef.current;
-    if (!runner) return;
-    setBusy("run");
-    setBottomTab("console");
+    const requested = selfTests.filter((testCase) => caseIds.includes(testCase.id));
+    if (!runner || requested.length === 0) return;
+    cancelledRef.current = false;
+    setBusy("test");
+    setBottomTab("tests");
+    setSelectedSelfTestId(requested[0].id);
+    setSelfTestResults((current) => current.filter((result) => !caseIds.includes(result.caseId)));
     setLogs([]);
     try {
       const key = await projectCacheKey(project);
@@ -835,24 +943,35 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
         setBusy(undefined);
         runnable = await doBuild(true);
         if (!runnable) return;
-        setBusy("run");
-        setBottomTab("console");
-        setLogs([]);
+        setBottomTab("tests");
+        setBusy("test");
       }
-      const sample = sampleCases(activeProblem)[0];
-      if (!sample) throw new Error(`Problem '${activeProblem.id}' has no sample case.`);
-      addLog("system", `執行範例輸入 · ${activeProblem.title[problemLocale]}`);
-      const result = await runner.run(runnable, { ...project.config, stdin: sample.input });
-      const cost = result.metrics.cost === null
-        ? "cost unavailable"
-        : `${result.metrics.cost.toLocaleString()} net weighted ops (${result.metrics.rawCost?.toLocaleString()} raw − ${result.metrics.baselineCost.toLocaleString()} baseline)`;
-      addLog("system", `${result.termination} · exit ${result.code} · ${cost} · ${Math.round(result.durationMs)} ms`);
+      for (const [index, testCase] of requested.entries()) {
+        if (cancelledRef.current) break;
+        setRunningSelfTestId(testCase.id);
+        setSelectedSelfTestId(testCase.id);
+        setProgress({
+          phase: "running",
+          label: `自行測試 ${index + 1} / ${requested.length}`,
+          progress: index / requested.length,
+        });
+        addLog("system", `run ${testCase.name.trim() || `Case ${index + 1}`}`);
+        const result = await runner.run(runnable, { ...project.config, stdin: testCase.input });
+        setSelfTestResults((current) => [
+          ...current.filter((candidate) => candidate.caseId !== testCase.id),
+          { caseId: testCase.id, run: result },
+        ]);
+        const cost = result.metrics.cost === null ? "cost unavailable" : `${result.metrics.cost.toLocaleString()} cost`;
+        addLog("system", `${result.termination} · exit ${result.code} · ${cost} · ${formatDuration(result.durationMs)}`);
+      }
+      setProgress({ phase: "running", label: "自行測試完成", progress: 1 });
     } catch (error) {
-      addLog("stderr", error instanceof Error ? error.message : String(error));
+      if (!cancelledRef.current) addLog("stderr", error instanceof Error ? error.message : String(error));
     } finally {
+      setRunningSelfTestId(undefined);
       setBusy(undefined);
     }
-  }, [activeProblem, addLog, artifact, doBuild, problemLocale, project]);
+  }, [addLog, artifact, doBuild, project, selfTests]);
 
   const doJudge = useCallback(async () => {
     const runner = runnerRef.current;
@@ -1003,6 +1122,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
     compileCoordinatorRef.current?.cancel();
     runnerRef.current?.cancel();
     setBusy(undefined);
+    setRunningSelfTestId(undefined);
     setJudgeSession((current) => current?.verdict === "running" ? { ...current, verdict: "cancelled" } : current);
     addLog("system", "已取消操作並重啟 ForgeCompiler／ForgeRunner Workers");
   }, [addLog]);
@@ -1121,7 +1241,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
           ) : (
             <>
               <button className="build-button" onClick={() => void doBuild(false)} disabled={!runtimeReady}><Hammer size={14} /> 建置</button>
-              <button className="sample-button" onClick={() => void doRunSample()} disabled={!runtimeReady}><Play size={14} /> 跑範例</button>
+              <button className="sample-button" onClick={() => setBottomTab("tests")} disabled={!runtimeReady}><Play size={14} /> 自行測試</button>
               <button className="submit-button" onClick={() => void doJudge()} disabled={!runtimeReady}><Send size={14} /> 提交判題</button>
             </>
           )}
@@ -1297,11 +1417,13 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
               <button className={bottomTab === "judge" ? "active" : ""} onClick={() => setBottomTab("judge")}>
                 判題結果 {judgeSession && <span className={`verdict-mini ${judgeSession.verdict}`}>{judgeSession.completed}/{judgeSession.total}</span>}
               </button>
+              <button className={bottomTab === "tests" ? "active" : ""} onClick={() => setBottomTab("tests")}>
+                自行測試 <span className="test-count-badge">{selfTestResults.length}/{selfTests.length}</span>
+              </button>
               <button className={bottomTab === "diagnostics" ? "active" : ""} onClick={() => setBottomTab("diagnostics")}>
                 Diagnostics {diagnostics.length > 0 && <span className="count-badge">{diagnostics.length}</span>}
               </button>
-              <button className={bottomTab === "output" ? "active" : ""} onClick={() => setBottomTab("output")}>Build output</button>
-              <button className={bottomTab === "console" ? "active" : ""} onClick={() => setBottomTab("console")}>Console</button>
+              <button className={bottomTab === "output" ? "active" : ""} onClick={() => setBottomTab("output")}>Output</button>
               <div className="panel-status">
                 {busy && <><span className="spinner" />{progress.label}</>}
                 {!busy && compileAhead === "scheduled" && <>背景編譯已排程</>}
@@ -1382,6 +1504,92 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                     )}
                   </div>
                 )
+              ) : bottomTab === "tests" ? (
+                <div className="self-test-workbench">
+                  <section className="self-test-cases" aria-label="自行測試輸入">
+                    <header className="self-test-toolbar">
+                      <div>
+                        <strong>測試案例</strong>
+                        <span>每筆輸入會使用相同的最新編譯產物依序執行</span>
+                      </div>
+                      <div>
+                        <button type="button" onClick={addSampleSelfTests} disabled={Boolean(busy) || selfTests.length >= MAX_SELF_TEST_CASES}>加入範例</button>
+                        <button type="button" onClick={addSelfTest} disabled={Boolean(busy) || selfTests.length >= MAX_SELF_TEST_CASES}><Plus size={12} /> 新增</button>
+                        <button className="self-test-run-all" type="button" onClick={() => void doRunSelfTests(selfTests.map((testCase) => testCase.id))} disabled={Boolean(busy) || !runtimeReady}><Play size={12} /> 全部執行</button>
+                      </div>
+                    </header>
+                    <div className="self-test-list">
+                      {selfTests.map((testCase, index) => {
+                        const result = selfTestResults.find((candidate) => candidate.caseId === testCase.id)?.run;
+                        const successful = result?.termination === "exited" && result.code === 0;
+                        return (
+                          <article className={`self-test-card ${selectedSelfTest?.id === testCase.id ? "selected" : ""}`} key={testCase.id}>
+                            <header>
+                              <button
+                                className="self-test-selector"
+                                type="button"
+                                onClick={() => setSelectedSelfTestId(testCase.id)}
+                                aria-pressed={selectedSelfTest?.id === testCase.id}
+                              >
+                                <span>{String(index + 1).padStart(2, "0")}</span>
+                                {runningSelfTestId === testCase.id
+                                  ? <span className="spinner" />
+                                  : result
+                                    ? successful ? <CheckCircle2 size={13} /> : <TriangleAlert size={13} />
+                                    : <Code2 size={13} />}
+                              </button>
+                              <input
+                                value={testCase.name}
+                                maxLength={80}
+                                aria-label={`測試案例 ${index + 1} 名稱`}
+                                onFocus={() => setSelectedSelfTestId(testCase.id)}
+                                onChange={(event) => updateSelfTest(testCase.id, { name: event.target.value })}
+                                disabled={Boolean(busy)}
+                              />
+                              <button type="button" onClick={() => void doRunSelfTests([testCase.id])} disabled={Boolean(busy) || !runtimeReady} aria-label={`執行 ${testCase.name || `Case ${index + 1}`}`}><Play size={12} /></button>
+                              <button type="button" onClick={() => removeSelfTest(testCase.id)} disabled={Boolean(busy) || selfTests.length === 1} aria-label={`刪除 ${testCase.name || `Case ${index + 1}`}`}><X size={12} /></button>
+                            </header>
+                            <label>
+                              <span>STDIN</span>
+                              <textarea
+                                value={testCase.input}
+                                rows={4}
+                                spellCheck={false}
+                                onFocus={() => setSelectedSelfTestId(testCase.id)}
+                                onChange={(event) => updateSelfTest(testCase.id, { input: event.target.value })}
+                                disabled={Boolean(busy)}
+                              />
+                            </label>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                  <section className="self-test-result" aria-live="polite">
+                    <header>
+                      <div><span>RESULT</span><strong>{selectedSelfTest?.name.trim() || "Untitled case"}</strong></div>
+                      {selectedSelfTestResult && (
+                        <span className={selectedSelfTestResult.run.termination === "exited" && selectedSelfTestResult.run.code === 0 ? "success" : "failure"}>
+                          {selectedSelfTestResult.run.termination} · exit {selectedSelfTestResult.run.code}
+                        </span>
+                      )}
+                    </header>
+                    {!selectedSelfTestResult ? (
+                      <div className="empty-panel"><Play size={17} /><span>執行選取的案例後，在這裡查看輸出與資源用量</span></div>
+                    ) : (
+                      <div className="self-test-result-body">
+                        <div className="self-test-metrics">
+                          <div><span>Duration</span><strong>{formatDuration(selectedSelfTestResult.run.durationMs)}</strong></div>
+                          <div><span>Instruction cost</span><strong>{selectedSelfTestResult.run.metrics.cost?.toLocaleString() ?? "—"}</strong></div>
+                          <div><span>Peak memory</span><strong>{selectedSelfTestResult.run.metrics.memoryBytes === null ? "—" : formatBytes(selectedSelfTestResult.run.metrics.memoryBytes)}</strong></div>
+                          <div><span>Logical time</span><strong>{selectedSelfTestResult.run.metrics.logicalTimeNs === null ? "—" : formatDuration(selectedSelfTestResult.run.metrics.logicalTimeNs / 1_000_000)}</strong></div>
+                        </div>
+                        <div className="self-test-stream stdout"><span>STDOUT</span><pre>{selectedSelfTestResult.run.stdout || "∅"}</pre></div>
+                        {selectedSelfTestResult.run.stderr && <div className="self-test-stream stderr"><span>STDERR</span><pre>{selectedSelfTestResult.run.stderr}</pre></div>}
+                      </div>
+                    )}
+                  </section>
+                </div>
               ) : bottomTab === "diagnostics" ? (
                 diagnostics.length === 0 ? (
                   <div className="empty-panel"><Check size={17} /><span>沒有編譯診斷</span></div>
@@ -1398,7 +1606,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                   </div>
                 )
               ) : logs.length === 0 ? (
-                <div className="empty-panel"><Code2 size={17} /><span>{bottomTab === "console" ? "執行範例以查看程式輸出" : "建置專案以查看編譯器輸出"}</span></div>
+                <div className="empty-panel"><Code2 size={17} /><span>建置或執行後，在這裡查看完整輸出紀錄</span></div>
               ) : (
                 <div className="terminal-output">
                   {logs.map((entry) => <pre className={entry.stream} key={entry.id}>{entry.stream === "system" ? <span className="prompt">› </span> : null}{entry.text}</pre>)}
@@ -1422,7 +1630,7 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
       {settingsOpen && (
         <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
           <aside className="settings-drawer" aria-label="本機 Judge 設定">
-            <div className="drawer-heading"><div><span>LOCAL JUDGE</span><h2>編譯與執行設定</h2></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label="關閉設定"><X size={16} /></button></div>
+            <div className="drawer-heading"><div><span>LOCAL JUDGE</span><h2>工作區設定</h2><p>編譯、執行與本機資料各自獨立設定。</p></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label="關閉設定"><X size={16} /></button></div>
             <section className="problem-source-section" aria-labelledby="problem-source-heading">
               <div className="problem-source-heading">
                 <div><span>PROBLEM COLLECTION</span><strong id="problem-source-heading">遠端題庫來源</strong></div>
@@ -1439,43 +1647,55 @@ export function JudgeStudio({ collection, initialProblem, onProblemCollectionSou
                 }}
               />
             </section>
-            <div className="toolchain-card">
-              <span className={`toolchain-mark ${languageTone(project.config.language)}`}>{languageIcon(project.config.language)}</span>
-              <div><strong>{activeToolchain.label}</strong><p>{activeToolchain.note}</p></div>
-            </div>
-            <label className="form-field"><span>Entry file</span><select value={project.config.entry} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, entry: event.target.value } }))}>{project.files.map((file) => <option key={file.path}>{file.path}</option>)}</select></label>
-            <div className="form-grid">
-              <label className="form-field"><span>Target ABI</span><select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")}>{activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}</select></label>
-              <label className="form-field"><span>Profile</span><select value={project.config.optimization} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, optimization: event.target.value as "debug" | "release" } }))}><option value="debug">Debug · -O0</option><option value="release">Release · -O2</option></select></label>
-            </div>
-            <label className="form-field"><span>自訂 Run stdin</span><textarea value={project.config.stdin} onChange={(event) => updateRunConfig((current) => ({ ...current, stdin: event.target.value }))} rows={5} /></label>
-            <div className="form-grid">
-              <label className="form-field"><span>Net weighted instruction budget</span><input type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1000000" value={project.config.resources.instructionBudget} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, instructionBudget: Number(event.target.value) } }))} /></label>
-              <label className="form-field"><span>Logical time budget (ms)</span><input type="number" min="1" max="9007199254" step="100" value={project.config.resources.logicalTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, logicalTimeLimitMs: Number(event.target.value) } }))} /></label>
-            </div>
-            <div className="form-grid">
+            <section className="settings-section" aria-labelledby="compile-settings-heading">
+              <header className="settings-section-heading"><span>COMPILATION</span><strong id="compile-settings-heading">編譯設定</strong><p>選擇入口檔、目標 ABI 與最佳化方式。</p></header>
+              <div className="toolchain-card">
+                <span className={`toolchain-mark ${languageTone(project.config.language)}`}>{languageIcon(project.config.language)}</span>
+                <div><strong>{activeToolchain.label}</strong><p>{activeToolchain.note}</p></div>
+              </div>
+              <label className="form-field"><span>Entry file</span><select value={project.config.entry} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, entry: event.target.value } }))}>{project.files.map((file) => <option key={file.path}>{file.path}</option>)}</select></label>
+              <div className="form-grid">
+                <label className="form-field"><span>Target ABI</span><select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")}>{activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}</select></label>
+                <label className="form-field"><span>Profile</span><select value={project.config.optimization} onChange={(event) => updateProject((current) => ({ ...current, config: { ...current.config, optimization: event.target.value as "debug" | "release" } }))}><option value="debug">Debug · -O0</option><option value="release">Release · -O2</option></select></label>
+              </div>
+              {project.config.language === "rust" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Real Rust toolchain</strong> 使用來源可追溯的 <code>rustc 1.91.1-dev</code> WebC 與相符的 standard library，在 Wasmer 內直接產生 WASI P1；Cargo 可使用 Forge 統一 lock/cache API，但目前 editor 尚未把解析後的 crate 掛載進 rustc build。</p></div>}
+              {project.config.language === "go" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Standard Go / wasip1</strong> 使用標準 <code>Go 1.26.5</code> compiler、linker 與相符的 349-package standard library，全程在 Wasmer 內產生 WASI P1；Go modules 可使用 Forge 統一 lock/cache API。</p></div>}
+            </section>
+
+            <section className="settings-section" aria-labelledby="runtime-settings-heading">
+              <header className="settings-section-heading"><span>EXECUTION</span><strong id="runtime-settings-heading">執行限制</strong><p>控制每次自行測試的 deterministic runtime 資源邊界。</p></header>
+              <div className="form-grid">
+                <label className="form-field"><span>Net weighted instruction budget</span><input type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1000000" value={project.config.resources.instructionBudget} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, instructionBudget: Number(event.target.value) } }))} /></label>
+                <label className="form-field"><span>Logical time budget (ms)</span><input type="number" min="1" max="9007199254" step="100" value={project.config.resources.logicalTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, logicalTimeLimitMs: Number(event.target.value) } }))} /></label>
+              </div>
+              <div className="form-grid">
+                <label className="form-field"><span>Linear memory (MiB)</span><input type="number" min="1" max="4096" step="1" value={project.config.resources.memoryLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, memoryLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+                <label className="form-field"><span>Captured output (MiB)</span><input type="number" min="0.0625" max="64" step="0.0625" value={project.config.resources.outputLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, outputLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+              </div>
+              <div className="form-grid">
+                <label className="form-field"><span>Writable VFS (MiB)</span><input type="number" min="0.0625" max="512" step="0.0625" value={project.config.resources.filesystemWriteLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemWriteLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
+                <label className="form-field"><span>Writable VFS entries</span><input type="number" min="1" max="65536" step="1" value={project.config.resources.filesystemEntryLimit} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemEntryLimit: Number(event.target.value) } }))} /></label>
+              </div>
               <label className="form-field"><span>Emergency wall deadline (ms)</span><input type="number" min="1" max="600000" step="100" value={project.config.resources.wallTimeLimitMs} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, wallTimeLimitMs: Number(event.target.value) } }))} /></label>
-            </div>
-            <div className="form-grid">
-              <label className="form-field"><span>Linear memory (MiB)</span><input type="number" min="1" max="4096" step="1" value={project.config.resources.memoryLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, memoryLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
-              <label className="form-field"><span>Captured output (MiB)</span><input type="number" min="0.0625" max="64" step="0.0625" value={project.config.resources.outputLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, outputLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
-            </div>
-            <div className="form-grid">
-              <label className="form-field"><span>Writable VFS (MiB)</span><input type="number" min="0.0625" max="512" step="0.0625" value={project.config.resources.filesystemWriteLimitBytes / (1024 * 1024)} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemWriteLimitBytes: Number(event.target.value) * 1024 * 1024 } }))} /></label>
-              <label className="form-field"><span>Writable VFS entries</span><input type="number" min="1" max="65536" step="1" value={project.config.resources.filesystemEntryLimit} onChange={(event) => updateRunConfig((current) => ({ ...current, resources: { ...current.resources, filesystemEntryLimit: Number(event.target.value) } }))} /></label>
-            </div>
-            <div className="profile-notice"><Gauge size={15} /><p><strong>Deterministic resource policy</strong> weighted instruction、logical time、linear memory、captured output 與 VFS live-storage 上限由 portable runtime 強制執行；wall deadline 由 host 終止 Worker，僅作為緊急安全上限。</p></div>
-            <div className="form-grid">
-              <label className="form-field"><span>Random seed</span><input type="number" min="0" max="4294967295" step="1" value={project.config.determinism.randomSeed} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, randomSeed: Number(event.target.value) } }))} /></label>
-              <label className="form-field"><span>Clock step (ns)</span><input type="number" min="1" max="1000000000" step="1" value={project.config.determinism.clockStepNs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, clockStepNs: Number(event.target.value) } }))} /></label>
-            </div>
-            <label className="form-field"><span>Realtime epoch (Unix ms)</span><input type="number" min="0" max="18446744073000" step="1" value={project.config.determinism.realtimeEpochMs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, realtimeEpochMs: Number(event.target.value) } }))} /></label>
-            <div className="profile-notice"><Clock3 size={15} /><p><strong>Deterministic execution</strong> 固定 entropy、realtime 與 monotonic clock；sleep 與 clock poll 只會快轉虛擬時間，不等待 host。相同 artifact、stdin、args、env 與設定會得到相同的 exit code、stdout 和 stderr。實際執行時間不屬於 deterministic transcript。</p></div>
-            {project.config.language === "rust" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Real Rust toolchain</strong> 使用來源可追溯的 <code>rustc 1.91.1-dev</code> WebC 與相符的 standard library，在 Wasmer 內直接產生 WASI P1；Cargo 可使用 Forge 統一 lock/cache API，但目前 editor 尚未把解析後的 crate 掛載進 rustc build。</p></div>}
-            {project.config.language === "go" && <div className="profile-notice"><TriangleAlert size={15} /><p><strong>Standard Go / wasip1</strong> 使用標準 <code>Go 1.26.5</code> compiler、linker 與相符的 349-package standard library，全程在 Wasmer 內產生 WASI P1；Go modules 可使用 Forge 統一 lock/cache API。</p></div>}
-            <div className="local-judge-note drawer-judge-note"><LockKeyhole size={15} /><p><strong>不防作弊</strong>完全本機的測資一定能被檢視；這是刻意的隱私與教學取捨。</p></div>
-            <div className="cache-section"><div><strong>本機快取</strong><span>{formatBytes(storage.usage)} / {storage.quota ? formatBytes(storage.quota) : "browser quota"}</span></div><button onClick={() => void clearCaches()} disabled={Boolean(busy)}><RotateCcw size={13} /> 清除快取</button></div>
-            <div className="drawer-footer"><ShieldCheck size={14} /><span>只下載經驗證的題庫與工具鏈套件；提交程式碼、stdin、判題結果與產物不會上傳。</span></div>
+              <div className="profile-notice"><Gauge size={15} /><p><strong>Portable limits</strong> instruction、logical time、memory、output 與 VFS 上限由 runtime 強制執行；wall deadline 只負責終止失控 Worker。</p></div>
+            </section>
+
+            <section className="settings-section" aria-labelledby="determinism-settings-heading">
+              <header className="settings-section-heading"><span>DETERMINISM</span><strong id="determinism-settings-heading">可重現環境</strong><p>固定隨機來源與虛擬時鐘，讓相同輸入得到相同 transcript。</p></header>
+              <div className="form-grid">
+                <label className="form-field"><span>Random seed</span><input type="number" min="0" max="4294967295" step="1" value={project.config.determinism.randomSeed} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, randomSeed: Number(event.target.value) } }))} /></label>
+                <label className="form-field"><span>Clock step (ns)</span><input type="number" min="1" max="1000000000" step="1" value={project.config.determinism.clockStepNs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, clockStepNs: Number(event.target.value) } }))} /></label>
+              </div>
+              <label className="form-field"><span>Realtime epoch (Unix ms)</span><input type="number" min="0" max="18446744073000" step="1" value={project.config.determinism.realtimeEpochMs} onChange={(event) => updateRunConfig((current) => ({ ...current, determinism: { ...current.determinism, realtimeEpochMs: Number(event.target.value) } }))} /></label>
+              <div className="profile-notice"><Clock3 size={15} /><p><strong>Deterministic execution</strong> sleep 與 clock poll 只會快轉虛擬時間，不等待 host；實際執行時間不屬於 deterministic transcript。</p></div>
+            </section>
+
+            <section className="settings-section settings-storage-section" aria-labelledby="storage-settings-heading">
+              <header className="settings-section-heading"><span>LOCAL DATA</span><strong id="storage-settings-heading">本機資料與隱私</strong><p>管理裝置上的工具鏈、題庫與建置快取。</p></header>
+              <div className="local-judge-note drawer-judge-note"><LockKeyhole size={15} /><p><strong>不防作弊</strong>完全本機的測資一定能被檢視；這是刻意的隱私與教學取捨。</p></div>
+              <div className="cache-section"><div><strong>本機快取</strong><span>{formatBytes(storage.usage)} / {storage.quota ? formatBytes(storage.quota) : "browser quota"}</span></div><button onClick={() => void clearCaches()} disabled={Boolean(busy)}><RotateCcw size={13} /> 清除快取</button></div>
+              <div className="drawer-footer"><ShieldCheck size={14} /><span>只下載經驗證的題庫與工具鏈；程式碼、自行測試輸入、判題結果與產物不會上傳。</span></div>
+            </section>
           </aside>
         </div>
       )}
