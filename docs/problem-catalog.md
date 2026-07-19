@@ -26,10 +26,16 @@ slug stays the same.
 
 ## Lazy loading and integrity
 
-The `wasm-oj-browser-collection-v3` index is capped at 512 KiB and contains localized list and
-learning-track metadata plus one bundle descriptor per problem. Forge renders the challenge list after loading
+The `wasm-oj-browser-collection-v4` index is capped at 512 KiB and contains localized list and
+learning-track metadata, explicit repository-root-relative statement paths for both locales, and
+one bundle descriptor per problem. Forge renders the challenge list after loading
 the index and initially downloads only the first problem. Selecting another problem fetches its
 `wasm-oj-browser-problem-v3` bundle on demand.
+
+The learning-assistant button opens ChatGPT in one click with a compact query. It links to the
+active locale's public statement Markdown, which includes the samples, and keeps only the selected
+language's starter template inline. Forge never guesses a statement path from a slug or bundle
+name. This keeps the query URL bounded while preserving an explicit source for the full problem.
 
 The canonical repository keeps stable manifest IDs and paths for calibration evidence and API
 consumers. Its separate `learning-path.json` groups problems by topic and orders each group from
