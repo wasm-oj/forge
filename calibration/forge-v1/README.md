@@ -9,8 +9,8 @@ solution SHA-256, test input/output SHA-256, Forge content identity, and recorde
 cost remains unchanged; the derivation tool rechecks all of those byte-level
 measurement inputs before accepting the refreshed catalog hash.
 
-- `reference-costs.json` contains 280 records (40 problems × 7 languages) and
-  1,141 case executions. Every record binds the source, input, expected output,
+- `reference-costs.json` contains 315 records (45 problems × 7 languages) and
+  1,281 case executions. Every record binds the source, input, expected output,
   artifact profile, compiler, runner, generated Forge library, toolchains, Node
   runtime, and the two external JavaScript dependency trees by SHA-256.
 - `derived-policies.json` is a deterministic projection of that evidence. It
@@ -36,9 +36,12 @@ node tools/derive_cost_policies.mjs --write
 ```
 
 The measurement command refuses to overwrite existing evidence. Use `--resume`
-only with the same catalog and exact runtime identity. `--problem` and
-`--language` can narrow an interrupted run; a production derivation still
-requires all 280 records.
+only with the same catalog and exact runtime identity. For an append-only catalog
+extension, add `--extend`: the tool first verifies the exact compiler, runner,
+library, toolchain, and dependency digests, then rehashes every previously
+measured solution and test pair before preserving any old records. `--problem`
+and `--language` can narrow an interrupted run; a production derivation still
+requires all 315 records.
 
 After changing a reference implementation, replace its stale records explicitly:
 

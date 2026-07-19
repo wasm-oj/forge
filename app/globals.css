@@ -490,3 +490,14 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .studio-shell { min-width: 1080px; }
   .topbar { position: sticky; top: 0; z-index: 10; }
 }
+/* Browser-only problem data is loaded as a verified static asset. */
+.problem-catalog-status {
+  align-items: center;
+  background: var(--bg);
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+  inset: 0;
+  justify-content: center;
+  min-height: 100vh;
+}

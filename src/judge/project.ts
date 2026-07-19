@@ -6,7 +6,7 @@ import {
   DEFAULT_PROBLEM_LOCALE,
   sampleCases,
   type JudgeProblem,
-} from "./problems";
+} from "./problem-model";
 
 const ENTRY_BY_LANGUAGE: Record<BuiltinLanguage, string> = {
   c: "src/main.c",

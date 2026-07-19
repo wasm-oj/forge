@@ -68,18 +68,17 @@ import {
   resizedBottomPanelHeight,
 } from "@/src/components/judge-panel-layout";
 import { assertProblemCostProfile, scoreProblemResults } from "@/src/judge/problem-scoring";
+import { loadBrowserProblemCatalog } from "@/src/judge/problem-catalog-loader";
 import {
   broadestPolicy,
   DEFAULT_PROBLEM_LOCALE,
   PROBLEM_LOCALES,
-  PROBLEMS,
-  problemById,
   problemText,
   sampleCases,
   type JudgeProblem,
   type ProblemDifficulty,
   type ProblemLocale,
-} from "@/src/judge/problems";
+} from "@/src/judge/problem-model";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 const SITES_CHUNK_MANIFEST_URL = process.env.NODE_ENV === "production"
@@ -113,9 +112,6 @@ const MONACO_LANGUAGE: Record<BuiltinLanguage, string> = {
   typescript: "typescript",
   go: "go",
 };
-
-const VALID_PROBLEM_IDS = new Set(PROBLEMS.map((problem) => problem.id));
-const INITIAL_PROBLEM = PROBLEMS[0];
 
 function cleanPath(path: string): string | undefined {
   const normalized = path.trim().replaceAll("\\", "/").replace(/^\.\//, "");
@@ -210,9 +206,48 @@ function verdictLabel(verdict: SubmissionVerdict): string {
   })[verdict];
 }
 
-export function JudgeStudio() {
-  const [project, setProject] = useState<Project>(() => createJudgeProject(INITIAL_PROBLEM, "c"));
-  const [problemId, setProblemId] = useState(INITIAL_PROBLEM.id);
+export function JudgeStudioLoader() {
+  const [problems, setProblems] = useState<readonly JudgeProblem[]>();
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadBrowserProblemCatalog(controller.signal).then(setProblems).catch((reason: unknown) => {
+      if (reason instanceof DOMException && reason.name === "AbortError") return;
+      setError(reason instanceof Error ? reason.message : String(reason));
+    });
+    return () => controller.abort();
+  }, []);
+
+  if (error) {
+    return (
+      <main className="problem-catalog-status" role="alert">
+        <TriangleAlert size={22} />
+        <span>{error}</span>
+      </main>
+    );
+  }
+  if (!problems) {
+    return (
+      <main className="problem-catalog-status" aria-live="polite">
+        <ShieldCheck size={22} />
+        <span>Loading verified problem catalog…</span>
+      </main>
+    );
+  }
+  return <JudgeStudio problems={problems} />;
+}
+
+interface JudgeStudioProps {
+  problems: readonly JudgeProblem[];
+}
+
+export function JudgeStudio({ problems }: JudgeStudioProps) {
+  const initialProblem = problems[0];
+  if (!initialProblem) throw new Error("The browser problem catalog is empty.");
+  const validProblemIds = useMemo(() => new Set(problems.map((problem) => problem.id)), [problems]);
+  const [project, setProject] = useState<Project>(() => createJudgeProject(initialProblem, "c"));
+  const [problemId, setProblemId] = useState(initialProblem.id);
   const [problemLocale, setProblemLocale] = useState<ProblemLocale>(DEFAULT_PROBLEM_LOCALE);
   const [problemPane, setProblemPane] = useState<ProblemPane>("statement");
   const [filter, setFilter] = useState<DifficultyFilter>("all");
@@ -250,10 +285,10 @@ export function JudgeStudio() {
   const panelResizeRef = useRef<PanelResizeSession | undefined>(undefined);
 
   const activeProblem = useMemo(() => {
-    const problem = problemById(problemId);
+    const problem = problems.find((candidate) => candidate.id === problemId);
     if (!problem) throw new Error(`Unknown problem id '${problemId}'.`);
     return problem;
-  }, [problemId]);
+  }, [problemId, problems]);
   const activeProblemText = problemText(activeProblem, problemLocale);
   const activeBaseline = broadestPolicy(activeProblem);
   const activeFile = useMemo(
@@ -270,8 +305,8 @@ export function JudgeStudio() {
   const activeToolchain = TOOLCHAINS[projectLanguage];
   const buildIdentity = useMemo(() => projectBuildIdentity(project), [project]);
   const filteredProblems = useMemo(
-    () => filter === "all" ? PROBLEMS : PROBLEMS.filter((problem) => problem.difficulty === filter),
-    [filter],
+    () => filter === "all" ? problems : problems.filter((problem) => problem.difficulty === filter),
+    [filter, problems],
   );
   const selectedCaseResult = judgeSession?.cases.find((testCase) => (
     testCase.number === selectedCaseNumber
@@ -390,7 +425,7 @@ export function JudgeStudio() {
         await storageCoordinator.requestPersistence();
         if (disposed) return;
         try {
-          setSolved(decodeSolvedProgress(localStorage.getItem(JUDGE_PROGRESS_KEY), VALID_PROBLEM_IDS));
+          setSolved(decodeSolvedProgress(localStorage.getItem(JUDGE_PROGRESS_KEY), validProblemIds));
         } catch (error) {
           localStorage.removeItem(JUDGE_PROGRESS_KEY);
           addLog("stderr", error instanceof Error ? error.message : String(error));
@@ -398,7 +433,9 @@ export function JudgeStudio() {
         const restored = await loadLatestProject();
         if (disposed) return;
         const restoredProblemId = restored ? problemIdFromProject(restored) : undefined;
-        const restoredProblem = restoredProblemId ? problemById(restoredProblemId) : undefined;
+        const restoredProblem = restoredProblemId
+          ? problems.find((candidate) => candidate.id === restoredProblemId)
+          : undefined;
         if (
           restored
           && restoredProblem
@@ -426,7 +463,7 @@ export function JudgeStudio() {
       compilation?.dispose();
       runner?.dispose();
     };
-  }, [addLog]);
+  }, [addLog, problems, validProblemIds]);
 
   useEffect(() => {
     if (!hydrated || !runtimeReady) return;
@@ -928,8 +965,8 @@ export function JudgeStudio() {
       <section className="judge-workspace">
         <aside className="problem-catalog">
           <div className="catalog-heading">
-            <div><span>CHALLENGES</span><strong>{solved.size} / {PROBLEMS.length}</strong></div>
-            <div className="catalog-progress"><span style={{ width: `${(solved.size / PROBLEMS.length) * 100}%` }} /></div>
+            <div><span>CHALLENGES</span><strong>{solved.size} / {problems.length}</strong></div>
+            <div className="catalog-progress"><span style={{ width: `${(solved.size / problems.length) * 100}%` }} /></div>
           </div>
           <div className="difficulty-filter" aria-label="題目難度篩選">
             {(["all", "easy", "medium", "hard"] as const).map((value) => (
@@ -1203,7 +1240,7 @@ export function JudgeStudio() {
         <div><Package size={12} />{activeToolchain.label} {activeToolchain.version}</div>
         <div><HardDrive size={12} />{formatBytes(storage.usage)} cached</div>
         <div className="status-spacer" />
-        <div>{solved.size}/{PROBLEMS.length} solved</div>
+        <div>{solved.size}/{problems.length} solved</div>
         <div>{project.config.target.toUpperCase()}</div>
         <div>Ln {location.line}, Col {location.column}</div>
       </footer>

@@ -5,7 +5,7 @@ import {
   sampleCases,
   type JudgeProblem,
   type ProblemLocale,
-} from "./problems";
+} from "./problem-model";
 
 const CHATGPT_URL = "https://chat.openai.com/";
 

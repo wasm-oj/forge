@@ -208,6 +208,31 @@
       "id": 40,
       "slug": "dual-quota-output-knapsack",
       "manifest": "problems/040-dual-quota-output-knapsack/problem.json"
+    },
+    {
+      "id": 41,
+      "slug": "progressive-cost-budget",
+      "manifest": "problems/041-progressive-cost-budget/problem.json"
+    },
+    {
+      "id": 42,
+      "slug": "first-duplicate-test",
+      "manifest": "problems/042-first-duplicate-test/problem.json"
+    },
+    {
+      "id": 43,
+      "slug": "verdict-range-counts",
+      "manifest": "problems/043-verdict-range-counts/problem.json"
+    },
+    {
+      "id": 44,
+      "slug": "recent-submission-reuse",
+      "manifest": "problems/044-recent-submission-reuse/problem.json"
+    },
+    {
+      "id": 45,
+      "slug": "slowest-k-cases",
+      "manifest": "problems/045-slowest-k-cases/problem.json"
     }
   ]
 }

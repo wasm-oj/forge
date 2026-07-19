@@ -4,7 +4,7 @@
 [![npm](https://img.shields.io/npm/v/%40wasm-oj%2Fforge)](https://www.npmjs.com/package/@wasm-oj/forge)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-WASM OJ Forge is a local-first compiler, deterministic runner, and online-judge library. It is the experimental successor to WASM-OJ's `compilet` and `wark`. In the browser deployment, source compilation, linking, execution, diagnostics, and all 40 original problems stay on the device. Compiler and language-runtime packages execute under the Wasmer JavaScript SDK; submitted programs execute under a portable Rust/Wasmer runtime core compiled for both WebAssembly and native server hosts.
+WASM OJ Forge is a local-first compiler, deterministic runner, and online-judge library. It is the experimental successor to WASM-OJ's `compilet` and `wark`. In the browser deployment, source compilation, linking, execution, diagnostics, and all 45 original problems stay on the device. Compiler and language-runtime packages execute under the Wasmer JavaScript SDK; submitted programs execute under a portable Rust/Wasmer runtime core compiled for both WebAssembly and native server hosts.
 
 All production compatibility is governed by one `wasm-oj-forge-v1` contract. It
 jointly versions compilation, execution, determinism, metering, artifacts,
@@ -13,7 +13,7 @@ compiler/determinism/resource/judge counters. See [versioning policy](docs/versi
 
 ## Judge experience
 
-- Browse and filter 40 progressively harder systems-algorithm problems in Traditional Chinese or English.
+- Browse and filter 45 progressively harder systems-algorithm problems in Traditional Chinese or English.
 - Work in C, C++, Rust, Go, Python, JavaScript, or TypeScript with Monaco and multi-file projects.
 - Build once, run the sample, then execute each judge case locally through Wasmer.
 - Compare normalized stdout, surface compile/runtime/time-limit/wrong-answer verdicts, and retain solved progress in browser storage.
@@ -21,14 +21,16 @@ compiler/determinism/resource/judge counters. See [versioning policy](docs/versi
 
 Because the judge is completely local, its test data can be inspected by a determined user. This is an explicit privacy and learning tradeoff: the product is for practice and self-verification, not cheat-resistant competition.
 
-## The 40-problem systems track
+## The 45-problem systems track
 
 The repository-root [`catalog.json`](catalog.json) is the canonical discovery
-entry point. It names all 40 manifests, the default locale, and the complete
+entry point. It names all 45 manifests, the default locale, and the complete
 locale set. Every manifest explicitly names its localized title, statement,
 editorial, seven reference solutions, tests, and cumulative cost/memory scoring
-policies. The browser bundle is generated deterministically from those files by
-`scripts/generate-judge-problems.mjs`; CI rejects a stale generated catalog.
+policies. `scripts/generate-judge-problems.mjs` deterministically materializes
+both the typed library fixture and the browser's same-origin static catalog;
+CI rejects either output when stale. Keeping the 45-problem payload outside the
+server Worker also preserves the deployment provider's code-size boundary.
 See the [problem catalog contract](docs/problem-catalog.md) for discovery,
 localization, generation, and cumulative scoring behavior.
 
