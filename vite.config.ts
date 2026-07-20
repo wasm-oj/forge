@@ -13,7 +13,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
   return {
     server: {
       headers: {
-        "Cross-Origin-Embedder-Policy": "credentialless",
+        "Cross-Origin-Embedder-Policy": "require-corp",
         "Cross-Origin-Opener-Policy": "same-origin",
       },
       ...(isCodexSeatbeltSandbox

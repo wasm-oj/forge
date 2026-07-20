@@ -37,6 +37,43 @@ await requireSource(
   `"schema": "${FORGE_SCHEMAS.pythonToolchain}"`,
 );
 
+const crossOriginPolicyFiles = [
+  "README.md",
+  "docs/architecture.md",
+  "docs/integration-guide.md",
+  "docs/library-contract.md",
+  "public/_headers",
+  "scripts/start-production.mjs",
+  "vite.config.ts",
+  "worker/index.ts",
+];
+for (const relative of crossOriginPolicyFiles) {
+  await rejectSource(relative, "credentialless");
+}
+await requireSource(
+  "vite.config.ts",
+  `"Cross-Origin-Embedder-Policy": "require-corp"`,
+  `"Cross-Origin-Opener-Policy": "same-origin"`,
+);
+await requireSource(
+  "worker/index.ts",
+  `headers.set("Cross-Origin-Embedder-Policy", "require-corp")`,
+  `headers.set("Cross-Origin-Opener-Policy", "same-origin")`,
+  `headers.set("Cross-Origin-Resource-Policy", "same-origin")`,
+);
+await requireSource(
+  "scripts/start-production.mjs",
+  `response.setHeader("Cross-Origin-Embedder-Policy", "require-corp")`,
+  `response.setHeader("Cross-Origin-Opener-Policy", "same-origin")`,
+  `response.setHeader("Cross-Origin-Resource-Policy", "same-origin")`,
+);
+await requireSource(
+  "public/_headers",
+  "Cross-Origin-Embedder-Policy: require-corp",
+  "Cross-Origin-Opener-Policy: same-origin",
+  "Cross-Origin-Resource-Policy: same-origin",
+);
+
 const pins = await readJson("public/toolchains/clang-22.0.0-git20542-10.cc1-pins.json");
 const manifest = await readJson("public/toolchains/clang-22.0.0-git20542-10.manifest.json");
 const rustManifest = await readJson("public/toolchains/rust-1.91.1-dev.manifest.json");
@@ -59,6 +96,11 @@ async function requireSource(relative, ...needles) {
     const count = source.split(needle).length - 1;
     if (count !== 1) throw new Error(`Expected exactly one '${needle}' in '${relative}', received ${count}.`);
   }
+}
+
+async function rejectSource(relative, needle) {
+  const source = await readFile(path.join(root, relative), "utf8");
+  if (source.includes(needle)) throw new Error(`Unexpected '${needle}' in '${relative}'.`);
 }
 
 async function readJson(relative) {

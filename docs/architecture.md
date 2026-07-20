@@ -163,7 +163,7 @@ The judge editor debounces build-identity changes for 900 ms and then calls the 
 
 ## Security and privacy boundaries
 
-- The production response sets `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: credentialless`, and `Cross-Origin-Resource-Policy: same-origin`, plus the documented referrer, content-type, and permissions policies. A Content Security Policy must allow `worker-src 'self' blob:`.
+- The production response sets `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`, and `Cross-Origin-Resource-Policy: same-origin`, plus the documented referrer, content-type, and permissions policies. A Content Security Policy must allow `worker-src 'self' blob:`.
 - Guest programs see only explicit in-memory mounts and configured stdin, arguments, and environment variables.
 - Source paths are normalized and cannot escape the project mount.
 - User-controlled code runs only inside Wasmer's WASI/WASIX sandbox in a disposable Worker or native child process.

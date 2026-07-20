@@ -170,7 +170,7 @@ manage scheduling and lifecycle. Public asynchronous infrastructure failures
 are `ForgeError` records; compiler diagnostics, guest termination, and judge
 verdicts remain result data. A production browser host must provide
 `Cross-Origin-Opener-Policy: same-origin`,
-`Cross-Origin-Embedder-Policy: credentialless`, and
+`Cross-Origin-Embedder-Policy: require-corp`, and
 `Cross-Origin-Resource-Policy: same-origin`. Forge uses same-origin `blob:`
 bootstraps for its module Workers, so a Content Security Policy must include
 `worker-src 'self' blob:`. The packed compiler, runner, Python-stage,
