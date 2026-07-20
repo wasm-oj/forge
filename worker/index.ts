@@ -17,7 +17,7 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const response = await handler.fetch(request, env, ctx);
     const headers = new Headers(response.headers);
-    headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+    headers.set("Cross-Origin-Embedder-Policy", "require-corp");
     headers.set("Cross-Origin-Opener-Policy", "same-origin");
     headers.set("Cross-Origin-Resource-Policy", "same-origin");
     headers.set("Referrer-Policy", "no-referrer");

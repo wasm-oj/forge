@@ -43,8 +43,8 @@ const forge = await Forge.create({
 ```
 
 The page must be cross-origin isolated. Its responses need COOP
-`same-origin`, COEP `credentialless` (or an equivalently valid isolation
-policy), and CORP `same-origin`; CSP must permit `worker-src 'self' blob:`.
+`same-origin`, COEP `require-corp`, and CORP `same-origin`; CSP must permit
+`worker-src 'self' blob:`.
 Toolchain requests are static, digest-pinned GETs and contain no source code,
 stdin, diagnostics, or artifacts.
 

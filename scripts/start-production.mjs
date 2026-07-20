@@ -33,7 +33,7 @@ function parsePort(value) {
 
 function installProductionResponsePolicy(server) {
   server.prependListener("request", (request, response) => {
-    response.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
+    response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
     response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
     response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
     response.setHeader("Referrer-Policy", "no-referrer");
