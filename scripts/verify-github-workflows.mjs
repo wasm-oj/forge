@@ -9,10 +9,10 @@ const workflowPaths = [
   ".github/workflows/release.yml",
 ];
 const pinnedActions = new Map([
-  ["actions/checkout", "de0fac2e4500dabe0009e67214ff5f5447ce83dd"],
-  ["actions/setup-node", "6044e13b5dc448c55e2357c09f80417699197238"],
-  ["pnpm/action-setup", "8912a9102ac27614460f54aedde9e1e7f9aec20d"],
-  ["actions/attest-build-provenance", "977bb373ede98d70efdf65b84cb5f73e068dcc2a"],
+  ["actions/checkout", "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"],
+  ["actions/setup-node", "820762786026740c76f36085b0efc47a31fe5020"],
+  ["pnpm/action-setup", "0ebf47130e4866e96fce0953f49152a61190b271"],
+  ["actions/attest-build-provenance", "0f67c3f4856b2e3261c31976d6725780e5e4c373"],
 ]);
 
 const workflows = new Map();
