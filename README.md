@@ -6,6 +6,57 @@
 
 WASM OJ Forge is a local-first compiler, deterministic runner, and online-judge library. It is the experimental successor to WASM-OJ's `compilet` and `wark`. In the browser deployment, source compilation, linking, execution, diagnostics, and all 45 original problems stay on the device. Compiler and language-runtime packages execute under the Wasmer JavaScript SDK; submitted programs execute under a portable Rust/Wasmer runtime core compiled for both WebAssembly and native server hosts.
 
+**[Open the live judge](https://wasm-oj-forge.jacoblincool.chatgpt.site/)** — no account, server build, or test data is required.
+
+## OpenAI Build Week: Codex and GPT-5.6
+
+Codex with GPT-5.6 was used as an engineering collaborator throughout the Build Week rebuild. It helped recover behavioral invariants from earlier prototypes, turn them into one explicit browser/server contract, implement and debug the compiler and runtime boundaries, and create the experiments, conformance matrices, and regression tests used to validate the result.
+
+The product decisions remained deliberate and human-owned: ordinary compilation and practice runs should move to learner devices; browser and server hosts must preserve the same observable semantics; and portable computational work must be measured independently of wall-clock speed. We accepted implementation and performance claims only when executable evidence supported them. The resulting Build Week work includes the integrated seven-language browser toolchains, the deterministic Rust/Wasmer runtime core, shared browser/server judging semantics, the 45-problem learner experience, and the evidence pipeline documented in [`experiments/`](experiments/) and [the conformance report](docs/conformance-report.md).
+
+## Judge quick test
+
+The fastest evaluation path is the public browser deployment:
+
+1. Open the [live judge](https://wasm-oj-forge.jacoblincool.chatgpt.site/) in a current desktop Chromium browser.
+2. Keep problem 01 and C/WASIP1 selected, then replace the starter with the verified solution below.
+3. Choose **Build** to compile the source locally, **Self Test** to run the sample input, and **Submit** to execute all four judge cases.
+4. Inspect the Accepted result, per-case instruction cost, normalized baseline, peak memory, logical time, and cumulative scoring tiers.
+
+The public demo is verified on Chromium and requires WebAssembly, Web Workers, `SharedArrayBuffer`, and cross-origin isolation. The package requires Node.js 22.13 or newer; the native server build is continuously verified on Ubuntu 24.04. See [Run locally](#run-locally) for installation and [the integration guide](docs/integration-guide.md) for browser and server library use.
+
+<details>
+<summary>Verified problem 01 solution</summary>
+
+```c
+#include <stdio.h>
+
+int main(void) {
+    int n, q;
+    if (scanf("%d %d", &n, &q) != 2) return 0;
+    static long long prefix[200001];
+    for (int i = 1; i <= n; ++i) {
+        long long cost;
+        scanf("%lld", &cost);
+        prefix[i] = prefix[i - 1] + cost;
+    }
+    for (int i = 0; i < q; ++i) {
+        long long budget;
+        scanf("%lld", &budget);
+        int lo = 0, hi = n;
+        while (lo < hi) {
+            int mid = lo + (hi - lo + 1) / 2;
+            if (prefix[mid] <= budget) lo = mid;
+            else hi = mid - 1;
+        }
+        printf("%d\n", lo);
+    }
+    return 0;
+}
+```
+
+</details>
+
 All production compatibility is governed by one `wasm-oj-forge-v1` contract. It
 jointly versions compilation, execution, determinism, metering, artifacts,
 judge specifications, caches, and conformance schemas; there are no separate
