@@ -4155,16 +4155,6 @@ dependencies = [
 
 [[package]]
 name = "wasm-encoder"
-version = "0.245.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f9dca005e69bf015e45577e415b9af8c67e8ee3c0e38b5b0add5aa92581ed5c"
-dependencies = [
- "leb128fmt",
- "wasmparser 0.245.1",
-]
-
-[[package]]
-name = "wasm-encoder"
 version = "0.252.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8185ae345fa5687c054626ff9a50e7089797a343d9904d1dc9820eb4c4d3196f"
@@ -4202,7 +4192,7 @@ dependencies = [
  "virtual-fs",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-encoder 0.245.1",
+ "wasm-encoder 0.253.0",
  "wasmer",
  "wasmer-types",
  "wasmer-wasix",
