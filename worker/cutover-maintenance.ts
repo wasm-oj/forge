@@ -9,6 +9,12 @@ function json(value: unknown, status: number): Response {
   });
 }
 
+// Cloudflare requires a replacement version of the same Worker script to keep
+// exporting every live Container and Workflow class, even while fetch traffic
+// is temporarily served by the maintenance handler.
+export { SubmissionJudgeContainer, ValidationJudgeContainer } from "./judge-container";
+export { SubmissionWorkflow, ValidationWorkflow } from "./workflows";
+
 const maintenanceWorker = {
   fetch(request: Request): Response {
     const pathname = new URL(request.url).pathname;
