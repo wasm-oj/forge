@@ -2,39 +2,23 @@ import { describe, expect, it, vi } from "vitest";
 import { validationStepOutcome } from "./validation-step-outcome";
 
 describe("validation Container Workflow step outcome", () => {
-  it.each([409, 422] as const)("keeps HTTP %s rejection classification across serialization", async (status) => {
-    const code = status === 422 ? "validation-input-rejected" : "container-one-shot";
+  it("keeps HTTP 422 rejection classification across serialization", async () => {
+    const code = "validation-input-rejected";
     const outcome = await validationStepOutcome(
       new Response(JSON.stringify({ error: { code } }), {
-        status,
+        status: 422,
         headers: { "content-type": "application/json" },
       }),
       vi.fn(),
     );
 
-    expect(JSON.parse(JSON.stringify(outcome))).toMatchObject({ kind: "rejected", status, code });
+    expect(JSON.parse(JSON.stringify(outcome))).toMatchObject({ kind: "rejected", status: 422, code });
     expect(outcome.kind).toBe("rejected");
     if (outcome.kind !== "rejected") throw new Error("Expected a validation rejection.");
     expect(outcome.message).not.toContain("undefined");
   });
 
   it("preserves only a bounded, known safe rejection code and message", async () => {
-    const safe = await validationStepOutcome(
-      new Response(JSON.stringify({
-        error: {
-          code: "container-identity-mismatch",
-          message: "Judge Container identity could not be verified.",
-        },
-      }), { status: 409 }),
-      vi.fn(),
-    );
-    expect(safe).toEqual({
-      kind: "rejected",
-      status: 409,
-      code: "container-identity-mismatch",
-      message: "Judge Container identity could not be verified.",
-    });
-
     const untrusted = await validationStepOutcome(
       new Response(JSON.stringify({ error: { code: "private-path-leak", message: "secret/repository/path" } }), { status: 422 }),
       vi.fn(),
@@ -45,6 +29,17 @@ describe("validation Container Workflow step outcome", () => {
       code: "validation-failed",
       message: "Managed collection validation rejected the canonical source.",
     });
+  });
+
+  it.each([
+    "container-identity-mismatch",
+    "container-one-shot",
+    "container-pool-mismatch",
+  ])("keeps HTTP 409 %s retryable as infrastructure", async (code) => {
+    await expect(validationStepOutcome(
+      new Response(JSON.stringify({ error: { code, message: "system conflict" } }), { status: 409 }),
+      vi.fn(),
+    )).rejects.toThrow(`infrastructure failed with HTTP 409 (${code})`);
   });
 
   it("keeps successful parsing and infrastructure failures distinct", async () => {
