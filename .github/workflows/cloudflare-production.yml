@@ -31,29 +31,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
       - run: pnpm run build
-      - name: Enter maintenance mode
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler deploy --config wrangler.maintenance-production.jsonc
-      - name: Wait up to ten minutes for validation imports
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/wait-for-validation-cutover.mjs
-      - name: Apply the single database migration
+      - name: Apply pending database migrations
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.quick-production.jsonc
-      - name: Reset retired submission objects once
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          node scripts/cleanup-production-r2.mjs --operation reset-submissions
-          pnpm exec wrangler d1 execute DB --remote --config wrangler.quick-production.jsonc --command \
-            "UPDATE formal_mutation_controls SET formal_mutations_enabled=0, reason='production-deployment', updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE environment='production'"
       - name: Backfill published problem catalog metadata
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
@@ -71,18 +53,3 @@ jobs:
           curl --fail --retry 6 --retry-all-errors --retry-delay 5 \
             https://wasm-oj-forge-production.jacob.workers.dev/api/health/ready
           node scripts/verify-production-catalog.mjs
-      - name: Resume formal mutations
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          pnpm exec wrangler d1 execute DB --remote --config wrangler.quick-production.jsonc --command \
-            "UPDATE formal_mutation_controls SET formal_mutations_enabled=1, reason='production-smoke-passed', updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE environment='production'"
-      - name: Pause formal mutations after a failed rollout
-        if: ${{ failure() }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          pnpm exec wrangler d1 execute DB --remote --config wrangler.quick-production.jsonc --command \
-            "UPDATE formal_mutation_controls SET formal_mutations_enabled=0, reason=CASE WHEN reason='single-store-object-reset-pending' THEN reason ELSE 'production-rollout-failed' END, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE environment='production'"

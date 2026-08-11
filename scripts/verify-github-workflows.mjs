@@ -13,7 +13,6 @@ const workerConfigs = Object.fromEntries(await Promise.all([
   ["development", "wrangler.jsonc"],
   ["production", "wrangler.quick-production.jsonc"],
 ].map(async ([name, path]) => [name, JSON.parse(await readFile(path, "utf8"))])));
-const maintenanceConfig = JSON.parse(await readFile("wrangler.maintenance-production.jsonc", "utf8"));
 
 function requireText(source, text, label) {
   if (!source.includes(text)) throw new Error(`${label} must include ${JSON.stringify(text)}.`);
@@ -27,28 +26,28 @@ requireText(sources.production, "environment: production", "Production deploymen
 requireText(sources.production, "workflow_dispatch:", "Production deployment");
 forbidText(sources.production, "branches: [main]", "Production deployment");
 requireText(sources.production, "wrangler d1 migrations apply DB", "Production deployment");
-requireText(sources.production, "wrangler deploy --config wrangler.maintenance-production.jsonc", "Production deployment");
-requireText(sources.production, "wait-for-validation-cutover.mjs", "Production deployment");
-requireText(sources.production, "cleanup-production-r2.mjs --operation reset-submissions", "Production deployment");
-requireText(sources.production, "formal_mutations_enabled=0", "Production deployment");
+requireText(sources.production, "backfill-problem-catalog-metadata.mjs", "Production deployment");
 requireText(sources.production, "wrangler deploy --config wrangler.quick-production.jsonc", "Production deployment");
+requireText(sources.production, "/api/health/live", "Production deployment");
 requireText(sources.production, "/api/health/ready", "Production deployment");
 requireText(sources.production, "verify-production-catalog.mjs", "Production deployment");
-requireText(sources.production, "formal_mutations_enabled=1", "Production deployment");
-requireText(sources.production, "if: ${{ failure() }}", "Production deployment");
 forbidText(sources.production, "CORE_DB", "Production deployment");
 forbidText(sources.production, "SUBMISSIONS_DB", "Production deployment");
+for (const destructiveCutoverStep of [
+  "wrangler.maintenance-production.jsonc",
+  "wait-for-validation-cutover.mjs",
+  "cleanup-production-r2.mjs",
+  "delete-retired-submissions-d1.mjs",
+  "formal_mutations_enabled",
+]) forbidText(sources.production, destructiveCutoverStep, "Production deployment");
 
 const orderedProductionSteps = [
-  "wrangler deploy --config wrangler.maintenance-production.jsonc",
-  "wait-for-validation-cutover.mjs",
   "wrangler d1 migrations apply DB",
-  "cleanup-production-r2.mjs --operation reset-submissions",
-  "formal_mutations_enabled=0",
+  "backfill-problem-catalog-metadata.mjs",
   "wrangler deploy --config wrangler.quick-production.jsonc",
+  "/api/health/live",
   "/api/health/ready",
   "verify-production-catalog.mjs",
-  "formal_mutations_enabled=1",
 ];
 let previousProductionIndex = -1;
 for (const step of orderedProductionSteps) {
@@ -101,9 +100,6 @@ for (const [name, config] of Object.entries(workerConfigs)) {
   if (JSON.stringify(deletion) !== JSON.stringify(deletedProductClasses)) {
     throw new Error(`${name} Worker must delete the five product-state Durable Object classes in one migration.`);
   }
-}
-if (maintenanceConfig.name !== workerConfigs.production.name || maintenanceConfig.durable_objects || maintenanceConfig.migrations) {
-  throw new Error("Production maintenance mode must replace the app without binding or deleting Durable Objects.");
 }
 
 console.log("Verified minimal workflows and Container-only Durable Object bindings.");
