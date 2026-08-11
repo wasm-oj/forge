@@ -15,6 +15,17 @@ interface OrganizerProblem { readonly id: string; readonly slug: string; readonl
 interface OrganizerCollection { readonly snapshotId: string; readonly importId: string; readonly mode: "official-practice" | "contest"; readonly revision: string; readonly status: string; readonly publishedAt: string | null; readonly repository: { readonly id: number; readonly owner: string; readonly name: string }; readonly problems: readonly OrganizerProblem[]; }
 interface CollectionResult { readonly imports: readonly OrganizerImport[]; readonly collections: readonly OrganizerCollection[]; }
 
+export function collectionPublicationMessage(value: unknown, mode: "official-practice" | "contest"): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Collection publication response must be an object.");
+  const result = value as Record<string, unknown>;
+  if (typeof result.snapshotId !== "string" || typeof result.replayed !== "boolean" || result.status !== "published") {
+    throw new TypeError("Collection publication response is invalid.");
+  }
+  if (result.replayed) return `Collection was already published as ${mode}.`;
+  if (!Array.isArray(result.problems)) throw new TypeError("New collection publication is missing its problems.");
+  return `Published ${result.problems.length} problems as ${mode}.`;
+}
+
 function post<T>(path: string, body: unknown): Promise<T> {
   const csrf = csrfToken();
   if (!csrf) return Promise.reject(new Error("Sign in again: the CSRF token is missing."));
@@ -133,7 +144,7 @@ function CollectionsContent() {
   }
   async function publish(mode: "official-practice" | "contest") {
     if (!selectedImport) return; setBusy(true); setMessage("");
-    try { const result = await post<{ snapshotId: string; problems: readonly OrganizerProblem[] }>(`/api/organizer/imports/${encodeURIComponent(selectedImport.id)}/publish`, { mode }); await load(); setMessage(`Published ${result.problems.length} problems as ${mode}.`); }
+    try { const result = await post<unknown>(`/api/organizer/imports/${encodeURIComponent(selectedImport.id)}/publish`, { mode }); const publicationMessage = collectionPublicationMessage(result, mode); await load(); setMessage(publicationMessage); }
     catch (reason) { setMessage(reason instanceof Error ? reason.message : String(reason)); } finally { setBusy(false); }
   }
 
