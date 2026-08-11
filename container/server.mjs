@@ -1,5 +1,4 @@
 import { createServer } from "node:http";
-import { gunzipSync } from "node:zlib";
 import {
   assertProblemCostProfile,
   BROWSER_PROBLEM_SCHEMA,
@@ -18,15 +17,13 @@ import { createServerForge } from "@wasm-oj/forge/server";
 import { assertExpectedContainerIdentity, loadEmbeddedContainerIdentity } from "./identity.mjs";
 import { OutputBudget, OutputBudgetExceededError } from "./output-budget.mjs";
 import { formalSubmissionOutcome, isSubmissionProjectionAdmitted } from "./submission-result.mjs";
+import { parseGitHubTarGz } from "./github-archive.mjs";
 
 const MAX_REQUEST_BYTES = 64 * 1024;
 const MAX_SOURCE_SNAPSHOT_BYTES = 2 * 1024 * 1024;
 const MAX_JUDGE_PROJECTION_BYTES = 32 * 1024 * 1024;
 const MAX_CANONICAL_OBJECT_BYTES = 32 * 1024 * 1024;
 const MAX_ARCHIVE_BYTES = 128 * 1024 * 1024;
-const MAX_EXPANDED_BYTES = 256 * 1024 * 1024;
-const MAX_ARCHIVE_ENTRIES = 10_000;
-const MAX_ARCHIVE_FILE_BYTES = 32 * 1024 * 1024;
 const MAX_JUDGE_JOB_OUTPUT_BYTES = 32 * 1024 * 1024;
 const MAX_VALIDATION_JOB_OUTPUT_BYTES = 64 * 1024 * 1024;
 const MAX_MANAGED_PROBLEMS = 64;
@@ -281,69 +278,6 @@ async function executeSubmission(job, identity) {
   } finally {
     engine.dispose();
   }
-}
-
-function tarString(bytes) {
-  const zero = bytes.indexOf(0);
-  return Buffer.from(zero >= 0 ? bytes.subarray(0, zero) : bytes).toString("utf8").trim();
-}
-
-function tarOctal(bytes, label) {
-  const value = tarString(bytes).replace(/^0+/, "") || "0";
-  if (!/^[0-7]+$/.test(value)) throw new Error(`${label} has invalid tar octal metadata`);
-  const parsed = Number.parseInt(value, 8);
-  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error(`${label} has unsafe tar metadata`);
-  return parsed;
-}
-
-function normalizedArchivePath(value) {
-  if (!value || value.startsWith("/") || value.includes("\\") || value.includes("\0")) throw new Error(`archive path '${value}' is unsafe`);
-  const parts = value.replace(/\/$/, "").split("/");
-  if (parts.some((part) => !part || part === "." || part === "..")) throw new Error(`archive path '${value}' is unsafe`);
-  return parts;
-}
-
-function parseGitHubTarGz(archive) {
-  if (archive.byteLength > MAX_ARCHIVE_BYTES) throw new Error("repository archive exceeds 128 MiB");
-  const tar = new Uint8Array(gunzipSync(archive, { maxOutputLength: MAX_EXPANDED_BYTES }));
-  const files = new Map();
-  let offset = 0;
-  let entries = 0;
-  let root;
-  while (offset + 512 <= tar.byteLength) {
-    const header = tar.subarray(offset, offset + 512);
-    if (header.every((byte) => byte === 0)) break;
-    entries += 1;
-    if (entries > MAX_ARCHIVE_ENTRIES) throw new Error("repository archive has too many entries");
-    const storedChecksum = tarOctal(header.subarray(148, 156), "tar header");
-    let checksum = 0;
-    for (let index = 0; index < header.length; index += 1) checksum += index >= 148 && index < 156 ? 32 : header[index];
-    if (storedChecksum !== checksum) throw new Error("repository archive tar checksum is invalid");
-    const name = tarString(header.subarray(0, 100));
-    const prefix = tarString(header.subarray(345, 500));
-    const parts = normalizedArchivePath(prefix ? `${prefix}/${name}` : name);
-    root ??= parts[0];
-    if (parts[0] !== root) throw new Error("repository archive contains multiple roots");
-    const relative = parts.slice(1).join("/");
-    const size = tarOctal(header.subarray(124, 136), relative || "archive root");
-    if (size > MAX_ARCHIVE_FILE_BYTES) throw new Error(`archive file '${relative}' exceeds 32 MiB`);
-    const type = String.fromCharCode(header[156] || 48);
-    if (type === "1" || type === "2") throw new Error(`archive link '${relative}' is forbidden`);
-    if (type !== "0" && type !== "5") throw new Error(`archive entry '${relative}' has unsupported tar type '${type}'`);
-    const dataStart = offset + 512;
-    const dataEnd = dataStart + size;
-    if (dataEnd > tar.byteLength) throw new Error(`archive entry '${relative}' is truncated`);
-    if (type === "0" && relative) {
-      if (files.has(relative)) throw new Error(`archive repeats '${relative}'`);
-      const contents = tar.slice(dataStart, dataEnd);
-      const prefixText = Buffer.from(contents.subarray(0, 200)).toString("utf8");
-      if (prefixText.startsWith("version https://git-lfs.github.com/spec/v1")) throw new Error(`Git LFS pointer '${relative}' is forbidden`);
-      if (relative === ".gitmodules") throw new Error("Git submodules are forbidden");
-      files.set(relative, contents);
-    }
-    offset = dataStart + Math.ceil(size / 512) * 512;
-  }
-  return files;
 }
 
 async function uploadProjection(job, value) {

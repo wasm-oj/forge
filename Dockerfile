@@ -35,10 +35,11 @@ COPY --from=build /src/container/generate-identity.mjs ./container/generate-iden
 COPY --from=build /src/container/tree-digest.mjs ./container/tree-digest.mjs
 COPY --from=build /src/container/submission-result.mjs ./container/submission-result.mjs
 COPY --from=build /src/container/output-budget.mjs ./container/output-budget.mjs
+COPY --from=build /src/container/github-archive.mjs ./container/github-archive.mjs
 
 RUN mkdir -p /app/release \
   && chmod 0555 /app/runtime/forge-compiler /app/runtime/forge-runner \
-  && chmod 0444 /app/container/server.mjs /app/container/identity.mjs /app/container/generate-identity.mjs /app/container/tree-digest.mjs /app/container/submission-result.mjs /app/container/output-budget.mjs \
+  && chmod 0444 /app/container/server.mjs /app/container/identity.mjs /app/container/generate-identity.mjs /app/container/tree-digest.mjs /app/container/submission-result.mjs /app/container/output-budget.mjs /app/container/github-archive.mjs \
   && chmod -R a-w /app \
   && chmod u+w /app/release \
   && FORGE_RELEASE_ID="$FORGE_RELEASE_ID" \
