@@ -3,6 +3,10 @@ export interface FormalSubmissionOutcome {
   readonly score: number;
   readonly fullyPassedCases: number;
 }
+export function isSubmissionProjectionAdmitted(
+  projection: unknown,
+  expectedProblemBundleDigest: unknown,
+): boolean;
 export function formalSubmissionOutcome(
   verdict: "accepted" | "wrong-answer" | "runtime-error" | "instruction-limit" | "memory-limit" | "output-limit" | "filesystem-limit" | "logical-time-limit" | "wall-time-limit" | "judge-error",
   scoring: { readonly points: number; readonly cases: readonly { readonly outputAccepted: boolean }[] },

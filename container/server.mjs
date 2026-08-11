@@ -17,7 +17,7 @@ import {
 import { createServerForge } from "@wasm-oj/forge/server";
 import { assertExpectedContainerIdentity, loadEmbeddedContainerIdentity } from "./identity.mjs";
 import { OutputBudget, OutputBudgetExceededError } from "./output-budget.mjs";
-import { formalSubmissionOutcome } from "./submission-result.mjs";
+import { formalSubmissionOutcome, isSubmissionProjectionAdmitted } from "./submission-result.mjs";
 
 const MAX_REQUEST_BYTES = 64 * 1024;
 const MAX_SOURCE_SNAPSHOT_BYTES = 2 * 1024 * 1024;
@@ -194,11 +194,7 @@ async function executeSubmission(job, identity) {
   if (source?.schema !== "forge-official-source-v1" || projection?.schema !== "forge-server-judge-projection-v1") {
     throw new Error("job objects use unsupported schemas");
   }
-  if (
-    projection.forgeReleaseId !== job.expectedReleaseId
-    || !/^[0-9a-f]{64}$/.test(job.expectedProblemBundleDigest ?? "")
-    || projection.digest !== job.expectedProblemBundleDigest
-  ) {
+  if (!isSubmissionProjectionAdmitted(projection, job.expectedProblemBundleDigest)) {
     throw new ContainerProtocolError(409, "judge-projection-identity", "Judge projection identity does not match the immutable admission.");
   }
   const problem = parseStandaloneProblemBundle({ schema: BROWSER_PROBLEM_SCHEMA, problem: projection.problem });
