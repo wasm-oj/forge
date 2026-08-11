@@ -23,7 +23,7 @@ export type ValidationObjectReference = {
  * value in both Workflow metadata and our delivery outbox, so it deliberately
  * contains no Organizer identity, repository metadata, GitHub installation,
  * commit/index coordinates, or R2 object key. Those values are hydrated from
- * CORE_DB inside bounded Workflow steps immediately before use.
+ * DB inside bounded Workflow steps immediately before use.
  */
 export interface ValidationWorkflowParameters {
   readonly importId: string;
@@ -49,7 +49,7 @@ export interface ValidationProblemOutput {
 
 export interface ValidationCore {
   readonly importId: string;
-  readonly sourceKind: "github-archive" | "canonical-successor";
+  readonly sourceKind: "github-archive";
   readonly forgeReleaseId: string;
   readonly collectionRevision: string;
   readonly canonicalSource: {
@@ -77,9 +77,7 @@ export type ValidationReport = ValidationCore & {
 
 export interface ValidationExpectation {
   readonly importId: string;
-  readonly sourceKind: "github-archive" | "canonical-successor";
   readonly forgeReleaseId: string;
-  readonly canonicalSourceSha256?: string;
 }
 
 export function trustedGithubArchiveRedirect(value: string | null): string {
@@ -220,16 +218,13 @@ function core(
   expectation: ValidationExpectation,
   schema: "forge-validation-workflow-result-v1" | "forge-collection-validation-report-v1",
 ): ValidationCore {
-  if (value.schema !== schema || value.importId !== expectation.importId || value.sourceKind !== expectation.sourceKind || value.forgeReleaseId !== expectation.forgeReleaseId) {
+  if (value.schema !== schema || value.importId !== expectation.importId || value.sourceKind !== "github-archive" || value.forgeReleaseId !== expectation.forgeReleaseId) {
     throw new TypeError("Validation result identity does not match the immutable workflow.");
   }
   const collectionRevision = string(value.collectionRevision, DIGEST, "validation collectionRevision", 64);
   const canonical = object(value.canonicalSource, "validation canonicalSource");
   exact(canonical, ["manifest", "objects"], "validation canonicalSource");
   const manifest = reference(canonical.manifest, "validation canonical source manifest");
-  if (expectation.canonicalSourceSha256 !== undefined && manifest.digest !== expectation.canonicalSourceSha256) {
-    throw new TypeError("Canonical successor changed its source manifest.");
-  }
   if (!Array.isArray(canonical.objects) || canonical.objects.length < 1 || canonical.objects.length > MAX_CANONICAL_OBJECTS) {
     throw new TypeError("Validation canonical object inventory is invalid.");
   }
@@ -256,7 +251,7 @@ function core(
   }
   return {
     importId: expectation.importId,
-    sourceKind: expectation.sourceKind,
+    sourceKind: "github-archive",
     forgeReleaseId: expectation.forgeReleaseId,
     collectionRevision,
     canonicalSource: { manifest, objects },

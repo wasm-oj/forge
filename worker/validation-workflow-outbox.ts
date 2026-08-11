@@ -17,14 +17,12 @@ const QUARANTINE_MILLISECONDS = 24 * 60 * 60 * 1_000;
 interface ValidationImportDeliveryRow {
   readonly status: string;
   readonly error_code: string | null;
-  readonly source_kind: string;
   readonly commit_sha: string;
   readonly archive_r2_key: string | null;
   readonly archive_disposition: string;
   readonly archive_delete_after: string | null;
   readonly validation_report_r2_key: string | null;
   readonly canonical_source_r2_key: string | null;
-  readonly canonical_source_mirror_r2_key: string | null;
   readonly canonical_source_sha256: string | null;
   readonly manifest_sha256: string;
 }
@@ -53,11 +51,11 @@ function exactArchiveKey(importId: string, commitSha: string, key: string): bool
 }
 
 async function importDeliveryRow(env: ForgeWorkerEnv, parameters: ValidationWorkflowParameters): Promise<ValidationImportDeliveryRow> {
-  const row = await env.CORE_DB.prepare(`SELECT
-      imports.status, imports.error_code, imports.source_kind, imports.commit_sha,
+  const row = await env.DB.prepare(`SELECT
+      imports.status, imports.error_code, imports.commit_sha,
       imports.archive_r2_key, imports.archive_disposition, imports.archive_delete_after,
       imports.validation_report_r2_key, imports.canonical_source_r2_key,
-      imports.canonical_source_mirror_r2_key, imports.canonical_source_sha256,
+      imports.canonical_source_sha256,
       releases.manifest_sha256
     FROM collection_imports AS imports
     JOIN forge_releases AS releases ON releases.id=imports.forge_release_id
@@ -66,14 +64,8 @@ async function importDeliveryRow(env: ForgeWorkerEnv, parameters: ValidationWork
   if (!row || row.manifest_sha256 !== parameters.expectedManifestSha256) {
     throw new Error("Terminal Validation Workflow does not match its immutable import release.");
   }
-  if (row.source_kind !== "github-archive" && row.source_kind !== "canonical-successor") {
-    throw new Error("Terminal Validation Workflow import has an invalid source kind.");
-  }
-  if (row.archive_r2_key !== null && (row.source_kind !== "github-archive" || !exactArchiveKey(parameters.importId, row.commit_sha, row.archive_r2_key))) {
+  if (row.archive_r2_key !== null && !exactArchiveKey(parameters.importId, row.commit_sha, row.archive_r2_key)) {
     throw new Error("Terminal Validation Workflow archive is not bound to its import.");
-  }
-  if (row.source_kind === "canonical-successor" && (row.archive_r2_key !== null || row.archive_disposition !== "deleted")) {
-    throw new Error("Terminal canonical successor unexpectedly owns a GitHub archive.");
   }
   return row;
 }
@@ -100,9 +92,9 @@ async function ensureArchiveCleanup(
     return;
   }
   if (row.archive_disposition !== "pending") throw new Error("Terminal Validation Workflow archive has no cleanup or quarantine fence.");
-  await env.CORE_DB.prepare("INSERT OR IGNORE INTO core_outbox (id, kind, aggregate_id, payload_json, created_at) SELECT ?, 'cleanup-import-archive', ?, ?, ? WHERE EXISTS (SELECT 1 FROM collection_imports WHERE id=? AND archive_r2_key=? AND archive_disposition='pending')")
+  await env.DB.prepare("INSERT OR IGNORE INTO outbox (id, kind, aggregate_id, payload_json, created_at) SELECT ?, 'cleanup-import-archive', ?, ?, ? WHERE EXISTS (SELECT 1 FROM collection_imports WHERE id=? AND archive_r2_key=? AND archive_disposition='pending')")
     .bind(crypto.randomUUID(), parameters.importId, archiveCleanupOutboxJson(parameters.importId), now, parameters.importId, row.archive_r2_key).run();
-  const cleanup = await env.CORE_DB.prepare("SELECT 1 AS valid FROM core_outbox WHERE kind='cleanup-import-archive' AND aggregate_id=? AND delivered_at IS NULL")
+  const cleanup = await env.DB.prepare("SELECT 1 AS valid FROM outbox WHERE kind='cleanup-import-archive' AND aggregate_id=? AND delivered_at IS NULL")
     .bind(parameters.importId).first<{ readonly valid: number }>();
   if (!cleanup) throw new Error("Terminal Validation Workflow lost its archive cleanup outbox.");
 }
@@ -120,10 +112,10 @@ async function settleFailedValidationWorkflow(
     const archiveDeleteAfter = row.archive_r2_key === null
       ? null
       : new Date(nowDate.getTime() + QUARANTINE_MILLISECONDS).toISOString();
-    const terminalized = await env.CORE_DB.prepare(`UPDATE collection_imports
+    const terminalized = await env.DB.prepare(`UPDATE collection_imports
       SET status='infrastructure-error', error_code=?, archive_disposition=?, archive_delete_after=?, updated_at=?
       WHERE id=? AND forge_release_id=? AND status IN ('queued','downloading','validating')
-        AND source_kind=? AND commit_sha=? AND archive_r2_key IS ?`)
+        AND commit_sha=? AND archive_r2_key IS ?`)
       .bind(
         `validation-workflow-${workflowStatus}`,
         archiveDisposition,
@@ -131,7 +123,6 @@ async function settleFailedValidationWorkflow(
         now,
         parameters.importId,
         parameters.expectedReleaseId,
-        row.source_kind,
         row.commit_sha,
         row.archive_r2_key,
       ).run();
@@ -152,7 +143,6 @@ async function settleFailedValidationWorkflow(
     if (
       reportDigest === null
       || row.canonical_source_r2_key === null
-      || row.canonical_source_mirror_r2_key !== row.canonical_source_r2_key
       || row.canonical_source_sha256 === null
       || !DIGEST.test(row.canonical_source_sha256)
       || row.canonical_source_r2_key !== `snapshots/objects/${row.canonical_source_sha256}`

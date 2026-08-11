@@ -13,7 +13,7 @@ import {
 } from "./validation-contract";
 
 const IMPORT_ID = "00000000-0000-4000-8000-000000000001";
-const PREDECESSOR_ID = "00000000-0000-4000-8000-000000000002";
+const OTHER_ID = "00000000-0000-4000-8000-000000000002";
 const USER_ID = "00000000-0000-4000-8000-000000000003";
 const RELEASE_ID = "00000000-0000-4000-8000-000000000004";
 const COMMIT = "a".repeat(40);
@@ -26,7 +26,7 @@ function ref(character: string, bytes = 100): ValidationObjectReference {
   return { key: `snapshots/objects/${digest}`, digest, bytes };
 }
 
-function canonicalParameters() {
+function validationParameters() {
   return {
     importId: IMPORT_ID,
     expectedReleaseId: RELEASE_ID,
@@ -40,7 +40,7 @@ function resultFixture(schema: "forge-validation-workflow-result-v1" | "forge-co
   const core = {
     schema,
     importId: IMPORT_ID,
-    sourceKind: "canonical-successor",
+    sourceKind: "github-archive",
     forgeReleaseId: RELEASE_ID,
     collectionRevision: "2".repeat(64),
     canonicalSource: { manifest: ref("1"), objects: [ref("3")] },
@@ -62,23 +62,21 @@ function resultFixture(schema: "forge-validation-workflow-result-v1" | "forge-co
   };
   return schema === "forge-validation-workflow-result-v1"
     ? { ...core, report: ref("b") }
-    : { ...core, problemCount: 1, checks: ["canonical-successor-source", "public-hidden-projection"] };
+    : { ...core, problemCount: 1, checks: ["github-archive-source", "public-hidden-projection"] };
 }
 
 const expectation = {
   importId: IMPORT_ID,
-  sourceKind: "canonical-successor" as const,
   forgeReleaseId: RELEASE_ID,
-  canonicalSourceSha256: "1".repeat(64),
 };
 
-describe("canonical successor protocol", () => {
+describe("collection validation protocol", () => {
   it("uses an exact opaque workflow reference without repository or Organizer context", () => {
-    expect(parseValidationWorkflowParameters(canonicalParameters())).toEqual(canonicalParameters());
-    expect(() => parseValidationWorkflowParameters({ ...canonicalParameters(), installationId: 99 })).toThrow("invalid shape");
+    expect(parseValidationWorkflowParameters(validationParameters())).toEqual(validationParameters());
+    expect(() => parseValidationWorkflowParameters({ ...validationParameters(), installationId: 99 })).toThrow("invalid shape");
     expect(() => parseValidationWorkflowParameters({
-      ...canonicalParameters(),
-      source: { kind: "canonical-successor", predecessorImportId: PREDECESSOR_ID },
+      ...validationParameters(),
+      source: { kind: "github-archive", archiveR2Key: `imports/${IMPORT_ID}/${COMMIT}.tar.gz` },
     })).toThrow("invalid shape");
   });
 
@@ -105,18 +103,16 @@ describe("canonical successor protocol", () => {
       expectedManifestSha256: MANIFEST,
       expectedContainerIdentitySha256: IDENTITY,
       source: {
-        kind: "canonical-successor",
-        predecessorImportId: PREDECESSOR_ID,
-        canonicalSourceR2Key: `snapshots/objects/${"1".repeat(64)}`,
-        canonicalSourceSha256: "1".repeat(64),
+        kind: "github-archive",
+        archiveR2Key: `imports/${IMPORT_ID}/${COMMIT}.tar.gz`,
       },
     } as const;
     expect(parseExecuteRequest(job).kind).toBe("validation");
     expect(() => parseExecuteRequest({ ...job, legacyArchiveKey: "imports/x" })).toThrow("invalid shape");
     expect(() => parseExecuteRequest({
       ...job,
-      source: { ...job.source, canonicalSourceR2Key: `snapshots/objects/${"2".repeat(64)}` },
-    })).toThrow("content addressed");
+      source: { ...job.source, archiveR2Key: `imports/${OTHER_ID}/${COMMIT}.tar.gz` },
+    })).toThrow("immutable import");
     expect(() => parseExecuteRequest({
       kind: "submission",
       jobId: IMPORT_ID,
@@ -128,7 +124,7 @@ describe("canonical successor protocol", () => {
       expectedContainerIdentitySha256: IDENTITY,
       expectedProblemBundleDigest: "1".repeat(64),
       sourceOwnerId: USER_ID,
-      sourceR2Key: `sources/${USER_ID}/${PREDECESSOR_ID}.${"2".repeat(64)}.json`,
+      sourceR2Key: `sources/${USER_ID}/${OTHER_ID}.${"2".repeat(64)}.json`,
       sourceSha256: "2".repeat(64),
       judgeR2Key: `snapshots/objects/${"3".repeat(64)}`,
       judgeSha256: "3".repeat(64),
@@ -158,8 +154,8 @@ describe("canonical successor protocol", () => {
       sourceOwnerId: USER_ID,
       sourceSha256: "2".repeat(64),
     });
-    expect(() => parseExecuteRequest({ ...request, sourceOwnerId: PREDECESSOR_ID })).toThrow("submission and digest");
-    expect(() => parseExecuteRequest({ ...request, sourceR2Key: `sources/${USER_ID}/${PREDECESSOR_ID}.${"2".repeat(64)}.json` })).toThrow("submission and digest");
+    expect(() => parseExecuteRequest({ ...request, sourceOwnerId: OTHER_ID })).toThrow("submission and digest");
+    expect(() => parseExecuteRequest({ ...request, sourceR2Key: `sources/${USER_ID}/${OTHER_ID}.${"2".repeat(64)}.json` })).toThrow("submission and digest");
     expect(() => parseExecuteRequest({ ...request, sourceSha256: "4".repeat(64) })).toThrow("submission and digest");
   });
 

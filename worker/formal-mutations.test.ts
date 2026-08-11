@@ -42,7 +42,7 @@ function fixture(environment: ForgeWorkerEnv["ENVIRONMENT"]): { readonly databas
     database,
     env: {
       ENVIRONMENT: environment,
-      CORE_DB: new SqliteD1(database) as unknown as D1Database,
+      DB: new SqliteD1(database) as unknown as D1Database,
     } as unknown as ForgeWorkerEnv,
   };
 }

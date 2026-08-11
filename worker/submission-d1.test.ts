@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -20,6 +20,11 @@ import { INSERT_OFFICIAL_SUBMISSION_SQL } from "./submissions";
 const NOW = "2026-08-11T00:00:00.000Z";
 const DIGEST = "a".repeat(64);
 const TOKEN_HASH = "b".repeat(64);
+const OWNER_ID = "0198dbd3-5c00-7000-8000-000000990001";
+const IMPORT_ID = "0198dbd3-5c00-7000-8000-000000990002";
+const SNAPSHOT_ID = "0198dbd3-5c00-7000-8000-000000990003";
+const PROBLEM_ID = "0198dbd3-5c00-7000-8000-000000990004";
+const RELEASE_ID = "0198dbd3-5c00-7000-8000-000000990005";
 
 class SqliteStatement {
   private bindings: readonly SQLInputValue[] = [];
@@ -67,19 +72,43 @@ class SqliteD1 {
 
 function database(): { readonly sqlite: DatabaseSync; readonly env: ForgeWorkerEnv } {
   const sqlite = new DatabaseSync(":memory:");
-  for (const migration of [
-    "0001_initial.sql",
-    "0002_rejudge_pipeline.sql",
-    "0003_account_erasure_fence.sql",
-    "0004_projection_outbox_uniqueness.sql",
-    "0005_formal_admission_claim.sql",
-    "0006_d1_submission_events_capacity.sql",
-  ]) {
-    sqlite.exec(readFileSync(path.join(process.cwd(), "migrations/submissions", migration), "utf8"));
+  const migrationDirectory = path.join(process.cwd(), "migrations/core");
+  for (const migration of readdirSync(migrationDirectory).filter((entry) => entry.endsWith(".sql")).sort()) {
+    sqlite.exec(readFileSync(path.join(migrationDirectory, migration), "utf8"));
   }
+  sqlite.prepare("INSERT INTO users (id, created_at, updated_at, status) VALUES (?, ?, ?, 'active')")
+    .run(OWNER_ID, NOW, NOW);
+  sqlite.prepare(`INSERT INTO github_installations
+      (installation_id, account_github_id, account_login, installed_by_user_id, status,
+       permissions_json, repository_selection, created_at, updated_at)
+    VALUES (1, 1, 'fixture', ?, 'active', '{}', 'selected', ?, ?)`)
+    .run(OWNER_ID, NOW, NOW);
+  sqlite.prepare(`INSERT INTO github_repositories
+      (github_repository_id, installation_id, owner_login, name, is_private, authorization_status, updated_at)
+    VALUES (1, 1, 'fixture', 'problems', 0, 'authorized', ?)`)
+    .run(NOW);
+  sqlite.prepare(`INSERT INTO forge_releases
+      (id, version, manifest_r2_key, manifest_sha256, source_git_commit, status, created_at)
+    VALUES (?, 'test-release', ?, ?, ?, 'active', ?)`)
+    .run(RELEASE_ID, `releases/${DIGEST}`, DIGEST, "c".repeat(40), NOW);
+  sqlite.prepare(`INSERT INTO collection_imports
+      (id, organizer_user_id, github_repository_id, requested_ref, commit_sha, index_path,
+       forge_release_id, archive_disposition, status, created_at, updated_at)
+    VALUES (?, ?, 1, 'main', ?, 'collection/index.json', ?, 'deleted', 'valid', ?, ?)`)
+    .run(IMPORT_ID, OWNER_ID, "d".repeat(40), RELEASE_ID, NOW, NOW);
+  sqlite.prepare(`INSERT INTO managed_snapshots
+      (id, import_id, mode, collection_revision, judge_projection_digest, status,
+       published_at, published_by, created_at)
+    VALUES (?, ?, 'official-practice', 'fixture', ?, 'published', ?, ?, ?)`)
+    .run(SNAPSHOT_ID, IMPORT_ID, DIGEST, NOW, OWNER_ID, NOW);
+  sqlite.prepare(`INSERT INTO managed_problem_versions
+      (id, snapshot_id, problem_slug, problem_number, title_json, bundle_digest,
+       public_projection_r2_key, judge_projection_r2_key, maximum_score, created_at)
+    VALUES (?, ?, 'fixture', 1, '{}', ?, ?, ?, 100, ?)`)
+    .run(PROBLEM_ID, SNAPSHOT_ID, DIGEST, `snapshots/objects/${DIGEST}`, `snapshots/objects/${DIGEST}`, NOW);
   return {
     sqlite,
-    env: { SUBMISSIONS_DB: new SqliteD1(sqlite) as unknown as D1Database } as unknown as ForgeWorkerEnv,
+    env: { DB: new SqliteD1(sqlite) as unknown as D1Database } as unknown as ForgeWorkerEnv,
   };
 }
 
@@ -93,12 +122,14 @@ function insertSubmission(
   userId: string,
   state = "admitting",
 ): void {
+  sqlite.prepare("INSERT OR IGNORE INTO users (id, created_at, updated_at, status) VALUES (?, ?, ?, 'active')")
+    .run(userId, NOW, NOW);
   sqlite.prepare(`INSERT INTO submissions
       (id, user_id, managed_problem_version_id, language, target, optimization, entry_path,
        source_r2_key, source_digest, forge_release_id, forge_manifest_sha256, state,
-       visibility, created_at, updated_at)
-    VALUES (?, ?, ?, 'c', 'wasip1', 'release', 'main.c', ?, ?, ?, ?, ?, 'private', ?, ?)`)
-    .run(submissionId, userId, id(999), `sources/${userId}/${submissionId}.${DIGEST}.json`, DIGEST, id(998), DIGEST, state, NOW, NOW);
+       visibility, admitted_at, created_at, updated_at)
+    VALUES (?, ?, ?, 'c', 'wasip1', 'release', 'main.c', ?, ?, ?, ?, ?, 'private', ?, ?, ?)`)
+    .run(submissionId, userId, PROBLEM_ID, `sources/${userId}/${submissionId}.${DIGEST}.json`, DIGEST, RELEASE_ID, DIGEST, state, NOW, NOW, NOW);
 }
 
 function insertAttempt(sqlite: DatabaseSync, submissionId: string, attempt = 1, tokenHash = TOKEN_HASH): void {
@@ -114,33 +145,30 @@ describe("D1 submission events and capacity", () => {
     expect(submissionColumns).not.toContain("reservation_released_at");
     expect(rejudgeColumns).not.toContain("reservation_released_at");
     expect(sqlite.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name='submission_events'").get()).toBeTruthy();
-    expect(sqlite.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name='submission_outbox'").get()).toMatchObject({
-      sql: expect.not.stringContaining("reconcile-terminal-event"),
-    });
+    expect(sqlite.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name='outbox'").get()).toBeTruthy();
     expect(sqlite.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 
   it("admits only three queued submissions for one account", () => {
     const { sqlite } = database();
     const userId = id(10);
+    sqlite.prepare("INSERT INTO users (id, created_at, updated_at, status) VALUES (?, ?, ?, 'active')")
+      .run(userId, NOW, NOW);
     const insert = (submissionId: string) => sqlite.prepare(INSERT_OFFICIAL_SUBMISSION_SQL).run(
       submissionId,
       userId,
-      id(20),
+      PROBLEM_ID,
       null,
-      NOW,
-      DIGEST,
       "c",
       "wasip1",
       "release",
       "main.c",
       `sources/${userId}/${submissionId}.${DIGEST}.json`,
       DIGEST,
-      id(30),
+      RELEASE_ID,
       DIGEST,
-      NOW,
-      NOW,
-      userId,
+      "development",
+      `submission-${submissionId}`,
     );
     expect([insert(id(1)), insert(id(2)), insert(id(3))].map((result) => Number(result.changes))).toEqual([1, 1, 1]);
     expect(Number(insert(id(4)).changes)).toBe(0);
@@ -247,24 +275,23 @@ describe("D1 submission events and capacity", () => {
     }
     const submissionId = id(30_000);
     const userId = id(30_001);
+    sqlite.prepare("INSERT INTO users (id, created_at, updated_at, status) VALUES (?, ?, ?, 'active')")
+      .run(userId, NOW, NOW);
     const result = sqlite.prepare(INSERT_OFFICIAL_SUBMISSION_SQL).run(
       submissionId,
       userId,
-      id(30_002),
+      PROBLEM_ID,
       null,
-      NOW,
-      DIGEST,
       "c",
       "wasip1",
       "release",
       "main.c",
       `sources/${userId}/${submissionId}.${DIGEST}.json`,
       DIGEST,
-      id(30_003),
+      RELEASE_ID,
       DIGEST,
-      NOW,
-      NOW,
-      userId,
+      "development",
+      `submission-${submissionId}`,
     );
     expect(Number(result.changes)).toBe(0);
   });

@@ -1,6 +1,4 @@
-import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { ForgeWorkerEnv } from "./env";
 import { reconcilePhase, reconcileUncommittedAttemptAudits } from "./reconciler";
@@ -37,37 +35,27 @@ class Bucket {
 }
 
 const SUBMISSION_ID = "0198dbd3-5c00-7000-8000-000000000201";
-const USER_ID = "0198dbd3-5c00-7000-8000-000000000202";
-const PROBLEM_ID = "0198dbd3-5c00-7000-8000-000000000203";
 const DIGEST = "a".repeat(64);
 const NOW = "2026-08-09T00:00:00.000Z";
 
 function fixture() {
   const database = new DatabaseSync(":memory:");
-  for (const migration of [
-    "0001_initial.sql",
-    "0002_rejudge_pipeline.sql",
-    "0003_account_erasure_fence.sql",
-    "0004_projection_outbox_uniqueness.sql",
-    "0005_formal_admission_claim.sql",
-    "0006_d1_submission_events_capacity.sql",
-  ]) {
-    database.exec(readFileSync(path.join(process.cwd(), "migrations/submissions", migration), "utf8"));
-  }
-  database.prepare(`INSERT INTO submissions
-    (id, user_id, managed_problem_version_id, language, target, optimization, entry_path,
-     source_r2_key, source_digest, forge_release_id, forge_manifest_sha256, state,
-     visibility, created_at, updated_at, completed_at)
-    VALUES (?, ?, ?, 'c', 'wasip1', 'release', 'main.c', 'source', ?, ?, ?, 'infrastructure-error', 'private', ?, ?, ?)`)
-    .run(SUBMISSION_ID, USER_ID, PROBLEM_ID, DIGEST, PROBLEM_ID, DIGEST, NOW, NOW, NOW);
+  database.exec(`CREATE TABLE submission_attempts (
+    submission_id TEXT NOT NULL,
+    attempt INTEGER NOT NULL,
+    token_hash TEXT NOT NULL,
+    container_key TEXT NOT NULL,
+    state TEXT NOT NULL,
+    finished_at TEXT,
+    audit_r2_key TEXT,
+    PRIMARY KEY (submission_id, attempt)
+  ) STRICT`);
   const primary = new Bucket();
-  const mirror = new Bucket();
   const env = {
-    SUBMISSIONS_DB: new SqliteD1(database) as unknown as D1Database,
+    DB: new SqliteD1(database) as unknown as D1Database,
     JUDGE_BUCKET: primary as unknown as R2Bucket,
-    JUDGE_MIRROR_BUCKET: mirror as unknown as R2Bucket,
   } as ForgeWorkerEnv;
-  return { database, primary, mirror, env };
+  return { database, primary, env };
 }
 
 function auditKey(attempt: number): string {
@@ -87,43 +75,33 @@ describe("submission attempt audit cleanup", () => {
     }
   });
 
-  it("retains the D1 claim across a partial mirrored deletion and retries", async () => {
-    const { database, primary, mirror, env } = fixture();
+  it("retains the D1 claim when object deletion fails and retries", async () => {
+    const { database, primary, env } = fixture();
     database.prepare("INSERT INTO submission_attempts (submission_id, attempt, token_hash, container_key, state, finished_at, audit_r2_key) VALUES (?, 1, ?, ?, 'failed', ?, ?)")
       .run(SUBMISSION_ID, DIGEST, SUBMISSION_ID, NOW, auditKey(1));
     primary.objects.add(auditKey(1));
-    mirror.objects.add(auditKey(1));
     primary.deleteFailures = 1;
     const log = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
       await expect(reconcileUncommittedAttemptAudits(env)).resolves.toBe(0);
       expect(database.prepare("SELECT audit_r2_key FROM submission_attempts WHERE submission_id=? AND attempt=1").get(SUBMISSION_ID)).toEqual({ audit_r2_key: auditKey(1) });
       expect(primary.objects.has(auditKey(1))).toBe(true);
-      expect(mirror.objects.has(auditKey(1))).toBe(false);
       await expect(reconcileUncommittedAttemptAudits(env)).resolves.toBe(1);
       expect(database.prepare("SELECT audit_r2_key FROM submission_attempts WHERE submission_id=? AND attempt=1").get(SUBMISSION_ID)).toEqual({ audit_r2_key: null });
-      expect(primary.objects.size + mirror.objects.size).toBe(0);
+      expect(primary.objects.size).toBe(0);
     } finally {
       log.mockRestore();
     }
   });
 
   it("never deletes the permanent audit of a succeeded attempt", async () => {
-    const { database, primary, mirror, env } = fixture();
+    const { database, primary, env } = fixture();
     database.prepare("INSERT INTO submission_attempts (submission_id, attempt, token_hash, container_key, state, finished_at, audit_r2_key) VALUES (?, 1, ?, ?, 'succeeded', ?, ?)")
       .run(SUBMISSION_ID, DIGEST, SUBMISSION_ID, NOW, auditKey(1));
     primary.objects.add(auditKey(1));
-    mirror.objects.add(auditKey(1));
 
     await expect(reconcileUncommittedAttemptAudits(env)).resolves.toBe(0);
-    expect(primary.objects.has(auditKey(1)) && mirror.objects.has(auditKey(1))).toBe(true);
+    expect(primary.objects.has(auditKey(1))).toBe(true);
     expect(database.prepare("SELECT audit_r2_key FROM submission_attempts WHERE submission_id=?").get(SUBMISSION_ID)).toEqual({ audit_r2_key: auditKey(1) });
-  });
-
-  it("enforces one profile outbox per submission", () => {
-    const { database } = fixture();
-    const insert = database.prepare("INSERT OR IGNORE INTO submission_outbox (id, submission_id, kind, payload_json, created_at) VALUES (?, ?, ?, '{}', ?)");
-    expect(insert.run("profile-1", SUBMISSION_ID, "update-profile", NOW).changes).toBe(1);
-    expect(insert.run("profile-2", SUBMISSION_ID, "update-profile", NOW).changes).toBe(0);
   });
 });

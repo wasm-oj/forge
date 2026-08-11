@@ -470,8 +470,8 @@ async function canonicalArchiveInput(job) {
   const canonicalSource = await uploadObject(job, canonicalSourceBytes, "application/json");
   created.objects.clear();
 
-  // Persistence barrier: all semantic validation consumes primary+mirror
-  // read/hash verified objects, never archive-backed in-memory bytes.
+  // Persistence barrier: semantic validation consumes objects read back from
+  // the authoritative bucket and verified by digest, never archive-backed bytes.
   const persistedSourceBytes = await reloadUploadedObject(job, canonicalSource);
   const persistedSource = await verifyForgeValidationSourceBytes(persistedSourceBytes, canonicalSource.digest);
   const persistedObjects = new Map();
@@ -485,51 +485,8 @@ async function canonicalArchiveInput(job) {
   return { sourceKind: "github-archive", canonicalSource, canonicalObjects, persistedSource, persistedObjects };
 }
 
-async function canonicalSuccessorInput(job) {
-  const response = await callback(job, "/r2/canonical/manifest");
-  if (!response.ok) throw new ContainerProtocolError(500, "canonical-source-read", "Canonical source manifest read failed.");
-  const persistedSourceBytes = await verifiedResponseBody(
-    response,
-    job.source.canonicalSourceSha256,
-    MAX_CANONICAL_OBJECT_BYTES,
-    "canonical source manifest",
-  );
-  let persistedSource;
-  try {
-    persistedSource = await verifyForgeValidationSourceBytes(persistedSourceBytes, job.source.canonicalSourceSha256);
-  } catch {
-    throw new ContainerProtocolError(500, "canonical-source-integrity", "Canonical source manifest is invalid.");
-  }
-  if (
-    persistedSource.provenance.githubRepositoryId !== job.githubRepositoryId
-    || persistedSource.provenance.commitSha !== job.commitSha
-    || persistedSource.provenance.indexPath !== job.indexPath
-  ) throw new ContainerProtocolError(409, "canonical-source-provenance", "Canonical source provenance is inconsistent.");
-  const canonicalSource = {
-    key: job.source.canonicalSourceR2Key,
-    digest: job.source.canonicalSourceSha256,
-    bytes: persistedSourceBytes.byteLength,
-  };
-  const canonicalObjects = persistedSource.objects.map((reference) => ({
-    key: `snapshots/objects/${reference.sha256}`,
-    digest: reference.sha256,
-    bytes: reference.bytes,
-  }));
-  const persistedObjects = new Map();
-  for (const reference of persistedSource.objects) {
-    const objectResponse = await callback(job, `/r2/canonical/object/${reference.sha256}`);
-    if (!objectResponse.ok) throw new ContainerProtocolError(500, "canonical-object-read", "Canonical source object read failed.");
-    const bytes = await verifiedResponseBody(objectResponse, reference.sha256, MAX_CANONICAL_OBJECT_BYTES, "canonical source object");
-    if (bytes.byteLength !== reference.bytes) throw new ContainerProtocolError(500, "canonical-object-integrity", "Canonical source object length is inconsistent.");
-    persistedObjects.set(reference.sha256, bytes);
-  }
-  return { sourceKind: "canonical-successor", canonicalSource, canonicalObjects, persistedSource, persistedObjects };
-}
-
 async function validateCollection(job) {
-  const canonical = job.source.kind === "github-archive"
-    ? await canonicalArchiveInput(job)
-    : await canonicalSuccessorInput(job);
+  const canonical = await canonicalArchiveInput(job);
   const { sourceKind, canonicalSource, canonicalObjects, persistedSource, persistedObjects } = canonical;
   const verifiedSource = await verifyForgeValidationSourceObjects(persistedSource, persistedObjects);
   persistedObjects.clear();
@@ -620,7 +577,7 @@ async function validateCollection(job) {
     collectionRevision: index.revision,
     problemCount: outputs.length,
     checks: [
-      ...(sourceKind === "github-archive" ? ["archive-structure", "no-links", "no-lfs", "canonical-source-extraction"] : ["canonical-successor-source"]),
+      "archive-structure", "no-links", "no-lfs", "canonical-source-extraction",
       "canonical-source-integrity", "collection-schema", "bundle-integrity", "reference-declarations",
       ...(needsTrustedJudgeCompilation ? ["trusted-judge-source-compile"] : []),
       "public-hidden-projection",

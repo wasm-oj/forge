@@ -5,10 +5,8 @@ export type ForgeEnvironment = "development" | "staging" | "production";
 
 export interface ForgeWorkerEnv {
   readonly ASSETS: Fetcher;
-  readonly CORE_DB: D1Database;
-  readonly SUBMISSIONS_DB: D1Database;
+  readonly DB: D1Database;
   readonly JUDGE_BUCKET: R2Bucket;
-  readonly JUDGE_MIRROR_BUCKET: R2Bucket;
   readonly SUBMISSION_CONTAINER: DurableObjectNamespace;
   readonly VALIDATION_CONTAINER: DurableObjectNamespace;
   readonly SUBMISSION_WORKFLOW: Workflow<SubmissionWorkflowParameters>;

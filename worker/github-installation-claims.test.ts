@@ -173,7 +173,7 @@ describe("GitHub installation ownership claims", () => {
       },
       body,
     });
-    const env = { CORE_DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv;
+    const env = { DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv;
 
     await expect(githubWebhook(await signedRequest("0".repeat(64)), env)).rejects.toMatchObject({
       code: "github-webhook-signature",
@@ -217,7 +217,7 @@ describe("GitHub installation ownership claims", () => {
           "x-hub-signature-256": `sha256=${await hmacSha256Hex(secret, bytes)}`,
         },
         body,
-      }), { CORE_DB: forbiddenD1, GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
+      }), { DB: forbiddenD1, GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
     };
     const boundary = Array.from({ length: MAX_GITHUB_INSTALLATION_REPOSITORY_CHANGES }, (_, id) => ({ id: id + 1 }));
 
@@ -278,7 +278,7 @@ describe("GitHub installation ownership claims", () => {
           "x-hub-signature-256": `sha256=${await hmacSha256Hex(secret, new TextEncoder().encode(body))}`,
         },
         body,
-      }), { CORE_DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
+      }), { DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
     };
 
     expect((await deliver("delivery-permission-write", { contents: "write", metadata: "read" }, "selected")).status).toBe(200);
@@ -327,7 +327,7 @@ describe("GitHub installation ownership claims", () => {
         "x-hub-signature-256": `sha256=${signature}`,
       },
       body,
-    }), { CORE_DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
+    }), { DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
 
     expect(response.status).toBe(200);
     expect(database.prepare("SELECT COUNT(*) AS count FROM github_installation_claim_proofs WHERE installer_github_user_id=?").get(GITHUB_A)).toEqual({ count: 0 });
@@ -359,7 +359,7 @@ describe("GitHub installation ownership claims", () => {
       },
       body: value,
     });
-    const env = { CORE_DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv;
+    const env = { DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv;
     expect((await githubWebhook(await request(body), env)).status).toBe(200);
     expect(database.prepare("SELECT attempts, outcome FROM github_webhook_deliveries WHERE delivery_id=?").get(deliveryId)).toEqual({ attempts: 2, outcome: "accepted" });
     await expect(githubWebhook(await request(`${body} `), env)).rejects.toMatchObject({ code: "github-webhook-delivery-conflict" });
@@ -376,7 +376,7 @@ describe("GitHub installation ownership claims", () => {
     database.prepare("INSERT INTO github_installation_states (state_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
       .run(stateHash, USER_A, NOW, "2099-01-01T00:00:00.000Z");
     const env = {
-      CORE_DB: d1,
+      DB: d1,
       ENVIRONMENT: "development",
       STAGING_ALLOWED_GITHUB_USER_IDS: "",
     } as ForgeWorkerEnv;

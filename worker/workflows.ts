@@ -16,7 +16,7 @@ import {
 } from "./validation-contract";
 import { releaseImportObjectClaims } from "./canonical-object-claims";
 import { readBoundedResponseBytes, readBoundedResponseJson } from "./http";
-import { putImmutableMirroredObject } from "./immutable-r2";
+import { putImmutableObject } from "./immutable-r2";
 import { operationalLog } from "./structured-log";
 import {
   FINALIZE_SUBMISSION_ATTEMPT_SQL,
@@ -32,7 +32,6 @@ import {
   hydrateValidationWorkflowContext,
   validationWorkflowStepMarker,
   type HydratedValidationWorkflowContext,
-  type ValidationSourceKind,
 } from "./validation-workflow-context";
 import { archiveCleanupOutboxJson } from "./validation-workflow-outbox";
 import { claimSubmissionExecutionSlot } from "./submission-capacity";
@@ -72,7 +71,7 @@ async function putVerifiedPermanentAudit(
     sha256: digestBytes(digest),
   } satisfies R2PutOptions;
   if (bytes.byteLength < 1 || bytes.byteLength > 2 * 1024 * 1024) throw new Error("Permanent audit exceeds its size limit.");
-  await putImmutableMirroredObject(env.JUDGE_BUCKET, env.JUDGE_MIRROR_BUCKET, key, bytes, digest, options);
+  await putImmutableObject(env.JUDGE_BUCKET, key, bytes, digest, options);
 }
 
 async function appendSubmissionEvent(
@@ -97,12 +96,12 @@ async function finalizePreExecutionInfrastructureFailure(
   submission: SubmissionWorkflowParameters,
 ): Promise<"infrastructure-error" | "cancelled"> {
   const now = new Date().toISOString();
-  const [finalized] = await env.SUBMISSIONS_DB.batch([
-    env.SUBMISSIONS_DB.prepare("UPDATE submissions SET state='infrastructure-error', score=0, fully_passed_cases=0, updated_at=?, completed_at=? WHERE id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled')")
+  const [finalized] = await env.DB.batch([
+    env.DB.prepare("UPDATE submissions SET state='infrastructure-error', score=0, fully_passed_cases=0, updated_at=?, completed_at=? WHERE id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled')")
       .bind(now, now, submission.submissionId),
-    env.SUBMISSIONS_DB.prepare("UPDATE submission_attempts SET state='failed', finished_at=?, failure_code='pre-execution-infrastructure-error' WHERE submission_id=? AND state IN ('created','running') AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state='infrastructure-error')")
+    env.DB.prepare("UPDATE submission_attempts SET state='failed', finished_at=?, failure_code='pre-execution-infrastructure-error' WHERE submission_id=? AND state IN ('created','running') AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state='infrastructure-error')")
       .bind(now, submission.submissionId, submission.submissionId),
-    prepareSubmissionEventInsert(env.SUBMISSIONS_DB, {
+    prepareSubmissionEventInsert(env.DB, {
       submissionId: submission.submissionId,
       eventKey: "workflow:pre-execution-infrastructure-error",
       event: { kind: "state", state: "infrastructure-error" },
@@ -111,7 +110,7 @@ async function finalizePreExecutionInfrastructureFailure(
     }),
   ]);
   if (finalized?.meta.changes === 1) return "infrastructure-error";
-  const current = await env.SUBMISSIONS_DB.prepare("SELECT state FROM submissions WHERE id=?")
+  const current = await env.DB.prepare("SELECT state FROM submissions WHERE id=?")
     .bind(submission.submissionId).first<{ readonly state: string }>();
   if (current?.state === "cancelled") return "cancelled";
   if (current?.state === "infrastructure-error") return "infrastructure-error";
@@ -146,7 +145,7 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
     try {
       for (let waitIteration = 0; waitIteration < CAPACITY_WAIT_ITERATIONS; waitIteration += 1) {
         const state = await step.do(`check cancellation before capacity ${waitIteration}`, async () => (
-          this.env.SUBMISSIONS_DB.prepare("SELECT state FROM submissions WHERE id=?")
+          this.env.DB.prepare("SELECT state FROM submissions WHERE id=?")
             .bind(submission.submissionId).first<{ state: string }>()
         ));
         if (state?.state === "cancelled") {
@@ -189,7 +188,7 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
             retries: { limit: 0, delay: "1 second" },
             timeout: "30 minutes",
           }, async () => {
-            const started = await this.env.SUBMISSIONS_DB.prepare("UPDATE submission_attempts SET state='running', started_at=? WHERE submission_id=? AND attempt=? AND state='created' AND token_hash=? AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled'))")
+            const started = await this.env.DB.prepare("UPDATE submission_attempts SET state='running', started_at=? WHERE submission_id=? AND attempt=? AND state='created' AND token_hash=? AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled'))")
               .bind(new Date().toISOString(), submission.submissionId, attempt, await sha256Hex(currentToken), submission.submissionId).run();
             if (started.meta.changes !== 1) throw new Error("Submission attempt lost its execution fence.");
             const container = this.env.SUBMISSION_CONTAINER.getByName(`${submission.submissionId}:${attempt}`);
@@ -231,10 +230,10 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
             const digest = await sha256Hex(bytes);
             const key = `audits/${submission.submissionId}/${attempt}.${digest}.json`;
             const tokenHash = await sha256Hex(currentToken);
-            const claimed = await this.env.SUBMISSIONS_DB.prepare("UPDATE submission_attempts SET audit_r2_key=? WHERE submission_id=? AND attempt=? AND state='running' AND token_hash=? AND audit_r2_key IS NULL AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled'))")
+            const claimed = await this.env.DB.prepare("UPDATE submission_attempts SET audit_r2_key=? WHERE submission_id=? AND attempt=? AND state='running' AND token_hash=? AND audit_r2_key IS NULL AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled'))")
               .bind(key, submission.submissionId, attempt, tokenHash, submission.submissionId).run();
             if (claimed.meta.changes !== 1) {
-              const existing = await this.env.SUBMISSIONS_DB.prepare("SELECT 1 AS exact FROM submission_attempts JOIN submissions ON submissions.id=submission_attempts.submission_id WHERE submission_attempts.submission_id=? AND submission_attempts.attempt=? AND submission_attempts.state='running' AND submission_attempts.token_hash=? AND submission_attempts.audit_r2_key=? AND submissions.state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled')")
+              const existing = await this.env.DB.prepare("SELECT 1 AS exact FROM submission_attempts JOIN submissions ON submissions.id=submission_attempts.submission_id WHERE submission_attempts.submission_id=? AND submission_attempts.attempt=? AND submission_attempts.state='running' AND submission_attempts.token_hash=? AND submission_attempts.audit_r2_key=? AND submissions.state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled')")
                 .bind(submission.submissionId, attempt, tokenHash, key).first<{ readonly exact: number }>();
               if (!existing) throw new Error("Submission audit lost its durable attempt claim.");
             }
@@ -247,12 +246,13 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
           const finalized = await step.do(`finalize submission database ${attempt}`, async () => {
             const now = new Date().toISOString();
             const tokenHash = await sha256Hex(currentToken);
+            const terminalVerdict = result.state === "compile-error" ? "compile-error" : result.verdict;
             const statements = [
-              this.env.SUBMISSIONS_DB.prepare(FINALIZE_SUBMISSION_SQL)
-                .bind(result.state, result.score, result.fullyPassedCases, result.state === "compile-error" ? null : result.deterministicCost, result.state === "compile-error" ? null : result.peakMemoryBytes, attempt, now, now, submission.submissionId, attempt, submission.submissionId, submission.submissionId, attempt, tokenHash),
-              this.env.SUBMISSIONS_DB.prepare(FINALIZE_SUBMISSION_ATTEMPT_SQL)
+              this.env.DB.prepare(FINALIZE_SUBMISSION_SQL)
+                .bind(result.state, terminalVerdict, result.score, result.fullyPassedCases, result.state === "compile-error" ? null : result.deterministicCost, result.state === "compile-error" ? null : result.peakMemoryBytes, attempt, now, now, submission.submissionId, attempt, submission.submissionId, submission.submissionId, attempt, tokenHash),
+              this.env.DB.prepare(FINALIZE_SUBMISSION_ATTEMPT_SQL)
                 .bind(now, submission.submissionId, attempt, tokenHash, auditKey, auditKey, submission.submissionId, attempt, result.state),
-              prepareSubmissionEventInsert(this.env.SUBMISSIONS_DB, {
+              prepareSubmissionEventInsert(this.env.DB, {
                 submissionId: submission.submissionId,
                 eventKey: `workflow:terminal:${attempt}`,
                 event: { kind: "state", state: result.state },
@@ -261,21 +261,10 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
                 requiredAttempt: attempt,
               }),
             ];
-            if (submission.rejudge) {
-              statements.push(
-                this.env.SUBMISSIONS_DB.prepare("INSERT OR IGNORE INTO rejudge_result_outbox (id, rejudge_batch_id, old_submission_id, new_submission_id, created_at) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM submissions WHERE id=? AND state=? AND effective_attempt=?)")
-                  .bind(crypto.randomUUID(), submission.rejudge.batchId, submission.rejudge.oldSubmissionId, submission.submissionId, now, submission.submissionId, result.state, attempt),
-              );
-            } else if (result.state === "completed") {
-              statements.push(
-                this.env.SUBMISSIONS_DB.prepare("INSERT OR IGNORE INTO submission_outbox (id, submission_id, kind, payload_json, created_at) SELECT ?, ?, 'update-profile', ?, ? WHERE EXISTS (SELECT 1 FROM submissions WHERE id=? AND state='completed' AND effective_attempt=?)")
-                  .bind(crypto.randomUUID(), submission.submissionId, JSON.stringify({ submissionId: submission.submissionId }), now, submission.submissionId, attempt),
-              );
-            }
-            const [claim, attemptClaim] = await this.env.SUBMISSIONS_DB.batch(statements);
+            const [claim, attemptClaim] = await this.env.DB.batch(statements);
             if (claim?.meta.changes === 1 && attemptClaim?.meta.changes === 1) return "committed" as const;
-            const exact = await this.env.SUBMISSIONS_DB.prepare(`SELECT
-                submissions.state, submissions.score, submissions.fully_passed_cases,
+            const exact = await this.env.DB.prepare(`SELECT
+                submissions.state, submissions.verdict, submissions.score, submissions.fully_passed_cases,
                 submissions.deterministic_cost, submissions.peak_memory_bytes, submissions.effective_attempt,
                 submission_attempts.state AS attempt_state, submission_attempts.token_hash,
                 submission_attempts.audit_r2_key
@@ -284,6 +273,7 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
               WHERE submissions.id=?`)
               .bind(attempt, submission.submissionId).first<{
                 readonly state: string;
+                readonly verdict: string | null;
                 readonly score: number | null;
                 readonly fully_passed_cases: number | null;
                 readonly deterministic_cost: number | null;
@@ -295,6 +285,7 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
               }>();
             const expected = {
               state: result.state,
+              verdict: terminalVerdict,
               score: result.score,
               fullyPassedCases: result.fullyPassedCases,
               deterministicCost: result.state === "compile-error" ? null : result.deterministicCost,
@@ -305,6 +296,7 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
             };
             if (finalizedSubmissionAttemptMatches(exact, expected)) return "replayed" as const;
             const submissionMatches = exact?.state === expected.state
+              && exact.verdict === expected.verdict
               && exact.score === expected.score
               && exact.fully_passed_cases === expected.fullyPassedCases
               && exact.deterministic_cost === expected.deterministicCost
@@ -312,14 +304,14 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
               && exact.effective_attempt === expected.attempt;
             const attemptMatches = exact?.token_hash === expected.tokenHash && exact.audit_r2_key === expected.auditR2Key;
             if (submissionMatches && attemptMatches && exact.attempt_state === "running") {
-              const repaired = await this.env.SUBMISSIONS_DB.prepare(FINALIZE_SUBMISSION_ATTEMPT_SQL)
+              const repaired = await this.env.DB.prepare(FINALIZE_SUBMISSION_ATTEMPT_SQL)
                 .bind(now, submission.submissionId, attempt, tokenHash, auditKey, auditKey, submission.submissionId, attempt, result.state).run();
               if (repaired.meta.changes === 1) return "replayed" as const;
             }
             return "lost" as const;
           });
           if (finalized === "lost") {
-            const state = await this.env.SUBMISSIONS_DB.prepare("SELECT state FROM submissions WHERE id=?")
+            const state = await this.env.DB.prepare("SELECT state FROM submissions WHERE id=?")
               .bind(submission.submissionId).first<{ state: string }>();
             if (state?.state === "cancelled") return { state: "cancelled", score: 0, fullyPassedCases: 0 };
             throw new Error("Submission finalization lost its terminal-state fence.");
@@ -327,7 +319,7 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
           return result;
         } catch (error) {
           await step.do(`record failed attempt ${attempt}`, async () => {
-            await this.env.SUBMISSIONS_DB.prepare("UPDATE submission_attempts SET state='failed', finished_at=?, failure_code='container-failure' WHERE submission_id=? AND attempt=? AND state='running'")
+            await this.env.DB.prepare("UPDATE submission_attempts SET state='failed', finished_at=?, failure_code='container-failure' WHERE submission_id=? AND attempt=? AND state='running'")
               .bind(new Date().toISOString(), submission.submissionId, attempt).run();
           });
           if (attempt >= submission.attempt + 1) throw error;
@@ -339,12 +331,12 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
           );
           await step.do(`create isolated retry attempt ${nextAttempt}`, async () => {
             const now = new Date().toISOString();
-            const [inserted, yielded, reclaimed] = await this.env.SUBMISSIONS_DB.batch([
-              this.env.SUBMISSIONS_DB.prepare("INSERT INTO submission_attempts (submission_id, attempt, token_hash, container_key, state) SELECT ?, ?, ?, ?, 'created' WHERE EXISTS (SELECT 1 FROM submissions WHERE id=? AND state IN ('preparing','compiling','running'))")
+            const [inserted, yielded, reclaimed] = await this.env.DB.batch([
+              this.env.DB.prepare("INSERT INTO submission_attempts (submission_id, attempt, token_hash, container_key, state) SELECT ?, ?, ?, ?, 'created' WHERE EXISTS (SELECT 1 FROM submissions WHERE id=? AND state IN ('preparing','compiling','running'))")
                 .bind(submission.submissionId, nextAttempt, await sha256Hex(nextToken), `${submission.submissionId}:${nextAttempt}`, submission.submissionId),
-              this.env.SUBMISSIONS_DB.prepare("UPDATE submissions SET state='waiting-capacity', updated_at=? WHERE id=? AND state IN ('preparing','compiling','running') AND EXISTS (SELECT 1 FROM submission_attempts WHERE submission_id=? AND attempt=? AND state='created')")
+              this.env.DB.prepare("UPDATE submissions SET state='waiting-capacity', updated_at=? WHERE id=? AND state IN ('preparing','compiling','running') AND EXISTS (SELECT 1 FROM submission_attempts WHERE submission_id=? AND attempt=? AND state='created')")
                 .bind(now, submission.submissionId, submission.submissionId, nextAttempt),
-              this.env.SUBMISSIONS_DB.prepare("UPDATE submissions SET state='preparing', updated_at=? WHERE id=? AND state='waiting-capacity' AND EXISTS (SELECT 1 FROM submission_attempts WHERE submission_id=? AND attempt=? AND state='created')")
+              this.env.DB.prepare("UPDATE submissions SET state='preparing', updated_at=? WHERE id=? AND state='waiting-capacity' AND EXISTS (SELECT 1 FROM submission_attempts WHERE submission_id=? AND attempt=? AND state='created')")
                 .bind(now, submission.submissionId, submission.submissionId, nextAttempt),
             ]);
             if ([inserted, yielded, reclaimed].some((result) => result?.meta.changes !== 1)) {
@@ -357,7 +349,7 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
       }
       throw new Error(`No judge result after attempt ${currentAttempt}.`);
     } catch {
-      const cancelled = await this.env.SUBMISSIONS_DB.prepare("SELECT 1 AS cancelled FROM submissions WHERE id=? AND state='cancelled'")
+      const cancelled = await this.env.DB.prepare("SELECT 1 AS cancelled FROM submissions WHERE id=? AND state='cancelled'")
         .bind(submission.submissionId).first<{ cancelled: number }>();
       if (cancelled) return { state: "cancelled", score: 0, fullyPassedCases: 0 };
       try {
@@ -381,11 +373,11 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
       const infrastructureFinalized = await step.do("finalize infrastructure failure", async () => {
         const now = new Date().toISOString();
         const statements = [
-          this.env.SUBMISSIONS_DB.prepare("UPDATE submissions SET state='infrastructure-error', score=0, fully_passed_cases=0, updated_at=?, completed_at=? WHERE id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled')")
+          this.env.DB.prepare("UPDATE submissions SET state='infrastructure-error', score=0, fully_passed_cases=0, updated_at=?, completed_at=? WHERE id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled')")
             .bind(now, now, submission.submissionId),
-          this.env.SUBMISSIONS_DB.prepare("UPDATE submission_attempts SET state='failed', finished_at=COALESCE(finished_at, ?), failure_code=COALESCE(failure_code, 'workflow-infrastructure-error') WHERE submission_id=? AND state IN ('created','running') AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state='infrastructure-error')")
+          this.env.DB.prepare("UPDATE submission_attempts SET state='failed', finished_at=COALESCE(finished_at, ?), failure_code=COALESCE(failure_code, 'workflow-infrastructure-error') WHERE submission_id=? AND state IN ('created','running') AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state='infrastructure-error')")
             .bind(now, submission.submissionId, submission.submissionId),
-          prepareSubmissionEventInsert(this.env.SUBMISSIONS_DB, {
+          prepareSubmissionEventInsert(this.env.DB, {
             submissionId: submission.submissionId,
             eventKey: "workflow:infrastructure-error",
             event: { kind: "state", state: "infrastructure-error" },
@@ -393,15 +385,11 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Submi
             requiredState: "infrastructure-error",
           }),
         ];
-        if (submission.rejudge) statements.push(
-          this.env.SUBMISSIONS_DB.prepare("INSERT OR IGNORE INTO rejudge_result_outbox (id, rejudge_batch_id, old_submission_id, new_submission_id, created_at) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM submissions WHERE id=? AND state='infrastructure-error')")
-            .bind(crypto.randomUUID(), submission.rejudge.batchId, submission.rejudge.oldSubmissionId, submission.submissionId, now, submission.submissionId),
-        );
-        const [finalized] = await this.env.SUBMISSIONS_DB.batch(statements);
+        const [finalized] = await this.env.DB.batch(statements);
         return finalized.meta.changes === 1;
       });
       if (!infrastructureFinalized) {
-        const state = await this.env.SUBMISSIONS_DB.prepare("SELECT state FROM submissions WHERE id=?")
+        const state = await this.env.DB.prepare("SELECT state FROM submissions WHERE id=?")
           .bind(submission.submissionId).first<{ state: string }>();
         if (state?.state === "cancelled") return { state: "cancelled", score: 0, fullyPassedCases: 0 };
         return { state: "infrastructure-error", score: 0, fullyPassedCases: 0 };
@@ -483,9 +471,7 @@ async function readBoundedValidationResult(
   }
   return parseValidationWorkflowResult(value, {
     importId: input.importId,
-    sourceKind: input.source.kind,
     forgeReleaseId: input.expectedReleaseId,
-    ...(input.source.kind === "canonical-successor" ? { canonicalSourceSha256: input.source.canonicalSourceSha256 } : {}),
   });
 }
 
@@ -494,7 +480,7 @@ function exactValidationArchiveKey(importId: string, commitSha: string, value: s
 }
 
 async function assertValidationArchiveCleanupFence(env: ForgeWorkerEnv, importId: string): Promise<void> {
-  const cleanup = await env.CORE_DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND archive_r2_key IS NULL AND archive_disposition='deleted' UNION ALL SELECT 1 AS valid FROM core_outbox WHERE kind='cleanup-import-archive' AND aggregate_id=? AND delivered_at IS NULL LIMIT 1")
+  const cleanup = await env.DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND archive_r2_key IS NULL AND archive_disposition='deleted' UNION ALL SELECT 1 AS valid FROM outbox WHERE kind='cleanup-import-archive' AND aggregate_id=? AND delivered_at IS NULL LIMIT 1")
     .bind(importId, importId).first<{ readonly valid: number }>();
   if (!cleanup) throw new Error("Validation result lost its archive-cleanup fence.");
 }
@@ -502,9 +488,8 @@ async function assertValidationArchiveCleanupFence(env: ForgeWorkerEnv, importId
 export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, ValidationWorkflowParameters> {
   async run(event: WorkflowEvent<ValidationWorkflowParameters>, step: WorkflowStep): Promise<ValidationWorkflowResult> {
     const opaque = parseValidationWorkflowParameters(event.payload);
-    let sourceKind: ValidationSourceKind | undefined;
     try {
-      const marker = await step.do("hydrate exact import and verify active release", {
+      await step.do("hydrate exact import and verify active release", {
         retries: { limit: 2, delay: "2 seconds", backoff: "exponential" },
         timeout: "1 minute",
       }, async () => {
@@ -514,107 +499,97 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
         // Full context exists only inside this closure. The returned marker is
         // intentionally the sole non-sensitive Workflow step output.
         const context = await hydrateValidationWorkflowContext(this.env, opaque, ["queued", "validating"]);
-        if (context.source.kind === "github-archive" && context.status !== "queued") {
+        if (context.status !== "queued") {
           throw new NonRetryableError("GitHub archive import entered validation before its archive was acquired.");
         }
-        const active = await assertActiveRelease(this.env.CORE_DB, this.env.JUDGE_BUCKET, this.env.ENVIRONMENT, opaque.expectedReleaseId, opaque.expectedManifestSha256);
+        const active = await assertActiveRelease(this.env.DB, this.env.JUDGE_BUCKET, this.env.ENVIRONMENT, opaque.expectedReleaseId, opaque.expectedManifestSha256);
         if (active.manifest.artifacts.containerImage.identitySha256 !== opaque.expectedContainerIdentitySha256) {
           throw new NonRetryableError("Validation Container identity does not match the active release.");
         }
-        if (context.source.kind === "canonical-successor" && context.status === "queued") {
-          const validating = await this.env.CORE_DB.prepare("UPDATE collection_imports SET status='validating', updated_at=? WHERE id=? AND status='queued' AND source_kind='canonical-successor'")
-            .bind(new Date().toISOString(), opaque.importId).run();
-          if (validating.meta.changes !== 1) throw new NonRetryableError("Canonical successor could not claim validation.");
-        }
         return validationWorkflowStepMarker(context);
       });
-      sourceKind = marker.sourceKind;
-      if (sourceKind === "github-archive") {
-        await step.do("verify immutable Git tree", async () => {
-          const context = await hydrateValidationWorkflowContext(this.env, opaque, ["queued"], "github-archive");
-          if (context.source.kind !== "github-archive") throw new NonRetryableError("Validation source kind changed.");
-          const token = await githubInstallationToken(this.env, context.source.installationId);
-          const coordinates = await resolveGithubRepositoryCoordinates(token, context.githubRepositoryId, context.source.expectedOwner, context.source.expectedRepository);
-          const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(coordinates.owner)}/${encodeURIComponent(coordinates.repository)}/git/trees/${context.commitSha}?recursive=1`, {
-            headers: githubHeaders(token),
-            redirect: "manual",
-          });
-          if (!response.ok) throw new Error(`Git tree request failed with HTTP ${response.status}.`);
-          let body: { truncated?: unknown; tree?: unknown };
-          try {
-            body = await readBoundedResponseJson(response, 8 * 1024 * 1024) as { truncated?: unknown; tree?: unknown };
-          } catch {
-            throw new NonRetryableError("Git tree response is malformed or exceeds 8 MiB.");
-          }
-          if (body.truncated !== false || !Array.isArray(body.tree) || body.tree.length > 10_000) throw new NonRetryableError("Git tree is truncated or exceeds 10,000 entries.");
-          let totalBytes = 0;
-          for (const item of body.tree) {
-            const entry = item as Record<string, unknown>;
-            if (entry.mode === "160000" || entry.type === "commit") throw new NonRetryableError("Git submodules are forbidden.");
-            if (entry.mode === "120000") throw new NonRetryableError("Symbolic links are forbidden.");
-            if (entry.type === "blob") {
-              if (!Number.isSafeInteger(entry.size) || (entry.size as number) < 0 || (entry.size as number) > 32 * 1024 * 1024) throw new NonRetryableError("Repository contains an oversized blob.");
-              totalBytes += entry.size as number;
-              if (totalBytes > 256 * 1024 * 1024) throw new NonRetryableError("Repository contents exceed 256 MiB.");
-            }
-          }
+      await step.do("verify immutable Git tree", async () => {
+        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["queued"]);
+        const token = await githubInstallationToken(this.env, context.source.installationId);
+        const coordinates = await resolveGithubRepositoryCoordinates(token, context.githubRepositoryId, context.source.expectedOwner, context.source.expectedRepository);
+        const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(coordinates.owner)}/${encodeURIComponent(coordinates.repository)}/git/trees/${context.commitSha}?recursive=1`, {
+          headers: githubHeaders(token),
+          redirect: "manual",
         });
-        await step.do("reserve exact commit archive key", async () => {
-          const context = await hydrateValidationWorkflowContext(this.env, opaque, ["queued", "downloading"], "github-archive");
-          if (context.source.kind !== "github-archive") throw new NonRetryableError("Validation source kind changed.");
-          const key = `imports/${context.importId}/${context.commitSha}.tar.gz`;
-          if (context.status === "downloading") {
-            if (context.source.archiveR2Key !== key) throw new NonRetryableError("GitHub archive reservation changed.");
-            return;
+        if (!response.ok) throw new Error(`Git tree request failed with HTTP ${response.status}.`);
+        let body: { truncated?: unknown; tree?: unknown };
+        try {
+          body = await readBoundedResponseJson(response, 8 * 1024 * 1024) as { truncated?: unknown; tree?: unknown };
+        } catch {
+          throw new NonRetryableError("Git tree response is malformed or exceeds 8 MiB.");
+        }
+        if (body.truncated !== false || !Array.isArray(body.tree) || body.tree.length > 10_000) throw new NonRetryableError("Git tree is truncated or exceeds 10,000 entries.");
+        let totalBytes = 0;
+        for (const item of body.tree) {
+          const entry = item as Record<string, unknown>;
+          if (entry.mode === "160000" || entry.type === "commit") throw new NonRetryableError("Git submodules are forbidden.");
+          if (entry.mode === "120000") throw new NonRetryableError("Symbolic links are forbidden.");
+          if (entry.type === "blob") {
+            if (!Number.isSafeInteger(entry.size) || (entry.size as number) < 0 || (entry.size as number) > 32 * 1024 * 1024) throw new NonRetryableError("Repository contains an oversized blob.");
+            totalBytes += entry.size as number;
+            if (totalBytes > 256 * 1024 * 1024) throw new NonRetryableError("Repository contents exceed 256 MiB.");
           }
-          const reserved = await this.env.CORE_DB.prepare("UPDATE collection_imports SET archive_r2_key=?, status='downloading', updated_at=? WHERE id=? AND status='queued' AND source_kind='github-archive' AND archive_r2_key IS NULL")
-            .bind(key, new Date().toISOString(), context.importId).run();
-          if (reserved.meta.changes === 1) return;
-          const replayed = await this.env.CORE_DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND status='downloading' AND source_kind='github-archive' AND archive_r2_key=?")
-            .bind(context.importId, key).first<{ valid: number }>();
-          if (!replayed) throw new NonRetryableError("GitHub archive import could not reserve immutable storage.");
+        }
+      });
+      await step.do("reserve exact commit archive key", async () => {
+        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["queued", "downloading"]);
+        const key = `imports/${context.importId}/${context.commitSha}.tar.gz`;
+        if (context.status === "downloading") {
+          if (context.source.archiveR2Key !== key) throw new NonRetryableError("GitHub archive reservation changed.");
+          return;
+        }
+        const reserved = await this.env.DB.prepare("UPDATE collection_imports SET archive_r2_key=?, status='downloading', updated_at=? WHERE id=? AND status='queued' AND archive_r2_key IS NULL")
+          .bind(key, new Date().toISOString(), context.importId).run();
+        if (reserved.meta.changes === 1) return;
+        const replayed = await this.env.DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND status='downloading' AND archive_r2_key=?")
+          .bind(context.importId, key).first<{ valid: number }>();
+        if (!replayed) throw new NonRetryableError("GitHub archive import could not reserve immutable storage.");
+      });
+      await step.do("download exact commit archive", { retries: { limit: 5, delay: "5 seconds", backoff: "exponential" }, timeout: "5 minutes" }, async () => {
+        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["downloading", "validating"]);
+        if (!context.source.archiveR2Key) throw new NonRetryableError("GitHub archive reservation is missing.");
+        const token = await githubInstallationToken(this.env, context.source.installationId);
+        const coordinates = await resolveGithubRepositoryCoordinates(token, context.githubRepositoryId, context.source.expectedOwner, context.source.expectedRepository);
+        const archiveApi = `https://api.github.com/repos/${encodeURIComponent(coordinates.owner)}/${encodeURIComponent(coordinates.repository)}/tarball/${context.commitSha}`;
+        const redirect = await fetch(archiveApi, { headers: githubHeaders(token), redirect: "manual" });
+        if (redirect.status < 300 || redirect.status > 399) throw new Error(`GitHub archive request failed with HTTP ${redirect.status}.`);
+        let archiveLocation: string;
+        try { archiveLocation = trustedGithubArchiveRedirect(redirect.headers.get("location")); } catch { throw new NonRetryableError("GitHub archive redirect target is not trusted."); }
+        const archive = await fetch(archiveLocation, { redirect: "manual", credentials: "omit" });
+        if (!archive.ok || !archive.body) throw new Error(`GitHub archive download failed with HTTP ${archive.status}.`);
+        const declaredHeader = archive.headers.get("content-length");
+        if (declaredHeader !== null) {
+          const declared = Number(declaredHeader);
+          if (!Number.isSafeInteger(declared) || declared < 1 || declared > 128 * 1024 * 1024) throw new NonRetryableError("Repository archive exceeds 128 MiB.");
+        }
+        let archiveBytes: Uint8Array;
+        try {
+          archiveBytes = await readBoundedResponseBytes(archive, 128 * 1024 * 1024);
+        } catch (error) {
+          if (error instanceof RangeError) throw new NonRetryableError("Repository archive exceeds 128 MiB.");
+          throw error;
+        }
+        if (archiveBytes.byteLength < 1) throw new NonRetryableError("Repository archive is empty.");
+        await this.env.JUDGE_BUCKET.put(context.source.archiveR2Key, archiveBytes, {
+          httpMetadata: { contentType: "application/gzip" },
+          customMetadata: { importId: context.importId, commitSha: context.commitSha },
         });
-        await step.do("download exact commit archive", { retries: { limit: 5, delay: "5 seconds", backoff: "exponential" }, timeout: "5 minutes" }, async () => {
-          const context = await hydrateValidationWorkflowContext(this.env, opaque, ["downloading", "validating"], "github-archive");
-          if (context.source.kind !== "github-archive" || !context.source.archiveR2Key) throw new NonRetryableError("GitHub archive reservation is missing.");
-          const token = await githubInstallationToken(this.env, context.source.installationId);
-          const coordinates = await resolveGithubRepositoryCoordinates(token, context.githubRepositoryId, context.source.expectedOwner, context.source.expectedRepository);
-          const archiveApi = `https://api.github.com/repos/${encodeURIComponent(coordinates.owner)}/${encodeURIComponent(coordinates.repository)}/tarball/${context.commitSha}`;
-          const redirect = await fetch(archiveApi, { headers: githubHeaders(token), redirect: "manual" });
-          if (redirect.status < 300 || redirect.status > 399) throw new Error(`GitHub archive request failed with HTTP ${redirect.status}.`);
-          let archiveLocation: string;
-          try { archiveLocation = trustedGithubArchiveRedirect(redirect.headers.get("location")); } catch { throw new NonRetryableError("GitHub archive redirect target is not trusted."); }
-          const archive = await fetch(archiveLocation, { redirect: "manual", credentials: "omit" });
-          if (!archive.ok || !archive.body) throw new Error(`GitHub archive download failed with HTTP ${archive.status}.`);
-          const declaredHeader = archive.headers.get("content-length");
-          if (declaredHeader !== null) {
-            const declared = Number(declaredHeader);
-            if (!Number.isSafeInteger(declared) || declared < 1 || declared > 128 * 1024 * 1024) throw new NonRetryableError("Repository archive exceeds 128 MiB.");
-          }
-          let archiveBytes: Uint8Array;
-          try {
-            archiveBytes = await readBoundedResponseBytes(archive, 128 * 1024 * 1024);
-          } catch (error) {
-            if (error instanceof RangeError) throw new NonRetryableError("Repository archive exceeds 128 MiB.");
-            throw error;
-          }
-          if (archiveBytes.byteLength < 1) throw new NonRetryableError("Repository archive is empty.");
-          await this.env.JUDGE_BUCKET.put(context.source.archiveR2Key, archiveBytes, {
-            httpMetadata: { contentType: "application/gzip" },
-            customMetadata: { importId: context.importId, commitSha: context.commitSha },
-          });
-          const claimed = await this.env.CORE_DB.prepare("UPDATE collection_imports SET status='validating', updated_at=? WHERE id=? AND status='downloading' AND source_kind='github-archive' AND archive_r2_key=?")
-            .bind(new Date().toISOString(), context.importId, context.source.archiveR2Key).run();
-          if (claimed.meta.changes !== 1) {
-            const replayed = await this.env.CORE_DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND status='validating' AND source_kind='github-archive' AND archive_r2_key=?")
-              .bind(context.importId, context.source.archiveR2Key).first<{ valid: number }>();
-            if (!replayed) throw new NonRetryableError("GitHub archive import could not claim validation.");
-          }
-        });
-      }
+        const claimed = await this.env.DB.prepare("UPDATE collection_imports SET status='validating', updated_at=? WHERE id=? AND status='downloading' AND archive_r2_key=?")
+          .bind(new Date().toISOString(), context.importId, context.source.archiveR2Key).run();
+        if (claimed.meta.changes !== 1) {
+          const replayed = await this.env.DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND status='validating' AND archive_r2_key=?")
+            .bind(context.importId, context.source.archiveR2Key).first<{ valid: number }>();
+          if (!replayed) throw new NonRetryableError("GitHub archive import could not claim validation.");
+        }
+      });
       const result = await step.do("validate and project collection", { retries: { limit: 2, delay: "10 seconds", backoff: "exponential" }, timeout: "30 minutes" }, async () => {
-        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["validating"], sourceKind);
-        if (context.source.kind === "github-archive" && !context.source.archiveR2Key) {
+        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["validating"]);
+        if (!context.source.archiveR2Key) {
           throw new NonRetryableError("GitHub archive validation source is missing its reserved object.");
         }
         const attemptToken = randomToken();
@@ -635,14 +610,7 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
             expectedReleaseId: context.expectedReleaseId,
             expectedManifestSha256: context.expectedManifestSha256,
             expectedContainerIdentitySha256: context.expectedContainerIdentitySha256,
-            source: context.source.kind === "github-archive"
-              ? { kind: "github-archive", archiveR2Key: context.source.archiveR2Key }
-              : {
-                kind: "canonical-successor",
-                predecessorImportId: context.source.predecessorImportId,
-                canonicalSourceR2Key: context.source.canonicalSourceR2Key,
-                canonicalSourceSha256: context.source.canonicalSourceSha256,
-              },
+            source: { kind: "github-archive", archiveR2Key: context.source.archiveR2Key },
           }),
         }));
         if (response.status === 409 || response.status === 422) throw new NonRetryableError("Managed collection validation rejected the canonical source.");
@@ -652,25 +620,20 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
       await step.do("record successful validation", async () => {
         const report = result.report;
         const canonical = result.canonicalSource?.manifest;
-        const replayedTerminal = await this.env.CORE_DB.prepare("SELECT source_kind, commit_sha, status, validation_report_r2_key, canonical_source_r2_key, canonical_source_mirror_r2_key, canonical_source_sha256, archive_r2_key, archive_disposition FROM collection_imports WHERE id=? AND forge_release_id=?")
+        const replayedTerminal = await this.env.DB.prepare("SELECT commit_sha, status, validation_report_r2_key, canonical_source_r2_key, canonical_source_sha256, archive_r2_key, archive_disposition FROM collection_imports WHERE id=? AND forge_release_id=?")
           .bind(opaque.importId, opaque.expectedReleaseId).first<{
-            readonly source_kind: string;
             readonly commit_sha: string;
             readonly status: string;
             readonly validation_report_r2_key: string | null;
             readonly canonical_source_r2_key: string | null;
-            readonly canonical_source_mirror_r2_key: string | null;
             readonly canonical_source_sha256: string | null;
             readonly archive_r2_key: string | null;
             readonly archive_disposition: string;
           }>();
         if (replayedTerminal?.status === "valid") {
           if (
-            replayedTerminal.source_kind !== result.sourceKind
-            || (sourceKind !== undefined && replayedTerminal.source_kind !== sourceKind)
-            || replayedTerminal.validation_report_r2_key !== report.key
+            replayedTerminal.validation_report_r2_key !== report.key
             || replayedTerminal.canonical_source_r2_key !== canonical.key
-            || replayedTerminal.canonical_source_mirror_r2_key !== canonical.key
             || replayedTerminal.canonical_source_sha256 !== canonical.digest
             || (replayedTerminal.archive_r2_key !== null && !exactValidationArchiveKey(opaque.importId, replayedTerminal.commit_sha, replayedTerminal.archive_r2_key))
           ) throw new Error("Replayed validation result does not match its immutable import.");
@@ -681,14 +644,13 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
         if (replayedTerminal && ["invalid", "infrastructure-error"].includes(replayedTerminal.status)) {
           throw new Error("Validation success cannot replace a terminal failed import.");
         }
-        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["validating"], sourceKind);
-        const archiveR2Key = context.source.kind === "github-archive" ? context.source.archiveR2Key : undefined;
+        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["validating"]);
+        const archiveR2Key = context.source.archiveR2Key;
         const now = new Date();
         const statements = [
-          this.env.CORE_DB.prepare("UPDATE collection_imports SET validation_report_r2_key=?, canonical_source_r2_key=?, canonical_source_mirror_r2_key=?, canonical_source_sha256=?, archive_disposition=?, archive_delete_after=?, canonical_draft_delete_after=?, canonical_expired_at=NULL, status='valid', error_code=NULL, updated_at=? WHERE id=? AND status='validating' AND forge_release_id=?")
+          this.env.DB.prepare("UPDATE collection_imports SET validation_report_r2_key=?, canonical_source_r2_key=?, canonical_source_sha256=?, archive_disposition=?, archive_delete_after=?, canonical_draft_delete_after=?, canonical_expired_at=NULL, status='valid', error_code=NULL, updated_at=? WHERE id=? AND status='validating' AND forge_release_id=?")
             .bind(
               report.key,
-              canonical.key,
               canonical.key,
               canonical.digest,
               archiveR2Key ? "pending" : "deleted",
@@ -700,12 +662,12 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
             ),
         ];
         if (archiveR2Key) statements.push(
-          this.env.CORE_DB.prepare("INSERT OR IGNORE INTO core_outbox (id, kind, aggregate_id, payload_json, created_at) SELECT ?, 'cleanup-import-archive', ?, ?, ? WHERE EXISTS (SELECT 1 FROM collection_imports WHERE id=? AND status='valid' AND archive_r2_key=? AND archive_disposition='pending')")
+          this.env.DB.prepare("INSERT OR IGNORE INTO outbox (id, kind, aggregate_id, payload_json, created_at) SELECT ?, 'cleanup-import-archive', ?, ?, ? WHERE EXISTS (SELECT 1 FROM collection_imports WHERE id=? AND status='valid' AND archive_r2_key=? AND archive_disposition='pending')")
             .bind(crypto.randomUUID(), context.importId, archiveCleanupOutboxJson(context.importId), now.toISOString(), context.importId, archiveR2Key),
         );
-        const results = await this.env.CORE_DB.batch(statements);
+        const results = await this.env.DB.batch(statements);
         if (results[0]?.meta.changes !== 1) {
-          const replayed = await this.env.CORE_DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND status='valid' AND validation_report_r2_key=? AND canonical_source_r2_key=? AND canonical_source_sha256=?")
+          const replayed = await this.env.DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND status='valid' AND validation_report_r2_key=? AND canonical_source_r2_key=? AND canonical_source_sha256=?")
             .bind(context.importId, report.key, canonical.key, canonical.digest).first<{ valid: number }>();
           if (!replayed) throw new Error("Validation result lost its immutable import fence.");
         }
@@ -719,9 +681,8 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
       await step.do("record failed validation", async () => {
         const expectedStatus = invalid ? "invalid" : "infrastructure-error";
         const expectedErrorCode = invalid ? "validation-failed" : "validation-infrastructure";
-        const replayedTerminal = await this.env.CORE_DB.prepare("SELECT source_kind, commit_sha, status, error_code, archive_r2_key, archive_disposition FROM collection_imports WHERE id=? AND forge_release_id=?")
+        const replayedTerminal = await this.env.DB.prepare("SELECT commit_sha, status, error_code, archive_r2_key, archive_disposition FROM collection_imports WHERE id=? AND forge_release_id=?")
           .bind(opaque.importId, opaque.expectedReleaseId).first<{
-            readonly source_kind: string;
             readonly commit_sha: string;
             readonly status: string;
             readonly error_code: string | null;
@@ -730,8 +691,7 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
           }>();
         if (replayedTerminal?.status === expectedStatus && replayedTerminal.error_code === expectedErrorCode) {
           if (
-            (sourceKind !== undefined && replayedTerminal.source_kind !== sourceKind)
-            || (replayedTerminal.archive_r2_key !== null && !exactValidationArchiveKey(opaque.importId, replayedTerminal.commit_sha, replayedTerminal.archive_r2_key))
+            (replayedTerminal.archive_r2_key !== null && !exactValidationArchiveKey(opaque.importId, replayedTerminal.commit_sha, replayedTerminal.archive_r2_key))
             || (expectedStatus === "invalid" && replayedTerminal.archive_r2_key !== null && replayedTerminal.archive_disposition !== "pending")
             || (expectedStatus === "infrastructure-error" && replayedTerminal.archive_r2_key !== null && replayedTerminal.archive_disposition !== "quarantined")
             || (replayedTerminal.archive_r2_key === null && replayedTerminal.archive_disposition !== "deleted")
@@ -745,13 +705,13 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
         if (replayedTerminal && ["valid", "invalid", "infrastructure-error"].includes(replayedTerminal.status)) {
           throw new Error("Validation failure cannot replace a different terminal import.");
         }
-        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["queued", "downloading", "validating"], sourceKind);
-        const archiveR2Key = context.source.kind === "github-archive" ? context.source.archiveR2Key : undefined;
+        const context = await hydrateValidationWorkflowContext(this.env, opaque, ["queued", "downloading", "validating"]);
+        const archiveR2Key = context.source.archiveR2Key;
         const now = new Date();
-        const quarantine = context.source.kind === "github-archive" && archiveR2Key !== undefined && !invalid;
-        const cleanup = context.source.kind === "github-archive" && archiveR2Key !== undefined && invalid;
+        const quarantine = archiveR2Key !== undefined && !invalid;
+        const cleanup = archiveR2Key !== undefined && invalid;
         const statements = [
-          this.env.CORE_DB.prepare("UPDATE collection_imports SET status=?, error_code=?, archive_disposition=?, archive_delete_after=?, updated_at=? WHERE id=? AND status IN ('queued','downloading','validating')")
+          this.env.DB.prepare("UPDATE collection_imports SET status=?, error_code=?, archive_disposition=?, archive_delete_after=?, updated_at=? WHERE id=? AND status IN ('queued','downloading','validating')")
             .bind(
               expectedStatus,
               expectedErrorCode,
@@ -762,12 +722,12 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
             ),
         ];
         if (cleanup) statements.push(
-          this.env.CORE_DB.prepare("INSERT OR IGNORE INTO core_outbox (id, kind, aggregate_id, payload_json, created_at) SELECT ?, 'cleanup-import-archive', ?, ?, ? WHERE EXISTS (SELECT 1 FROM collection_imports WHERE id=? AND archive_r2_key=? AND archive_disposition='pending')")
+          this.env.DB.prepare("INSERT OR IGNORE INTO outbox (id, kind, aggregate_id, payload_json, created_at) SELECT ?, 'cleanup-import-archive', ?, ?, ? WHERE EXISTS (SELECT 1 FROM collection_imports WHERE id=? AND archive_r2_key=? AND archive_disposition='pending')")
             .bind(crypto.randomUUID(), context.importId, archiveCleanupOutboxJson(context.importId), now.toISOString(), context.importId, archiveR2Key),
         );
-        const results = await this.env.CORE_DB.batch(statements);
+        const results = await this.env.DB.batch(statements);
         if (results[0]?.meta.changes !== 1) {
-          const replayed = await this.env.CORE_DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND status=? AND error_code=?")
+          const replayed = await this.env.DB.prepare("SELECT 1 AS valid FROM collection_imports WHERE id=? AND status=? AND error_code=?")
             .bind(context.importId, expectedStatus, expectedErrorCode).first<{ valid: number }>();
           if (!replayed) throw new Error("Failed validation lost its terminal state fence.");
         }

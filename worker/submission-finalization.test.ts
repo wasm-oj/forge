@@ -1,6 +1,4 @@
-import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   FINALIZE_SUBMISSION_ATTEMPT_SQL,
@@ -19,16 +17,49 @@ const AUDIT_KEY = `audits/${SUBMISSION_ID}/1.${DIGEST}.json`;
 
 function database(): DatabaseSync {
   const database = new DatabaseSync(":memory:");
-  for (const migration of [
-    "0001_initial.sql",
-    "0002_rejudge_pipeline.sql",
-    "0003_account_erasure_fence.sql",
-    "0004_projection_outbox_uniqueness.sql",
-    "0005_formal_admission_claim.sql",
-    "0006_d1_submission_events_capacity.sql",
-  ]) {
-    database.exec(readFileSync(path.join(process.cwd(), "migrations/submissions", migration), "utf8"));
-  }
+  database.exec(`CREATE TABLE submissions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    managed_problem_version_id TEXT NOT NULL,
+    language TEXT NOT NULL,
+    target TEXT NOT NULL,
+    optimization TEXT NOT NULL,
+    entry_path TEXT NOT NULL,
+    source_r2_key TEXT NOT NULL,
+    source_digest TEXT NOT NULL,
+    forge_release_id TEXT NOT NULL,
+    forge_manifest_sha256 TEXT NOT NULL,
+    state TEXT NOT NULL,
+    verdict TEXT,
+    visibility TEXT NOT NULL,
+    score REAL,
+    fully_passed_cases INTEGER,
+    deterministic_cost INTEGER,
+    peak_memory_bytes INTEGER,
+    effective_attempt INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT
+  ) STRICT;
+  CREATE TABLE submission_attempts (
+    submission_id TEXT NOT NULL,
+    attempt INTEGER NOT NULL,
+    token_hash TEXT NOT NULL,
+    container_key TEXT NOT NULL,
+    state TEXT NOT NULL,
+    started_at TEXT,
+    finished_at TEXT,
+    audit_r2_key TEXT,
+    PRIMARY KEY (submission_id, attempt)
+  ) STRICT;
+  CREATE TABLE submission_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    submission_id TEXT NOT NULL,
+    event_key TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (submission_id, event_key)
+  ) STRICT;`);
   database.prepare(`INSERT INTO submissions
     (id, user_id, managed_problem_version_id, language, target, optimization, entry_path,
      source_r2_key, source_digest, forge_release_id, forge_manifest_sha256, state,
@@ -40,19 +71,17 @@ function database(): DatabaseSync {
   return database;
 }
 
-function finalize(database: DatabaseSync, suffix: string): readonly number[] {
+function finalize(database: DatabaseSync): readonly number[] {
   database.exec("BEGIN IMMEDIATE");
   try {
     const submission = database.prepare(FINALIZE_SUBMISSION_SQL)
-      .run("completed", 100, 10, 1234, 4096, 1, NOW, NOW, SUBMISSION_ID, 1, SUBMISSION_ID, SUBMISSION_ID, 1, TOKEN_HASH);
+      .run("completed", "accepted", 100, 10, 1234, 4096, 1, NOW, NOW, SUBMISSION_ID, 1, SUBMISSION_ID, SUBMISSION_ID, 1, TOKEN_HASH);
     const attempt = database.prepare(FINALIZE_SUBMISSION_ATTEMPT_SQL)
       .run(NOW, SUBMISSION_ID, 1, TOKEN_HASH, AUDIT_KEY, AUDIT_KEY, SUBMISSION_ID, 1, "completed");
     const terminal = database.prepare("INSERT OR IGNORE INTO submission_events (submission_id, event_key, payload_json, created_at) SELECT ?, 'attempt:1:terminal', ?, ? WHERE EXISTS (SELECT 1 FROM submissions WHERE id=? AND state='completed' AND effective_attempt=1)")
       .run(SUBMISSION_ID, JSON.stringify({ kind: "state", state: "completed" }), NOW, SUBMISSION_ID);
-    const profile = database.prepare("INSERT OR IGNORE INTO submission_outbox (id, submission_id, kind, payload_json, created_at) SELECT ?, ?, 'update-profile', '{}', ? WHERE EXISTS (SELECT 1 FROM submissions WHERE id=? AND state='completed' AND effective_attempt=1)")
-      .run(`profile-${suffix}`, SUBMISSION_ID, NOW, SUBMISSION_ID);
     database.exec("COMMIT");
-    return [submission.changes, attempt.changes, terminal.changes, profile.changes].map(Number);
+    return [submission.changes, attempt.changes, terminal.changes].map(Number);
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
@@ -60,17 +89,18 @@ function finalize(database: DatabaseSync, suffix: string): readonly number[] {
 }
 
 describe("submission result finalization", () => {
-  it("treats a response-loss replay as exact and preserves one terminal/projection set", () => {
+  it("treats a response-loss replay as exact and preserves one terminal event", () => {
     const db = database();
-    expect(finalize(db, "first")).toEqual([1, 1, 1, 1]);
-    expect(finalize(db, "replay")).toEqual([0, 0, 0, 0]);
-    const record = db.prepare(`SELECT submissions.state, submissions.score, submissions.fully_passed_cases,
+    expect(finalize(db)).toEqual([1, 1, 1]);
+    expect(finalize(db)).toEqual([0, 0, 0]);
+    const record = db.prepare(`SELECT submissions.state, submissions.verdict, submissions.score, submissions.fully_passed_cases,
         submissions.deterministic_cost, submissions.peak_memory_bytes, submissions.effective_attempt,
         submission_attempts.state AS attempt_state, submission_attempts.token_hash, submission_attempts.audit_r2_key
       FROM submissions JOIN submission_attempts ON submission_attempts.submission_id=submissions.id
       WHERE submissions.id=? AND submission_attempts.attempt=1`).get(SUBMISSION_ID) as unknown as FinalizedSubmissionAttemptRecord;
     expect(finalizedSubmissionAttemptMatches(record, {
       state: "completed",
+      verdict: "accepted",
       score: 100,
       fullyPassedCases: 10,
       deterministicCost: 1234,
@@ -79,9 +109,6 @@ describe("submission result finalization", () => {
       tokenHash: TOKEN_HASH,
       auditR2Key: AUDIT_KEY,
     })).toBe(true);
-    expect(db.prepare("SELECT kind, COUNT(*) AS count FROM submission_outbox GROUP BY kind ORDER BY kind").all()).toEqual([
-      { kind: "update-profile", count: 1 },
-    ]);
     expect(db.prepare("SELECT event_key, payload_json FROM submission_events WHERE submission_id=?").all(SUBMISSION_ID)).toEqual([
       { event_key: "attempt:1:terminal", payload_json: JSON.stringify({ kind: "state", state: "completed" }) },
     ]);

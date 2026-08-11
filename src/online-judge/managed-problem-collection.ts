@@ -56,6 +56,10 @@ export interface LoadedManagedProblemCollection {
     readonly problems: readonly ManagedProblemCollectionEntry[];
   };
   readonly origin: "managed-projection";
+  readonly publication: {
+    readonly status: "current" | "archived";
+    readonly currentProblemVersionId?: string;
+  };
   loadProblem(id: string, signal?: AbortSignal): Promise<JudgeProblem>;
 }
 
@@ -166,8 +170,22 @@ export async function loadManagedProblemCollection(
   if (!JSON_CONTENT_TYPE.test(response.headers.get("content-type") ?? "")) {
     throw new ManagedProblemCollectionError("The managed problem projection is not JSON.", "schema");
   }
-
   const bytes = await readBoundedProjection(response);
+  let publication: LoadedManagedProblemCollection["publication"] = { status: "current" };
+  if (mode === "official-practice") {
+    const status = response.headers.get("x-forge-problem-status");
+    if (status === "current") {
+      publication = { status: "current" };
+    } else if (status === "archived") {
+      const currentProblemVersionId = response.headers.get("x-forge-current-problem-version");
+      if (!currentProblemVersionId || !UUID_PATTERN.test(currentProblemVersionId) || currentProblemVersionId === context.problemVersionId) {
+        throw new ManagedProblemCollectionError("The archived problem is missing its current version identity.", "schema");
+      }
+      publication = { status: "archived", currentProblemVersionId };
+    } else {
+      throw new ManagedProblemCollectionError("The managed practice publication status is invalid.", "schema");
+    }
+  }
   const value = parseUtf8Json(bytes);
   const digest = projectionDigest(value);
   let projection: ReturnType<typeof parseManagedPublicProblemProjection>;
@@ -219,6 +237,7 @@ export async function loadManagedProblemCollection(
       problems: [entry],
     },
     origin: "managed-projection",
+    publication,
     loadProblem(id, signal) {
       if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
       if (id !== problem.id) {

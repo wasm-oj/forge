@@ -1,10 +1,5 @@
 import { sha256Hex } from "./crypto";
 
-export interface ImmutableMirroredPutResult {
-  readonly primary: "created" | "reused";
-  readonly mirror: "created" | "reused";
-}
-
 async function createOrReuse(
   bucket: R2Bucket,
   key: string,
@@ -42,20 +37,17 @@ async function createOrReuse(
 }
 
 /**
- * Create missing sides or reuse exact immutable sides. Failure never deletes
- * here: another import may already have reused a newly created side after our
- * conditional PUT. The caller releases its exact D1 claim into the tokenized,
- * reference-aware GC, which is the only safe deletion authority.
+ * Create a missing object or reuse the exact immutable object. Failure never
+ * deletes here: another import may already have reused a newly created object
+ * after our conditional PUT. The caller releases its exact D1 claim into the
+ * tokenized, reference-aware GC, which is the only safe deletion authority.
  */
-export async function putImmutableMirroredObject(
-  primary: R2Bucket,
-  mirror: R2Bucket,
+export async function putImmutableObject(
+  bucket: R2Bucket,
   key: string,
   bytes: Uint8Array,
   digest: string,
   options: R2PutOptions,
-): Promise<ImmutableMirroredPutResult> {
-  const primaryResult = await createOrReuse(primary, key, bytes, digest, options);
-  const mirrorResult = await createOrReuse(mirror, key, bytes, digest, options);
-  return { primary: primaryResult, mirror: mirrorResult };
+): Promise<"created" | "reused"> {
+  return createOrReuse(bucket, key, bytes, digest, options);
 }

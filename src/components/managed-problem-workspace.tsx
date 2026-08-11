@@ -1,17 +1,15 @@
 "use client";
 
 import { ShieldCheck, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { JudgeStudio } from "./judge-studio";
-import {
-  DEFAULT_JUDGE_UI_LOCALE,
-  judgeUiText,
-  readJudgeUiLocale,
-  writeJudgeUiLocale,
-} from "./judge-ui-i18n";
-import type { JudgeProblem, ProblemLocale } from "../judge/problem-model";
+import { useEffect, useMemo, useState } from "react";
+import { useProduct } from "./app-shell";
+import { JudgeStudio, type ContestWorkspaceNavigation } from "./judge-studio";
+import { judgeUiText } from "./judge-ui-i18n";
+import { usePageTitle } from "./page-title";
+import { problemText, type JudgeProblem } from "../judge/problem-model";
 import {
   loadManagedProblemCollection,
+  managedProblemWorkspacePath,
   normalizeManagedProblemContext,
   type LoadedManagedProblemCollection,
   type ManagedProblemContext,
@@ -20,6 +18,16 @@ import {
 interface ManagedProblemSession {
   readonly collection: LoadedManagedProblemCollection;
   readonly problem: JudgeProblem;
+  readonly contestNavigation?: ContestWorkspaceNavigation;
+}
+
+interface ContestWorkspaceDetail {
+  readonly contest: { readonly id: string; readonly title: string };
+  readonly problems: readonly {
+    readonly problemVersionId: string;
+    readonly problemSlug: string;
+    readonly title: Record<string, string>;
+  }[];
 }
 
 type ManagedProblemLoadState =
@@ -27,6 +35,7 @@ type ManagedProblemLoadState =
   | { readonly key: string; readonly error: string };
 
 export function ManagedProblemWorkspace({ problemVersionId, contestId }: ManagedProblemContext) {
+  const { locale: problemLocale, setLocale: changeLocale } = useProduct();
   const parsedContext = useMemo(() => {
     try {
       return { ok: true, context: normalizeManagedProblemContext({
@@ -37,24 +46,12 @@ export function ManagedProblemWorkspace({ problemVersionId, contestId }: Managed
       return { ok: false, error: error instanceof Error ? error.message : String(error) } as const;
     }
   }, [contestId, problemVersionId]);
-  const [problemLocale, setProblemLocale] = useState<ProblemLocale>(() => {
-    if (typeof window === "undefined") return DEFAULT_JUDGE_UI_LOCALE;
-    try {
-      return readJudgeUiLocale(localStorage, navigator.language.toLowerCase().startsWith("zh") ? "zh-TW" : "en");
-    } catch {
-      return DEFAULT_JUDGE_UI_LOCALE;
-    }
-  });
   const [loadState, setLoadState] = useState<ManagedProblemLoadState>();
   const [retry, setRetry] = useState(0);
   const text = judgeUiText(problemLocale);
   const loadKey = parsedContext.ok
     ? `${parsedContext.context.contestId ?? "practice"}:${parsedContext.context.problemVersionId}:${retry}`
     : `invalid:${retry}`;
-
-  useEffect(() => {
-    document.documentElement.lang = problemLocale === "zh-TW" ? "zh-Hant" : "en";
-  }, [problemLocale]);
 
   useEffect(() => {
     if (!parsedContext.ok) return;
@@ -64,25 +61,44 @@ export function ManagedProblemWorkspace({ problemVersionId, contestId }: Managed
       const entry = collection.index.problems[0];
       if (!entry) throw new Error("The managed problem projection is empty.");
       const problem = await collection.loadProblem(entry.id, controller.signal);
-      if (!controller.signal.aborted) setLoadState({ key: loadKey, session: { collection, problem } });
+      let contestNavigation: ContestWorkspaceNavigation | undefined;
+      if (parsedContext.context.contestId) {
+        const response = await fetch(`/api/contests/${encodeURIComponent(parsedContext.context.contestId)}`, {
+          credentials: "same-origin",
+          headers: { accept: "application/json" },
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`Contest navigation failed with HTTP ${response.status}.`);
+        const detail = await response.json() as ContestWorkspaceDetail;
+        const position = detail.problems.findIndex((candidate) => candidate.problemVersionId === parsedContext.context.problemVersionId);
+        if (position < 0) throw new Error("The active problem is absent from its contest.");
+        const link = (index: number) => {
+          const candidate = detail.problems[index];
+          return candidate ? {
+            href: managedProblemWorkspacePath({ contestId: detail.contest.id, problemVersionId: candidate.problemVersionId }),
+            label: candidate.title[problemLocale] ?? candidate.title.en ?? candidate.problemSlug,
+          } : undefined;
+        };
+        contestNavigation = {
+          title: detail.contest.title,
+          overviewHref: `/contests/${encodeURIComponent(detail.contest.id)}`,
+          previous: link(position - 1),
+          next: link(position + 1),
+        };
+      }
+      if (!controller.signal.aborted) setLoadState({ key: loadKey, session: { collection, problem, contestNavigation } });
     })().catch((error: unknown) => {
       if (controller.signal.aborted) return;
       if (error instanceof DOMException && error.name === "AbortError") return;
       setLoadState({ key: loadKey, error: error instanceof Error ? error.message : String(error) });
     });
     return () => controller.abort();
-  }, [loadKey, parsedContext]);
-
-  const changeLocale = useCallback((locale: ProblemLocale) => {
-    setProblemLocale(locale);
-    try {
-      writeJudgeUiLocale(localStorage, locale);
-    } catch {
-      // The selected locale still applies to this in-memory workspace.
-    }
-  }, []);
+  }, [loadKey, parsedContext, problemLocale]);
 
   const currentLoadState = loadState?.key === loadKey ? loadState : undefined;
+  usePageTitle(currentLoadState && "session" in currentLoadState
+    ? problemText(currentLoadState.session.problem, problemLocale).title
+    : (problemLocale === "zh-TW" ? "解題工作區" : "Problem workspace"));
   const error = !parsedContext.ok
     ? parsedContext.error
     : currentLoadState && "error" in currentLoadState ? currentLoadState.error : undefined;
@@ -111,6 +127,7 @@ export function ManagedProblemWorkspace({ problemVersionId, contestId }: Managed
       problemLocale={problemLocale}
       onProblemLocaleChange={changeLocale}
       managedContext={parsedContext.context}
+      contestNavigation={currentLoadState.session.contestNavigation}
     />
   );
 }

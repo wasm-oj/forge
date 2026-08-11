@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { SubmissionState, SubmissionVerdict } from "../online-judge/contracts";
 import type { ProductLocale } from "./app-shell";
 import { forgeJson } from "./online-api";
 
 export interface CatalogProblem {
   readonly id: string;
+  readonly bundleDigest: string;
   readonly slug: string;
   readonly number: number;
   readonly title: Record<string, string>;
@@ -45,7 +47,8 @@ export interface SubmissionSummary {
   readonly managedProblemVersionId: string;
   readonly contestId: string | null;
   readonly language: string;
-  readonly state: string;
+  readonly state: SubmissionState;
+  readonly verdict: SubmissionVerdict | null;
   readonly visibility: "private" | "public";
   readonly score: number | null;
   readonly fullyPassedCases: number | null;
@@ -54,6 +57,8 @@ export interface SubmissionSummary {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly completedAt: string | null;
+  readonly owner?: boolean;
+  readonly sourceAvailable?: boolean;
   readonly problem: { readonly slug: string; readonly title: Record<string, string> } | null;
   readonly contest: { readonly id: string; readonly title: string } | null;
 }

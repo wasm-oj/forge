@@ -8,9 +8,8 @@ import { parseArgs } from "node:util";
 const { values } = parseArgs({
   options: {
     config: { type: "string", default: "wrangler.quick-production.jsonc" },
-    database: { type: "string", default: "CORE_DB" },
+    database: { type: "string", default: "DB" },
     primary: { type: "string", default: "wasm-oj-judge-production" },
-    mirror: { type: "string", default: "wasm-oj-judge-mirror-production" },
   },
   strict: true,
 });
@@ -57,8 +56,7 @@ for (const row of rows) {
   const keyDigest = /^snapshots\/objects\/([0-9a-f]{64})$/.exec(row.public_projection_r2_key)?.[1];
   if (!keyDigest) throw new Error(`Problem ${row.id} has an invalid projection key.`);
   const primary = run(["r2", "object", "get", `${values.primary}/${row.public_projection_r2_key}`, "--remote", "--pipe", "--config", values.config]);
-  const mirror = run(["r2", "object", "get", `${values.mirror}/${row.public_projection_r2_key}`, "--remote", "--pipe", "--config", values.config]);
-  if (!Buffer.isBuffer(primary) || !Buffer.isBuffer(mirror) || primary.length === 0 || !primary.equals(mirror) || sha256(primary) !== keyDigest) throw new Error(`Problem ${row.id} projection failed primary/mirror verification.`);
+  if (!Buffer.isBuffer(primary) || primary.length === 0 || sha256(primary) !== keyDigest) throw new Error(`Problem ${row.id} projection failed authoritative object verification.`);
   const item = metadata(primary, row.bundle_digest);
   statements.push(`UPDATE managed_problem_versions SET difficulty=${sqlString(item.difficulty)}, tags_json=${sqlString(JSON.stringify(item.tags))}, track_id=${sqlString(item.trackId)}, track_json=${sqlString(JSON.stringify(item.track))} WHERE id=${sqlString(row.id)} AND public_projection_r2_key=${sqlString(row.public_projection_r2_key)} AND bundle_digest=${sqlString(row.bundle_digest)} AND difficulty IS NULL AND tags_json IS NULL AND track_id IS NULL AND track_json IS NULL`);
 }
@@ -66,4 +64,4 @@ run(["d1", "execute", values.database, "--remote", "--config", values.config, "-
 const remainingRaw = run(["d1", "execute", values.database, "--remote", "--config", values.config, "--json", "--command", `SELECT COUNT(*) AS count FROM managed_problem_versions JOIN managed_snapshots ON managed_snapshots.id=managed_problem_versions.snapshot_id WHERE managed_snapshots.mode='official-practice' AND managed_snapshots.status='published' AND (managed_problem_versions.difficulty IS NULL OR managed_problem_versions.tags_json IS NULL OR managed_problem_versions.track_id IS NULL OR managed_problem_versions.track_json IS NULL)`], "utf8");
 const remaining = JSON.parse(remainingRaw)?.[0]?.results?.[0]?.count;
 if (remaining !== 0) throw new Error(`Catalog metadata backfill left ${remaining} incomplete rows.`);
-process.stdout.write(`Backfilled ${rows.length} published problem catalog rows from verified primary/mirror projections.\n`);
+process.stdout.write(`Backfilled ${rows.length} published problem catalog rows from verified authoritative projections.\n`);

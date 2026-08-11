@@ -1,4 +1,4 @@
-import { ProfileSettings } from "@/src/components/student-records";
+import { ProfileSettings } from "@/src/components/profile-settings";
 
 export default function ProfileSettingsPage() {
   return <ProfileSettings />;

@@ -1,23 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_JUDGE_UI_LOCALE,
   executionTerminationLabel,
-  JUDGE_UI_LOCALE_STORAGE_KEY,
   judgeUiText,
   localizedWorkerProgress,
-  readJudgeUiLocale,
   verdictLabel,
-  writeJudgeUiLocale,
 } from "./judge-ui-i18n";
-
-function memoryStorage(initial?: string): Pick<Storage, "getItem" | "setItem"> {
-  const values = new Map<string, string>();
-  if (initial !== undefined) values.set(JUDGE_UI_LOCALE_STORAGE_KEY, initial);
-  return {
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => { values.set(key, value); },
-  };
-}
 
 describe("judge UI localization", () => {
   it("provides complete locale-specific copy for primary workspace surfaces", () => {
@@ -39,17 +26,6 @@ describe("judge UI localization", () => {
 
   it("keeps all static English copy free of Chinese characters", () => {
     expect(JSON.stringify(judgeUiText("en"))).not.toMatch(/[\p{Script=Han}]/u);
-  });
-
-  it("persists only supported locales and defaults missing or invalid values to English", () => {
-    const storage = memoryStorage();
-    expect(DEFAULT_JUDGE_UI_LOCALE).toBe("en");
-    expect(readJudgeUiLocale(storage)).toBe("en");
-    expect(readJudgeUiLocale(storage, "zh-TW")).toBe("zh-TW");
-
-    writeJudgeUiLocale(storage, "zh-TW");
-    expect(readJudgeUiLocale(storage)).toBe("zh-TW");
-    expect(readJudgeUiLocale(memoryStorage("fr"))).toBe("en");
   });
 
   it("localizes verdicts, termination states, and worker progress", () => {

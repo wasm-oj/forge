@@ -117,7 +117,7 @@
     "contract:verify": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-contract.mjs",
     "package-manager:verify": "node scripts/verify-package-manager.mjs",
     "docs:verify": "node scripts/verify-docs.mjs",
-    "github:verify": "node --test scripts/wait-for-product-do-cutover.test.mjs && node scripts/verify-github-workflows.mjs",
+    "github:verify": "node --test scripts/wait-for-validation-cutover.test.mjs scripts/cleanup-production-r2.test.mjs scripts/prepare-production-release.test.mjs scripts/single-store-migration.test.mjs && node scripts/verify-github-workflows.mjs",
     "conformance:server": "FORGE_RUN_CONFORMANCE=1 vitest run --config vitest.config.ts src/server/conformance.integration.test.ts --reporter=verbose",
     "conformance:browser": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/run-browser-conformance.mjs",
     "conformance:compare": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/compare-conformance.ts",

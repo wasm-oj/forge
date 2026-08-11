@@ -60,9 +60,8 @@ async function projectionEnvironment(options: ProjectionEnvironmentOptions) {
   }));
   return {
     env: {
-      CORE_DB: { prepare },
+      DB: { prepare },
       JUDGE_BUCKET: { get },
-      JUDGE_MIRROR_BUCKET: { get },
     } as unknown as ForgeWorkerEnv,
     get,
   };

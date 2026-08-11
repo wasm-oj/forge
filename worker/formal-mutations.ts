@@ -34,7 +34,7 @@ function statusFromRow(row: FormalMutationRow | null): FormalMutationStatus {
 }
 
 export async function formalMutationStatus(env: ForgeWorkerEnv): Promise<FormalMutationStatus> {
-  return statusFromRow(await env.CORE_DB.prepare(
+  return statusFromRow(await env.DB.prepare(
     "SELECT formal_mutations_enabled, reason, updated_at FROM formal_mutation_controls WHERE environment=?",
   ).bind(env.ENVIRONMENT).first<FormalMutationRow>());
 }
@@ -52,7 +52,7 @@ export async function setFormalMutationsEnabled(
 ): Promise<FormalMutationStatus> {
   const reason = reasonText(reasonInput);
   const updatedAt = new Date().toISOString();
-  const result = await env.CORE_DB.prepare(
+  const result = await env.DB.prepare(
     "UPDATE formal_mutation_controls SET formal_mutations_enabled=?, reason=?, updated_at=? WHERE environment=?",
   ).bind(enabled ? 1 : 0, reason, updatedAt, env.ENVIRONMENT).run();
   if (result.meta.changes !== 1) {

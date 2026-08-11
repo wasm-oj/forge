@@ -10,8 +10,8 @@ The production Worker configuration is [wrangler.quick-production.jsonc](../wran
 It binds:
 
 - the application Worker and static assets;
-- `CORE_DB` and `SUBMISSIONS_DB`;
-- private primary and mirror R2 buckets;
+- the existing core D1 database, bound once as `DB`;
+- one private authoritative R2 bucket;
 - the `SubmissionJudgeContainer` and `ValidationJudgeContainer` adapters required by Cloudflare
   Containers;
 - Submission and Validation Workflows; and
@@ -32,11 +32,14 @@ GitHub Actions. After production Environment approval the workflow:
 1. installs Node 24.18 and pnpm 10.34.5;
 2. runs typecheck and the site build;
 3. briefly replaces the app with a maintenance Worker so no new formal request can start;
-4. waits until D1 reports no active submissions, imports, or rejudges;
-5. applies pending migrations to both D1 databases while formal mutations remain disabled;
+4. waits at most ten minutes for active validation imports; submission and rejudge history is reset
+   by the one-way single-store migration;
+5. applies pending migrations once to `DB`, deletes retired `sources/` and `audits/` objects, and
+   keeps formal mutations disabled;
 6. deploys the app Worker, Workflows, the two Container adapter bindings, and Turnstile route;
-7. checks `/api/health/live` and `/api/health/ready`; and
-8. enables formal mutations.
+7. checks `/api/health/live`, `/api/health/ready`, and the complete 45-problem official catalog; and
+8. enables formal mutations so an authenticated operator can run the required Turnstile, Official
+   Submit, and Organizer import/publish smoke.
 
 This is intentionally a fast deployment path. There is no automatic staging promotion or
 cross-account backup. Production is best-effort and has no formal SLO or 24/7 on-call promise.
@@ -48,7 +51,7 @@ deployed forward.
 
 ## Operations
 
-`GET /api/health/live` checks the Worker process. `GET /api/health/ready` checks both D1 bindings.
+`GET /api/health/live` checks the Worker process. `GET /api/health/ready` checks the single D1 binding.
 An authenticated Admin can read, pause, or resume new formal work through
 `/api/admin/formal-mutations`, `/pause`, and `/resume`. These routes are not exposed in the student
 UI.
@@ -56,10 +59,17 @@ UI.
 Formal mutations normally remain enabled. Pause them only for an actual incident or migration that
 cannot accept new formal jobs. Existing submissions continue through Workflows and Containers.
 
-Deleting the five old product-state Durable Object classes is a one-way cutover. A failure after
-that point is fixed by deploying the corrected Worker forward; the workflow does not attempt a
-version rollback across the schema change. D1 Time Travel remains available for operator-assisted
-database recovery, but deployment does not automatically restore or rewrite data.
+The single-store migration and retired resource deletion are a one-way cutover. Existing accounts,
+roles, installations, collections, published snapshots, contests, and participants remain. Existing
+submission, solve, leaderboard, contest-result, and rejudge history is intentionally reset. A
+failure is fixed by deploying forward; the workflow immediately disables formal mutations and does
+not attempt a version rollback across the schema change.
+
+The deployment workflow deliberately does not delete the retired submissions database or mirror
+bucket after anonymous health/catalog checks. After the authenticated Official Submit and Organizer
+smoke succeeds, run `node scripts/delete-retired-submissions-d1.mjs` and then
+`node scripts/cleanup-production-r2.mjs --operation delete-mirror` with the production Cloudflare
+credentials. If either functional smoke fails, pause formal mutations and roll forward instead.
 
 ## Deliberately removed
 
@@ -72,4 +82,5 @@ database recovery, but deployment does not automatically restore or rewrite data
 - clean-commit provenance and cost-calibration deployment gates; and
 - scheduled cost-monitor workflow.
 
-The remaining checks are the ones needed to compile, migrate, deploy, and answer health probes.
+The remaining checks are the ones needed to compile, migrate, deploy, answer health probes, and
+confirm that the official catalog is still available.

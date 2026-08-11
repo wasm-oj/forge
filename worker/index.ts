@@ -22,6 +22,7 @@ import {
   listOrganizerRepositories,
   organizerStatus,
   publishCollectionImport,
+  retryCollectionImport,
 } from "./organizer";
 import {
   acknowledgeRepositoryPushNotice,
@@ -29,7 +30,9 @@ import {
   createContest,
   currentProfile,
   getContest,
+  getOrganizerContest,
   joinContest,
+  listOrganizerContests,
   listRepositoryPushNotices,
   listContests,
   listOrganizerCollections,
@@ -38,6 +41,8 @@ import {
   problemLeaderboard,
   publicProfile,
   publishContest,
+  rotateContestInviteCode,
+  updateOrganizerContest,
   updateProfile,
 } from "./product";
 import { reconcile } from "./reconciler";
@@ -45,12 +50,13 @@ import {
   createOrganizerApplication,
   getFormalMutationControl,
   listOrganizerApplications,
+  revokeOrganizerRole,
   reviewOrganizerApplication,
   updateFormalMutationControl,
 } from "./admin";
 import { detailedReadiness } from "./readiness";
 import { eraseAccount } from "./account-erasure";
-import { cancelRejudgeBatch, createRejudgeBatch, getRejudgeBatch } from "./rejudge";
+import { cancelRejudgeBatch, createRejudgeBatch, getRejudgeBatch, listRejudgeBatches, rejudgeOptions } from "./rejudge";
 import { withSecurityHeaders } from "./security-headers";
 import { TURNSTILE_CHALLENGE_PATH, turnstileChallengeResponse } from "./turnstile-challenge";
 
@@ -97,6 +103,8 @@ async function api(request: Request, env: ForgeWorkerEnv): Promise<Response> {
   if (request.method === "POST" && pathname === "/api/admin/formal-mutations/resume") return updateFormalMutationControl(request, env, true);
   const applicationId = identifier(pathname, new RegExp(`^/api/admin/organizer-applications/(${UUID})/review$`));
   if (request.method === "POST" && applicationId) return reviewOrganizerApplication(request, env, applicationId);
+  const revokedOrganizerUserId = identifier(pathname, new RegExp(`^/api/admin/organizers/(${UUID})/revoke$`));
+  if (request.method === "POST" && revokedOrganizerUserId) return revokeOrganizerRole(request, env, revokedOrganizerUserId);
 
   if (request.method === "GET" && pathname === "/api/organizer/status") return organizerStatus(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/github/install") return beginGithubAppInstall(request, env);
@@ -112,6 +120,16 @@ async function api(request: Request, env: ForgeWorkerEnv): Promise<Response> {
   if (request.method === "GET" && importId) return getCollectionImport(request, env, importId);
   const publishImportId = identifier(pathname, new RegExp(`^/api/organizer/imports/(${UUID})/publish$`));
   if (request.method === "POST" && publishImportId) return publishCollectionImport(request, env, publishImportId);
+  const retryImportId = identifier(pathname, new RegExp(`^/api/organizer/imports/(${UUID})/retry$`));
+  if (request.method === "POST" && retryImportId) return retryCollectionImport(request, env, retryImportId);
+  if (request.method === "GET" && pathname === "/api/organizer/contests") return listOrganizerContests(request, env);
+  const organizerContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})$`));
+  if (request.method === "GET" && organizerContestId) return getOrganizerContest(request, env, organizerContestId);
+  if (request.method === "PUT" && organizerContestId) return updateOrganizerContest(request, env, organizerContestId);
+  const rotateContestInviteId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/invite-code$`));
+  if (request.method === "POST" && rotateContestInviteId) return rotateContestInviteCode(request, env, rotateContestInviteId);
+  if (request.method === "GET" && pathname === "/api/organizer/rejudges/options") return rejudgeOptions(request, env);
+  if (request.method === "GET" && pathname === "/api/organizer/rejudges") return listRejudgeBatches(request, env);
   if (request.method === "POST" && pathname === "/api/organizer/rejudges") return createRejudgeBatch(request, env);
   const rejudgeBatchId = identifier(pathname, new RegExp(`^/api/organizer/rejudges/(${UUID})$`));
   if (request.method === "GET" && rejudgeBatchId) return getRejudgeBatch(request, env, rejudgeBatchId);

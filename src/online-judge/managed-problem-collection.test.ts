@@ -20,10 +20,10 @@ const contestProblem = {
   judgeCases: problem.judgeCases.filter((testCase) => testCase.kind === "sample"),
 };
 
-function projectionResponse(value: unknown): Response {
+function projectionResponse(value: unknown, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(value), {
     status: 200,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-forge-problem-status": "current", ...headers },
   });
 }
 
@@ -85,7 +85,23 @@ describe("managed problem collection adapter", () => {
       projectionUrl: `/api/problems/${PROBLEM_VERSION_ID}`,
     });
     expect(collection.sourceKey).toBe(`managed:official-practice:${PROBLEM_VERSION_ID}:${DIGEST}`);
+    expect(collection.publication).toEqual({ status: "current" });
     expect(await collection.loadProblem(problem.id)).toEqual(problem);
+  });
+
+  it("exposes an archived practice only with an exact current-version link", async () => {
+    const currentProblemVersionId = "33333333-3333-4333-8333-333333333333";
+    const collection = await loadManagedProblemCollection({ problemVersionId: PROBLEM_VERSION_ID }, {
+      fetch: async () => projectionResponse({
+        schema: "forge-practice-problem-projection-v1",
+        problem,
+        digest: DIGEST,
+      }, {
+        "x-forge-problem-status": "archived",
+        "x-forge-current-problem-version": currentProblemVersionId,
+      }),
+    });
+    expect(collection.publication).toEqual({ status: "archived", currentProblemVersionId });
   });
 
   it("rejects wrong identifiers before network access", async () => {

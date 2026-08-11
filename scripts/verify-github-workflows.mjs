@@ -24,24 +24,30 @@ function forbidText(source, text, label) {
 }
 
 requireText(sources.production, "environment: production", "Production deployment");
-requireText(sources.production, "branches: [main]", "Production deployment");
-requireText(sources.production, "wrangler d1 migrations apply CORE_DB", "Production deployment");
-requireText(sources.production, "wrangler d1 migrations apply SUBMISSIONS_DB", "Production deployment");
+requireText(sources.production, "workflow_dispatch:", "Production deployment");
+forbidText(sources.production, "branches: [main]", "Production deployment");
+requireText(sources.production, "wrangler d1 migrations apply DB", "Production deployment");
 requireText(sources.production, "wrangler deploy --config wrangler.maintenance-production.jsonc", "Production deployment");
-requireText(sources.production, "wait-for-product-do-cutover.mjs", "Production deployment");
+requireText(sources.production, "wait-for-validation-cutover.mjs", "Production deployment");
+requireText(sources.production, "cleanup-production-r2.mjs --operation reset-submissions", "Production deployment");
 requireText(sources.production, "formal_mutations_enabled=0", "Production deployment");
 requireText(sources.production, "wrangler deploy --config wrangler.quick-production.jsonc", "Production deployment");
 requireText(sources.production, "/api/health/ready", "Production deployment");
+requireText(sources.production, "verify-production-catalog.mjs", "Production deployment");
 requireText(sources.production, "formal_mutations_enabled=1", "Production deployment");
+requireText(sources.production, "if: ${{ failure() }}", "Production deployment");
+forbidText(sources.production, "CORE_DB", "Production deployment");
+forbidText(sources.production, "SUBMISSIONS_DB", "Production deployment");
 
 const orderedProductionSteps = [
   "wrangler deploy --config wrangler.maintenance-production.jsonc",
-  "wait-for-product-do-cutover.mjs",
-  "wrangler d1 migrations apply CORE_DB",
+  "wait-for-validation-cutover.mjs",
+  "wrangler d1 migrations apply DB",
+  "cleanup-production-r2.mjs --operation reset-submissions",
   "formal_mutations_enabled=0",
-  "wrangler d1 migrations apply SUBMISSIONS_DB",
   "wrangler deploy --config wrangler.quick-production.jsonc",
   "/api/health/ready",
+  "verify-production-catalog.mjs",
   "formal_mutations_enabled=1",
 ];
 let previousProductionIndex = -1;
@@ -79,6 +85,14 @@ const deletedProductClasses = [
   "AdmissionControlDO",
 ];
 for (const [name, config] of Object.entries(workerConfigs)) {
+  const databases = config.d1_databases?.map((database) => [database.binding, database.migrations_dir]);
+  if (JSON.stringify(databases) !== JSON.stringify([["DB", "migrations/core"]])) {
+    throw new Error(`${name} Worker must bind the existing core database once as DB.`);
+  }
+  const buckets = config.r2_buckets?.map((bucket) => bucket.binding);
+  if (JSON.stringify(buckets) !== JSON.stringify(["JUDGE_BUCKET"])) {
+    throw new Error(`${name} Worker must bind only the authoritative judge bucket.`);
+  }
   const bindings = config.durable_objects?.bindings?.map((binding) => [binding.name, binding.class_name]);
   if (JSON.stringify(bindings) !== JSON.stringify(containerBindings)) {
     throw new Error(`${name} Worker must bind only the two Cloudflare Container adapters.`);

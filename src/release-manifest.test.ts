@@ -66,7 +66,7 @@ function fixture(): ForgeReleaseManifest {
     toolchains: { rootSha256: digest("f"), manifestSha256: digest("0") },
     cost: { model: "weighted", profileRootSha256: digest("1"), baselineSha256: digest("2") },
     evidence: { conformanceSha256: digest("3"), testsSha256: digest("4"), costCalibrationSha256: digest("5") },
-    migrations: { coreSha256: digest("6"), submissionsSha256: digest("7") },
+    migrations: { databaseSha256: digest("6") },
     provenance: { issuer: "https://token.actions.githubusercontent.com", subject: "repo:wasm-oj/forge" },
   };
 }
@@ -92,5 +92,12 @@ describe("Forge release manifest", () => {
       ...fixture(),
       runtime: { ...fixture().runtime, runtimeIdentitySha256: digest("f") },
     })).toThrow("runtime identity");
+  });
+
+  it("accepts only the single authoritative database migration digest", () => {
+    expect(() => parseForgeReleaseManifest({
+      ...fixture(),
+      migrations: { coreSha256: digest("6"), submissionsSha256: digest("7") },
+    })).toThrow("migrations has an invalid shape");
   });
 });

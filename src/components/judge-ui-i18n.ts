@@ -1,9 +1,8 @@
 import { FORGE_CONTRACT_ID } from "../core/contract";
 import type { BuiltinLanguage, ExecutionTermination, WorkerProgress } from "../core/types";
-import { PROBLEM_LOCALES, type ProblemLocale } from "../judge/problem-model";
+import type { ProblemLocale } from "../judge/problem-model";
 
 export const JUDGE_UI_LOCALE_STORAGE_KEY = `${FORGE_CONTRACT_ID}:judge-ui-locale:v1`;
-export const DEFAULT_JUDGE_UI_LOCALE: ProblemLocale = "en";
 
 type LocalizedShape<T> = T extends (...args: infer Arguments) => string
   ? (...args: Arguments) => string
@@ -69,6 +68,10 @@ const ZH_TW = {
     cancelUnavailable: "正式提交尚未取得 Server ID，現在無法安全取消。",
     pollingFailed: "無法取得正式 Judge 事件。",
     pollingStopped: "正式 Judge 事件更新在完成前停止；可從 submission API 繼續取得。",
+    resultPending: "等待正式判題結果",
+    resultScore: (score: number) => `${score.toFixed(2)} 分`,
+    submission: (id: string) => `Submission：${id}`,
+    viewSubmission: "查看完整 submission →",
   },
   catalog: {
     heading: "題目",
@@ -346,6 +349,10 @@ const EN = {
     cancelUnavailable: "The official submission does not have a server ID yet, so it cannot be cancelled safely.",
     pollingFailed: "Could not retrieve official judge events.",
     pollingStopped: "Official judge event updates stopped early; the submission API can continue from the saved cursor.",
+    resultPending: "Official result pending",
+    resultScore: (score: number) => `${score.toFixed(2)} points`,
+    submission: (id: string) => `Submission: ${id}`,
+    viewSubmission: "View submission details →",
   },
   catalog: {
     heading: "Challenges",
@@ -574,17 +581,6 @@ const TEXT: Readonly<Record<ProblemLocale, JudgeUiText>> = {
 
 export function judgeUiText(locale: ProblemLocale): JudgeUiText {
   return TEXT[locale];
-}
-
-export function readJudgeUiLocale(storage: Pick<Storage, "getItem">, preferredLocale: ProblemLocale = DEFAULT_JUDGE_UI_LOCALE): ProblemLocale {
-  const value = storage.getItem(JUDGE_UI_LOCALE_STORAGE_KEY);
-  return PROBLEM_LOCALES.includes(value as ProblemLocale)
-    ? value as ProblemLocale
-    : preferredLocale;
-}
-
-export function writeJudgeUiLocale(storage: Pick<Storage, "setItem">, locale: ProblemLocale): void {
-  storage.setItem(JUDGE_UI_LOCALE_STORAGE_KEY, locale);
 }
 
 export function verdictLabel(locale: ProblemLocale, verdict: keyof JudgeUiText["judge"]["verdicts"]): string {

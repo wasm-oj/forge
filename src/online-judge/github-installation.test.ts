@@ -62,7 +62,7 @@ async function githubAppPrivateKey(): Promise<string> {
 
 async function tokenEnvironment(database: InstallationAuthorityDatabase): Promise<ForgeWorkerEnv> {
   return {
-    CORE_DB: database as unknown as D1Database,
+    DB: database as unknown as D1Database,
     GITHUB_APP_ID: "12345",
     GITHUB_APP_PRIVATE_KEY: await githubAppPrivateKey(),
   } as ForgeWorkerEnv;
@@ -98,7 +98,7 @@ describe("GitHub installation token boundary", () => {
     const fetcher = vi.fn();
     vi.stubGlobal("fetch", fetcher);
     const env = {
-      CORE_DB: {
+      DB: {
         prepare: () => ({
           bind: () => ({ first: async () => null }),
         }),

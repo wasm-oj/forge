@@ -59,7 +59,7 @@ async function existingEvent(
   submissionId: string,
   eventKey: string,
 ): Promise<SubmissionEventRow | null> {
-  return env.SUBMISSIONS_DB.prepare(
+  return env.DB.prepare(
     "SELECT id, payload_json, created_at FROM submission_events WHERE submission_id=? AND event_key=?",
   ).bind(submissionId, eventKey).first<SubmissionEventRow>();
 }
@@ -68,7 +68,7 @@ async function currentSubmissionState(
   env: ForgeWorkerEnv,
   submissionId: string,
 ): Promise<SubmissionState> {
-  const row = await env.SUBMISSIONS_DB.prepare("SELECT state FROM submissions WHERE id=?")
+  const row = await env.DB.prepare("SELECT state FROM submissions WHERE id=?")
     .bind(submissionId).first<{ readonly state: unknown }>();
   if (!row) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   return parseSubmissionState(row.state);
@@ -104,7 +104,7 @@ export async function appendAuthorizedSubmissionEvent(
       }
       assertSubmissionTransition(before, payload.state);
     }
-    stateUpdate = env.SUBMISSIONS_DB.prepare(`UPDATE submissions
+    stateUpdate = env.DB.prepare(`UPDATE submissions
        SET state=?, updated_at=?
      WHERE id=? AND state=?
        AND EXISTS (
@@ -116,7 +116,7 @@ export async function appendAuthorizedSubmissionEvent(
     throw new ApiError(409, "submission-terminal", "No event may be appended after a terminal state.");
   }
 
-  const insertion = env.SUBMISSIONS_DB.prepare(`INSERT INTO submission_events
+  const insertion = env.DB.prepare(`INSERT INTO submission_events
       (submission_id, event_key, payload_json, created_at)
     SELECT ?, ?, ?, ?
      WHERE EXISTS (
@@ -141,7 +141,7 @@ export async function appendAuthorizedSubmissionEvent(
       input.attemptTokenHash,
     );
 
-  const results = await env.SUBMISSIONS_DB.batch(stateUpdate ? [stateUpdate, insertion] : [insertion]);
+  const results = await env.DB.batch(stateUpdate ? [stateUpdate, insertion] : [insertion]);
   const inserted = results.at(-1)?.meta.changes === 1;
   const stored = await existingEvent(env, input.submissionId, input.eventKey);
   if (!stored) {
@@ -201,7 +201,7 @@ export async function replaySubmissionEvents(
   after: number,
   limit = 100,
 ): Promise<readonly SequencedSubmissionEvent[]> {
-  const rows = await env.SUBMISSIONS_DB.prepare(`SELECT id, payload_json, created_at
+  const rows = await env.DB.prepare(`SELECT id, payload_json, created_at
       FROM submission_events
      WHERE submission_id=? AND id>?
      ORDER BY id ASC
@@ -214,7 +214,7 @@ export async function latestSubmissionEventCursor(
   env: ForgeWorkerEnv,
   submissionId: string,
 ): Promise<number> {
-  const row = await env.SUBMISSIONS_DB.prepare(
+  const row = await env.DB.prepare(
     "SELECT COALESCE(MAX(id), 0) AS cursor FROM submission_events WHERE submission_id=?",
   ).bind(submissionId).first<{ readonly cursor: number }>();
   return row?.cursor ?? 0;
@@ -234,12 +234,12 @@ export async function terminalizeSubmissionWithEvent(
   validateEventKey(input.eventKey);
   const timestamp = (input.now ?? new Date()).toISOString();
   const ownerFence = input.ownerUserId === undefined ? "" : " AND user_id=?";
-  const update = env.SUBMISSIONS_DB.prepare(`UPDATE submissions
+  const update = env.DB.prepare(`UPDATE submissions
       SET state=?, updated_at=?, completed_at=COALESCE(completed_at, ?)
     WHERE id=?${ownerFence}
       AND state NOT IN (${TERMINAL_SQL})`)
     .bind(input.state, timestamp, timestamp, input.submissionId, ...(input.ownerUserId === undefined ? [] : [input.ownerUserId]));
-  const insertion = prepareSubmissionEventInsert(env.SUBMISSIONS_DB, {
+  const insertion = prepareSubmissionEventInsert(env.DB, {
     submissionId: input.submissionId,
     eventKey: input.eventKey,
     event: { kind: "state", state: input.state },
@@ -247,8 +247,8 @@ export async function terminalizeSubmissionWithEvent(
     requiredState: input.state,
     requiredOwnerUserId: input.ownerUserId,
   });
-  const [updated] = await env.SUBMISSIONS_DB.batch([update, insertion]);
-  const row = await env.SUBMISSIONS_DB.prepare("SELECT state, user_id FROM submissions WHERE id=?")
+  const [updated] = await env.DB.batch([update, insertion]);
+  const row = await env.DB.prepare("SELECT state, user_id FROM submissions WHERE id=?")
     .bind(input.submissionId).first<{ readonly state: string; readonly user_id: string }>();
   if (!row) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   if (input.ownerUserId !== undefined && row.user_id !== input.ownerUserId) {

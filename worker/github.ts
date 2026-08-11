@@ -120,7 +120,7 @@ export async function githubAppJwt(env: ForgeWorkerEnv): Promise<string> {
 }
 
 async function suspendGithubInstallationForPermissionDrift(env: ForgeWorkerEnv, installationId: number): Promise<void> {
-  await env.CORE_DB.prepare(
+  await env.DB.prepare(
     `UPDATE github_installations
         SET status='suspended', authority_generation=authority_generation+1, updated_at=?
       WHERE installation_id=? AND status!='removed'`,
@@ -181,7 +181,7 @@ async function mintGithubInstallationToken(
 
 export async function githubInstallationToken(env: ForgeWorkerEnv, installationId: number): Promise<string> {
   if (!Number.isSafeInteger(installationId) || installationId < 1) throw new TypeError("Invalid GitHub installation ID.");
-  const authority = async () => env.CORE_DB.prepare(
+  const authority = async () => env.DB.prepare(
     `SELECT permissions_json, repository_selection, status, authority_generation
        FROM github_installations
       WHERE installation_id=? AND status='active' AND installed_by_user_id IS NOT NULL`,
@@ -198,7 +198,7 @@ export async function githubInstallationProvisioningToken(
   if (!Number.isSafeInteger(installationId) || installationId < 1 || !/^[0-9a-f]{64}$/.test(stateHash)) {
     throw new TypeError("Invalid GitHub installation claim identity.");
   }
-  const authority = async () => env.CORE_DB.prepare(
+  const authority = async () => env.DB.prepare(
     `SELECT installations.permissions_json, installations.repository_selection,
             installations.status, installations.authority_generation
       FROM github_installations AS installations

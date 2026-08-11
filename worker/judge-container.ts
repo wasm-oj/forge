@@ -7,10 +7,9 @@ import {
   type SubmissionExecuteRequest,
   type ValidationExecuteRequest,
 } from "./container-job";
-import { verifyForgeValidationSourceBytes, type ForgeValidationSource } from "../src/online-judge/validation-source";
 import { publicSubmissionEvent } from "../src/online-judge/contracts";
-import { claimImportObject, claimPredecessorCanonicalManifest, claimPredecessorObject, releaseImportObjectClaim, type ClaimedObject } from "./canonical-object-claims";
-import { putImmutableMirroredObject } from "./immutable-r2";
+import { claimImportObject, releaseImportObjectClaim, type ClaimedObject } from "./canonical-object-claims";
+import { putImmutableObject } from "./immutable-r2";
 import { assertActiveRelease } from "./release";
 import {
   assertContainerIdentityFence,
@@ -44,13 +43,6 @@ const MAX_VALIDATION_OUTPUT_BYTES = 32 * 1024 * 1024;
 
 abstract class SecureJudgeContainer extends Container<ForgeWorkerEnv> {
   protected abstract readonly acceptedKind: "submission" | "validation";
-  private canonicalSourceCache?: {
-    readonly jobId: string;
-    readonly digest: string;
-    readonly bytes: Uint8Array;
-    readonly source: ForgeValidationSource;
-    readonly objectsByDigest: ReadonlyMap<string, { readonly sha256: string; readonly bytes: number }>;
-  };
   defaultPort = 8080;
   sleepAfter = "30s";
   enableInternet = false;
@@ -81,7 +73,7 @@ abstract class SecureJudgeContainer extends Container<ForgeWorkerEnv> {
 
   private async loadReleaseBinding(expectedReleaseId: string, expectedManifestSha256: string): Promise<ContainerIdentityReleaseBinding> {
     const active = await assertActiveRelease(
-      this.env.CORE_DB,
+      this.env.DB,
       this.env.JUDGE_BUCKET,
       this.env.ENVIRONMENT,
       expectedReleaseId,
@@ -180,8 +172,6 @@ abstract class SecureJudgeContainer extends Container<ForgeWorkerEnv> {
         const outputs = await this.ctx.storage.list({ prefix: "output:" });
         if (outputs.size > 0) await this.ctx.storage.delete([...outputs.keys()]);
       } catch { cleanupFailed = true; }
-      this.canonicalSourceCache?.bytes.fill(0);
-      this.canonicalSourceCache = undefined;
       try { await this.destroy(); } catch { cleanupFailed = true; }
       try {
         await this.ctx.storage.delete(["authorization", "identity-fence"]);
@@ -221,37 +211,11 @@ abstract class SecureJudgeContainer extends Container<ForgeWorkerEnv> {
       if (request.method === "GET" && url.pathname === "/__forge/r2/archive" && authorization.kind === "validation" && authorization.source.kind === "github-archive") {
         return this.r2Object(authorization.source.archiveR2Key);
       }
-      if (request.method === "GET" && url.pathname === "/__forge/r2/canonical/manifest" && authorization.kind === "validation" && authorization.source.kind === "canonical-successor") {
-        const { bytes } = await this.canonicalSource(authorization);
-        return this.verifiedBytesResponse(bytes, authorization.source.canonicalSourceSha256, "application/json");
-      }
-      if (request.method === "GET" && url.pathname.startsWith("/__forge/r2/canonical/object/") && authorization.kind === "validation" && authorization.source.kind === "canonical-successor") {
-        const digest = url.pathname.slice("/__forge/r2/canonical/object/".length);
-        if (!/^[0-9a-f]{64}$/.test(digest)) throw new ApiError(400, "canonical-object-digest", "Canonical object digest is invalid.");
-        const { objectsByDigest } = await this.canonicalSource(authorization);
-        const declared = objectsByDigest.get(digest);
-        if (!declared) throw new ApiError(403, "canonical-object-not-authorized", "Canonical object is not declared by the verified source manifest.");
-        const reference = await claimPredecessorObject(
-          this.env,
-          authorization.jobId,
-          authorization.source.predecessorImportId,
-          `snapshots/objects/${digest}`,
-          digest,
-          declared.bytes,
-        );
-        try {
-          const bytes = await this.verifiedMirroredBytes(reference.key, digest, declared.bytes);
-          return this.verifiedBytesResponse(bytes, digest, "application/octet-stream");
-        } catch (error) {
-          await releaseImportObjectClaim(this.env, authorization.jobId, reference);
-          throw error;
-        }
-      }
       if (request.method === "GET" && url.pathname.startsWith("/__forge/r2/output/") && authorization.kind === "validation") {
         const digest = url.pathname.slice("/__forge/r2/output/".length);
         const output = await this.ctx.storage.get<AuthorizedOutput>(`output:${digest}`);
         if (!output || output.jobId !== authorization.jobId || output.digest !== digest) {
-          throw new ApiError(403, "canonical-object-not-authorized", "Canonical object has not crossed the mirrored persistence barrier.");
+          throw new ApiError(403, "canonical-object-not-authorized", "Canonical object has not crossed the immutable persistence barrier.");
         }
         return this.r2Object(output.key, output.digest, output.bytes);
       }
@@ -272,7 +236,7 @@ abstract class SecureJudgeContainer extends Container<ForgeWorkerEnv> {
             sha256: Uint8Array.from(digest.match(/.{2}/g) ?? [], (byte) => Number.parseInt(byte, 16)),
           } satisfies R2PutOptions;
           try {
-            await putImmutableMirroredObject(this.env.JUDGE_BUCKET, this.env.JUDGE_MIRROR_BUCKET, key, bytes, digest, options);
+            await putImmutableObject(this.env.JUDGE_BUCKET, key, bytes, digest, options);
           } catch (error) {
             await releaseImportObjectClaim(this.env, authorization.jobId, reference);
             throw error;
@@ -298,82 +262,6 @@ abstract class SecureJudgeContainer extends Container<ForgeWorkerEnv> {
       return jsonResponse({ error: { code: "container-egress-denied", message: "Object is not authorized for this one-shot job." } }, 403);
     } catch (error) {
       return apiErrorResponse(error);
-    }
-  }
-
-  private async verifiedMirroredBytes(key: string, expectedSha256: string, expectedBytes: number): Promise<Uint8Array> {
-    if (expectedBytes < 1 || expectedBytes > MAX_VALIDATION_OUTPUT_BYTES) throw new ApiError(500, "r2-object-integrity", "Authorized canonical object has an invalid length.");
-    const [primary, mirror] = await Promise.all([
-      this.env.JUDGE_BUCKET.get(key),
-      this.env.JUDGE_MIRROR_BUCKET.get(key),
-    ]);
-    if (!primary || !mirror || primary.size !== expectedBytes || mirror.size !== expectedBytes || primary.customMetadata?.sha256 !== expectedSha256 || mirror.customMetadata?.sha256 !== expectedSha256) {
-      throw new ApiError(500, "r2-object-integrity", "Authorized canonical object metadata failed mirrored verification.");
-    }
-    const [primaryBytes, mirrorBytes] = await Promise.all([
-      primary.arrayBuffer().then((value) => new Uint8Array(value)),
-      mirror.arrayBuffer().then((value) => new Uint8Array(value)),
-    ]);
-    const [primaryDigest, mirrorDigest] = await Promise.all([sha256Hex(primaryBytes), sha256Hex(mirrorBytes)]);
-    if (primaryDigest !== expectedSha256 || mirrorDigest !== expectedSha256) throw new ApiError(500, "r2-object-integrity", "Authorized canonical object bytes failed mirrored verification.");
-    return primaryBytes;
-  }
-
-  private verifiedBytesResponse(bytes: Uint8Array, digest: string, contentType: string): Response {
-    return new Response(bytes.slice().buffer, {
-      headers: {
-        "content-type": contentType,
-        "content-length": String(bytes.byteLength),
-        "x-forge-sha256": digest,
-      },
-    });
-  }
-
-  private async canonicalSource(authorization: Extract<JobAuthorization, { readonly kind: "validation" }>): Promise<{
-    readonly bytes: Uint8Array;
-    readonly source: ForgeValidationSource;
-    readonly objectsByDigest: ReadonlyMap<string, { readonly sha256: string; readonly bytes: number }>;
-  }> {
-    if (authorization.source.kind !== "canonical-successor") throw new ApiError(403, "canonical-source-not-authorized", "Canonical source is not authorized for this job.");
-    if (this.canonicalSourceCache) {
-      if (this.canonicalSourceCache.jobId !== authorization.jobId || this.canonicalSourceCache.digest !== authorization.source.canonicalSourceSha256) {
-        throw new ApiError(409, "canonical-source-identity", "Cached canonical source identity is inconsistent.");
-      }
-      return {
-        bytes: this.canonicalSourceCache.bytes,
-        source: this.canonicalSourceCache.source,
-        objectsByDigest: this.canonicalSourceCache.objectsByDigest,
-      };
-    }
-    const reference = await claimPredecessorCanonicalManifest(
-      this.env,
-      authorization.jobId,
-      authorization.source.predecessorImportId,
-      authorization.source.canonicalSourceR2Key,
-      authorization.source.canonicalSourceSha256,
-    );
-    try {
-      const bytes = await this.verifiedMirroredBytes(reference.key, reference.digest, reference.bytes);
-      let source: ForgeValidationSource;
-      try {
-        source = await verifyForgeValidationSourceBytes(bytes, authorization.source.canonicalSourceSha256);
-      } catch {
-        throw new ApiError(500, "canonical-source-integrity", "Canonical source manifest is invalid.");
-      }
-      if (source.provenance.githubRepositoryId !== authorization.githubRepositoryId || source.provenance.commitSha !== authorization.commitSha || source.provenance.indexPath !== authorization.indexPath) {
-        throw new ApiError(409, "canonical-source-provenance", "Canonical source provenance does not match the immutable successor job.");
-      }
-      this.canonicalSourceCache = {
-        jobId: authorization.jobId,
-        digest: authorization.source.canonicalSourceSha256,
-        bytes,
-        source,
-        objectsByDigest: new Map(source.objects.map((item) => [item.sha256, item])),
-      };
-      return { bytes, source, objectsByDigest: this.canonicalSourceCache.objectsByDigest };
-    } catch (error) {
-      await releaseImportObjectClaim(this.env, authorization.jobId, reference);
-      throw error;
     }
   }
 

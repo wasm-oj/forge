@@ -78,8 +78,7 @@ export interface ForgeReleaseManifest {
     readonly costCalibrationSha256: string;
   };
   readonly migrations: {
-    readonly coreSha256: string;
-    readonly submissionsSha256: string;
+    readonly databaseSha256: string;
   };
   readonly provenance: {
     readonly issuer: string;
@@ -191,7 +190,7 @@ export function parseForgeReleaseManifest(value: unknown): ForgeReleaseManifest 
   const evidence = record(manifest.evidence, "evidence");
   exact(evidence, ["conformanceSha256", "costCalibrationSha256", "testsSha256"], [], "evidence");
   const migrations = record(manifest.migrations, "migrations");
-  exact(migrations, ["coreSha256", "submissionsSha256"], [], "migrations");
+  exact(migrations, ["databaseSha256"], [], "migrations");
   const provenance = record(manifest.provenance, "provenance");
   exact(provenance, ["issuer", "subject"], [], "provenance");
   if (typeof provenance.issuer !== "string" || !IDENTITY.test(provenance.issuer) || typeof provenance.subject !== "string" || !IDENTITY.test(provenance.subject)) {
@@ -258,8 +257,7 @@ export function parseForgeReleaseManifest(value: unknown): ForgeReleaseManifest 
       costCalibrationSha256: digest(evidence.costCalibrationSha256, "evidence.costCalibrationSha256"),
     },
     migrations: {
-      coreSha256: digest(migrations.coreSha256, "migrations.coreSha256"),
-      submissionsSha256: digest(migrations.submissionsSha256, "migrations.submissionsSha256"),
+      databaseSha256: digest(migrations.databaseSha256, "migrations.databaseSha256"),
     },
     provenance: { issuer: provenance.issuer, subject: provenance.subject } as ForgeReleaseManifest["provenance"],
   };

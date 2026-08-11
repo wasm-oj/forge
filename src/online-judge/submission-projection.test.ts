@@ -14,7 +14,11 @@ describe("official submission projection", () => {
       entry_path: "main.c",
       source_r2_key: "sources/private-key",
       source_digest: "a".repeat(64),
+      source_erased_at: null,
+      forge_release_id: "release-id",
+      forge_manifest_sha256: "b".repeat(64),
       state: "completed",
+      verdict: "accepted",
       visibility: "private",
       score: 100,
       fully_passed_cases: 4,
@@ -34,6 +38,7 @@ describe("official submission projection", () => {
       optimization: "release",
       entry: "main.c",
       state: "completed",
+      verdict: "accepted",
       visibility: "private",
       score: 100,
       fullyPassedCases: 4,
@@ -46,5 +51,7 @@ describe("official submission projection", () => {
     expect(projection).not.toHaveProperty("user_id");
     expect(projection).not.toHaveProperty("source_r2_key");
     expect(projection).not.toHaveProperty("source_digest");
+    expect(projection).not.toHaveProperty("forge_release_id");
+    expect(projection).not.toHaveProperty("forge_manifest_sha256");
   });
 });

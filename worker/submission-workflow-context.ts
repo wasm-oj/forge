@@ -45,7 +45,6 @@ interface StoredManagedProblemRow {
   readonly judge_projection_r2_key: string;
   readonly bundle_digest: string;
   readonly snapshot_status: string;
-  readonly forge_release_id: string;
 }
 
 export const HYDRATE_SUBMISSION_WORKFLOW_SQL = `SELECT
@@ -58,10 +57,8 @@ export const HYDRATE_SUBMISSION_WORKFLOW_SQL = `SELECT
   WHERE submissions.id=?
     AND submissions.state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled')
     AND submissions.source_erased_at IS NULL
-    AND NOT EXISTS (
-      SELECT 1 FROM submission_owner_erasure_fences
-      WHERE submission_owner_erasure_fences.owner_user_id=submissions.user_id
-    )`;
+    AND EXISTS (SELECT 1 FROM users WHERE users.id=submissions.user_id AND users.status='active')
+    AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=submissions.user_id)`;
 
 function digestAddressedKey(key: string, label: string): string {
   const digest = /(?:^|\/)([0-9a-f]{64})$/.exec(key)?.[1];
@@ -86,7 +83,7 @@ export async function hydrateSubmissionWorkflow(
   opaque: unknown,
 ): Promise<HydratedSubmissionWorkflow> {
   const parameters = parseSubmissionWorkflowParameters(opaque);
-  const stored = await env.SUBMISSIONS_DB.prepare(HYDRATE_SUBMISSION_WORKFLOW_SQL)
+  const stored = await env.DB.prepare(HYDRATE_SUBMISSION_WORKFLOW_SQL)
     .bind(parameters.attempt, parameters.submissionId).first<StoredSubmissionWorkflowRow>();
   if (
     !stored
@@ -100,30 +97,28 @@ export async function hydrateSubmissionWorkflow(
     stored.token_hash,
   );
   const active = await assertActiveRelease(
-    env.CORE_DB,
+    env.DB,
     env.JUDGE_BUCKET,
     env.ENVIRONMENT,
     parameters.expectedReleaseId,
     parameters.expectedManifestSha256,
   );
-  const problem = await env.CORE_DB.prepare(`SELECT
+  const problem = await env.DB.prepare(`SELECT
       managed_problem_versions.judge_projection_r2_key,
       managed_problem_versions.bundle_digest,
-      managed_snapshots.status AS snapshot_status,
-      collection_imports.forge_release_id
+      managed_snapshots.status AS snapshot_status
     FROM managed_problem_versions
     JOIN managed_snapshots ON managed_snapshots.id=managed_problem_versions.snapshot_id
-    JOIN collection_imports ON collection_imports.id=managed_snapshots.import_id
     WHERE managed_problem_versions.id=?`)
     .bind(stored.managed_problem_version_id).first<StoredManagedProblemRow>();
-  if (!problem || problem.snapshot_status !== "published" || problem.forge_release_id !== parameters.expectedReleaseId) {
-    throw new Error("Submission Workflow managed problem is not an immutable published release member.");
+  if (!problem || !["published", "superseded"].includes(problem.snapshot_status)) {
+    throw new Error("Submission Workflow managed problem is not an immutable published problem.");
   }
 
   let rejudge: HydratedSubmissionWorkflow["rejudge"];
   if (stored.rejudge_batch_id !== null || stored.rejudge_of_submission_id !== null) {
     if (!stored.rejudge_batch_id || !stored.rejudge_of_submission_id) throw new Error("Rejudge submission identity is incomplete.");
-    const job = await env.SUBMISSIONS_DB.prepare(
+    const job = await env.DB.prepare(
       "SELECT old_problem_version_id, state FROM rejudge_jobs WHERE rejudge_batch_id=? AND old_submission_id=? AND new_submission_id=?",
     ).bind(stored.rejudge_batch_id, stored.rejudge_of_submission_id, parameters.submissionId).first<{
       readonly old_problem_version_id: string;

@@ -34,14 +34,7 @@ export type ValidationExecuteRequest = ContainerJobBase & {
   readonly githubRepositoryId: number;
   readonly commitSha: string;
   readonly indexPath: string;
-  readonly source:
-    | { readonly kind: "github-archive"; readonly archiveR2Key: string }
-    | {
-      readonly kind: "canonical-successor";
-      readonly predecessorImportId: string;
-      readonly canonicalSourceR2Key: string;
-      readonly canonicalSourceSha256: string;
-    };
+  readonly source: { readonly kind: "github-archive"; readonly archiveR2Key: string };
 };
 
 export type ExecuteRequest = SubmissionExecuteRequest | ValidationExecuteRequest;
@@ -110,42 +103,20 @@ export function parseExecuteRequest(value: unknown): ExecuteRequest {
     const commitSha = patterned(input.commitSha, COMMIT, "validation commitSha", 40);
     const indexPath = patterned(input.indexPath, NORMALIZED_PATH, "validation indexPath", 512);
     const source = object(input.source, "validation container source");
-    if (source.kind === "github-archive") {
-      exact(source, ["archiveR2Key", "kind"], "validation GitHub archive source");
-      const expected = `imports/${parsedBase.jobId}/${commitSha}.tar.gz`;
-      if (source.archiveR2Key !== expected) throw new TypeError("validation archive key is not bound to the immutable import.");
-      return {
-        ...parsedBase,
-        kind: "validation",
-        outputPrefix: "snapshots/objects",
-        forgeReleaseId: parsedBase.expectedReleaseId,
-        githubRepositoryId: input.githubRepositoryId as number,
-        commitSha,
-        indexPath,
-        source: { kind: "github-archive", archiveR2Key: expected },
-      };
-    }
-    if (source.kind === "canonical-successor") {
-      exact(source, ["canonicalSourceR2Key", "canonicalSourceSha256", "kind", "predecessorImportId"], "validation canonical successor source");
-      const canonicalSourceSha256 = patterned(source.canonicalSourceSha256, DIGEST, "validation canonical source digest", 64);
-      if (source.canonicalSourceR2Key !== `snapshots/objects/${canonicalSourceSha256}`) throw new TypeError("validation canonical source key is not content addressed.");
-      return {
-        ...parsedBase,
-        kind: "validation",
-        outputPrefix: "snapshots/objects",
-        forgeReleaseId: parsedBase.expectedReleaseId,
-        githubRepositoryId: input.githubRepositoryId as number,
-        commitSha,
-        indexPath,
-        source: {
-          kind: "canonical-successor",
-          predecessorImportId: patterned(source.predecessorImportId, UUID, "validation predecessorImportId", 36),
-          canonicalSourceR2Key: source.canonicalSourceR2Key,
-          canonicalSourceSha256,
-        },
-      };
-    }
-    throw new TypeError("validation container source kind is unsupported.");
+    if (source.kind !== "github-archive") throw new TypeError("validation container source kind is unsupported.");
+    exact(source, ["archiveR2Key", "kind"], "validation GitHub archive source");
+    const expected = `imports/${parsedBase.jobId}/${commitSha}.tar.gz`;
+    if (source.archiveR2Key !== expected) throw new TypeError("validation archive key is not bound to the immutable import.");
+    return {
+      ...parsedBase,
+      kind: "validation",
+      outputPrefix: "snapshots/objects",
+      forgeReleaseId: parsedBase.expectedReleaseId,
+      githubRepositoryId: input.githubRepositoryId as number,
+      commitSha,
+      indexPath,
+      source: { kind: "github-archive", archiveR2Key: expected },
+    };
   }
   throw new TypeError("container job kind is unsupported.");
 }

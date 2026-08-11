@@ -123,36 +123,3 @@ export function mergeEffectiveLeaderboardEntries(
     .sort((left, right) => compareLeaderboardEntries(left, right))
     .slice(0, limit);
 }
-
-export type SubmissionCompletionOutboxKind = "rejudge-result" | "update-profile";
-
-export function submissionCompletionOutboxKinds(input: {
-  readonly rejudge: boolean;
-  readonly state: RejudgeChildState;
-  readonly contest: boolean;
-}): readonly SubmissionCompletionOutboxKind[] {
-  if (input.rejudge) return ["rejudge-result"];
-  if (input.state !== "completed") return [];
-  // Leaderboards are queried directly from authoritative submissions. The
-  // only remaining cross-database projection is the practice solve profile.
-  if (input.contest) return [];
-  return ["update-profile"];
-}
-
-export function formalAdmissionCommitWon(changes: number): boolean {
-  if (!Number.isSafeInteger(changes) || changes < 0 || changes > 1) throw new TypeError("Formal admission commit count is invalid.");
-  return changes === 1;
-}
-
-export type FormalAdmissionMarkerState = "pending" | "committed" | "aborted" | null;
-export type SubmissionWorkflowFenceDisposition = "start" | "wait" | "reject";
-
-export function submissionWorkflowFenceDisposition(input: {
-  readonly rejudge: boolean;
-  readonly markerState: FormalAdmissionMarkerState;
-}): SubmissionWorkflowFenceDisposition {
-  if (input.rejudge) return "start";
-  if (input.markerState === "committed") return "start";
-  if (input.markerState === "pending") return "wait";
-  return "reject";
-}

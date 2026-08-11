@@ -25,12 +25,10 @@
     "OFFICIAL_GITHUB_REPOSITORY_ID": "1328710736"
   },
   "d1_databases": [
-    { "binding": "CORE_DB", "database_name": "wasm-oj-core-development", "database_id": "local-forge-core", "migrations_dir": "migrations/core" },
-    { "binding": "SUBMISSIONS_DB", "database_name": "wasm-oj-submissions-development-00", "database_id": "local-forge-submissions-00", "migrations_dir": "migrations/submissions" }
+    { "binding": "DB", "database_name": "wasm-oj-core-development", "database_id": "local-forge-core", "migrations_dir": "migrations/core" }
   ],
   "r2_buckets": [
-    { "binding": "JUDGE_BUCKET", "bucket_name": "wasm-oj-judge-development" },
-    { "binding": "JUDGE_MIRROR_BUCKET", "bucket_name": "wasm-oj-judge-mirror-development" }
+    { "binding": "JUDGE_BUCKET", "bucket_name": "wasm-oj-judge-development" }
   ],
   "durable_objects": {
     "bindings": [

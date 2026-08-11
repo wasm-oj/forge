@@ -44,18 +44,19 @@ published as `official-practice` through the same import UI.
 
 | Resource | Scope / owner | Storage |
 | --- | --- | --- |
-| User, role, Profile | GitHub user | `CORE_DB` |
-| GitHub App installation | Organizer | `CORE_DB`; GitHub stores repository authority |
-| Collection import and snapshot | Organizer + exact repository commit | `CORE_DB`, private R2 |
-| Managed problem version | Published snapshot | `CORE_DB`, public/private R2 projections |
-| Contest | Organizer | `CORE_DB` |
-| Submission source and result | User + managed problem | `SUBMISSIONS_DB`, private R2 |
-| Submission event cursor log | Submission | `SUBMISSIONS_DB` |
+| User, role, Profile | GitHub user | `DB` |
+| GitHub App installation | Organizer | `DB`; GitHub stores repository authority |
+| Collection import and snapshot | Organizer + exact repository commit | `DB`, private R2 |
+| Managed problem version | Published snapshot | `DB`, public/private R2 projections |
+| Contest | Organizer | `DB` |
+| Submission source and result | User + managed problem | `DB`, private R2 |
+| Submission event cursor log | Submission | `DB` |
 | Local project and local progress | Browser profile | IndexedDB/browser cache only |
 
-Primary and same-account mirror R2 protect against a single mistaken object write. They are not an
-external backup. D1's built-in Time Travel is the only database recovery facility promised by this
-deployment.
+One private R2 bucket is authoritative for immutable judge projections and submission source. It
+uses conditional writes plus stored size and SHA-256 verification; the deployment does not maintain
+a second bucket or promise an external backup. D1's built-in Time Travel is the only database
+recovery facility promised by this deployment.
 
 ## Submission state and capacity
 
@@ -69,7 +70,7 @@ Submission admission and execution claims use conditional D1 writes. The fixed p
 one executing and three queued submissions per account, 50 executing submissions globally, and
 500 nonterminal submissions globally. A terminal state naturally releases capacity.
 
-`CORE_DB` also stores one `formal_mutations_enabled` switch per environment. Authenticated Admin
+`DB` also stores one `formal_mutations_enabled` switch per environment. Authenticated Admin
 API routes can pause or resume new Official Submit, import, publish, contest-start, and rejudge
 mutations with a reason. Those routes are intentionally absent from the student UI. Jobs that have
 already started continue. There are no leases, drain receipts, reservation generations, or
@@ -92,5 +93,10 @@ strings, OAuth values, tokens, source, output, hidden data, or private repositor
 Cloudflare Containers require Durable Object-backed adapter classes. Forge keeps only
 `SubmissionJudgeContainer` and `ValidationJudgeContainer` for that platform integration; product
 state is not stored in those adapters.
+
+One per-minute scheduled recovery pass delivers Workflow outbox rows, repairs stranded submission
+admission, resumes account erasure, and advances validation/rejudge work. Expired OAuth/Turnstile
+state and attempt cleanup run hourly; import retention and canonical object GC run daily. Contest
+phase is derived at read time, and the scheduler does not scan release manifests.
 
 Deployment details are in the [production deployment guide](cloudflare-deployment-plan.md).

@@ -1,11 +1,17 @@
 export interface LeaderboardEntryRow {
   readonly userId: string;
+  readonly language?: string;
   readonly score: number;
   readonly fullyPassedCases: number;
   readonly deterministicCost: number;
   readonly peakMemoryBytes: number;
   readonly achievedAt: string;
   readonly attemptedProblems?: number;
+  readonly problemResults?: readonly {
+    readonly problemVersionId: string;
+    readonly score: number;
+    readonly fullyPassedCases: number;
+  }[];
   readonly submissionId?: string;
 }
 
@@ -17,6 +23,7 @@ export interface ContestProblemSelection {
 
 interface ProblemLeaderboardRow {
   readonly user_id: string;
+  readonly language: string;
   readonly score: number;
   readonly fully_passed_cases: number;
   readonly deterministic_cost: number;
@@ -25,8 +32,9 @@ interface ProblemLeaderboardRow {
   readonly submission_id: string;
 }
 
-interface ContestLeaderboardRow extends Omit<ProblemLeaderboardRow, "submission_id"> {
+interface ContestLeaderboardRow extends Omit<ProblemLeaderboardRow, "submission_id" | "language"> {
   readonly attempted_problems: number;
+  readonly problem_results_json: string;
 }
 
 const COMPLETE_METRICS = `submissions.state='completed'
@@ -39,6 +47,7 @@ const COMPLETE_METRICS = `submissions.state='completed'
 function entry(row: ProblemLeaderboardRow): LeaderboardEntryRow {
   return {
     userId: row.user_id,
+    language: row.language,
     score: row.score,
     fullyPassedCases: row.fully_passed_cases,
     deterministicCost: row.deterministic_cost,
@@ -53,6 +62,7 @@ export async function queryProblemLeaderboard(
   input: {
     readonly effectiveProblemVersionId: string;
     readonly rejudgeBatchId?: string;
+    readonly language?: string;
     readonly limit: number;
   },
 ): Promise<readonly LeaderboardEntryRow[]> {
@@ -61,10 +71,12 @@ export async function queryProblemLeaderboard(
     : "submissions.rejudge_batch_id IS NULL";
   const bindings: unknown[] = [input.effectiveProblemVersionId];
   if (input.rejudgeBatchId) bindings.push(input.rejudgeBatchId);
+  if (input.language) bindings.push(input.language);
   bindings.push(input.limit);
   const rows = await database.prepare(`WITH candidates AS (
       SELECT submissions.id AS submission_id,
         submissions.user_id,
+        submissions.language,
         submissions.score,
         submissions.fully_passed_cases,
         submissions.deterministic_cost,
@@ -76,6 +88,7 @@ export async function queryProblemLeaderboard(
         AND submissions.contest_id IS NULL
         AND ${COMPLETE_METRICS}
         AND ${batchPredicate}
+        ${input.language ? "AND submissions.language=?" : ""}
     ), ranked AS (
       SELECT candidates.*,
         ROW_NUMBER() OVER (
@@ -85,7 +98,7 @@ export async function queryProblemLeaderboard(
         ) AS candidate_rank
       FROM candidates
     )
-    SELECT user_id, score, fully_passed_cases, deterministic_cost,
+    SELECT user_id, language, score, fully_passed_cases, deterministic_cost,
       peak_memory_bytes, achieved_at, submission_id
     FROM ranked
     WHERE candidate_rank=1
@@ -109,6 +122,7 @@ export async function queryContestLeaderboard(
   const selectionJson = JSON.stringify(input.problems);
   const rows = await database.prepare(`WITH problem_selection AS (
       SELECT
+        CAST(key AS INTEGER) AS ordinal,
         json_extract(value, '$.originalProblemVersionId') AS original_problem_version_id,
         json_extract(value, '$.effectiveProblemVersionId') AS effective_problem_version_id,
         json_extract(value, '$.rejudgeBatchId') AS rejudge_batch_id
@@ -116,6 +130,7 @@ export async function queryContestLeaderboard(
     ), candidates AS (
       SELECT submissions.id AS submission_id,
         submissions.user_id,
+        problem_selection.ordinal,
         problem_selection.original_problem_version_id AS problem_version_id,
         submissions.score,
         submissions.fully_passed_cases,
@@ -145,28 +160,57 @@ export async function queryContestLeaderboard(
       FROM candidates
     ), effective_results AS (
       SELECT * FROM ranked WHERE candidate_rank=1
+    ), aggregates AS (
+      SELECT user_id,
+        SUM(score) AS score,
+        SUM(fully_passed_cases) AS fully_passed_cases,
+        SUM(deterministic_cost) AS deterministic_cost,
+        MAX(peak_memory_bytes) AS peak_memory_bytes,
+        MAX(achieved_at) AS achieved_at,
+        COUNT(*) AS attempted_problems
+      FROM effective_results
+      GROUP BY user_id
     )
-    SELECT user_id,
-      SUM(score) AS score,
-      SUM(fully_passed_cases) AS fully_passed_cases,
-      SUM(deterministic_cost) AS deterministic_cost,
-      MAX(peak_memory_bytes) AS peak_memory_bytes,
-      MAX(achieved_at) AS achieved_at,
-      COUNT(*) AS attempted_problems
-    FROM effective_results
-    GROUP BY user_id
-    ORDER BY score DESC, fully_passed_cases DESC, deterministic_cost ASC,
-      peak_memory_bytes ASC, achieved_at ASC, user_id ASC
+    SELECT aggregates.*,
+      (SELECT json_group_array(json_object(
+          'problemVersionId', ordered.problem_version_id,
+          'score', ordered.score,
+          'fullyPassedCases', ordered.fully_passed_cases
+        ))
+        FROM (
+          SELECT problem_version_id, score, fully_passed_cases
+          FROM effective_results
+          WHERE effective_results.user_id=aggregates.user_id
+          ORDER BY ordinal
+        ) AS ordered
+      ) AS problem_results_json
+    FROM aggregates
+    ORDER BY aggregates.score DESC, aggregates.fully_passed_cases DESC, aggregates.deterministic_cost ASC,
+      aggregates.peak_memory_bytes ASC, aggregates.achieved_at ASC, aggregates.user_id ASC
     LIMIT ?`)
     .bind(selectionJson, input.contestId, ...(input.completedAtOrBefore ? [input.completedAtOrBefore] : []), input.limit)
     .all<ContestLeaderboardRow>();
-  return rows.results.map((row) => ({
-    userId: row.user_id,
-    score: row.score,
-    fullyPassedCases: row.fully_passed_cases,
-    deterministicCost: row.deterministic_cost,
-    peakMemoryBytes: row.peak_memory_bytes,
-    achievedAt: row.achieved_at,
-    attemptedProblems: row.attempted_problems,
-  }));
+  return rows.results.map((row) => {
+    const problemResults = JSON.parse(row.problem_results_json) as Array<Record<string, unknown>>;
+    if (!Array.isArray(problemResults) || problemResults.some((result) => (
+      typeof result.problemVersionId !== "string"
+      || typeof result.score !== "number"
+      || !Number.isFinite(result.score)
+      || !Number.isSafeInteger(result.fullyPassedCases)
+    ))) throw new TypeError("Contest leaderboard problem breakdown is invalid.");
+    return {
+      userId: row.user_id,
+      score: row.score,
+      fullyPassedCases: row.fully_passed_cases,
+      deterministicCost: row.deterministic_cost,
+      peakMemoryBytes: row.peak_memory_bytes,
+      achievedAt: row.achieved_at,
+      attemptedProblems: row.attempted_problems,
+      problemResults: problemResults.map((result) => ({
+        problemVersionId: result.problemVersionId as string,
+        score: result.score as number,
+        fullyPassedCases: result.fullyPassedCases as number,
+      })),
+    };
+  });
 }

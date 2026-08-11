@@ -41,21 +41,14 @@
   },
   "d1_databases": [
     {
-      "binding": "CORE_DB",
+      "binding": "DB",
       "database_name": "wasm-oj-core-production",
       "database_id": "68f58868-311b-4a5b-9337-c1a5af88e954",
       "migrations_dir": "migrations/core"
-    },
-    {
-      "binding": "SUBMISSIONS_DB",
-      "database_name": "wasm-oj-submissions-production-00",
-      "database_id": "514a6ae0-719b-4de0-ad8e-46db42421b64",
-      "migrations_dir": "migrations/submissions"
     }
   ],
   "r2_buckets": [
-    { "binding": "JUDGE_BUCKET", "bucket_name": "wasm-oj-judge-production" },
-    { "binding": "JUDGE_MIRROR_BUCKET", "bucket_name": "wasm-oj-judge-mirror-production" }
+    { "binding": "JUDGE_BUCKET", "bucket_name": "wasm-oj-judge-production" }
   ],
   "durable_objects": {
     "bindings": [

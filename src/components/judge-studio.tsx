@@ -10,6 +10,8 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleHelp,
   CircleStop,
   Clock3,
@@ -32,11 +34,12 @@ import {
   ShieldCheck,
   Target,
   TriangleAlert,
+  Trophy,
   X,
   Zap,
 } from "lucide-react";
 import type * as Monaco from "monaco-editor";
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CompileCoordinator } from "@/src/compiler/coordinator";
 import { projectBuildIdentity, projectCacheKey } from "@/src/core/hash";
@@ -53,6 +56,8 @@ import { createJudgeExecutor, JudgeEngine, type JudgeCaseResult, type JudgeCaseV
 import { FORGE_CONTRACT_VERSION } from "@/src/core/contract";
 import { textMatcher } from "@/src/judge/spec";
 import { normalizeOutput } from "@/src/judge/normalization";
+import { sampleOutputMatches } from "@/src/judge/sample-output";
+import { recordLocalSamplesPassed } from "@/src/judge/local-practice-progress";
 import { createJudgeProject, judgeProjectId, latestJudgeProjectForCollection, problemIdentityFromProject } from "@/src/judge/project";
 import { buildChatGptProblemUrl } from "@/src/judge/chatgpt-help";
 import { BrowserForgeCompiler } from "@/src/runtime/compiler-client";
@@ -63,17 +68,21 @@ import { registerToolchainCache } from "@/src/storage/service-worker";
 import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
 import { forgeMonacoTheme, registerForgeMonacoThemes } from "@/src/editor/forge-monaco-theme";
 import { useProduct } from "@/src/components/app-shell";
+import { Drawer } from "@/src/components/drawer";
+import { IconButton } from "@/src/components/icon-button";
+import {
+  OfficialSubmissionResult,
+  type OfficialSubmissionStatus,
+} from "@/src/components/official-submission-result";
 import { ProblemMarkdown } from "@/src/components/problem-markdown";
+import { ProblemLeaderboard } from "@/src/components/problem-leaderboard";
 import { CaseScoreDetails } from "@/src/components/case-score-details";
 import {
-  DEFAULT_JUDGE_UI_LOCALE,
   executionTerminationLabel,
   judgeUiText,
   localizedWorkerProgress,
-  readJudgeUiLocale,
   toolchainNote,
   verdictLabel,
-  writeJudgeUiLocale,
 } from "@/src/components/judge-ui-i18n";
 import {
   completeJudgeOnboarding,
@@ -119,12 +128,11 @@ import {
   type SelfTestCase,
 } from "@/src/judge/self-tests";
 import { requestForgeTurnstileToken } from "@/src/turnstile/client";
-import { isTerminalSubmissionState, type SequencedSubmissionEvent, type SubmissionState } from "@/src/online-judge/contracts";
+import { isTerminalSubmissionState, type SequencedSubmissionEvent } from "@/src/online-judge/contracts";
 import {
   parseOfficialSubmissionCancellation,
   parseOfficialSubmissionCreated,
   SubmissionEventPollingClient,
-  type SubmissionPollingConnectionState,
 } from "@/src/online-judge/submission-event-polling";
 import {
   createOfficialSubmissionRequest,
@@ -145,7 +153,7 @@ type BottomTab = "judge" | "tests" | "diagnostics" | "output";
 type BusyAction = "build" | "test" | "judge" | "official" | "cache" | undefined;
 type DifficultyFilter = "all" | ProblemDifficulty;
 type CompileAheadState = "idle" | "scheduled" | "compiling" | "ready" | "error";
-type ProblemPane = "statement" | "editorial";
+type ProblemPane = "statement" | "editorial" | "leaderboard";
 
 interface PanelResizeSession {
   pointerId: number;
@@ -162,27 +170,13 @@ interface LogEntry {
 interface SelfTestRunResult {
   readonly caseId: string;
   readonly run: RunResult;
+  readonly expectedOutput?: string;
+  readonly matchesExpected?: boolean;
 }
 
 interface ManagedCollectionMatch {
   readonly snapshotId: string;
   readonly problems: Readonly<Record<string, string>>;
-}
-
-interface OfficialSubmissionStatus {
-  readonly submissionId: string;
-  readonly connection: SubmissionPollingConnectionState;
-  readonly cursor: number;
-  readonly state?: SubmissionState;
-  readonly compilePhase?: string;
-  readonly completedCases?: number;
-  readonly totalCases?: number;
-  readonly verdict?: string;
-  readonly score?: number;
-  readonly deterministicCost?: number;
-  readonly peakMemoryBytes?: number;
-  readonly eventError?: string;
-  readonly connectionDetail?: string;
 }
 
 const MONACO_LANGUAGE: Record<BuiltinLanguage, string> = {
@@ -406,15 +400,8 @@ interface ProblemCollectionSession {
 }
 
 export function JudgeStudioLoader() {
+  const { locale: problemLocale, setLocale: changeProblemLocale } = useProduct();
   const [storedSource] = useState<StoredProblemCollectionSource>(storedProblemCollectionSource);
-  const [problemLocale, setProblemLocale] = useState<ProblemLocale>(() => {
-    if (typeof window === "undefined") return DEFAULT_JUDGE_UI_LOCALE;
-    try {
-      return readJudgeUiLocale(localStorage, navigator.language.toLowerCase().startsWith("zh") ? "zh-TW" : "en");
-    } catch {
-      return DEFAULT_JUDGE_UI_LOCALE;
-    }
-  });
   const [source, setSource] = useState<GithubProblemCollectionSource>(storedSource.source);
   const [session, setSession] = useState<ProblemCollectionSession>();
   const [error, setError] = useState<{
@@ -424,10 +411,6 @@ export function JudgeStudioLoader() {
   const [blockedByStoredConfiguration, setBlockedByStoredConfiguration] = useState(Boolean(storedSource.error));
   const [retry, setRetry] = useState(0);
   const text = judgeUiText(problemLocale);
-
-  useEffect(() => {
-    document.documentElement.lang = problemLocale === "zh-TW" ? "zh-Hant" : "en";
-  }, [problemLocale]);
 
   useEffect(() => {
     if (blockedByStoredConfiguration) return;
@@ -460,11 +443,6 @@ export function JudgeStudioLoader() {
     setError(undefined);
     setBlockedByStoredConfiguration(false);
     setRetry((value) => value + 1);
-  }, []);
-
-  const changeProblemLocale = useCallback((locale: ProblemLocale) => {
-    setProblemLocale(locale);
-    writeJudgeUiLocale(localStorage, locale);
   }, []);
 
   const errorMessage = error?.kind === "read"
@@ -522,6 +500,14 @@ interface JudgeStudioProps {
   onProblemLocaleChange(locale: ProblemLocale): void;
   onProblemCollectionSourceChange?(source: GithubProblemCollectionSource): void;
   managedContext?: ManagedProblemContext;
+  contestNavigation?: ContestWorkspaceNavigation;
+}
+
+export interface ContestWorkspaceNavigation {
+  readonly title: string;
+  readonly overviewHref: string;
+  readonly previous?: { readonly href: string; readonly label: string };
+  readonly next?: { readonly href: string; readonly label: string };
 }
 
 export function JudgeStudio({
@@ -531,6 +517,7 @@ export function JudgeStudio({
   onProblemLocaleChange,
   onProblemCollectionSourceChange,
   managedContext,
+  contestNavigation,
 }: JudgeStudioProps) {
   const { theme: productTheme } = useProduct();
   const explicitManagedContext = useMemo(
@@ -565,6 +552,8 @@ export function JudgeStudio({
   const [solved, setSolved] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
   const [runtimeReady, setRuntimeReady] = useState(false);
+  const [runtimeInitializationError, setRuntimeInitializationError] = useState("");
+  const [runtimeGeneration, setRuntimeGeneration] = useState(0);
   const [progress, setProgress] = useState<WorkerProgress>({ phase: "initializing", label: "Starting Wasmer runtime", progress: 0 });
   const [busy, setBusy] = useState<BusyAction>();
   const [artifact, setArtifact] = useState<BuildArtifact>();
@@ -585,6 +574,8 @@ export function JudgeStudio({
   const [bottomPanelMaximum, setBottomPanelMaximum] = useState(DEFAULT_BOTTOM_PANEL_HEIGHT);
   const [resizingBottomPanel, setResizingBottomPanel] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pendingFileRemoval, setPendingFileRemoval] = useState<string>();
+  const [drawerPortalTarget, setDrawerPortalTarget] = useState<HTMLElement>();
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<"problem" | "code" | "result">("problem");
   const [newFileOpen, setNewFileOpen] = useState(false);
@@ -612,6 +603,8 @@ export function JudgeStudio({
   const officialCancelPendingRef = useRef(false);
   const officialRunRef = useRef(0);
   const panelResizeRef = useRef<PanelResizeSession | undefined>(undefined);
+  const settingsReturnFocusRef = useRef<HTMLElement>(null);
+  const fileRemovalReturnFocusRef = useRef<HTMLElement>(null);
   const text = judgeUiText(problemLocale);
 
   const activeProblemText = problemText(activeProblem, problemLocale);
@@ -626,6 +619,9 @@ export function JudgeStudio({
     ?? (matchedProblemVersionId ? { problemVersionId: matchedProblemVersionId } : undefined);
   const managedProblemVersionId = officialContext?.problemVersionId;
   const officialContestId = officialContext?.contestId;
+  const archivedManagedPractice = "publication" in collection && collection.publication.status === "archived"
+    ? collection.publication
+    : undefined;
   const fullLocalJudgeAvailable = explicitManagedContext
     ? managedCollectionAllowsFullLocalJudge(explicitManagedContext)
     : true;
@@ -817,29 +813,9 @@ export function JudgeStudio({
   useEffect(() => {
     const storageCoordinator = createDefaultBrowserStorageCoordinator();
     storageCoordinatorRef.current = storageCoordinator;
-    let compilation: CompileCoordinator | undefined;
-    let runner: BrowserForgeRunner | undefined;
     let disposed = false;
     void (async () => {
       try {
-        await registerToolchainCache({ chunkManifestUrl: SITES_CHUNK_MANIFEST_URL });
-        if (disposed) return;
-        const compiler = new BrowserForgeCompiler();
-        compilation = new CompileCoordinator(compiler, {
-          load: loadArtifact,
-          save: saveArtifact,
-          delete: deleteArtifact,
-          clear: clearArtifactCache,
-        });
-        runner = new BrowserForgeRunner();
-        compilerRef.current = compiler;
-        compileCoordinatorRef.current = compilation;
-        runnerRef.current = runner;
-        compiler.onProgress(setProgress);
-        runner.onProgress(setProgress);
-        runner.onStream((stream, chunk) => {
-          if (!judgingRef.current) addLog(stream, chunk);
-        });
         await storageCoordinator.requestPersistence();
         if (disposed) return;
         try {
@@ -876,9 +852,6 @@ export function JudgeStudio({
         if (disposed) return;
         setStorage({ usage: storageReport.usage, quota: storageReport.quota });
         setHydrated(true);
-        await Promise.all([compiler.ready(), runner.ready()]);
-        if (disposed) return;
-        setRuntimeReady(true);
       } catch (error) {
         if (disposed) return;
         addLog("stderr", error instanceof Error ? error.message : String(error));
@@ -887,10 +860,61 @@ export function JudgeStudio({
     })();
     return () => {
       disposed = true;
+    };
+  }, [addLog, collection, problemDigests, problems, progressKey, validProgressIds]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    let compilation: CompileCoordinator | undefined;
+    let runner: BrowserForgeRunner | undefined;
+    let disposed = false;
+    setRuntimeReady(false);
+    setRuntimeInitializationError("");
+    setProgress({ phase: "initializing", label: "Starting Wasmer runtime", progress: 0 });
+    void (async () => {
+      try {
+        await registerToolchainCache({ chunkManifestUrl: SITES_CHUNK_MANIFEST_URL });
+        if (disposed) return;
+        const compiler = new BrowserForgeCompiler();
+        compilation = new CompileCoordinator(compiler, {
+          load: loadArtifact,
+          save: saveArtifact,
+          delete: deleteArtifact,
+          clear: clearArtifactCache,
+        });
+        runner = new BrowserForgeRunner();
+        compilerRef.current = compiler;
+        compileCoordinatorRef.current = compilation;
+        runnerRef.current = runner;
+        compiler.onProgress(setProgress);
+        runner.onProgress(setProgress);
+        runner.onStream((stream, chunk) => {
+          if (!judgingRef.current) addLog(stream, chunk);
+        });
+        await Promise.all([compiler.ready(), runner.ready()]);
+        if (disposed) return;
+        setRuntimeReady(true);
+      } catch (error) {
+        if (disposed) return;
+        const message = error instanceof Error ? error.message : String(error);
+        addLog("stderr", message);
+        setRuntimeInitializationError(message);
+        if (compileCoordinatorRef.current === compilation) compileCoordinatorRef.current = undefined;
+        if (runnerRef.current === runner) runnerRef.current = undefined;
+        compilation?.dispose();
+        runner?.dispose();
+        compilation = undefined;
+        runner = undefined;
+      }
+    })();
+    return () => {
+      disposed = true;
+      if (compileCoordinatorRef.current === compilation) compileCoordinatorRef.current = undefined;
+      if (runnerRef.current === runner) runnerRef.current = undefined;
       compilation?.dispose();
       runner?.dispose();
     };
-  }, [addLog, collection, problemDigests, problems, progressKey, validProgressIds]);
+  }, [addLog, hydrated, runtimeGeneration]);
 
   useEffect(() => {
     if (!hydrated || !runtimeReady) return;
@@ -1062,6 +1086,8 @@ export function JudgeStudio({
       setRunningSelfTestId(undefined);
       setJudgeSession(undefined);
       setSelectedCaseNumber(undefined);
+      setOfficialSubmissionId(undefined);
+      setOfficialSubmissionStatus(undefined);
       setBottomTab("judge");
     } catch (error) {
       addLog("stderr", error instanceof Error ? error.message : String(error));
@@ -1150,10 +1176,15 @@ export function JudgeStudio({
     if (selectedSelfTestId === id) setSelectedSelfTestId(next[Math.min(index, next.length - 1)].id);
   };
 
-  const doRunSelfTests = useCallback(async (caseIds: readonly string[], availableCases: readonly SelfTestCase[] = selfTests) => {
+  const doRunSelfTests = useCallback(async (
+    caseIds: readonly string[],
+    availableCases: readonly SelfTestCase[] = selfTests,
+    expectedOutputs?: ReadonlyMap<string, string>,
+  ) => {
     const runner = runnerRef.current;
     const requested = availableCases.filter((testCase) => caseIds.includes(testCase.id));
     if (!runner || requested.length === 0) return;
+    const completedResults: SelfTestRunResult[] = [];
     cancelledRef.current = false;
     setBusy("test");
     setBottomTab("tests");
@@ -1181,9 +1212,15 @@ export function JudgeStudio({
         });
         addLog("system", text.logs.runStarted(testCase.name.trim() || text.selfTest.caseName(index + 1)));
         const result = await runner.run(runnable, { ...project.config, stdin: testCase.input });
+        const expectedOutput = expectedOutputs?.get(testCase.id);
+        const matchesExpected = expectedOutput === undefined
+          ? undefined
+          : sampleOutputMatches(result, expectedOutput);
+        const completed = { caseId: testCase.id, run: result, expectedOutput, matchesExpected } satisfies SelfTestRunResult;
+        completedResults.push(completed);
         setSelfTestResults((current) => [
           ...current.filter((candidate) => candidate.caseId !== testCase.id),
-          { caseId: testCase.id, run: result },
+          completed,
         ]);
         const cost = result.metrics.cost === null
           ? text.logs.costUnavailable
@@ -1197,6 +1234,7 @@ export function JudgeStudio({
       setRunningSelfTestId(undefined);
       setBusy(undefined);
     }
+    return completedResults;
   }, [addLog, artifact, doBuild, problemLocale, project, selfTests, text]);
 
   const doRunSamples = useCallback(async () => {
@@ -1204,13 +1242,22 @@ export function JudgeStudio({
       id: `sample-${index + 1}`,
       name: text.selfTest.sampleName(index + 1),
       input: sample.input,
+      expectedOutput: sample.output,
     }));
     if (samples.length === 0) return;
     setSelfTests(samples);
     setSelectedSelfTestId(samples[0].id);
     setMobileWorkspaceTab("result");
-    await doRunSelfTests(samples.map((sample) => sample.id), samples);
-  }, [activeProblem, doRunSelfTests, text]);
+    const expectedOutputs = new Map(samples.map((sample) => [sample.id, sample.expectedOutput] as const));
+    const results = await doRunSelfTests(samples.map((sample) => sample.id), samples, expectedOutputs);
+    if (
+      managedProblemVersionId
+      && results?.length === samples.length
+      && results.every((result) => result.matchesExpected === true)
+    ) {
+      recordLocalSamplesPassed(localStorage, managedProblemVersionId, activeProblemEntry.bundle.sha256);
+    }
+  }, [activeProblem, activeProblemEntry.bundle.sha256, doRunSelfTests, managedProblemVersionId, text]);
 
   const doJudge = useCallback(async () => {
     if (!fullLocalJudgeAvailable) {
@@ -1223,6 +1270,8 @@ export function JudgeStudio({
     cancelledRef.current = false;
     judgingRef.current = true;
     setSelectedCaseNumber(undefined);
+    setOfficialSubmissionId(undefined);
+    setOfficialSubmissionStatus(undefined);
     const started = performance.now();
     setBottomTab("judge");
     setLogs([]);
@@ -1361,13 +1410,14 @@ export function JudgeStudio({
   }, [activeProblem, activeProgressId, addLog, artifact, doBuild, fullLocalJudgeAvailable, project, projectLanguage, text.official.contestSamplesOnly]);
 
   const doOfficialSubmit = useCallback(async () => {
-    if (!managedProblemVersionId) return;
+    if (!managedProblemVersionId || archivedManagedPractice) return;
     setMobileWorkspaceTab("result");
     const runIdentity = officialRunRef.current + 1;
     officialRunRef.current = runIdentity;
     setBusy("official");
     setBottomTab("output");
     setLogs([]);
+    setJudgeSession(undefined);
     setOfficialSubmissionId(undefined);
     setOfficialSubmissionStatus(undefined);
     officialPollingRef.current?.stop("superseded");
@@ -1455,6 +1505,10 @@ export function JudgeStudio({
           if (event.kind === "verdict" && event.verdict && event.score !== undefined) addLog("system", text.official.verdict(event.verdict, event.score));
           if (event.kind === "resource-summary" && event.deterministicCost !== undefined && event.peakMemoryBytes !== undefined) addLog("system", text.official.resources(event.deterministicCost, formatBytes(event.peakMemoryBytes)));
           if (event.kind === "error" && event.message) addLog("stderr", event.message);
+          if (
+            event.kind === "verdict"
+            || (event.kind === "state" && event.state && isTerminalSubmissionState(event.state))
+          ) setBottomTab("judge");
         },
         onStatus: (status) => {
           setOfficialSubmissionStatus((current) => {
@@ -1469,6 +1523,7 @@ export function JudgeStudio({
           if (status.state === "disconnected") addLog("system", text.official.disconnected(status.cursor));
           if (status.state === "reconnecting") addLog("system", text.official.reconnecting(status.reconnectAttempt, status.cursor));
           if (status.state === "error") addLog("stderr", text.official.pollingError(status.cursor));
+          if (status.state === "completed") setBottomTab("judge");
         },
       });
       officialPollingRef.current = polling;
@@ -1483,7 +1538,7 @@ export function JudgeStudio({
         setBusy(undefined);
       }
     }
-  }, [addLog, managedProblemVersionId, officialContestId, project, projectLanguage, text]);
+  }, [addLog, archivedManagedPractice, managedProblemVersionId, officialContestId, project, projectLanguage, text]);
 
   const cancelOfficialSubmission = useCallback(async () => {
     if (officialCancelPendingRef.current) return;
@@ -1539,6 +1594,12 @@ export function JudgeStudio({
     addLog("system", text.logs.cancelled);
   }, [addLog, busy, cancelOfficialSubmission, text]);
 
+  const openSettings = (event: ReactMouseEvent<HTMLElement>) => {
+    settingsReturnFocusRef.current = event.currentTarget;
+    setDrawerPortalTarget(event.currentTarget.closest<HTMLElement>(".studio-shell") ?? undefined);
+    setSettingsOpen(true);
+  };
+
   const chooseTarget = (target: "wasip1" | "wasix") => {
     if (target === project.config.target) return;
     compileCoordinatorRef.current?.restart();
@@ -1556,14 +1617,23 @@ export function JudgeStudio({
     setNewFileOpen(false);
   };
 
-  const removeFile = (path: string) => {
-    if (project.files.length === 1 || !window.confirm(text.editor.deleteFileConfirm(path))) return;
+  const requestFileRemoval = (path: string, trigger: HTMLElement) => {
+    if (project.files.length === 1) return;
+    fileRemovalReturnFocusRef.current = trigger;
+    setDrawerPortalTarget(trigger.closest<HTMLElement>(".studio-shell") ?? undefined);
+    setPendingFileRemoval(path);
+  };
+
+  const removeFile = () => {
+    const path = pendingFileRemoval;
+    if (!path || project.files.length === 1) return;
     updateProject((current) => {
       const files = current.files.filter((file) => file.path !== path);
       const active = current.activeFile === path ? files[0].path : current.activeFile;
       const entry = current.config.entry === path ? files[0].path : current.config.entry;
       return { ...current, files, activeFile: active, config: { ...current.config, entry } };
     });
+    setPendingFileRemoval(undefined);
   };
 
   const openDiagnostic = (diagnostic: Diagnostic) => {
@@ -1615,7 +1685,7 @@ export function JudgeStudio({
 
   return (
     <main className={`studio-shell judge-shell ${explicitManagedContext ? "managed-judge-shell" : "custom-judge-shell"}`}>
-      <header className="topbar">
+      <header className="topbar" data-drawer-background>
         <div className="brand" aria-label="WASM OJ Forge">
           <span className="brand-mark"><Target size={17} strokeWidth={2.4} /></span>
           <span className="brand-name">FORGE</span>
@@ -1623,9 +1693,12 @@ export function JudgeStudio({
         </div>
 
         <div className="problem-switcher">
+          {contestNavigation && <a className="icon-button" href={contestNavigation.overviewHref} aria-label={`${contestNavigation.title} overview`} title={contestNavigation.title}><Trophy size={14} /></a>}
+          {contestNavigation?.previous && <a className="icon-button" href={contestNavigation.previous.href} aria-label={`Previous problem: ${contestNavigation.previous.label}`} title={contestNavigation.previous.label}><ChevronLeft size={14} /></a>}
           <span className="problem-switcher-number">#{String(activeProblem.number).padStart(2, "0")}</span>
           <span>{activeProblemText.title}</span>
           <span className={`difficulty-pill ${activeProblem.difficulty}`}>{difficultyLabel(activeProblem.difficulty, problemLocale)}</span>
+          {contestNavigation?.next && <a className="icon-button" href={contestNavigation.next.href} aria-label={`Next problem: ${contestNavigation.next.label}`} title={contestNavigation.next.label}><ChevronRight size={14} /></a>}
         </div>
 
         <div className="topbar-actions">
@@ -1658,9 +1731,9 @@ export function JudgeStudio({
             <button className="stop-button" onClick={cancel}><CircleStop size={14} /> {text.topbar.stop}</button>
           ) : explicitManagedContext ? (
             <>
-              <button className="workspace-advanced-button" onClick={() => setSettingsOpen(true)}><Settings2 size={14} />{problemLocale === "zh-TW" ? "測試 / 進階" : "Test / Advanced"}</button>
+              <button className="workspace-advanced-button" onClick={openSettings}><Settings2 size={14} />{problemLocale === "zh-TW" ? "測試 / 進階" : "Test / Advanced"}</button>
               <button className="workspace-run-button" onClick={() => void doRunSamples()} disabled={!runtimeReady}><Play size={14} />{problemLocale === "zh-TW" ? "執行" : "Run"}</button>
-              <button className="workspace-submit-button" onClick={() => void doOfficialSubmit()}><Send size={14} />{problemLocale === "zh-TW" ? "提交" : "Submit"}</button>
+              <button className="workspace-submit-button" onClick={() => void doOfficialSubmit()} disabled={Boolean(archivedManagedPractice)} title={archivedManagedPractice ? (problemLocale === "zh-TW" ? "此版本已封存，請開啟目前版本提交" : "This version is archived; open the current version to submit") : undefined}><Send size={14} />{problemLocale === "zh-TW" ? "提交" : "Submit"}</button>
             </>
           ) : (
             <>
@@ -1671,7 +1744,7 @@ export function JudgeStudio({
                 <ChevronDown size={12} />
               </label>
               <button className="icon-button" onClick={() => setOnboardingOpen(true)} aria-label={text.topbar.openGuide} title={text.topbar.guide}><CircleHelp size={16} /></button>
-              <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label={text.topbar.projectSettings}><Settings2 size={16} /></button>
+              <button className="icon-button" onClick={openSettings} aria-label={text.topbar.projectSettings}><Settings2 size={16} /></button>
               <button className="build-button" onClick={() => void doBuild(false)} disabled={!runtimeReady}><Hammer size={14} /> {text.topbar.build}</button>
               <button className="sample-button" onClick={() => setBottomTab("tests")} disabled={!runtimeReady}><Play size={14} /> {text.topbar.selfTest}</button>
               {fullLocalJudgeAvailable
@@ -1683,9 +1756,20 @@ export function JudgeStudio({
         </div>
       </header>
 
-      <section className={`judge-workspace ${explicitManagedContext ? "managed-workspace" : "custom-judge-workspace"}`}>
+      <section className={`judge-workspace ${explicitManagedContext ? "managed-workspace" : "custom-judge-workspace"}`} data-drawer-background>
         {explicitManagedContext && <nav className="mobile-workspace-tabs" aria-label="Workspace"><button className={mobileWorkspaceTab === "problem" ? "active" : ""} onClick={() => setMobileWorkspaceTab("problem")}>Problem</button><button className={mobileWorkspaceTab === "code" ? "active" : ""} onClick={() => setMobileWorkspaceTab("code")}>Code</button><button className={mobileWorkspaceTab === "result" ? "active" : ""} onClick={() => setMobileWorkspaceTab("result")}>Result</button></nav>}
         {explicitManagedContext && <div className="managed-capability" role="status"><ShieldCheck size={14} /> {explicitManagedContext.contestId ? (problemLocale === "zh-TW" ? "競賽題目 · 本機執行公開範例，提交後由 Server 正式判題" : "Contest problem · run public samples locally, then submit for the official verdict") : (problemLocale === "zh-TW" ? "官方練習 · 程式碼保存在瀏覽器，提交後取得驗證結果" : "Official practice · code stays in your browser until you submit")}</div>}
+        {archivedManagedPractice?.currentProblemVersionId && <div className="official-submission-status connection-completed" role="status"><LockKeyhole size={14} /><strong>{problemLocale === "zh-TW" ? "封存版本（唯讀）" : "Archived version (read-only)"}</strong><span>{problemLocale === "zh-TW" ? "你仍可查看當時題目與本機草稿，但不能從舊版本正式提交。" : "You can review this statement and local draft, but official submission is disabled for old versions."}</span><a className="judge-link" href={`/problems/${encodeURIComponent(archivedManagedPractice.currentProblemVersionId)}`}>{problemLocale === "zh-TW" ? "開啟目前版本" : "Open current version"}</a></div>}
+        {runtimeInitializationError && (
+          <div className="official-submission-status connection-error" role="alert">
+            <TriangleAlert size={14} />
+            <strong>{problemLocale === "zh-TW" ? "本機執行環境無法啟動" : "Local runtime failed to start"}</strong>
+            <span>{runtimeInitializationError}</span>
+            <button type="button" onClick={() => setRuntimeGeneration((current) => current + 1)}>
+              <RotateCcw size={12} /> {problemLocale === "zh-TW" ? "重試" : "Retry"}
+            </button>
+          </div>
+        )}
         {!explicitManagedContext && managedMatchChecked && managedMatch && <div className="managed-capability" role="status"><ShieldCheck size={14} /> {managedProblemVersionId ? text.official.available : text.official.snapshotOnly}</div>}
         {officialSubmissionStatus && (
           <div className={`official-submission-status connection-${officialSubmissionStatus.connection}`} role="status" aria-live="polite">
@@ -1796,6 +1880,9 @@ export function JudgeStudio({
             {fullLocalJudgeAvailable && <button className={problemPane === "editorial" ? "active" : ""} onClick={() => setProblemPane("editorial")}>
               {text.statement.editorial}
             </button>}
+            {explicitManagedContext && !explicitManagedContext.contestId && <button className={problemPane === "leaderboard" ? "active" : ""} onClick={() => setProblemPane("leaderboard")}>
+              {problemLocale === "zh-TW" ? "排名" : "Ranking"}
+            </button>}
             <a
               className="ask-chatgpt-button"
               href={chatGptProblemUrl}
@@ -1807,7 +1894,13 @@ export function JudgeStudio({
               {text.statement.askChatGpt}
             </a>
           </div>
-          <ProblemMarkdown markdown={problemPane === "statement" || !fullLocalJudgeAvailable ? activeProblemText.statement : activeProblemText.editorial} />
+          {problemPane === "leaderboard" && explicitManagedContext && !explicitManagedContext.contestId
+            ? <ProblemLeaderboard
+              problemVersionId={explicitManagedContext.problemVersionId}
+              locale={problemLocale}
+              refreshKey={officialSubmissionStatus?.state === "completed" ? officialSubmissionStatus.submissionId : undefined}
+            />
+            : <ProblemMarkdown markdown={problemPane === "statement" || !fullLocalJudgeAvailable ? activeProblemText.statement : activeProblemText.editorial} />}
         </article>
 
         <section
@@ -1822,7 +1915,7 @@ export function JudgeStudio({
                   <span className={`file-icon ${languageTone(file.language)}`}>{languageIcon(file.language)}</span>
                   {file.path.split("/").at(-1)}
                 </button>
-                {project.files.length > 1 && <button className="file-tab-close" onClick={() => removeFile(file.path)} aria-label={text.editor.deleteFile(file.path)}><X size={11} /></button>}
+                {project.files.length > 1 && <button className="file-tab-close" onClick={(event) => requestFileRemoval(file.path, event.currentTarget)} aria-label={text.editor.deleteFile(file.path)}><X size={11} /></button>}
               </div>
             ))}
             {newFileOpen ? (
@@ -1834,7 +1927,7 @@ export function JudgeStudio({
             ) : (
               <button className="bare-button add-file-tab" onClick={() => setNewFileOpen(true)} aria-label={text.editor.addFile}><Plus size={14} /></button>
             )}
-            <div className="editor-actions"><button className="bare-button" onClick={() => setSettingsOpen(true)} aria-label={text.editor.openCompilationSettings}><Settings2 size={14} /></button></div>
+            <div className="editor-actions"><button className="bare-button" onClick={openSettings} aria-label={text.editor.openCompilationSettings}><Settings2 size={14} /></button></div>
           </div>
           <div className="editor-surface">
             {activeFile && (
@@ -1888,7 +1981,13 @@ export function JudgeStudio({
           <section className="bottom-panel">
             <div className="bottom-tabs">
               <button className={bottomTab === "judge" ? "active" : ""} onClick={() => setBottomTab("judge")}>
-                {text.panel.judgeResults} {judgeSession && <span className={`verdict-mini ${judgeSession.verdict}`}>{judgeSession.completed}/{judgeSession.total}</span>}
+                {text.panel.judgeResults} {officialSubmissionStatus
+                  ? <span className={`verdict-mini ${officialSubmissionStatus.verdict ?? officialSubmissionStatus.state ?? "running"}`}>
+                    {officialSubmissionStatus.completedCases !== undefined && officialSubmissionStatus.totalCases !== undefined
+                      ? `${officialSubmissionStatus.completedCases}/${officialSubmissionStatus.totalCases}`
+                      : officialSubmissionStatus.state ?? "…"}
+                  </span>
+                  : judgeSession && <span className={`verdict-mini ${judgeSession.verdict}`}>{judgeSession.completed}/{judgeSession.total}</span>}
               </button>
               <button className={bottomTab === "tests" ? "active" : ""} onClick={() => setBottomTab("tests")}>
                 {text.panel.selfTest} <span className="test-count-badge">{selfTestResults.length}/{selfTests.length}</span>
@@ -1909,7 +2008,13 @@ export function JudgeStudio({
             </div>
             <div className="panel-content">
               {bottomTab === "judge" ? (
-                !judgeSession ? (
+                officialSubmissionStatus ? (
+                  <OfficialSubmissionResult
+                    status={officialSubmissionStatus}
+                    locale={problemLocale}
+                    formatBytes={formatBytes}
+                  />
+                ) : !judgeSession ? (
                   <div className="empty-panel judge-empty"><Target size={18} /><strong>{text.judge.ready}</strong><span>{text.judge.readyDescription}</span></div>
                 ) : (
                   <div className="judge-results">
@@ -1997,8 +2102,11 @@ export function JudgeStudio({
                     </header>
                     <div className="self-test-list">
                       {selfTests.map((testCase, index) => {
-                        const result = selfTestResults.find((candidate) => candidate.caseId === testCase.id)?.run;
-                        const successful = result?.termination === "exited" && result.code === 0;
+                        const runResult = selfTestResults.find((candidate) => candidate.caseId === testCase.id);
+                        const result = runResult?.run;
+                        const successful = result?.termination === "exited"
+                          && result.code === 0
+                          && runResult?.matchesExpected !== false;
                         return (
                           <article className={`self-test-card ${selectedSelfTest?.id === testCase.id ? "selected" : ""}`} key={testCase.id}>
                             <header>
@@ -2046,8 +2154,12 @@ export function JudgeStudio({
                     <header>
                       <div><span>{text.selfTest.result}</span><strong>{selectedSelfTest?.name.trim() || text.selfTest.untitled}</strong></div>
                       {selectedSelfTestResult && (
-                        <span className={selectedSelfTestResult.run.termination === "exited" && selectedSelfTestResult.run.code === 0 ? "success" : "failure"}>
-                          {executionTerminationLabel(problemLocale, selectedSelfTestResult.run.termination)} · {text.selfTest.exit} {selectedSelfTestResult.run.code}
+                        <span className={selectedSelfTestResult.run.termination === "exited" && selectedSelfTestResult.run.code === 0 && selectedSelfTestResult.matchesExpected !== false ? "success" : "failure"}>
+                          {selectedSelfTestResult.matchesExpected === true
+                            ? (problemLocale === "zh-TW" ? "範例通過" : "Sample passed")
+                            : selectedSelfTestResult.matchesExpected === false
+                              ? (problemLocale === "zh-TW" ? "輸出不符" : "Output differs")
+                              : `${executionTerminationLabel(problemLocale, selectedSelfTestResult.run.termination)} · ${text.selfTest.exit} ${selectedSelfTestResult.run.code}`}
                         </span>
                       )}
                     </header>
@@ -2061,7 +2173,10 @@ export function JudgeStudio({
                           <div><span>{text.selfTest.peakMemory}</span><strong>{selectedSelfTestResult.run.metrics.memoryBytes === null ? "—" : formatBytes(selectedSelfTestResult.run.metrics.memoryBytes)}</strong></div>
                           <div><span>{text.selfTest.logicalTime}</span><strong>{selectedSelfTestResult.run.metrics.logicalTimeNs === null ? "—" : formatDuration(selectedSelfTestResult.run.metrics.logicalTimeNs / 1_000_000)}</strong></div>
                         </div>
-                        <div className="self-test-stream stdout"><span>STDOUT</span><pre>{selectedSelfTestResult.run.stdout || "∅"}</pre></div>
+                        {selectedSelfTestResult.expectedOutput !== undefined && (
+                          <div className="self-test-stream stdout"><span>{text.judge.expected}</span><pre>{normalizeOutput(selectedSelfTestResult.expectedOutput, "lines") || "∅"}</pre></div>
+                        )}
+                        <div className="self-test-stream stdout"><span>{selectedSelfTestResult.expectedOutput === undefined ? "STDOUT" : text.judge.actual}</span><pre>{normalizeOutput(selectedSelfTestResult.run.stdout, "lines") || "∅"}</pre></div>
                         {selectedSelfTestResult.run.stderr && <div className="self-test-stream stderr"><span>STDERR</span><pre>{selectedSelfTestResult.run.stderr}</pre></div>}
                       </div>
                     )}
@@ -2094,7 +2209,7 @@ export function JudgeStudio({
         </section>
       </section>
 
-      <footer className="statusbar">
+      <footer className="statusbar" data-drawer-background>
         <div><LockKeyhole size={12} />{text.status.localJudge}</div>
         <div><Package size={12} />{activeToolchain.label} {activeToolchain.version}</div>
         <div><HardDrive size={12} />{text.status.cached(formatBytes(storage.usage))}</div>
@@ -2106,10 +2221,8 @@ export function JudgeStudio({
 
       {onboardingOpen && <JudgeOnboarding locale={problemLocale} onClose={dismissOnboarding} />}
 
-      {settingsOpen && (
-        <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
-          <aside className="settings-drawer" aria-label={text.settings.ariaLabel}>
-            <div className="drawer-heading"><div><span>{text.settings.eyebrow}</span><h2>{text.settings.title}</h2><p>{text.settings.description}</p></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label={text.settings.close}><X size={16} /></button></div>
+      <Drawer open={settingsOpen} label={text.settings.ariaLabel} onClose={() => setSettingsOpen(false)} returnFocusRef={settingsReturnFocusRef} portalTarget={drawerPortalTarget} className="settings-drawer">
+            <div className="drawer-heading"><div><span>{text.settings.eyebrow}</span><h2>{text.settings.title}</h2><p>{text.settings.description}</p></div><IconButton icon={X} label={text.settings.close} onClick={() => setSettingsOpen(false)} /></div>
             {collection.source.provider === "github" && onProblemCollectionSourceChange && <section className="problem-source-section" aria-labelledby="problem-source-heading">
               <div className="problem-source-heading">
                 <div><span>{text.settings.collectionEyebrow}</span><strong id="problem-source-heading">{text.settings.collectionTitle}</strong></div>
@@ -2189,9 +2302,14 @@ export function JudgeStudio({
               <div className="cache-section"><div><strong>{text.settings.localCache}</strong><span>{formatBytes(storage.usage)} / {storage.quota ? formatBytes(storage.quota) : text.settings.browserQuota}</span></div><button onClick={() => void clearCaches()} disabled={Boolean(busy)}><RotateCcw size={13} /> {text.settings.clearCache}</button></div>
               <div className="drawer-footer"><ShieldCheck size={14} /><span>{text.settings.privacyNote}</span></div>
             </section>
-          </aside>
+      </Drawer>
+      <Drawer open={Boolean(pendingFileRemoval)} label={pendingFileRemoval ? text.editor.deleteFileConfirm(pendingFileRemoval) : text.editor.deleteFile("")} onClose={() => setPendingFileRemoval(undefined)} returnFocusRef={fileRemovalReturnFocusRef} portalTarget={drawerPortalTarget}>
+        <div className="account-delete-drawer">
+          <header><div><span className="product-eyebrow"><TriangleAlert aria-hidden="true" size={14} /> {problemLocale === "zh-TW" ? "刪除檔案" : "Delete file"}</span><h2>{pendingFileRemoval ? text.editor.deleteFileConfirm(pendingFileRemoval) : ""}</h2></div><IconButton icon={X} label={text.settings.close} onClick={() => setPendingFileRemoval(undefined)} /></header>
+          <p>{problemLocale === "zh-TW" ? "這只會刪除目前瀏覽器草稿中的檔案。" : "This removes the file only from the draft stored in this browser."}</p>
+          <footer><button className="secondary-action" type="button" onClick={() => setPendingFileRemoval(undefined)}>{problemLocale === "zh-TW" ? "取消" : "Cancel"}</button><button className="danger-action" type="button" onClick={removeFile}><X aria-hidden="true" size={15} />{problemLocale === "zh-TW" ? "刪除" : "Delete"}</button></footer>
         </div>
-      )}
+      </Drawer>
     </main>
   );
 }

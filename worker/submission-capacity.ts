@@ -49,10 +49,10 @@ export async function submissionCapacitySnapshot(
   userId: string,
 ): Promise<SubmissionCapacitySnapshot> {
   const [global, user] = await Promise.all([
-    env.SUBMISSIONS_DB.prepare(
+    env.DB.prepare(
       `SELECT COUNT(*) AS count FROM submissions WHERE state IN (${NONTERMINAL_SUBMISSION_STATES.map(() => "?").join(",")})`,
     ).bind(...NONTERMINAL_SUBMISSION_STATES).first<{ readonly count: number }>(),
-    env.SUBMISSIONS_DB.prepare(
+    env.DB.prepare(
       "SELECT COUNT(*) AS count FROM submissions WHERE user_id=? AND state IN ('admitting','queued','waiting-capacity')",
     ).bind(userId).first<{ readonly count: number }>(),
   ]);
@@ -68,10 +68,10 @@ export async function claimSubmissionExecutionSlot(
   now = new Date(),
 ): Promise<boolean> {
   const timestamp = now.toISOString();
-  const [claimed] = await env.SUBMISSIONS_DB.batch([
-    env.SUBMISSIONS_DB.prepare(CLAIM_SUBMISSION_EXECUTION_SLOT_SQL)
+  const [claimed] = await env.DB.batch([
+    env.DB.prepare(CLAIM_SUBMISSION_EXECUTION_SLOT_SQL)
       .bind(timestamp, submissionId),
-    prepareSubmissionEventInsert(env.SUBMISSIONS_DB, {
+    prepareSubmissionEventInsert(env.DB, {
       submissionId,
       eventKey: "workflow:execution-slot",
       event: { kind: "state", state: "preparing" },
@@ -80,7 +80,7 @@ export async function claimSubmissionExecutionSlot(
     }),
   ]);
   if (claimed?.meta.changes === 1) return true;
-  const existing = await env.SUBMISSIONS_DB.prepare(
+  const existing = await env.DB.prepare(
     `SELECT state FROM submissions WHERE id=? AND state IN (${EXECUTING_SQL})`,
   ).bind(submissionId, ...EXECUTING_SUBMISSION_STATES).first<{ readonly state: string }>();
   return existing !== null;

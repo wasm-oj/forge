@@ -34,6 +34,7 @@ function fixture(): { readonly database: DatabaseSync; readonly d1: D1Database }
     user_id TEXT NOT NULL,
     managed_problem_version_id TEXT NOT NULL,
     contest_id TEXT,
+    language TEXT NOT NULL,
     state TEXT NOT NULL,
     score REAL,
     fully_passed_cases INTEGER,
@@ -50,6 +51,7 @@ function insert(database: DatabaseSync, input: {
   readonly id: string;
   readonly user: string;
   readonly problem: string;
+  readonly language?: string;
   readonly score: number;
   readonly cases: number;
   readonly cost: number;
@@ -60,11 +62,11 @@ function insert(database: DatabaseSync, input: {
   readonly original?: string;
 }): void {
   database.prepare(`INSERT INTO submissions
-    (id, user_id, managed_problem_version_id, contest_id, state, score,
+    (id, user_id, managed_problem_version_id, contest_id, language, state, score,
      fully_passed_cases, deterministic_cost, peak_memory_bytes, completed_at,
      rejudge_batch_id, rejudge_of_submission_id)
-    VALUES (?, ?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?)`)
-    .run(input.id, input.user, input.problem, input.contest ?? null, input.score,
+    VALUES (?, ?, ?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?)`)
+    .run(input.id, input.user, input.problem, input.contest ?? null, input.language ?? "c", input.score,
       input.cases, input.cost, input.memory, input.completedAt,
       input.batch ?? null, input.original ?? null);
 }
@@ -88,6 +90,32 @@ describe("D1 problem leaderboard", () => {
     expect(rows.map((row) => ({ user: row.userId, score: row.score, achievedAt: row.achievedAt }))).toEqual([
       { user: "a", score: 90, achievedAt: "2026-01-01T00:00:00.000Z" },
       { user: "b", score: 90, achievedAt: "2026-01-15T00:00:00.000Z" },
+    ]);
+  });
+
+  it("recomputes each participant's best row within a language filter", async () => {
+    const { database, d1 } = fixture();
+    insert(database, { id: "a-c", user: "a", problem: "problem", language: "c", score: 80, cases: 8, cost: 500, memory: 100, completedAt: "2026-01-01T00:00:00.000Z" });
+    insert(database, { id: "a-rust", user: "a", problem: "problem", language: "rust", score: 100, cases: 10, cost: 700, memory: 100, completedAt: "2026-01-02T00:00:00.000Z" });
+    insert(database, { id: "b-c", user: "b", problem: "problem", language: "c", score: 90, cases: 9, cost: 600, memory: 100, completedAt: "2026-01-03T00:00:00.000Z" });
+
+    const overall = await queryProblemLeaderboard(d1, {
+      effectiveProblemVersionId: "problem",
+      limit: 10,
+    });
+    expect(overall.map((row) => ({ user: row.userId, language: row.language, score: row.score }))).toEqual([
+      { user: "a", language: "rust", score: 100 },
+      { user: "b", language: "c", score: 90 },
+    ]);
+
+    const cOnly = await queryProblemLeaderboard(d1, {
+      effectiveProblemVersionId: "problem",
+      language: "c",
+      limit: 10,
+    });
+    expect(cOnly.map((row) => ({ user: row.userId, language: row.language, score: row.score }))).toEqual([
+      { user: "b", language: "c", score: 90 },
+      { user: "a", language: "c", score: 80 },
     ]);
   });
 });
@@ -119,6 +147,10 @@ describe("D1 contest leaderboard", () => {
       peakMemoryBytes: 100,
       achievedAt: "2026-01-02T00:00:00.000Z",
       attemptedProblems: 2,
+      problemResults: [
+        { problemVersionId: "old-p1", score: 100, fullyPassedCases: 10 },
+        { problemVersionId: "p2", score: 50, fullyPassedCases: 5 },
+      ],
     }]);
 
     const organizer = await queryContestLeaderboard(d1, { contestId: "contest", problems, limit: 10 });

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -58,29 +58,69 @@ const USER_ID = "00000000-0000-4000-8000-000000000003";
 const PROBLEM_ID = "00000000-0000-4000-8000-000000000004";
 const NEW_PROBLEM_ID = "00000000-0000-4000-8000-000000000005";
 const BATCH_ID = "00000000-0000-4000-8000-000000000006";
+const RELEASE_ID = "00000000-0000-4000-8000-000000000007";
+const IMPORT_ID = "00000000-0000-4000-8000-000000000008";
+const SNAPSHOT_ID = "00000000-0000-4000-8000-000000000009";
 const DIGEST = "a".repeat(64);
 
 function fixture(updatedAt = "2026-01-01T00:00:00.000Z") {
   const database = new DatabaseSync(":memory:");
-  for (const migration of ["0001_initial.sql", "0002_rejudge_pipeline.sql", "0003_account_erasure_fence.sql", "0004_projection_outbox_uniqueness.sql", "0005_formal_admission_claim.sql", "0006_d1_submission_events_capacity.sql", "0007_leaderboard_indexes.sql"]) {
-    database.exec(readFileSync(path.join(process.cwd(), "migrations/submissions", migration), "utf8"));
+  const migrationDirectory = path.join(process.cwd(), "migrations/core");
+  for (const migration of readdirSync(migrationDirectory).filter((entry) => entry.endsWith(".sql")).sort()) {
+    database.exec(readFileSync(path.join(migrationDirectory, migration), "utf8"));
   }
+  database.prepare("INSERT INTO users (id, created_at, updated_at, status) VALUES (?, ?, ?, 'active')")
+    .run(USER_ID, updatedAt, updatedAt);
+  database.prepare(`INSERT INTO github_installations
+      (installation_id, account_github_id, account_login, installed_by_user_id, status,
+       permissions_json, repository_selection, created_at, updated_at)
+    VALUES (1, 1, 'fixture', ?, 'active', '{}', 'selected', ?, ?)`)
+    .run(USER_ID, updatedAt, updatedAt);
+  database.prepare(`INSERT INTO github_repositories
+      (github_repository_id, installation_id, owner_login, name, is_private, authorization_status, updated_at)
+    VALUES (1, 1, 'fixture', 'problems', 0, 'authorized', ?)`)
+    .run(updatedAt);
+  database.prepare(`INSERT INTO forge_releases
+      (id, version, manifest_r2_key, manifest_sha256, source_git_commit, status, created_at)
+    VALUES (?, 'test-release', ?, ?, ?, 'active', ?)`)
+    .run(RELEASE_ID, `releases/${DIGEST}`, DIGEST, "c".repeat(40), updatedAt);
+  database.prepare(`INSERT INTO collection_imports
+      (id, organizer_user_id, github_repository_id, requested_ref, commit_sha, index_path,
+       forge_release_id, archive_disposition, status, created_at, updated_at)
+    VALUES (?, ?, 1, 'main', ?, 'collection/index.json', ?, 'deleted', 'valid', ?, ?)`)
+    .run(IMPORT_ID, USER_ID, "d".repeat(40), RELEASE_ID, updatedAt, updatedAt);
+  database.prepare(`INSERT INTO managed_snapshots
+      (id, import_id, mode, collection_revision, judge_projection_digest, status,
+       published_at, published_by, created_at)
+    VALUES (?, ?, 'official-practice', 'fixture', ?, 'published', ?, ?, ?)`)
+    .run(SNAPSHOT_ID, IMPORT_ID, DIGEST, updatedAt, USER_ID, updatedAt);
+  const insertProblem = database.prepare(`INSERT INTO managed_problem_versions
+      (id, snapshot_id, problem_slug, problem_number, title_json, bundle_digest,
+       public_projection_r2_key, judge_projection_r2_key, maximum_score, created_at)
+    VALUES (?, ?, ?, ?, '{}', ?, ?, ?, 100, ?)`);
+  insertProblem.run(PROBLEM_ID, SNAPSHOT_ID, "old", 1, DIGEST, `snapshots/objects/${DIGEST}`, `snapshots/objects/${DIGEST}`, updatedAt);
+  insertProblem.run(NEW_PROBLEM_ID, SNAPSHOT_ID, "new", 2, DIGEST, `snapshots/objects/${DIGEST}`, `snapshots/objects/${DIGEST}`, updatedAt);
+  database.prepare(`INSERT INTO rejudge_batches
+      (id, old_problem_version_id, new_problem_version_id, requested_by, status,
+       expected_count, completed_count, forge_release_id, forge_manifest_sha256, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'running', 1, 0, ?, ?, ?, ?)`)
+    .run(BATCH_ID, PROBLEM_ID, NEW_PROBLEM_ID, USER_ID, RELEASE_ID, DIGEST, updatedAt, updatedAt);
   const insert = database.prepare(`INSERT INTO submissions
     (id, user_id, managed_problem_version_id, language, target, optimization, entry_path,
      source_r2_key, source_digest, forge_release_id, forge_manifest_sha256, state, visibility,
-     created_at, updated_at, completed_at, rejudge_batch_id, rejudge_of_submission_id)
-    VALUES (?, ?, ?, 'c', 'wasip1', 'release', 'main.c', ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?)`);
-  insert.run(OLD_ID, USER_ID, PROBLEM_ID, "source", DIGEST, PROBLEM_ID, DIGEST, "completed", updatedAt, updatedAt, updatedAt, null, null);
-  insert.run(CHILD_ID, USER_ID, NEW_PROBLEM_ID, "source", DIGEST, PROBLEM_ID, DIGEST, "admitting", updatedAt, updatedAt, null, BATCH_ID, OLD_ID);
+     admitted_at, created_at, updated_at, completed_at, rejudge_batch_id, rejudge_of_submission_id)
+    VALUES (?, ?, ?, 'c', 'wasip1', 'release', 'main.c', ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?, ?)`);
+  insert.run(OLD_ID, USER_ID, PROBLEM_ID, "source", DIGEST, RELEASE_ID, DIGEST, "completed", updatedAt, updatedAt, updatedAt, updatedAt, null, null);
+  insert.run(CHILD_ID, USER_ID, NEW_PROBLEM_ID, "source", DIGEST, RELEASE_ID, DIGEST, "admitting", updatedAt, updatedAt, updatedAt, null, BATCH_ID, OLD_ID);
   database.prepare("INSERT INTO submission_attempts (submission_id, attempt, token_hash, container_key, state) VALUES (?, 1, ?, ?, 'created')")
     .run(CHILD_ID, DIGEST, CHILD_ID);
-  database.prepare("INSERT INTO rejudge_jobs (rejudge_batch_id, old_submission_id, new_submission_id, old_problem_version_id, new_problem_version_id, state, workflow_payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'dispatched', 'sensitive', ?, ?)")
+  database.prepare("INSERT INTO rejudge_jobs (rejudge_batch_id, old_submission_id, new_submission_id, old_problem_version_id, new_problem_version_id, state, workflow_payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'dispatched', '{}', ?, ?)")
     .run(BATCH_ID, OLD_ID, CHILD_ID, PROBLEM_ID, NEW_PROBLEM_ID, updatedAt, updatedAt);
-  database.prepare("INSERT INTO submission_outbox (id, submission_id, kind, payload_json, created_at, delivered_at) VALUES (?, ?, 'start-workflow', '{}', ?, ?)")
+  database.prepare("INSERT INTO outbox (id, kind, aggregate_id, payload_json, created_at, delivered_at) VALUES (?, 'start-submission-workflow', ?, '{}', ?, ?)")
     .run(BATCH_ID, CHILD_ID, updatedAt, updatedAt);
   const workflow = new WorkflowNamespace();
   const env = {
-    SUBMISSIONS_DB: new SqliteD1(database) as unknown as D1Database,
+    DB: new SqliteD1(database) as unknown as D1Database,
     SUBMISSION_WORKFLOW: workflow as unknown as Workflow,
   } as unknown as ForgeWorkerEnv;
   return { database, workflow, env };
