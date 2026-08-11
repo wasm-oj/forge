@@ -267,7 +267,9 @@ async function executeSubmission(job, identity) {
         submissionId: job.submissionId,
         attempt: job.attempt,
         sourceDigest: source.sourceDigest,
-        forgeReleaseId: projection.forgeReleaseId,
+        // This field binds the execution audit to the active runtime release.
+        // Validation provenance remains in the content-addressed projection.
+        forgeReleaseId: job.expectedReleaseId,
         expectedManifestSha256: job.expectedManifestSha256,
         expectedContainerIdentitySha256: job.expectedContainerIdentitySha256,
         actualContainerIdentitySha256: identity.identitySha256,
