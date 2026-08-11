@@ -30,8 +30,8 @@
   "vars": {
     "ENVIRONMENT": "production",
     "PUBLIC_ORIGIN": "https://wasm-oj-forge-production.jacob.workers.dev",
-    "FORGE_RELEASE_ID": "3dd39984-36df-43b2-b074-c0e174ebcd4a",
-    "FORGE_RELEASE_MANIFEST_SHA256": "4ace8f4c7bc1b99a83691e1034ef44f665307228f6362485a92e04cd8dba689a",
+    "FORGE_RELEASE_ID": "5c687ae2-9747-492b-9690-8a58323aa6e5",
+    "FORGE_RELEASE_MANIFEST_SHA256": "16100d2ed49a9b3ea09bb09bd73a907467dc5b450ed8887696373a417d47d6d5",
     "GITHUB_OAUTH_CLIENT_ID": "Ov23limRaIiQdRQ3xoyd",
     "GITHUB_APP_ID": "4536310",
     "GITHUB_APP_SLUG": "wasm-oj-forge-production-import",
@@ -96,7 +96,7 @@
     {
       "name": "wasm-oj-submission-production",
       "class_name": "SubmissionJudgeContainer",
-      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/forge-judge-production:3dd39984-36df-43b2-b074-c0e174ebcd4a",
+      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/forge-judge-production:5c687ae2-9747-492b-9690-8a58323aa6e5",
       "instance_type": "standard-2",
       "max_instances": 50,
       "ssh": { "enabled": false }
@@ -104,7 +104,7 @@
     {
       "name": "wasm-oj-validation-production",
       "class_name": "ValidationJudgeContainer",
-      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/forge-judge-production:3dd39984-36df-43b2-b074-c0e174ebcd4a",
+      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/forge-judge-production:5c687ae2-9747-492b-9690-8a58323aa6e5",
       "instance_type": "standard-2",
       "max_instances": 5,
       "ssh": { "enabled": false }
