@@ -40,6 +40,39 @@ interface AuthorizedOutput {
 }
 
 const MAX_VALIDATION_OUTPUT_BYTES = 32 * 1024 * 1024;
+const STORAGE_DELETE_BATCH_SIZE = 128;
+
+export async function cleanupOneShotContainer(
+  storage: Pick<DurableObjectStorage, "list" | "delete">,
+  destroy: () => Promise<void>,
+): Promise<void> {
+  let cleanupFailed = false;
+  try {
+    while (true) {
+      const outputs = await storage.list({
+        prefix: "output:",
+        limit: STORAGE_DELETE_BATCH_SIZE,
+      });
+      const keys = [...outputs.keys()];
+      if (keys.length === 0) break;
+      const deleted = await storage.delete(keys);
+      if (deleted !== keys.length) throw new Error("Durable Object output cleanup made no complete progress.");
+    }
+  } catch {
+    cleanupFailed = true;
+  }
+  try {
+    await storage.delete(["authorization", "identity-fence"]);
+  } catch {
+    cleanupFailed = true;
+  }
+  try {
+    await destroy();
+  } catch {
+    cleanupFailed = true;
+  }
+  if (cleanupFailed) throw new ApiError(500, "container-cleanup", "One-shot Container cleanup did not complete.");
+}
 
 abstract class SecureJudgeContainer extends Container<ForgeWorkerEnv> {
   protected abstract readonly acceptedKind: "submission" | "validation";
@@ -166,17 +199,9 @@ abstract class SecureJudgeContainer extends Container<ForgeWorkerEnv> {
       return apiErrorResponse(error);
     } finally {
       // Every /execute request is one-shot, including malformed jobs. Storage
-      // cleanup failures must never skip the actual Container destruction.
-      let cleanupFailed = false;
-      try {
-        const outputs = await this.ctx.storage.list({ prefix: "output:" });
-        if (outputs.size > 0) await this.ctx.storage.delete([...outputs.keys()]);
-      } catch { cleanupFailed = true; }
-      try { await this.destroy(); } catch { cleanupFailed = true; }
-      try {
-        await this.ctx.storage.delete(["authorization", "identity-fence"]);
-      } catch { cleanupFailed = true; }
-      if (cleanupFailed) throw new ApiError(500, "container-cleanup", "One-shot Container cleanup did not complete.");
+      // cleanup failures must never skip the actual Container destruction, and
+      // no storage operation may run after destruction.
+      await cleanupOneShotContainer(this.ctx.storage, () => this.destroy());
     }
   }
 
