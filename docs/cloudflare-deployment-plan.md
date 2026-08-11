@@ -26,20 +26,15 @@ secrets directly on the corresponding Workers.
 
 ## Deploy
 
-Merging to `main` starts **Deploy Cloudflare production**; it can also be started manually from
-GitHub Actions. After production Environment approval the workflow:
+An Owner starts **Deploy Cloudflare production** manually from GitHub Actions. After production
+Environment approval the workflow:
 
 1. installs Node 24.18 and pnpm 10.34.5;
 2. runs typecheck and the site build;
-3. briefly replaces the app with a maintenance Worker so no new formal request can start;
-4. waits at most ten minutes for active validation imports; submission and rejudge history is reset
-   by the one-way single-store migration;
-5. applies pending migrations once to `DB`, deletes retired `sources/` and `audits/` objects, and
-   keeps formal mutations disabled;
-6. deploys the app Worker, Workflows, the two Container adapter bindings, and Turnstile route;
-7. checks `/api/health/live`, `/api/health/ready`, and the complete 45-problem official catalog; and
-8. enables formal mutations so an authenticated operator can run the required Turnstile, Official
-   Submit, and Organizer import/publish smoke.
+3. applies pending migrations once to `DB`;
+4. backfills required published problem catalog metadata;
+5. deploys the app Worker, Workflows, the two Container adapter bindings, and Turnstile route; and
+6. checks `/api/health/live`, `/api/health/ready`, and the complete 45-problem official catalog.
 
 This is intentionally a fast deployment path. There is no automatic staging promotion or
 cross-account backup. Production is best-effort and has no formal SLO or 24/7 on-call promise.
@@ -59,17 +54,9 @@ UI.
 Formal mutations normally remain enabled. Pause them only for an actual incident or migration that
 cannot accept new formal jobs. Existing submissions continue through Workflows and Containers.
 
-The single-store migration and retired resource deletion are a one-way cutover. Existing accounts,
-roles, installations, collections, published snapshots, contests, and participants remain. Existing
-submission, solve, leaderboard, contest-result, and rejudge history is intentionally reset. A
-failure is fixed by deploying forward; the workflow immediately disables formal mutations and does
-not attempt a version rollback across the schema change.
-
-The deployment workflow deliberately does not delete the retired submissions database or mirror
-bucket after anonymous health/catalog checks. After the authenticated Official Submit and Organizer
-smoke succeeds, run `node scripts/delete-retired-submissions-d1.mjs` and then
-`node scripts/cleanup-production-r2.mjs --operation delete-mirror` with the production Cloudflare
-credentials. If either functional smoke fails, pause formal mutations and roll forward instead.
+Production now has one authoritative D1 database and one authoritative R2 bucket. Schema changes are
+deployed forward; production does not retain a dual-store compatibility path or an automatic schema
+rollback.
 
 ## Deliberately removed
 

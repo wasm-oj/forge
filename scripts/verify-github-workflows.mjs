@@ -33,13 +33,7 @@ requireText(sources.production, "/api/health/ready", "Production deployment");
 requireText(sources.production, "verify-production-catalog.mjs", "Production deployment");
 forbidText(sources.production, "CORE_DB", "Production deployment");
 forbidText(sources.production, "SUBMISSIONS_DB", "Production deployment");
-for (const destructiveCutoverStep of [
-  "wrangler.maintenance-production.jsonc",
-  "wait-for-validation-cutover.mjs",
-  "cleanup-production-r2.mjs",
-  "delete-retired-submissions-d1.mjs",
-  "formal_mutations_enabled",
-]) forbidText(sources.production, destructiveCutoverStep, "Production deployment");
+forbidText(sources.production, "formal_mutations_enabled", "Production deployment");
 
 const orderedProductionSteps = [
   "wrangler d1 migrations apply DB",
@@ -52,7 +46,7 @@ const orderedProductionSteps = [
 let previousProductionIndex = -1;
 for (const step of orderedProductionSteps) {
   const index = sources.production.indexOf(step);
-  if (index <= previousProductionIndex) throw new Error(`Production cutover step ${JSON.stringify(step)} is out of order.`);
+  if (index <= previousProductionIndex) throw new Error(`Production deployment step ${JSON.stringify(step)} is out of order.`);
   previousProductionIndex = index;
 }
 
