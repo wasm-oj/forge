@@ -90,6 +90,10 @@ export function collectionImportIssueMessage(code: string | null): string {
     "validation-workflow-delivery-exhausted": "The format check could not start. You can retry this exact commit.",
     "canonical-draft-expired": "This verified draft expired before publication. Import the commit again.",
     "validation-failed": "The collection format or judge packaging is invalid. Fix it in the repository and import a new commit.",
+    "validation-input-rejected": "The collection format or judge packaging is invalid. Fix it in the repository and import a new commit.",
+    "container-identity-mismatch": "The validation release did not accept this collection. Import a new commit after the platform is updated.",
+    "container-one-shot": "The validation attempt was rejected. Import a new commit.",
+    "container-pool-mismatch": "The validation job was rejected. Import a new commit.",
   } as Record<string, string>)[code] ?? code;
 }
 

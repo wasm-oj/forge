@@ -39,6 +39,10 @@ import {
   appendAuthorizedSubmissionEvent,
   prepareSubmissionEventInsert,
 } from "./submission-events";
+import {
+  validationStepOutcome,
+  type ValidationStepRejection,
+} from "./validation-step-outcome";
 
 export type { SubmissionWorkflowParameters } from "./submission-workflow-identity";
 
@@ -488,6 +492,7 @@ async function assertValidationArchiveCleanupFence(env: ForgeWorkerEnv, importId
 export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, ValidationWorkflowParameters> {
   async run(event: WorkflowEvent<ValidationWorkflowParameters>, step: WorkflowStep): Promise<ValidationWorkflowResult> {
     const opaque = parseValidationWorkflowParameters(event.payload);
+    let validationRejection: ValidationStepRejection | undefined;
     try {
       await step.do("hydrate exact import and verify active release", {
         retries: { limit: 2, delay: "2 seconds", backoff: "exponential" },
@@ -587,7 +592,7 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
           if (!replayed) throw new NonRetryableError("GitHub archive import could not claim validation.");
         }
       });
-      const result = await step.do("validate and project collection", { retries: { limit: 2, delay: "10 seconds", backoff: "exponential" }, timeout: "30 minutes" }, async () => {
+      const validation = await step.do("validate and project collection", { retries: { limit: 2, delay: "10 seconds", backoff: "exponential" }, timeout: "30 minutes" }, async () => {
         const context = await hydrateValidationWorkflowContext(this.env, opaque, ["validating"]);
         if (!context.source.archiveR2Key) {
           throw new NonRetryableError("GitHub archive validation source is missing its reserved object.");
@@ -613,10 +618,16 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
             source: { kind: "github-archive", archiveR2Key: context.source.archiveR2Key },
           }),
         }));
-        if (response.status === 409 || response.status === 422) throw new NonRetryableError("Managed collection validation rejected the canonical source.");
-        if (!response.ok) throw new Error(`Validation container infrastructure failed with HTTP ${response.status}.`);
-        return readBoundedValidationResult(response, context);
+        return validationStepOutcome(response, (accepted) => readBoundedValidationResult(accepted, context));
       });
+      if (validation.kind === "rejected") {
+        validationRejection = validation;
+        // This throw happens outside the durable step callback, so its class is
+        // available to this invocation. The plain outcome remains the durable
+        // source of truth if Cloudflare replays the step.
+        throw new NonRetryableError(validation.message);
+      }
+      const result = validation.result;
       await step.do("record successful validation", async () => {
         const report = result.report;
         const canonical = result.canonicalSource?.manifest;
@@ -677,10 +688,10 @@ export class ValidationWorkflow extends WorkflowEntrypoint<ForgeWorkerEnv, Valid
       });
       return result;
     } catch (error) {
-      const invalid = error instanceof NonRetryableError || (error instanceof Error && error.name === "NonRetryableError");
+      const invalid = validationRejection !== undefined || error instanceof NonRetryableError || (error instanceof Error && error.name === "NonRetryableError");
       await step.do("record failed validation", async () => {
         const expectedStatus = invalid ? "invalid" : "infrastructure-error";
-        const expectedErrorCode = invalid ? "validation-failed" : "validation-infrastructure";
+        const expectedErrorCode = validationRejection?.code ?? (invalid ? "validation-failed" : "validation-infrastructure");
         const replayedTerminal = await this.env.DB.prepare("SELECT commit_sha, status, error_code, archive_r2_key, archive_disposition FROM collection_imports WHERE id=? AND forge_release_id=?")
           .bind(opaque.importId, opaque.expectedReleaseId).first<{
             readonly commit_sha: string;
