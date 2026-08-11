@@ -17,7 +17,7 @@ import { artifactDigest, deterministicTranscript, type DeterministicTranscript }
 import { assertValidDependencyLock } from "../dependencies/lock.ts";
 import type { DependencyOfflineBundle } from "../dependencies/types.ts";
 import type { JudgeResult } from "../judge/engine.ts";
-import { validateJudgeSpec, type JudgeInputSpec, type JudgeSpec } from "../judge/spec.ts";
+import { validateJudgeSpec, type JudgeFileInputSpec, type JudgeInputSpec, type JudgeSpec } from "../judge/spec.ts";
 
 const MAGIC = new TextEncoder().encode("FORGRPL1");
 const HEADER_BYTES = MAGIC.byteLength + 8 + 4;
@@ -406,7 +406,7 @@ function validateSelfContainedJudgeSpec(spec: JudgeSpec): void {
   validateJudgeSpec(spec);
   for (const item of spec.cases) {
     requireInlineInput(item.input, `Judge case '${item.id}' stdin`);
-    for (const [path, input] of Object.entries(item.files ?? {})) requireInlineInput(input, `Judge case '${item.id}' file '${path}'`);
+    for (const [path, input] of Object.entries(item.files ?? {})) requireInlineFileInput(input, `Judge case '${item.id}' file '${path}'`);
     if (item.kind === "batch" && !SELF_CONTAINED_MATCHERS.has(item.matcher.id)) {
       throw new Error(`Judge matcher '${item.matcher.id}' is not self-contained in a replay bundle.`);
     }
@@ -415,6 +415,12 @@ function validateSelfContainedJudgeSpec(spec: JudgeSpec): void {
 
 function requireInlineInput(input: JudgeInputSpec, label: string): void {
   if (input.kind !== "inline") throw new Error(`${label} must be materialized inline for an offline replay bundle.`);
+}
+
+function requireInlineFileInput(input: JudgeFileInputSpec, label: string): void {
+  if (input.kind !== "inline" && input.kind !== "inline-bytes") {
+    throw new Error(`${label} must be materialized inline for an offline replay bundle.`);
+  }
 }
 
 async function assertOfflineDependencies(value: unknown): Promise<void> {

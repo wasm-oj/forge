@@ -5,13 +5,18 @@ import {
   BROWSER_PROBLEM_SCHEMA,
   DEFAULT_PROBLEM_COLLECTION_SOURCE,
   MemoryProblemCollectionCache,
+  PROBLEM_STARTER_LIMITS,
   ProblemCollectionError,
   clearProblemCollectionCache,
   githubRawContentUrl,
   loadProblemCollection,
   normalizeProblemCollectionSource,
+  parseGithubRepositoryUrl,
   parseProblemBundle,
   parseProblemCollectionIndex,
+  parseStandaloneProblemBundle,
+  problemCollectionShareUrl,
+  problemCollectionSourceFromShareUrl,
 } from "./problem-catalog-loader";
 
 const encoder = new TextEncoder();
@@ -55,12 +60,46 @@ async function fixture() {
 }
 
 describe("remote problem collection", () => {
-  it("isolates the v4 verified cache namespace from incompatible collection schemas", async () => {
+  it("parses every generated problem with the active standalone bundle contract", () => {
+    for (const problem of PROBLEMS) {
+      expect(parseStandaloneProblemBundle({ schema: BROWSER_PROBLEM_SCHEMA, problem })).toEqual(problem);
+    }
+  });
+
+  it("parses only credential-free GitHub repository URLs", () => {
+    expect(parseGithubRepositoryUrl("https://github.com/wasm-oj/problems.git")).toEqual({
+      owner: "wasm-oj",
+      repository: "problems",
+    });
+    for (const invalid of [
+      "https://github.example/wasm-oj/problems",
+      "https://token@github.com/wasm-oj/problems",
+      "https://github.com/wasm-oj/problems/tree/main",
+      "https://github.com/wasm-oj/problems?token=secret",
+    ]) {
+      expect(() => parseGithubRepositoryUrl(invalid)).toThrow(ProblemCollectionError);
+    }
+  });
+
+  it("round-trips a credential-free collection share URL and discards unrelated query data", () => {
+    const shared = problemCollectionShareUrl(
+      DEFAULT_PROBLEM_COLLECTION_SOURCE,
+      "https://forge.example/judge?session=secret#editor",
+    );
+    expect(shared).not.toContain("secret");
+    expect(problemCollectionSourceFromShareUrl(shared)).toEqual(DEFAULT_PROBLEM_COLLECTION_SOURCE);
+    expect(problemCollectionSourceFromShareUrl("https://forge.example/judge")).toBeUndefined();
+    expect(() => problemCollectionSourceFromShareUrl(
+      "https://forge.example/judge?collection-provider=github",
+    )).toThrow("incomplete");
+  });
+
+  it("isolates the v5 verified cache namespace from incompatible collection schemas", async () => {
     const deleteCache = vi.fn(async () => true);
     vi.stubGlobal("caches", { delete: deleteCache });
     try {
       await clearProblemCollectionCache();
-      expect(deleteCache).toHaveBeenCalledWith("wasm-oj-verified-problem-collections-v4");
+      expect(deleteCache).toHaveBeenCalledWith("wasm-oj-verified-problem-collections-v5");
     } finally {
       vi.unstubAllGlobals();
     }
@@ -214,6 +253,64 @@ describe("remote problem collection", () => {
       schema: BROWSER_PROBLEM_SCHEMA,
       problem: { ...data.problem, id: "different-problem" },
     }, data.entry)).toThrow("disagrees");
+  });
+
+  it("requires an exact starter template for every built-in language", async () => {
+    const { problem } = await fixture();
+    expect(() => parseStandaloneProblemBundle({
+      schema: "wasm-oj-browser-problem-v3",
+      problem,
+    })).toThrow("unsupported schema");
+    const withoutTemplates: Record<string, unknown> = { ...problem };
+    delete withoutTemplates.starterTemplates;
+    expect(() => parseStandaloneProblemBundle({
+      schema: BROWSER_PROBLEM_SCHEMA,
+      problem: withoutTemplates,
+    })).toThrow("invalid shape");
+
+    const missingLanguage = structuredClone(problem.starterTemplates) as Record<string, unknown>;
+    delete missingLanguage.go;
+    expect(() => parseStandaloneProblemBundle({
+      schema: BROWSER_PROBLEM_SCHEMA,
+      problem: { ...problem, starterTemplates: missingLanguage },
+    })).toThrow("every built-in language");
+  });
+
+  it("validates normalized, bounded starter file maps and a non-empty declared entry", async () => {
+    const { problem } = await fixture();
+    const withCStarter = (template: unknown) => ({
+      schema: BROWSER_PROBLEM_SCHEMA,
+      problem: {
+        ...problem,
+        starterTemplates: { ...problem.starterTemplates, c: template },
+      },
+    });
+    for (const template of [
+      { entry: "src/main.c", files: { "../main.c": "int main(void) {}\n" } },
+      { entry: "src/missing.c", files: { "src/main.c": "int main(void) {}\n" } },
+      { entry: "src/main.c", files: { "src/main.c": "" } },
+      { entry: "src/main.c", files: { "src/main.c": "\ud800" } },
+      {
+        entry: "src/main.c",
+        files: Object.fromEntries(Array.from(
+          { length: PROBLEM_STARTER_LIMITS.filesPerLanguage + 1 },
+          (_, index) => [`src/${index}.c`, index === 0 ? "int main(void) {}\n" : ""],
+        )),
+      },
+      {
+        entry: "src/main.c",
+        files: { "src/main.c": "🙂".repeat(PROBLEM_STARTER_LIMITS.bytesPerFile / 4 + 1) },
+      },
+      {
+        entry: "src/main.c",
+        files: Object.fromEntries(Array.from(
+          { length: 5 },
+          (_, index) => [`src/${index === 0 ? "main" : index}.c`, "a".repeat(PROBLEM_STARTER_LIMITS.bytesPerFile)],
+        )),
+      },
+    ]) {
+      expect(() => parseStandaloneProblemBundle(withCStarter(template))).toThrow();
+    }
   });
 
   it("rejects policy resource values outside the runtime contract", async () => {

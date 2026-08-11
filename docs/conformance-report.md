@@ -22,7 +22,7 @@ other or the source and specification present at publication time.
   no independent subsystem contract counters.
 - Pinned content: Clang 22 for C17/C++20, Rust 1.91.1-dev, Go 1.26.5,
   CPython 3.14.6, TypeScript 7.0.2, and QuickJS-ng 0.15.1.
-- Runtime: the shared Rust runtime core uses Wasmer 7.2.0 and WASIX 0.702.0;
+- Runtime: the shared Rust runtime core uses Wasmer 7.2.1 and WASIX 0.702.1;
   browser compiler and package execution use `@wasmer/sdk` 0.10.0.
 - Weighted meter model `weighted` under Forge contract 1, with opcode weights
   adapted from Binaryen's optimizer cost model and preserved for WARK 0.3
@@ -30,10 +30,7 @@ other or the source and specification present at publication time.
 - Every server case performs two uncached builds and three deterministic runs.
   A pass requires equal build digests, the declared output/termination, and an
   identical deterministic transcript across all three runs.
-- Empty-program baselines were recalibrated across all 18
-  language/target/optimization profiles and five seeds. All 90 executions
-  produced seed-independent raw costs; a separate nine-profile production
-  smoke confirmed `net = 0` and `raw = baseline` for every release profile.
+- Instruction budgets are applied directly without a separate empty-program calibration gate.
 
 ## Browser/server conformance
 
@@ -79,10 +76,7 @@ seconds and executed successfully. That targeted attempt is retained as
 append-only raw evidence, but it is not merged into the 21-case browser/server
 matrix above until a new full two-host publication is collected.
 
-Python has the largest fixed runtime cost, but normalization removes only its
-measured empty-program startup. Parsing/loading the submission, deterministic
-API use, input, allocation, I/O, and user code remain charged. Raw cost and the
-complete opcode map remain in every transcript.
+Startup, parsing/loading, deterministic API use, input, allocation, I/O, and user code are all
+charged. Raw cost and the complete opcode map remain in every transcript.
 
-See the recorded [contract 1 conformance evidence](../experiments/forge-contract-1-conformance/),
-[contract 1 cost calibration](../experiments/forge-contract-1-cost-baseline/).
+See the recorded [contract 1 conformance evidence](../experiments/forge-contract-1-conformance/).

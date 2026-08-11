@@ -11,11 +11,9 @@ describe("Forge Monaco language services", () => {
     const javascriptExtraLib = vi.fn();
     const typescriptExtraLib = vi.fn();
     const monaco = {
-      languages: {
-        typescript: {
-          javascriptDefaults: { addExtraLib: javascriptExtraLib },
-          typescriptDefaults: { addExtraLib: typescriptExtraLib },
-        },
+      typescript: {
+        javascriptDefaults: { addExtraLib: javascriptExtraLib },
+        typescriptDefaults: { addExtraLib: typescriptExtraLib },
       },
     } as unknown as typeof Monaco;
 

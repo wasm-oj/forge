@@ -64,9 +64,21 @@ describe("module Worker bootstrap", () => {
       }
     });
 
-    expect(() => createModuleWorker("https://cdn.example/runner.worker.js"))
+    expect(() => createModuleWorker("https://forge.example/runner.worker.js"))
       .toThrow("constructor failed");
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://forge.example/bootstrap");
+  });
+
+  it("rejects cross-origin and decorated module URLs before creating a blob", () => {
+    expect(() => createModuleWorker("https://cdn.example/runner.worker.js"))
+      .toThrow("must be same-origin");
+    expect(() => createModuleWorker("https://forge.example/runner.worker.js?token=secret"))
+      .toThrow("no credentials, query, or fragment");
+    expect(() => createModuleWorker("https://forge.example/runner.worker.js#entry"))
+      .toThrow("no credentials, query, or fragment");
+    expect(() => createModuleWorker("https://user:secret@forge.example/runner.worker.js"))
+      .toThrow("no credentials, query, or fragment");
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
 
   it("keeps a reusable bootstrap alive until its owner explicitly revokes it", async () => {

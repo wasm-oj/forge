@@ -17,7 +17,7 @@ if (inputs.length !== 2) {
 const records = await Promise.all(inputs.map(async (input) => {
   const file = path.resolve(input);
   const bytes = await readFile(file);
-  const value = JSON.parse(bytes.toString("utf8")) as {
+  const value = JSON.parse(bytes.toString()) as {
     schema: string;
     experimentId: string;
     forgeContract: number;

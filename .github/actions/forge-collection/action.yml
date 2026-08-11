@@ -1,0 +1,30 @@
+name: Verify Forge problem collection
+description: Validate schema, byte lengths, SHA-256 digests, revision, and canonical publication output.
+inputs:
+  version:
+    description: Exact @wasm-oj/forge release containing the collection contract.
+    required: false
+    default: 0.1.0
+  root:
+    description: Repository root containing collection/index.json.
+    required: false
+    default: .
+  managed:
+    description: Optional managed contract path; use collection/managed.json for publishable collections.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Verify Forge collection
+      shell: bash
+      env:
+        FORGE_ACTION_PACKAGE: "@wasm-oj/forge@${{ inputs.version }}"
+        FORGE_ACTION_ROOT: "${{ inputs.root }}"
+        FORGE_ACTION_MANAGED: "${{ inputs.managed }}"
+      run: |
+        arguments=(verify "$FORGE_ACTION_ROOT")
+        if [[ -n "$FORGE_ACTION_MANAGED" ]]; then
+          arguments+=(--managed "$FORGE_ACTION_MANAGED")
+        fi
+        npx --yes "$FORGE_ACTION_PACKAGE" "${arguments[@]}"

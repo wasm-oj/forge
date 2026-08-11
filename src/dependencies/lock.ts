@@ -1,6 +1,7 @@
 import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 import { assertSafeRelativePath } from "../core/project-files.ts";
+import { assertBoundedCount, DEPENDENCY_RESOLUTION_LIMITS } from "./limits.ts";
 import {
   DEPENDENCY_ECOSYSTEMS,
   type DependencyLock,
@@ -17,6 +18,8 @@ export function createDependencyLock(
   packages: readonly LockedDependencyPackage[],
 ): DependencyLock {
   requireSha256(manifestSha256, "Dependency manifest");
+  assertBoundedCount(roots.length, DEPENDENCY_RESOLUTION_LIMITS.roots, "Dependency roots");
+  assertBoundedCount(packages.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "Dependency packages");
   const lock: DependencyLock = {
     schema: FORGE_SCHEMAS.dependencyLock,
     forgeContract: FORGE_CONTRACT_VERSION,
@@ -36,6 +39,8 @@ export function assertValidDependencyLock(value: unknown): asserts value is Depe
   if (!Array.isArray(value.roots) || !Array.isArray(value.packages)) {
     throw new TypeError("Dependency lock roots and packages must be arrays.");
   }
+  assertBoundedCount(value.roots.length, DEPENDENCY_RESOLUTION_LIMITS.roots, "Dependency lock roots");
+  assertBoundedCount(value.packages.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "Dependency lock packages");
   requireSha256(value.manifestSha256, "Dependency manifest");
   const roots = canonicalStrings(value.roots, "dependency root");
   const packages = value.packages.map(canonicalPackage);
@@ -60,32 +65,13 @@ export async function dependencyLockSha256(lock: DependencyLock): Promise<string
 }
 
 export async function dependencyManifestSha256(manifest: DependencyManifest): Promise<string> {
-  if (!manifest || typeof manifest !== "object" || !Array.isArray(manifest.requirements)) {
-    throw new TypeError("Dependency manifest requirements must be an array.");
-  }
+  assertValidDependencyManifest(manifest);
   const requirementIds = new Set<string>();
   for (const requirement of manifest.requirements) {
     assertDependencyRequirement(requirement);
     const id = JSON.stringify(requirement);
     if (requirementIds.has(id)) throw new Error(`Duplicate dependency requirement '${requirement.name}'.`);
     requirementIds.add(id);
-  }
-  if (manifest.sourceFiles !== undefined && !Array.isArray(manifest.sourceFiles)) {
-    throw new TypeError("Dependency source files must be an array.");
-  }
-  const sourceIds = new Set<string>();
-  for (const file of manifest.sourceFiles ?? []) {
-    if (!file || typeof file !== "object" || !DEPENDENCY_ECOSYSTEMS.includes(file.ecosystem)
-      || !(["manifest", "lockfile", "source"] as const).includes(file.role)) {
-      throw new Error("Dependency source files require a supported ecosystem and role.");
-    }
-    assertSafeRelativePath(file.path, "Dependency source path");
-    if (typeof file.contents !== "string" || file.contents.includes("\0")) {
-      throw new Error(`Dependency source file '${file.path}' must contain NUL-free text.`);
-    }
-    const id = `${file.ecosystem}:${file.role}:${file.path}`;
-    if (sourceIds.has(id)) throw new Error(`Duplicate dependency source file '${file.path}'.`);
-    sourceIds.add(id);
   }
   const requirements = manifest.requirements.map((requirement) => ({
     ecosystem: requirement.ecosystem,
@@ -98,6 +84,49 @@ export async function dependencyManifestSha256(manifest: DependencyManifest): Pr
   return sha256Hex(JSON.stringify({ requirements, sourceFiles }));
 }
 
+export function assertValidDependencyManifest(value: unknown): asserts value is DependencyManifest {
+  if (!isRecord(value) || !Array.isArray(value.requirements)) {
+    throw new TypeError("Dependency manifest requirements must be an array.");
+  }
+  assertBoundedCount(value.requirements.length, DEPENDENCY_RESOLUTION_LIMITS.requirements, "Dependency requirements");
+  const requirementIds = new Set<string>();
+  for (const requirement of value.requirements) {
+    assertDependencyRequirement(requirement);
+    const identity = JSON.stringify(requirement);
+    if (requirementIds.has(identity)) throw new Error(`Duplicate dependency requirement '${requirement.name}'.`);
+    requirementIds.add(identity);
+  }
+  if (value.sourceFiles !== undefined && !Array.isArray(value.sourceFiles)) {
+    throw new TypeError("Dependency source files must be an array.");
+  }
+  const sourceFiles = value.sourceFiles ?? [];
+  assertBoundedCount(sourceFiles.length, DEPENDENCY_RESOLUTION_LIMITS.sourceFiles, "Dependency source files");
+  const sourceIds = new Set<string>();
+  const encoder = new TextEncoder();
+  let sourceTextBytes = 0;
+  for (const candidate of sourceFiles) {
+    if (!isRecord(candidate) || !DEPENDENCY_ECOSYSTEMS.includes(candidate.ecosystem as never)
+      || !(["manifest", "lockfile", "source"] as const).includes(candidate.role as never)) {
+      throw new Error("Dependency source files require a supported ecosystem and role.");
+    }
+    assertSafeRelativePath(candidate.path, "Dependency source path");
+    if (typeof candidate.contents !== "string" || candidate.contents.includes("\0")) {
+      throw new Error(`Dependency source file '${String(candidate.path)}' must contain NUL-free text.`);
+    }
+    const remainingBytes = DEPENDENCY_RESOLUTION_LIMITS.sourceTextBytes - sourceTextBytes;
+    if (candidate.contents.length > remainingBytes) {
+      throw new RangeError(`Dependency source text exceeds the ${DEPENDENCY_RESOLUTION_LIMITS.sourceTextBytes}-byte aggregate limit.`);
+    }
+    sourceTextBytes += encoder.encode(candidate.contents).byteLength;
+    if (sourceTextBytes > DEPENDENCY_RESOLUTION_LIMITS.sourceTextBytes) {
+      throw new RangeError(`Dependency source text exceeds the ${DEPENDENCY_RESOLUTION_LIMITS.sourceTextBytes}-byte aggregate limit.`);
+    }
+    const identity = `${candidate.ecosystem as string}:${candidate.role as string}:${candidate.path as string}`;
+    if (sourceIds.has(identity)) throw new Error(`Duplicate dependency source file '${candidate.path as string}'.`);
+    sourceIds.add(identity);
+  }
+}
+
 export function assertDependencyRequirement(value: unknown): asserts value is DependencyRequirement {
   if (!isRecord(value)) throw new TypeError("Dependency requirement must be an object.");
   if (!DEPENDENCY_ECOSYSTEMS.includes(value.ecosystem as never)) {
@@ -107,6 +136,7 @@ export function assertDependencyRequirement(value: unknown): asserts value is De
   canonicalText(value.requirement, "dependency requirement", 2_048);
   if (value.features !== undefined) {
     if (!Array.isArray(value.features)) throw new TypeError("Dependency features must be an array.");
+    assertBoundedCount(value.features.length, DEPENDENCY_RESOLUTION_LIMITS.referencesPerPackage, "Dependency features");
     assertSortedUnique(canonicalStrings(value.features, "dependency feature"), "dependency features");
   }
 }
@@ -128,11 +158,13 @@ function canonicalPackage(value: unknown): LockedDependencyPackage {
     throw new Error(`Dependency package '${value.id as string}' has an invalid SHA-256 integrity.`);
   }
   if (!Array.isArray(value.dependencies)) throw new TypeError("Package dependencies must be an array.");
+  assertBoundedCount(value.dependencies.length, DEPENDENCY_RESOLUTION_LIMITS.referencesPerPackage, "Package dependency references");
   const dependencies = canonicalStrings(value.dependencies, "dependency package reference");
   assertSortedUnique(dependencies, `dependencies of '${value.id as string}'`);
   let features: string[] | undefined;
   if (value.features !== undefined) {
     if (!Array.isArray(value.features)) throw new TypeError("Locked package features must be an array.");
+    assertBoundedCount(value.features.length, DEPENDENCY_RESOLUTION_LIMITS.referencesPerPackage, "Locked package features");
     features = canonicalStrings(value.features, "locked package feature");
     assertSortedUnique(features, `features of '${value.id as string}'`);
   }

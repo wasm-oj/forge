@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { BeforeMount, OnMount } from "@monaco-editor/react";
+import type { BeforeMount, OnMount } from "@/src/editor/self-hosted-monaco-editor";
 import {
   Award,
   Box,
@@ -14,6 +14,7 @@ import {
   CircleStop,
   Clock3,
   Code2,
+  Copy,
   Download,
   FileCode2,
   Gauge,
@@ -60,6 +61,8 @@ import { clearArtifactCache, deleteArtifact, listProjects, loadArtifact, saveArt
 import { createDefaultBrowserStorageCoordinator, type ForgeStorageCoordinator } from "@/src/storage/coordinator";
 import { registerToolchainCache } from "@/src/storage/service-worker";
 import { configureForgeLanguageServices } from "@/src/editor/forge-language-services";
+import { forgeMonacoTheme, registerForgeMonacoThemes } from "@/src/editor/forge-monaco-theme";
+import { useProduct } from "@/src/components/app-shell";
 import { ProblemMarkdown } from "@/src/components/problem-markdown";
 import { CaseScoreDetails } from "@/src/components/case-score-details";
 import {
@@ -74,7 +77,6 @@ import {
 } from "@/src/components/judge-ui-i18n";
 import {
   completeJudgeOnboarding,
-  isJudgeOnboardingComplete,
   JudgeOnboarding,
 } from "@/src/components/judge-onboarding";
 import {
@@ -92,6 +94,9 @@ import {
   githubRawContentUrl,
   loadProblemCollection,
   normalizeProblemCollectionSource,
+  parseGithubRepositoryUrl,
+  problemCollectionShareUrl,
+  problemCollectionSourceFromShareUrl,
   type GithubProblemCollectionSource,
   type LoadedProblemCollection,
   type ProblemCollectionEntry,
@@ -113,14 +118,31 @@ import {
   selfTestStorageKey,
   type SelfTestCase,
 } from "@/src/judge/self-tests";
+import { requestForgeTurnstileToken } from "@/src/turnstile/client";
+import { isTerminalSubmissionState, type SequencedSubmissionEvent, type SubmissionState } from "@/src/online-judge/contracts";
+import {
+  parseOfficialSubmissionCancellation,
+  parseOfficialSubmissionCreated,
+  SubmissionEventPollingClient,
+  type SubmissionPollingConnectionState,
+} from "@/src/online-judge/submission-event-polling";
+import {
+  createOfficialSubmissionRequest,
+  managedCollectionAllowsFullLocalJudge,
+  managedProblemProjectionApiPath,
+  normalizeManagedProblemContext,
+  type LoadedManagedProblemCollection,
+  type ManagedProblemCollectionEntry,
+  type ManagedProblemContext,
+} from "@/src/online-judge/managed-problem-collection";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+const MonacoEditor = dynamic(() => import("@/src/editor/self-hosted-monaco-editor"), { ssr: false });
 const SITES_CHUNK_MANIFEST_URL = process.env.NODE_ENV === "production"
   ? "/toolchains/forge-sites-chunks.json"
   : undefined;
 
 type BottomTab = "judge" | "tests" | "diagnostics" | "output";
-type BusyAction = "build" | "test" | "judge" | "cache" | undefined;
+type BusyAction = "build" | "test" | "judge" | "official" | "cache" | undefined;
 type DifficultyFilter = "all" | ProblemDifficulty;
 type CompileAheadState = "idle" | "scheduled" | "compiling" | "ready" | "error";
 type ProblemPane = "statement" | "editorial";
@@ -140,6 +162,27 @@ interface LogEntry {
 interface SelfTestRunResult {
   readonly caseId: string;
   readonly run: RunResult;
+}
+
+interface ManagedCollectionMatch {
+  readonly snapshotId: string;
+  readonly problems: Readonly<Record<string, string>>;
+}
+
+interface OfficialSubmissionStatus {
+  readonly submissionId: string;
+  readonly connection: SubmissionPollingConnectionState;
+  readonly cursor: number;
+  readonly state?: SubmissionState;
+  readonly compilePhase?: string;
+  readonly completedCases?: number;
+  readonly totalCases?: number;
+  readonly verdict?: string;
+  readonly score?: number;
+  readonly deterministicCost?: number;
+  readonly peakMemoryBytes?: number;
+  readonly eventError?: string;
+  readonly connectionDetail?: string;
 }
 
 const MONACO_LANGUAGE: Record<BuiltinLanguage, string> = {
@@ -167,6 +210,14 @@ function formatBytes(bytes: number): string {
 
 function formatDuration(milliseconds: number): string {
   return milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(2)} s`;
+}
+
+function csrfCookie(): string | undefined {
+  for (const part of document.cookie.split(";")) {
+    const [name, ...value] = part.trim().split("=");
+    if (name === "forge_csrf") return value.join("=");
+  }
+  return undefined;
 }
 
 function submissionVerdictFromContract(verdict: JudgeCaseVerdict | "accepted"): JudgeUiCaseResult["verdict"] {
@@ -230,6 +281,7 @@ function difficultyLabel(difficulty: ProblemDifficulty, locale: ProblemLocale): 
 }
 
 interface ProblemSourceDraft {
+  repositoryUrl: string;
   owner: string;
   repository: string;
   ref: string;
@@ -238,6 +290,7 @@ interface ProblemSourceDraft {
 
 function sourceDraft(source: GithubProblemCollectionSource): ProblemSourceDraft {
   return {
+    repositoryUrl: `https://github.com/${source.owner}/${source.repository}`,
     owner: source.owner,
     repository: source.repository,
     ref: source.ref,
@@ -255,6 +308,18 @@ interface StoredProblemCollectionSource {
 
 function storedProblemCollectionSource(): StoredProblemCollectionSource {
   if (typeof window === "undefined") return { source: DEFAULT_PROBLEM_COLLECTION_SOURCE };
+  try {
+    const shared = problemCollectionSourceFromShareUrl(window.location.href);
+    if (shared) return { source: shared };
+  } catch (reason) {
+    return {
+      source: DEFAULT_PROBLEM_COLLECTION_SOURCE,
+      error: {
+        kind: "invalid",
+        detail: reason instanceof Error ? reason.message : String(reason),
+      },
+    };
+  }
   let raw: string | null;
   try {
     raw = localStorage.getItem(PROBLEM_COLLECTION_SOURCE_KEY);
@@ -295,7 +360,16 @@ function ProblemSourceForm({ source, locale, disabled, onApply }: ProblemSourceF
 
   const apply = () => {
     try {
-      const normalized = normalizeProblemCollectionSource({ provider: "github", ...draft });
+      const repository = draft.repositoryUrl.trim()
+        ? parseGithubRepositoryUrl(draft.repositoryUrl)
+        : { owner: draft.owner, repository: draft.repository };
+      const normalized = normalizeProblemCollectionSource({
+        provider: "github",
+        owner: repository.owner,
+        repository: repository.repository,
+        ref: draft.ref,
+        indexPath: draft.indexPath,
+      });
       setError(undefined);
       onApply(normalized);
     } catch (reason) {
@@ -305,9 +379,10 @@ function ProblemSourceForm({ source, locale, disabled, onApply }: ProblemSourceF
 
   return (
     <div className="problem-source-form">
+      <label className="form-field problem-repository-url"><span>{text.repositoryUrl}</span><input type="url" placeholder="https://github.com/owner/repository" value={draft.repositoryUrl} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, repositoryUrl: event.target.value }))} /></label>
       <div className="form-grid">
-        <label className="form-field"><span>{text.owner}</span><input value={draft.owner} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, owner: event.target.value }))} /></label>
-        <label className="form-field"><span>{text.repository}</span><input value={draft.repository} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, repository: event.target.value }))} /></label>
+        <label className="form-field"><span>{text.owner}</span><input value={draft.owner} disabled={disabled || Boolean(draft.repositoryUrl.trim())} onChange={(event) => setDraft((current) => ({ ...current, owner: event.target.value }))} /></label>
+        <label className="form-field"><span>{text.repository}</span><input value={draft.repository} disabled={disabled || Boolean(draft.repositoryUrl.trim())} onChange={(event) => setDraft((current) => ({ ...current, repository: event.target.value }))} /></label>
       </div>
       <div className="form-grid">
         <label className="form-field"><span>{text.ref}</span><input value={draft.ref} disabled={disabled} onChange={(event) => setDraft((current) => ({ ...current, ref: event.target.value }))} /></label>
@@ -335,7 +410,7 @@ export function JudgeStudioLoader() {
   const [problemLocale, setProblemLocale] = useState<ProblemLocale>(() => {
     if (typeof window === "undefined") return DEFAULT_JUDGE_UI_LOCALE;
     try {
-      return readJudgeUiLocale(localStorage);
+      return readJudgeUiLocale(localStorage, navigator.language.toLowerCase().startsWith("zh") ? "zh-TW" : "en");
     } catch {
       return DEFAULT_JUDGE_UI_LOCALE;
     }
@@ -437,12 +512,16 @@ export function JudgeStudioLoader() {
   );
 }
 
+type JudgeStudioCollection = LoadedProblemCollection | LoadedManagedProblemCollection;
+type JudgeStudioCollectionEntry = ProblemCollectionEntry | ManagedProblemCollectionEntry;
+
 interface JudgeStudioProps {
-  collection: LoadedProblemCollection;
+  collection: JudgeStudioCollection;
   initialProblem: JudgeProblem;
   problemLocale: ProblemLocale;
   onProblemLocaleChange(locale: ProblemLocale): void;
-  onProblemCollectionSourceChange(source: GithubProblemCollectionSource): void;
+  onProblemCollectionSourceChange?(source: GithubProblemCollectionSource): void;
+  managedContext?: ManagedProblemContext;
 }
 
 export function JudgeStudio({
@@ -451,7 +530,26 @@ export function JudgeStudio({
   problemLocale,
   onProblemLocaleChange,
   onProblemCollectionSourceChange,
+  managedContext,
 }: JudgeStudioProps) {
+  const { theme: productTheme } = useProduct();
+  const explicitManagedContext = useMemo(
+    () => managedContext ? normalizeManagedProblemContext(managedContext) : undefined,
+    [managedContext],
+  );
+  if (collection.source.provider === "managed") {
+    if (
+      !explicitManagedContext
+      || collection.source.problemVersionId !== explicitManagedContext.problemVersionId
+      || collection.source.contestId !== explicitManagedContext.contestId
+      || collection.source.mode !== (explicitManagedContext.contestId ? "contest" : "official-practice")
+      || collection.source.projectionUrl !== managedProblemProjectionApiPath(explicitManagedContext)
+    ) {
+      throw new Error("Managed JudgeStudio collection and managedContext must identify the same immutable projection.");
+    }
+  } else if (explicitManagedContext) {
+    throw new Error("managedContext requires a managed problem collection; GitHub collection identity cannot be substituted.");
+  }
   const problems = collection.index.problems;
   const initialProblemEntry = problems.find((problem) => problem.id === initialProblem.id);
   if (!initialProblemEntry) throw new Error(`Initial problem '${initialProblem.id}' is absent from its collection index.`);
@@ -488,11 +586,17 @@ export function JudgeStudio({
   const [resizingBottomPanel, setResizingBottomPanel] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<"problem" | "code" | "result">("problem");
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");
   const [storage, setStorage] = useState({ usage: 0, quota: 0 });
   const [location, setLocation] = useState({ line: 1, column: 1 });
   const [compileAhead, setCompileAhead] = useState<CompileAheadState>("idle");
+  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
+  const [managedMatch, setManagedMatch] = useState<ManagedCollectionMatch>();
+  const [managedMatchChecked, setManagedMatchChecked] = useState(Boolean(explicitManagedContext));
+  const [officialSubmissionId, setOfficialSubmissionId] = useState<string>();
+  const [officialSubmissionStatus, setOfficialSubmissionStatus] = useState<OfficialSubmissionStatus>();
   const compilerRef = useRef<BrowserForgeCompiler | undefined>(undefined);
   const compileCoordinatorRef = useRef<CompileCoordinator | undefined>(undefined);
   const runnerRef = useRef<BrowserForgeRunner | undefined>(undefined);
@@ -504,6 +608,9 @@ export function JudgeStudio({
   const revealRef = useRef<{ line: number; column: number } | undefined>(undefined);
   const judgingRef = useRef(false);
   const cancelledRef = useRef(false);
+  const officialPollingRef = useRef<SubmissionEventPollingClient | undefined>(undefined);
+  const officialCancelPendingRef = useRef(false);
+  const officialRunRef = useRef(0);
   const panelResizeRef = useRef<PanelResizeSession | undefined>(undefined);
   const text = judgeUiText(problemLocale);
 
@@ -514,6 +621,14 @@ export function JudgeStudio({
     return entry;
   }, [activeProblem.id, problems]);
   const activeProgressId = judgeProblemProgressId(activeProblem.id, activeProblemEntry.bundle.sha256);
+  const matchedProblemVersionId = managedMatch?.problems[activeProblem.id];
+  const officialContext = explicitManagedContext
+    ?? (matchedProblemVersionId ? { problemVersionId: matchedProblemVersionId } : undefined);
+  const managedProblemVersionId = officialContext?.problemVersionId;
+  const officialContestId = officialContext?.contestId;
+  const fullLocalJudgeAvailable = explicitManagedContext
+    ? managedCollectionAllowsFullLocalJudge(explicitManagedContext)
+    : true;
   const activeSelfTestKey = useMemo(
     () => selfTestStorageKey(collection.sourceKey, activeProgressId),
     [activeProgressId, collection.sourceKey],
@@ -526,15 +641,19 @@ export function JudgeStudio({
   const projectLanguage: BuiltinLanguage = isBuiltinLanguage(project.config.language)
     ? project.config.language
     : "c";
-  const chatGptProblemUrl = useMemo(
-    () => buildChatGptProblemUrl(
-      activeProblem,
-      problemLocale,
-      projectLanguage,
-      githubRawContentUrl(collection.source, activeProblemEntry.statementPaths[problemLocale]),
-    ),
-    [activeProblem, activeProblemEntry.statementPaths, collection.source, problemLocale, projectLanguage],
-  );
+  const chatGptProblemUrl = useMemo(() => {
+    let statementUrl: string;
+    if (collection.source.provider === "github") {
+      if (!("statementPaths" in activeProblemEntry)) throw new Error("GitHub collection entry is missing statement paths.");
+      statementUrl = githubRawContentUrl(collection.source, activeProblemEntry.statementPaths[problemLocale]);
+    } else {
+      if ("statementPaths" in activeProblemEntry) throw new Error("Managed collection entry cannot masquerade as a GitHub entry.");
+      statementUrl = typeof window === "undefined"
+        ? collection.source.projectionUrl
+        : new URL(collection.source.projectionUrl, window.location.origin).toString();
+    }
+    return buildChatGptProblemUrl(activeProblem, problemLocale, projectLanguage, statementUrl);
+  }, [activeProblem, activeProblemEntry, collection.source, problemLocale, projectLanguage]);
   const activeToolchain = TOOLCHAINS[projectLanguage];
   const buildIdentity = useMemo(() => projectBuildIdentity(project), [project]);
   const filteredProblems = useMemo(
@@ -545,7 +664,7 @@ export function JudgeStudio({
     [filter, problemSearch, problems],
   );
   const groupedProblems = useMemo(
-    () => filteredProblems.reduce<Array<{ id: string; title: string; problems: ProblemCollectionEntry[] }>>((groups, problem) => {
+    () => filteredProblems.reduce<Array<{ id: string; title: string; problems: JudgeStudioCollectionEntry[] }>>((groups, problem) => {
       const id = problem.trackId;
       const current = groups.at(-1);
       if (current?.id === id) {
@@ -570,6 +689,43 @@ export function JudgeStudio({
     setLogs((current) => [...current, { id: crypto.randomUUID(), stream, text }]);
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setManagedMatch(undefined);
+    if (explicitManagedContext) {
+      setManagedMatchChecked(true);
+      return () => controller.abort();
+    }
+    if (collection.source.provider !== "github") {
+      setManagedMatchChecked(true);
+      return () => controller.abort();
+    }
+    setManagedMatchChecked(false);
+    const parameters = new URLSearchParams({
+      repository: `${collection.source.owner}/${collection.source.repository}`,
+      revision: collection.index.revision,
+    });
+    void fetch(`/api/collections/managed-match?${parameters}`, {
+      signal: controller.signal,
+      credentials: "same-origin",
+      headers: { accept: "application/json" },
+    }).then(async (response) => {
+      if (!response.ok) return;
+      const result = await response.json() as { matched?: unknown; snapshotId?: unknown; problems?: unknown };
+      if (result.matched === true && typeof result.snapshotId === "string" && result.problems && typeof result.problems === "object" && !Array.isArray(result.problems)) {
+        setManagedMatch({ snapshotId: result.snapshotId, problems: result.problems as Record<string, string> });
+      }
+    }).catch(() => undefined).finally(() => {
+      if (!controller.signal.aborted) setManagedMatchChecked(true);
+    });
+    return () => controller.abort();
+  }, [collection.index.revision, collection.source, explicitManagedContext]);
+
+  useEffect(() => () => {
+    officialRunRef.current += 1;
+    officialPollingRef.current?.stop("workspace closed");
+  }, []);
+
   const dismissOnboarding = useCallback(() => {
     try {
       completeJudgeOnboarding(localStorage);
@@ -578,16 +734,6 @@ export function JudgeStudio({
     }
     setOnboardingOpen(false);
   }, [addLog, text]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      setOnboardingOpen(!isJudgeOnboardingComplete(localStorage));
-    } catch (error) {
-      addLog("stderr", text.logs.onboardingReadFailed(error instanceof Error ? error.message : String(error)));
-      setOnboardingOpen(true);
-    }
-  }, [addLog, hydrated, text]);
 
   const measureBottomPanel = useCallback(() => {
     const stack = editorStackRef.current;
@@ -856,33 +1002,12 @@ export function JudgeStudio({
 
   const beforeEditorMount: BeforeMount = useCallback((monaco) => {
     configureForgeLanguageServices(monaco);
+    registerForgeMonacoThemes(monaco);
   }, []);
 
   const onEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    monaco.editor.defineTheme("forge", {
-      base: "vs-dark",
-      inherit: true,
-      rules: [
-        { token: "comment", foreground: "777168", fontStyle: "italic" },
-        { token: "keyword", foreground: "c9f27b" },
-        { token: "string", foreground: "e9bc7a" },
-        { token: "number", foreground: "8dc6ff" },
-        { token: "type", foreground: "9de1d1" },
-      ],
-      colors: {
-        "editor.background": "#151411",
-        "editor.foreground": "#e8e5de",
-        "editorLineNumber.foreground": "#5e5a52",
-        "editorLineNumber.activeForeground": "#b9b3a8",
-        "editor.lineHighlightBackground": "#1e1d19",
-        "editor.selectionBackground": "#39472d",
-        "editorCursor.foreground": "#c9f27b",
-        "editorIndentGuide.background1": "#292720",
-      },
-    });
-    monaco.editor.setTheme("forge");
     editor.onDidChangeCursorPosition((event) => setLocation({ line: event.position.lineNumber, column: event.position.column }));
     applyMarkers();
   }, [applyMarkers]);
@@ -914,7 +1039,7 @@ export function JudgeStudio({
     }));
   }, [activeFile, updateProject]);
 
-  const openWorkspace = useCallback(async (summary: ProblemCollectionEntry, language: BuiltinLanguage) => {
+  const openWorkspace = useCallback(async (summary: JudgeStudioCollectionEntry, language: BuiltinLanguage) => {
     if (busy || loadingProblemId) return;
     setLoadingProblemId(summary.id);
     try {
@@ -1025,9 +1150,9 @@ export function JudgeStudio({
     if (selectedSelfTestId === id) setSelectedSelfTestId(next[Math.min(index, next.length - 1)].id);
   };
 
-  const doRunSelfTests = useCallback(async (caseIds: readonly string[]) => {
+  const doRunSelfTests = useCallback(async (caseIds: readonly string[], availableCases: readonly SelfTestCase[] = selfTests) => {
     const runner = runnerRef.current;
-    const requested = selfTests.filter((testCase) => caseIds.includes(testCase.id));
+    const requested = availableCases.filter((testCase) => caseIds.includes(testCase.id));
     if (!runner || requested.length === 0) return;
     cancelledRef.current = false;
     setBusy("test");
@@ -1074,7 +1199,25 @@ export function JudgeStudio({
     }
   }, [addLog, artifact, doBuild, problemLocale, project, selfTests, text]);
 
+  const doRunSamples = useCallback(async () => {
+    const samples = sampleCases(activeProblem).map((sample, index) => ({
+      id: `sample-${index + 1}`,
+      name: text.selfTest.sampleName(index + 1),
+      input: sample.input,
+    }));
+    if (samples.length === 0) return;
+    setSelfTests(samples);
+    setSelectedSelfTestId(samples[0].id);
+    setMobileWorkspaceTab("result");
+    await doRunSelfTests(samples.map((sample) => sample.id), samples);
+  }, [activeProblem, doRunSelfTests, text]);
+
   const doJudge = useCallback(async () => {
+    if (!fullLocalJudgeAvailable) {
+      setBottomTab("tests");
+      addLog("system", text.official.contestSamplesOnly);
+      return;
+    }
     const runner = runnerRef.current;
     if (!runner) return;
     cancelledRef.current = false;
@@ -1215,9 +1358,177 @@ export function JudgeStudio({
       judgingRef.current = false;
       setBusy(undefined);
     }
-  }, [activeProblem, activeProgressId, addLog, artifact, doBuild, project, projectLanguage]);
+  }, [activeProblem, activeProgressId, addLog, artifact, doBuild, fullLocalJudgeAvailable, project, projectLanguage, text.official.contestSamplesOnly]);
+
+  const doOfficialSubmit = useCallback(async () => {
+    if (!managedProblemVersionId) return;
+    setMobileWorkspaceTab("result");
+    const runIdentity = officialRunRef.current + 1;
+    officialRunRef.current = runIdentity;
+    setBusy("official");
+    setBottomTab("output");
+    setLogs([]);
+    setOfficialSubmissionId(undefined);
+    setOfficialSubmissionStatus(undefined);
+    officialPollingRef.current?.stop("superseded");
+    officialCancelPendingRef.current = false;
+    let polling: SubmissionEventPollingClient | undefined;
+    try {
+      const session = await fetch("/api/auth/session", { credentials: "same-origin", headers: { accept: "application/json" } });
+      const sessionValue = await session.json() as { authenticated?: unknown };
+      if (!session.ok || sessionValue.authenticated !== true) {
+        const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        const loginUrl = new URL("/api/auth/github", window.location.origin);
+        loginUrl.searchParams.set("return", returnPath);
+        window.location.assign(loginUrl);
+        return;
+      }
+      const csrf = csrfCookie();
+      if (!csrf) throw new Error(text.official.csrfMissing);
+      addLog("system", text.official.admitting);
+      const requestBody = JSON.stringify(createOfficialSubmissionRequest({
+        problemVersionId: managedProblemVersionId,
+        ...(officialContestId ? { contestId: officialContestId } : {}),
+      }, {
+        language: projectLanguage,
+        target: project.config.target,
+        optimization: project.config.optimization,
+        entry: project.config.entry,
+        sourceFiles: project.files.map((file) => ({ path: file.path, encoding: "utf8" as const, content: file.content })),
+        idempotencyKey: `browser:${crypto.randomUUID()}`,
+      }));
+      type SubmissionResponse = {
+        submissionId?: unknown;
+        eventCursor?: unknown;
+        eventsUrl?: unknown;
+        state?: unknown;
+        replayed?: unknown;
+        error?: { code?: unknown; message?: unknown };
+      };
+      const submit = async (turnstileToken?: string): Promise<{ response: Response; value: SubmissionResponse }> => {
+        const response = await fetch("/api/submissions", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "content-type": "application/json",
+            accept: "application/json",
+            "x-forge-csrf": csrf,
+            ...(turnstileToken ? { "x-forge-turnstile-token": turnstileToken } : {}),
+          },
+          body: requestBody,
+        });
+        return { response, value: await response.json() as SubmissionResponse };
+      };
+      let { response, value } = await submit();
+      if (response.status === 403 && value.error?.code === "turnstile-required") {
+        const turnstileToken = await requestForgeTurnstileToken("official-submit");
+        ({ response, value } = await submit(turnstileToken));
+      }
+      if (!response.ok) throw new Error(typeof value.error?.message === "string" ? value.error.message : text.official.rejected);
+      const created = parseOfficialSubmissionCreated(value, window.location.origin);
+      setOfficialSubmissionId(created.submissionId);
+      setOfficialSubmissionStatus({
+        submissionId: created.submissionId,
+        state: created.state,
+        connection: "replaying",
+        cursor: created.eventCursor,
+      });
+      addLog("system", text.official.created(created.submissionId));
+      polling = new SubmissionEventPollingClient({
+        eventsUrl: created.eventsUrl,
+        initialCursor: created.eventCursor,
+        onEvent: (event: SequencedSubmissionEvent) => {
+          setOfficialSubmissionStatus((current) => {
+            if (!current || current.submissionId !== created.submissionId) return current;
+            const next: OfficialSubmissionStatus = { ...current, cursor: event.sequence };
+            if (event.kind === "state" && event.state) return { ...next, state: event.state };
+            if (event.kind === "compile-progress" && event.phase) return { ...next, compilePhase: event.phase };
+            if (event.kind === "case-progress" && event.completedCases !== undefined && event.totalCases !== undefined) return { ...next, completedCases: event.completedCases, totalCases: event.totalCases };
+            if (event.kind === "verdict" && event.verdict && event.score !== undefined) return { ...next, verdict: event.verdict, score: event.score };
+            if (event.kind === "resource-summary" && event.deterministicCost !== undefined && event.peakMemoryBytes !== undefined) return { ...next, deterministicCost: event.deterministicCost, peakMemoryBytes: event.peakMemoryBytes };
+            if (event.kind === "error" && event.message) return { ...next, eventError: event.message };
+            return next;
+          });
+          if (event.kind === "state" && event.state) addLog("system", text.official.state(event.state));
+          if (event.kind === "compile-progress" && event.phase) addLog("system", text.official.compiling(event.phase));
+          if (event.kind === "case-progress" && event.completedCases !== undefined && event.totalCases !== undefined) addLog("system", text.official.cases(event.completedCases, event.totalCases));
+          if (event.kind === "verdict" && event.verdict && event.score !== undefined) addLog("system", text.official.verdict(event.verdict, event.score));
+          if (event.kind === "resource-summary" && event.deterministicCost !== undefined && event.peakMemoryBytes !== undefined) addLog("system", text.official.resources(event.deterministicCost, formatBytes(event.peakMemoryBytes)));
+          if (event.kind === "error" && event.message) addLog("stderr", event.message);
+        },
+        onStatus: (status) => {
+          setOfficialSubmissionStatus((current) => {
+            if (!current || current.submissionId !== created.submissionId) return current;
+            return {
+              ...current,
+              connection: status.state,
+              cursor: status.cursor,
+              connectionDetail: status.reason,
+            };
+          });
+          if (status.state === "disconnected") addLog("system", text.official.disconnected(status.cursor));
+          if (status.state === "reconnecting") addLog("system", text.official.reconnecting(status.reconnectAttempt, status.cursor));
+          if (status.state === "error") addLog("stderr", text.official.pollingError(status.cursor));
+        },
+      });
+      officialPollingRef.current = polling;
+      const result = await polling.run();
+      if (result.kind === "disconnected" && result.reason !== "superseded" && result.reason !== "workspace closed") throw new Error(text.official.pollingStopped);
+    } catch (error) {
+      addLog("stderr", error instanceof Error ? error.message : String(error));
+    } finally {
+      if (officialRunRef.current === runIdentity && (!polling || officialPollingRef.current === polling)) {
+        officialPollingRef.current = undefined;
+        officialCancelPendingRef.current = false;
+        setBusy(undefined);
+      }
+    }
+  }, [addLog, managedProblemVersionId, officialContestId, project, projectLanguage, text]);
+
+  const cancelOfficialSubmission = useCallback(async () => {
+    if (officialCancelPendingRef.current) return;
+    if (!officialSubmissionId) {
+      addLog("stderr", text.official.cancelUnavailable);
+      return;
+    }
+    const csrf = csrfCookie();
+    if (!csrf) {
+      addLog("stderr", text.official.csrfMissing);
+      return;
+    }
+    officialCancelPendingRef.current = true;
+    addLog("system", text.official.cancelRequested);
+    try {
+      const response = await fetch(`/api/submissions/${officialSubmissionId}/cancel`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { accept: "application/json", "x-forge-csrf": csrf },
+      });
+      const value = await response.json() as unknown;
+      if (!response.ok) {
+        const message = value && typeof value === "object" && !Array.isArray(value)
+          && typeof (value as { error?: { message?: unknown } }).error?.message === "string"
+          ? (value as { error: { message: string } }).error.message
+          : text.official.pollingFailed;
+        throw new Error(message);
+      }
+      const cancellation = parseOfficialSubmissionCancellation(value, officialSubmissionId);
+      setOfficialSubmissionStatus((current) => current?.submissionId === officialSubmissionId
+        ? { ...current, state: cancellation.state }
+        : current);
+      addLog("system", text.official.cancelReconciled(cancellation.state));
+    } catch (error) {
+      addLog("stderr", error instanceof Error ? error.message : String(error));
+    } finally {
+      officialCancelPendingRef.current = false;
+    }
+  }, [addLog, officialSubmissionId, text]);
 
   const cancel = useCallback(() => {
+    if (busy === "official") {
+      void cancelOfficialSubmission();
+      return;
+    }
     cancelledRef.current = true;
     judgingRef.current = false;
     compileCoordinatorRef.current?.cancel();
@@ -1226,7 +1537,7 @@ export function JudgeStudio({
     setRunningSelfTestId(undefined);
     setJudgeSession((current) => current?.verdict === "running" ? { ...current, verdict: "cancelled" } : current);
     addLog("system", text.logs.cancelled);
-  }, [addLog, text]);
+  }, [addLog, busy, cancelOfficialSubmission, text]);
 
   const chooseTarget = (target: "wasip1" | "wasix") => {
     if (target === project.config.target) return;
@@ -1285,12 +1596,25 @@ export function JudgeStudio({
     }
   };
 
+  const copyCollectionShareUrl = useCallback(async () => {
+    try {
+      if (collection.source.provider !== "github") throw new Error("Managed problem routes have stable platform URLs and no repository share contract.");
+      const shareUrl = problemCollectionShareUrl(collection.source, window.location.href);
+      await navigator.clipboard.writeText(shareUrl);
+      setShareState("copied");
+      window.setTimeout(() => setShareState("idle"), 2_000);
+    } catch (error) {
+      setShareState("failed");
+      addLog("stderr", error instanceof Error ? error.message : String(error));
+    }
+  }, [addLog, collection.source]);
+
   if (!hydrated) {
     return <main className="boot-screen"><div className="boot-mark"><Zap size={20} /></div><p>{text.boot}</p></main>;
   }
 
   return (
-    <main className="studio-shell judge-shell">
+    <main className={`studio-shell judge-shell ${explicitManagedContext ? "managed-judge-shell" : "custom-judge-shell"}`}>
       <header className="topbar">
         <div className="brand" aria-label="WASM OJ Forge">
           <span className="brand-mark"><Target size={17} strokeWidth={2.4} /></span>
@@ -1330,28 +1654,54 @@ export function JudgeStudio({
             </select>
             <ChevronDown size={12} />
           </label>
-          <label className="compact-select">
-            <select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")} aria-label={text.topbar.compilationTarget} disabled={Boolean(busy || loadingProblemId)}>
-              {activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}
-            </select>
-            <ChevronDown size={12} />
-          </label>
-          <button className="icon-button" onClick={() => setOnboardingOpen(true)} aria-label={text.topbar.openGuide} title={text.topbar.guide}><CircleHelp size={16} /></button>
-          <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label={text.topbar.projectSettings}><Settings2 size={16} /></button>
           {busy ? (
             <button className="stop-button" onClick={cancel}><CircleStop size={14} /> {text.topbar.stop}</button>
+          ) : explicitManagedContext ? (
+            <>
+              <button className="workspace-advanced-button" onClick={() => setSettingsOpen(true)}><Settings2 size={14} />{problemLocale === "zh-TW" ? "測試 / 進階" : "Test / Advanced"}</button>
+              <button className="workspace-run-button" onClick={() => void doRunSamples()} disabled={!runtimeReady}><Play size={14} />{problemLocale === "zh-TW" ? "執行" : "Run"}</button>
+              <button className="workspace-submit-button" onClick={() => void doOfficialSubmit()}><Send size={14} />{problemLocale === "zh-TW" ? "提交" : "Submit"}</button>
+            </>
           ) : (
             <>
+              <label className="compact-select">
+                <select value={project.config.target} onChange={(event) => chooseTarget(event.target.value as "wasip1" | "wasix")} aria-label={text.topbar.compilationTarget} disabled={Boolean(loadingProblemId)}>
+                  {activeToolchain.targets.map((target) => <option value={target} key={target}>{target.toUpperCase()}</option>)}
+                </select>
+                <ChevronDown size={12} />
+              </label>
+              <button className="icon-button" onClick={() => setOnboardingOpen(true)} aria-label={text.topbar.openGuide} title={text.topbar.guide}><CircleHelp size={16} /></button>
+              <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label={text.topbar.projectSettings}><Settings2 size={16} /></button>
               <button className="build-button" onClick={() => void doBuild(false)} disabled={!runtimeReady}><Hammer size={14} /> {text.topbar.build}</button>
               <button className="sample-button" onClick={() => setBottomTab("tests")} disabled={!runtimeReady}><Play size={14} /> {text.topbar.selfTest}</button>
-              <button className="submit-button" onClick={() => void doJudge()} disabled={!runtimeReady}><Send size={14} /> {text.topbar.submit}</button>
+              {fullLocalJudgeAvailable
+                ? <button className="submit-button" onClick={() => void doJudge()} disabled={!runtimeReady}><Send size={14} /> {text.topbar.judgeLocally}</button>
+                : <button className="submit-button" disabled title={text.official.contestSamplesOnly}><LockKeyhole size={14} /> {text.topbar.samplesOnly}</button>}
+              {managedProblemVersionId && <button className="official-submit-button" onClick={() => void doOfficialSubmit()}><ShieldCheck size={14} /> {text.topbar.officialSubmit}</button>}
             </>
           )}
         </div>
       </header>
 
-      <section className="judge-workspace">
-        <aside className="problem-catalog">
+      <section className={`judge-workspace ${explicitManagedContext ? "managed-workspace" : "custom-judge-workspace"}`}>
+        {explicitManagedContext && <nav className="mobile-workspace-tabs" aria-label="Workspace"><button className={mobileWorkspaceTab === "problem" ? "active" : ""} onClick={() => setMobileWorkspaceTab("problem")}>Problem</button><button className={mobileWorkspaceTab === "code" ? "active" : ""} onClick={() => setMobileWorkspaceTab("code")}>Code</button><button className={mobileWorkspaceTab === "result" ? "active" : ""} onClick={() => setMobileWorkspaceTab("result")}>Result</button></nav>}
+        {explicitManagedContext && <div className="managed-capability" role="status"><ShieldCheck size={14} /> {explicitManagedContext.contestId ? (problemLocale === "zh-TW" ? "競賽題目 · 本機執行公開範例，提交後由 Server 正式判題" : "Contest problem · run public samples locally, then submit for the official verdict") : (problemLocale === "zh-TW" ? "官方練習 · 程式碼保存在瀏覽器，提交後取得驗證結果" : "Official practice · code stays in your browser until you submit")}</div>}
+        {!explicitManagedContext && managedMatchChecked && managedMatch && <div className="managed-capability" role="status"><ShieldCheck size={14} /> {managedProblemVersionId ? text.official.available : text.official.snapshotOnly}</div>}
+        {officialSubmissionStatus && (
+          <div className={`official-submission-status connection-${officialSubmissionStatus.connection}`} role="status" aria-live="polite">
+            <ShieldCheck size={14} />
+            <strong>{problemLocale === "zh-TW" ? "正式提交" : "Official submission"}</strong>
+            <span>{text.official.connection(officialSubmissionStatus.connection)}</span>
+            {officialSubmissionStatus.state && <span>{text.official.state(officialSubmissionStatus.state)}</span>}
+            {officialSubmissionStatus.compilePhase && <span>{text.official.compiling(officialSubmissionStatus.compilePhase)}</span>}
+            {officialSubmissionStatus.completedCases !== undefined && officialSubmissionStatus.totalCases !== undefined && <span>{text.official.cases(officialSubmissionStatus.completedCases, officialSubmissionStatus.totalCases)}</span>}
+            {officialSubmissionStatus.verdict && officialSubmissionStatus.score !== undefined && <span>{text.official.verdict(officialSubmissionStatus.verdict, officialSubmissionStatus.score)}</span>}
+            {officialSubmissionStatus.state && !isTerminalSubmissionState(officialSubmissionStatus.state) && <button type="button" onClick={() => void cancelOfficialSubmission()}><CircleStop size={12} /> {text.topbar.stop}</button>}
+            {officialSubmissionStatus.eventError && <span className="official-status-detail">{officialSubmissionStatus.eventError}</span>}
+            {officialSubmissionStatus.connectionDetail && <span className="official-status-detail">{officialSubmissionStatus.connectionDetail}</span>}
+          </div>
+        )}
+        {!explicitManagedContext && <aside className="problem-catalog">
           <div className="catalog-heading">
             <div><span>{text.catalog.heading.toUpperCase()}</span><strong>{solved.size} / {problems.length}</strong></div>
             <div className="catalog-progress"><span style={{ width: `${(solved.size / problems.length) * 100}%` }} /></div>
@@ -1407,14 +1757,19 @@ export function JudgeStudio({
           </div>
           <div className="collection-source-card" title={collection.sourceKey}>
             <Package size={14} />
-            <div>
-              <strong>{collection.source.owner}/{collection.source.repository}</strong>
-              <span>{collection.source.ref} · {collection.origin === "network" ? text.catalog.verifiedOnline : text.catalog.verifiedCache}</span>
-            </div>
+            {collection.source.provider === "github"
+              ? <div>
+                <strong>{collection.source.owner}/{collection.source.repository}</strong>
+                <span>{collection.source.ref} · {collection.index.revision.slice(0, 12)} · {collection.origin === "network" ? text.catalog.verifiedOnline : text.catalog.verifiedCache}</span>
+              </div>
+              : <div>
+                <strong>{collection.source.mode === "contest" ? text.catalog.managedContest : text.catalog.managedPractice}</strong>
+                <span>{collection.source.problemVersionId} · {collection.index.revision.slice(0, 12)} · {text.catalog.verifiedManaged}</span>
+              </div>}
           </div>
-        </aside>
+        </aside>}
 
-        <article className="problem-statement">
+        <article className={`problem-statement ${mobileWorkspaceTab === "problem" ? "mobile-active" : ""}`}>
           <div className="statement-kicker">
             <span>{text.statement.problem.toUpperCase()} {String(activeProblem.number).padStart(2, "0")}</span>
             <span>{activeProblem.track[problemLocale]} · {activeProblem.tags.join(" · ")}</span>
@@ -1422,10 +1777,10 @@ export function JudgeStudio({
           <h1>{activeProblemText.title}</h1>
           <div className="problem-metrics">
             <span><Gauge size={13} />{difficultyLabel(activeProblem.difficulty, problemLocale)}</span>
-            <span><Zap size={13} />{text.statement.baselineCost} {activeBaseline.limits.instructionBudget.toLocaleString()} · {text.statement.perCase}</span>
-            <span><Box size={13} />{text.statement.cases(activeProblem.judgeCases.length)}</span>
+            {!explicitManagedContext && <span><Zap size={13} />{text.statement.baselineCost} {activeBaseline.limits.instructionBudget.toLocaleString()} · {text.statement.perCase}</span>}
+            {!explicitManagedContext && <span><Box size={13} />{text.statement.cases(activeProblem.judgeCases.length)}</span>}
           </div>
-          <div className="problem-policy-grid" aria-label={text.statement.scoringPolicies}>
+          {!explicitManagedContext && <div className="problem-policy-grid" aria-label={text.statement.scoringPolicies}>
             {activeProblem.scoring.policies.map((policy) => (
               <div key={policy.id}>
                 <span>{policy.title[problemLocale]}</span>
@@ -1433,14 +1788,14 @@ export function JudgeStudio({
                 <small>{policy.limits.instructionBudget.toLocaleString()} {text.statement.costUnit} · {formatBytes(policy.limits.memoryLimitBytes)}</small>
               </div>
             ))}
-          </div>
+          </div>}
           <div className="problem-document-tabs">
             <button className={problemPane === "statement" ? "active" : ""} onClick={() => setProblemPane("statement")}>
               {text.statement.statement}
             </button>
-            <button className={problemPane === "editorial" ? "active" : ""} onClick={() => setProblemPane("editorial")}>
+            {fullLocalJudgeAvailable && <button className={problemPane === "editorial" ? "active" : ""} onClick={() => setProblemPane("editorial")}>
               {text.statement.editorial}
-            </button>
+            </button>}
             <a
               className="ask-chatgpt-button"
               href={chatGptProblemUrl}
@@ -1452,11 +1807,11 @@ export function JudgeStudio({
               {text.statement.askChatGpt}
             </a>
           </div>
-          <ProblemMarkdown markdown={problemPane === "statement" ? activeProblemText.statement : activeProblemText.editorial} />
+          <ProblemMarkdown markdown={problemPane === "statement" || !fullLocalJudgeAvailable ? activeProblemText.statement : activeProblemText.editorial} />
         </article>
 
         <section
-          className={`editor-stack judge-editor-stack ${resizingBottomPanel ? "resizing-bottom-panel" : ""}`}
+          className={`editor-stack judge-editor-stack ${resizingBottomPanel ? "resizing-bottom-panel" : ""} mobile-${mobileWorkspaceTab}`}
           ref={editorStackRef}
           style={{ "--judge-bottom-panel-height": `${bottomPanelHeight}px` } as CSSProperties}
         >
@@ -1490,7 +1845,7 @@ export function JudgeStudio({
                 onChange={updateActiveFile}
                 beforeMount={beforeEditorMount}
                 onMount={onEditorMount}
-                theme="forge"
+                theme={forgeMonacoTheme(productTheme)}
                 options={{
                   automaticLayout: true,
                   fontFamily: "var(--font-mono), monospace",
@@ -1755,12 +2110,17 @@ export function JudgeStudio({
         <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
           <aside className="settings-drawer" aria-label={text.settings.ariaLabel}>
             <div className="drawer-heading"><div><span>{text.settings.eyebrow}</span><h2>{text.settings.title}</h2><p>{text.settings.description}</p></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label={text.settings.close}><X size={16} /></button></div>
-            <section className="problem-source-section" aria-labelledby="problem-source-heading">
+            {collection.source.provider === "github" && onProblemCollectionSourceChange && <section className="problem-source-section" aria-labelledby="problem-source-heading">
               <div className="problem-source-heading">
                 <div><span>{text.settings.collectionEyebrow}</span><strong id="problem-source-heading">{text.settings.collectionTitle}</strong></div>
                 <code>{collection.index.revision.slice(0, 12)}</code>
               </div>
               <p>{text.settings.collectionDescription}</p>
+              <div className="collection-disclosure-warning"><TriangleAlert size={14} /><span>{text.settings.collectionDisclosureWarning}</span></div>
+              <div className="collection-share-row">
+                <a href={`https://github.com/${collection.source.owner}/${collection.source.repository}`} target="_blank" rel="noreferrer"><Package size={13} />{text.settings.openRepository}</a>
+                <button type="button" onClick={() => void copyCollectionShareUrl()}><Copy size={13} />{shareState === "copied" ? text.settings.shareCopied : shareState === "failed" ? text.settings.shareFailed : text.settings.copyShareLink}</button>
+              </div>
               <ProblemSourceForm
                 source={collection.source}
                 locale={problemLocale}
@@ -1771,7 +2131,15 @@ export function JudgeStudio({
                   });
                 }}
               />
-            </section>
+            </section>}
+            {collection.source.provider === "managed" && <section className="problem-source-section" aria-labelledby="problem-source-heading">
+              <div className="problem-source-heading">
+                <div><span>{text.settings.collectionEyebrow}</span><strong id="problem-source-heading">{collection.source.mode === "contest" ? text.catalog.managedContest : text.catalog.managedPractice}</strong></div>
+                <code>{collection.index.revision.slice(0, 12)}</code>
+              </div>
+              <p>{text.settings.managedProjectionDescription}</p>
+              {collection.source.mode === "contest" && <div className="collection-disclosure-warning"><LockKeyhole size={14} /><span>{text.official.contestSamplesOnly}</span></div>}
+            </section>}
             <section className="settings-section" aria-labelledby="compile-settings-heading">
               <header className="settings-section-heading"><span>{text.settings.compilationEyebrow}</span><strong id="compile-settings-heading">{text.settings.compilationTitle}</strong><p>{text.settings.compilationDescription}</p></header>
               <div className="toolchain-card">

@@ -14,6 +14,7 @@ type LocalizedShape<T> = T extends (...args: infer Arguments) => string
 const ZH_TW = {
   localeName: "繁體中文",
   source: {
+    repositoryUrl: "GitHub Repository URL",
     owner: "GitHub 擁有者",
     repository: "儲存庫",
     ref: "分支／標籤／commit",
@@ -41,7 +42,33 @@ const ZH_TW = {
     stop: "停止",
     build: "建置",
     selfTest: "自行測試",
-    submit: "提交判題",
+    judgeLocally: "本機判題",
+    samplesOnly: "僅公開範例",
+    officialSubmit: "正式提交",
+  },
+  official: {
+    available: "此題庫版本已由平台發布；本機判題仍保持獨立，正式結果只採 Server 重新編譯。",
+    snapshotOnly: "此題庫版本已受管理，但目前題目沒有正式提交能力。",
+    contestSamplesOnly: "競賽公開 projection 只包含範例測資；可在瀏覽器建置、執行與自行測試，完整 verdict 必須使用正式提交。",
+    csrfMissing: "登入工作階段缺少安全驗證資料，請重新登入。",
+    admitting: "正在建立正式提交；只上傳原始碼與編譯設定。",
+    rejected: "正式提交未被接受。",
+    created: (id: string) => `正式提交 ${id} 已建立。`,
+    state: (state: string) => `正式 Judge 狀態：${state}`,
+    compiling: (phase: string) => `Server 編譯：${phase}`,
+    cases: (completed: number, total: number) => `正式測資進度：${completed} / ${total}`,
+    verdict: (verdict: string, score: number) => `正式結果：${verdict} · ${score.toFixed(2)} 分`,
+    resources: (cost: number, memory: string) => `安全資源摘要：${cost.toLocaleString()} 指令成本 · ${memory} 記憶體峰值`,
+    cursor: (sequence: number) => `事件游標：${sequence}`,
+    connection: (state: string) => `事件更新：${state}`,
+    disconnected: (cursor: number) => `正式 Judge 事件更新暫時失敗；已保留事件游標 ${cursor}。`,
+    reconnecting: (attempt: number, cursor: number) => `正在第 ${attempt} 次重新取得事件，會從游標 ${cursor} 繼續。`,
+    pollingError: (cursor: number) => `正式 Judge 事件更新在游標 ${cursor} 進入錯誤狀態。`,
+    cancelRequested: "正在要求取消正式提交；會繼續取得事件直到 Server 確認終態。",
+    cancelReconciled: (state: string) => `取消要求已由 Server 對帳：${state}`,
+    cancelUnavailable: "正式提交尚未取得 Server ID，現在無法安全取消。",
+    pollingFailed: "無法取得正式 Judge 事件。",
+    pollingStopped: "正式 Judge 事件更新在完成前停止；可從 submission API 繼續取得。",
   },
   catalog: {
     heading: "題目",
@@ -53,6 +80,9 @@ const ZH_TW = {
     empty: "找不到符合條件的題目",
     verifiedOnline: "已驗證的線上來源",
     verifiedCache: "已驗證的快取",
+    verifiedManaged: "已驗證的 managed projection",
+    managedContest: "Managed 競賽題目",
+    managedPractice: "Managed 正式練習",
   },
   difficulty: {
     easy: "入門",
@@ -170,6 +200,12 @@ const ZH_TW = {
     collectionEyebrow: "題庫",
     collectionTitle: "遠端題庫來源",
     collectionDescription: "只先載入索引；選題時才下載並驗證該題的 SHA-256 bundle。設定會保存在此瀏覽器。",
+    collectionDisclosureWarning: "這是完整的公開練習題庫；題解、完整測資與計分政策都會下載到瀏覽器，因此不具防作弊性。",
+    managedProjectionDescription: "此工作區綁定平台發布的不可變題目 projection；來源身分與正式提交 context 不會由 GitHub 座標推測。",
+    openRepository: "開啟 Repository",
+    copyShareLink: "複製分享連結",
+    shareCopied: "已複製",
+    shareFailed: "無法複製",
     compilationEyebrow: "編譯",
     compilationTitle: "編譯設定",
     compilationDescription: "選擇入口檔、目標 ABI 與最佳化方式。",
@@ -255,6 +291,7 @@ const ZH_TW = {
 const EN = {
   localeName: "English",
   source: {
+    repositoryUrl: "GitHub repository URL",
     owner: "GitHub owner",
     repository: "Repository",
     ref: "Branch / tag / commit",
@@ -282,7 +319,33 @@ const EN = {
     stop: "Stop",
     build: "Build",
     selfTest: "Self Test",
-    submit: "Submit",
+    judgeLocally: "Judge Locally",
+    samplesOnly: "Public Samples Only",
+    officialSubmit: "Official Submit",
+  },
+  official: {
+    available: "This collection revision is platform-managed. Local judging remains independent; official results are rebuilt on the server.",
+    snapshotOnly: "This collection revision is managed, but this problem has no formal submission capability.",
+    contestSamplesOnly: "The contest-public projection contains samples only. Build, run, and self-test in the browser; use Official Submit for a complete verdict.",
+    csrfMissing: "The signed-in session is missing its security token. Sign in again.",
+    admitting: "Creating an official submission with source and compile settings only.",
+    rejected: "The official submission was rejected.",
+    created: (id: string) => `Official submission ${id} was created.`,
+    state: (state: string) => `Official judge state: ${state}`,
+    compiling: (phase: string) => `Server compile: ${phase}`,
+    cases: (completed: number, total: number) => `Official case progress: ${completed} / ${total}`,
+    verdict: (verdict: string, score: number) => `Official result: ${verdict} · ${score.toFixed(2)} points`,
+    resources: (cost: number, memory: string) => `Safe resource summary: ${cost.toLocaleString()} deterministic cost · ${memory} peak memory`,
+    cursor: (sequence: number) => `Event cursor: ${sequence}`,
+    connection: (state: string) => `Event updates: ${state}`,
+    disconnected: (cursor: number) => `Official judge event updates failed temporarily; event cursor ${cursor} is preserved.`,
+    reconnecting: (attempt: number, cursor: number) => `Event retry ${attempt} will continue from cursor ${cursor}.`,
+    pollingError: (cursor: number) => `Official judge event updates entered an error state at cursor ${cursor}.`,
+    cancelRequested: "Requesting cancellation while continuing event updates until the server confirms a terminal state.",
+    cancelReconciled: (state: string) => `The server reconciled the cancellation request: ${state}`,
+    cancelUnavailable: "The official submission does not have a server ID yet, so it cannot be cancelled safely.",
+    pollingFailed: "Could not retrieve official judge events.",
+    pollingStopped: "Official judge event updates stopped early; the submission API can continue from the saved cursor.",
   },
   catalog: {
     heading: "Challenges",
@@ -294,6 +357,9 @@ const EN = {
     empty: "No matching problems",
     verifiedOnline: "verified online",
     verifiedCache: "verified cache",
+    verifiedManaged: "verified managed projection",
+    managedContest: "Managed contest problem",
+    managedPractice: "Managed official practice",
   },
   difficulty: {
     easy: "Easy",
@@ -411,6 +477,12 @@ const EN = {
     collectionEyebrow: "PROBLEM COLLECTION",
     collectionTitle: "Remote problem collection",
     collectionDescription: "Only the index is loaded initially. Each problem's SHA-256 bundle is downloaded and verified when selected. These settings are saved in this browser.",
+    collectionDisclosureWarning: "This is a complete public practice collection. Editorials, full cases, and scoring policies are downloaded to the browser, so it is not an anti-cheat boundary.",
+    managedProjectionDescription: "This workspace is bound to an immutable platform-published problem projection. Source identity and formal submission context are never inferred from GitHub coordinates.",
+    openRepository: "Open repository",
+    copyShareLink: "Copy share link",
+    shareCopied: "Copied",
+    shareFailed: "Copy failed",
     compilationEyebrow: "COMPILATION",
     compilationTitle: "Compilation settings",
     compilationDescription: "Choose the entry file, target ABI, and optimization profile.",
@@ -504,11 +576,11 @@ export function judgeUiText(locale: ProblemLocale): JudgeUiText {
   return TEXT[locale];
 }
 
-export function readJudgeUiLocale(storage: Pick<Storage, "getItem">): ProblemLocale {
+export function readJudgeUiLocale(storage: Pick<Storage, "getItem">, preferredLocale: ProblemLocale = DEFAULT_JUDGE_UI_LOCALE): ProblemLocale {
   const value = storage.getItem(JUDGE_UI_LOCALE_STORAGE_KEY);
   return PROBLEM_LOCALES.includes(value as ProblemLocale)
     ? value as ProblemLocale
-    : DEFAULT_JUDGE_UI_LOCALE;
+    : preferredLocale;
 }
 
 export function writeJudgeUiLocale(storage: Pick<Storage, "setItem">, locale: ProblemLocale): void {

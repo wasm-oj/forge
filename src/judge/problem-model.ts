@@ -1,3 +1,5 @@
+import type { BuiltinLanguage } from "../core/types";
+
 export const PROBLEM_LOCALES = ["zh-TW", "en"] as const;
 export type ProblemLocale = typeof PROBLEM_LOCALES[number];
 export const DEFAULT_PROBLEM_LOCALE: ProblemLocale = "zh-TW";
@@ -44,6 +46,18 @@ export interface ProblemComplexity {
   readonly accepted: boolean;
 }
 
+/**
+ * Author-supplied source tree used to create a fresh draft. The entry must be
+ * one of the exact file-map keys; consumers copy these bytes and never invent
+ * source for a missing language.
+ */
+export interface JudgeStarterTemplate {
+  readonly entry: string;
+  readonly files: Readonly<Record<string, string>>;
+}
+
+export type JudgeStarterTemplates = Readonly<Record<BuiltinLanguage, JudgeStarterTemplate>>;
+
 export interface JudgeProblem {
   readonly id: string;
   readonly number: number;
@@ -54,6 +68,7 @@ export interface JudgeProblem {
   readonly tags: readonly string[];
   readonly statement: LocalizedText;
   readonly editorial: LocalizedText;
+  readonly starterTemplates: JudgeStarterTemplates;
   readonly judgeCases: readonly JudgeCase[];
   readonly scoring: ProblemScoring;
   readonly complexities: readonly ProblemComplexity[];

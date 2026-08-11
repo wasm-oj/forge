@@ -58,8 +58,37 @@ export interface ResolvedDependencyGraph {
   payloads: Readonly<Record<string, Uint8Array>>;
 }
 
+/** @internal Shared by all adapters participating in one bounded resolution. */
+export interface DependencyDownloadBudget {
+  readonly limitBytes: number;
+  readonly usedBytes: number;
+  reserve(bytes: number): void;
+  consume(bytes: number): void;
+  release(bytes: number): void;
+}
+
 export interface DependencyResolutionContext {
   previousLock?: DependencyLock;
+  /** Explicit browser/network consent scope. Omit only for offline resolution. */
+  networkAccess?: DependencyNetworkAccess;
+  /** @internal Forge-owned aggregate budget; custom resolvers must pass it through to network transports. */
+  downloadBudget?: DependencyDownloadBudget;
+}
+
+/** Repository and immutable problem-bundle identity used to isolate cached locks. */
+export interface DependencyNetworkScope {
+  sourceKey: string;
+  bundleDigest: string;
+}
+
+/** Complete host set approved for one repository source and immutable problem bundle. */
+export interface DependencyNetworkAccess extends DependencyNetworkScope {
+  hosts: readonly string[];
+}
+
+/** Performs the user- or host-owned authorization step before any dependency request. */
+export interface DependencyNetworkAuthorizer {
+  authorize(access: DependencyNetworkAccess): Promise<void>;
 }
 
 export interface ForgeDependencyResolver {
@@ -87,4 +116,7 @@ export interface DependencyOfflineBundle {
 export interface ResolveDependencyOptions {
   offline?: boolean;
   previousLock?: DependencyLock;
+  /** Required to use `previousLock` after a genuine network transport failure. */
+  previousLockNetworkScope?: DependencyNetworkScope;
+  networkAccess?: DependencyNetworkAccess;
 }

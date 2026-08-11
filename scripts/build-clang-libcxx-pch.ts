@@ -13,7 +13,7 @@ const COMPILER = path.resolve("crates/runtime-core/target/release/forge-compiler
 const packageCompressed = await readFile(path.join(DIRECTORY, `clang-${VERSION}.webc.gz.bin`));
 const packageBytes = gunzipSync(packageCompressed);
 const pinsBytes = await readFile(path.join(DIRECTORY, `clang-${VERSION}.cc1-pins.json`));
-const pins = JSON.parse(pinsBytes.toString("utf8")) as {
+const pins = JSON.parse(pinsBytes.toString()) as {
   placeholders: { input: string; output: string; mainFileName: string };
   configs: Record<string, { cc1: string[] }>;
 };

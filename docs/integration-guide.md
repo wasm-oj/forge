@@ -29,16 +29,28 @@ Deploy the package's emitted Worker assets without renaming them and serve the
 exported `public/toolchains/` files at `assetBaseUrl`. Then construct one host:
 
 ```ts
-import { Forge, registerToolchainCache } from "@wasm-oj/forge/browser";
+import {
+  BrowserDependencyNetworkConsent,
+  Forge,
+  registerToolchainCache,
+} from "@wasm-oj/forge/browser";
 
 await registerToolchainCache({
   scriptUrl: "/toolchain-cache-sw.js",
   scope: "/",
 });
 
+const dependencyConsent = new BrowserDependencyNetworkConsent(
+  window.localStorage,
+  async ({ hosts }) => window.confirm(
+    `Allow this problem bundle to download dependencies from:\n${hosts.join("\n")}`,
+  ),
+);
+
 const forge = await Forge.create({
   assetBaseUrl: "/toolchains/",
   artifactCache: true,
+  dependencyNetworkAuthorizer: dependencyConsent,
 });
 ```
 
@@ -197,7 +209,21 @@ const manifest = {
   }],
 } as const;
 
-const lock = await forge.resolveDependencies(manifest);
+// These values come from the already verified collection load. Do not derive
+// them from package metadata, editor state, or a placeholder repository.
+declare const loadedProblem: {
+  repositorySourceKey: string;
+  problemBundleSha256: string;
+  completeDependencyHosts: readonly string[];
+};
+
+const lock = await forge.resolveDependencies(manifest, {
+  networkAccess: {
+    sourceKey: loadedProblem.repositorySourceKey,
+    bundleDigest: loadedProblem.problemBundleSha256,
+    hosts: loadedProblem.completeDependencyHosts,
+  },
+});
 const dependencies = await forge.prepareDependencies(lock);
 const build = await forge.compile({
   language: "javascript",
@@ -261,7 +287,7 @@ Because the module executes with runner-Worker authority, a plug-in can see
 artifacts and run configuration and must be reviewed and pinned like host
 application code. It does not weaken Forge's native metering, memory, output,
 VFS, logical-time, or emergency wall limits; its `PreparedRunRequest` must
-preserve those inputs and use a calibrated cost profile.
+preserve those inputs and use the artifact's declared cost profile.
 
 ## Lifecycle
 

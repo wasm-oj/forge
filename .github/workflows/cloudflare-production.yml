@@ -1,0 +1,83 @@
+name: Deploy Cloudflare production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run build
+      - name: Enter maintenance mode
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy --config wrangler.maintenance-production.jsonc
+      - name: Wait for product-state work to finish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          sleep 30
+          node scripts/wait-for-product-do-cutover.mjs
+      - name: Apply CORE database migrations and keep formal mutations closed
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler d1 migrations apply CORE_DB --remote --config wrangler.quick-production.jsonc
+          pnpm exec wrangler d1 execute CORE_DB --remote --config wrangler.quick-production.jsonc --command \
+            "UPDATE formal_mutation_controls SET formal_mutations_enabled=0, reason='production-deployment', updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE environment='production'"
+      - name: Apply SUBMISSIONS database migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler d1 migrations apply SUBMISSIONS_DB --remote --config wrangler.quick-production.jsonc
+      - name: Backfill published problem catalog metadata
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/backfill-problem-catalog-metadata.mjs
+      - name: Deploy application, Workflows, and Containers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy --config wrangler.quick-production.jsonc
+      - name: Smoke test
+        run: |
+          curl --fail --retry 6 --retry-all-errors --retry-delay 5 \
+            https://wasm-oj-forge-production.jacob.workers.dev/api/health/live
+          curl --fail --retry 6 --retry-all-errors --retry-delay 5 \
+            https://wasm-oj-forge-production.jacob.workers.dev/api/health/ready
+      - name: Resume formal mutations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler d1 execute CORE_DB --remote --config wrangler.quick-production.jsonc --command \
+            "UPDATE formal_mutation_controls SET formal_mutations_enabled=1, reason='production-smoke-passed', updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE environment='production'"

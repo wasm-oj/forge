@@ -1,4 +1,3 @@
-import { GENERATED_COST_BASELINES } from "./generated/cost-baselines";
 import { costProfileId, isCostProfileFor } from "./cost-profile";
 import { WEIGHTED_METER_MODEL } from "./resources";
 import { isBuiltinLanguage, type BuildArtifact, type ExecutionMetrics } from "./types";
@@ -44,28 +43,19 @@ export class CostBaselineRegistry {
 
   baseline(profile: string): number {
     this.sealed = true;
-    const baseline = this.baselines.get(profile);
-    if (baseline === undefined) throw new Error(`No calibrated cost baseline is registered for '${profile}'.`);
-    return baseline;
+    if (typeof profile !== "string" || profile.length === 0) throw new Error("Cost profile is required.");
+    return this.baselines.get(profile) ?? 0;
   }
 }
 
 export function createDefaultCostBaselineRegistry(): CostBaselineRegistry {
-  return new CostBaselineRegistry(GENERATED_COST_BASELINES);
+  return new CostBaselineRegistry();
 }
 
-/** Creates the built-in registry plus downstream profiles without permitting canonical overrides. */
 export function createExtendedCostBaselineRegistry(
   additional: Readonly<Record<string, number>> = {},
 ): CostBaselineRegistry {
-  const registry = createDefaultCostBaselineRegistry();
-  for (const [profile, baseline] of Object.entries(additional)) {
-    if (Object.hasOwn(GENERATED_COST_BASELINES, profile)) {
-      throw new Error(`Additional cost baseline '${profile}' would override a canonical Forge profile.`);
-    }
-    registry.register(profile, baseline);
-  }
-  return registry;
+  return new CostBaselineRegistry(additional);
 }
 
 export function resolveCostBudget(

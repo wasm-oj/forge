@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { sha256Hex } from "../core/hash.ts";
+import { dependencyManifestSha256 } from "./lock.ts";
+import { DEPENDENCY_RESOLUTION_LIMITS } from "./limits.ts";
 import { ForgeDependencyManager, MemoryDependencyCache } from "./manager.ts";
+import { DependencyNetworkError, NpmLockDependencyResolver } from "./resolvers.ts";
 import type { ForgeDependencyResolver } from "./types.ts";
 
 describe("ForgeDependencyManager", () => {
@@ -76,5 +79,170 @@ describe("ForgeDependencyManager", () => {
     await expect(manager.resolve({
       requirements: [{ ecosystem: "npm", name: "@scope/package", requirement: "1.0.0" }],
     }, { offline: true })).rejects.toThrow("requires a previous lock");
+  });
+
+  it("falls back only for a transport failure with a matching manifest and network scope", async () => {
+    const payload = new TextEncoder().encode("cached archive");
+    const digest = await sha256Hex(payload);
+    const cache = new MemoryDependencyCache();
+    const manifest = {
+      requirements: [{ ecosystem: "npm" as const, name: "answer", requirement: "1.0.0" }],
+    };
+    const packageRecord = {
+      id: "npm:answer@1.0.0",
+      ecosystem: "npm" as const,
+      name: "answer",
+      version: "1.0.0",
+      source: "https://registry.npmjs.org/answer/-/answer-1.0.0.tgz",
+      integritySha256: digest,
+      dependencies: [],
+    };
+    const priming = new ForgeDependencyManager(cache, [{
+      ecosystem: "npm",
+      resolve: async () => ({
+        roots: [packageRecord.id],
+        packages: [packageRecord],
+        payloads: { [packageRecord.id]: payload },
+      }),
+    }]);
+    const previousLock = await priming.resolve(manifest);
+    const networkAccess = {
+      sourceKey: "github:wasm-oj/fixture@main:collection/index.json",
+      bundleDigest: "a".repeat(64),
+      hosts: ["registry.npmjs.org"],
+    };
+    const transportFailure = new ForgeDependencyManager(cache, [{
+      ecosystem: "npm",
+      resolve: async () => { throw new DependencyNetworkError("registry.npmjs.org"); },
+    }]);
+
+    await expect(transportFailure.resolve(manifest, {
+      previousLock,
+      previousLockNetworkScope: networkAccess,
+      networkAccess,
+    })).resolves.toEqual(previousLock);
+    await expect(transportFailure.resolve(manifest, {
+      previousLock,
+      previousLockNetworkScope: { ...networkAccess, sourceKey: "github:other/fork@main:collection/index.json" },
+      networkAccess,
+    })).rejects.toBeInstanceOf(DependencyNetworkError);
+    await expect(transportFailure.resolve({
+      requirements: [{ ecosystem: "npm", name: "answer", requirement: "2.0.0" }],
+    }, {
+      previousLock,
+      previousLockNetworkScope: networkAccess,
+      networkAccess,
+    })).rejects.toBeInstanceOf(DependencyNetworkError);
+
+    for (const failure of ["HTTP 503", "malformed registry metadata", "integrity mismatch"]) {
+      const protocolFailure = new ForgeDependencyManager(cache, [{
+        ecosystem: "npm",
+        resolve: async () => { throw new Error(failure); },
+      }]);
+      await expect(protocolFailure.resolve(manifest, {
+        previousLock,
+        previousLockNetworkScope: networkAccess,
+        networkAccess,
+      })).rejects.toThrow(failure);
+    }
+
+    const emptyCacheFailure = new ForgeDependencyManager(new MemoryDependencyCache(), [{
+      ecosystem: "npm",
+      resolve: async () => { throw new DependencyNetworkError("registry.npmjs.org"); },
+    }]);
+    await expect(emptyCacheFailure.resolve(manifest, {
+      previousLock,
+      previousLockNetworkScope: networkAccess,
+      networkAccess,
+    })).rejects.toThrow("absent from the content cache");
+  });
+
+  it("never reuses a verified lock when the dependency endpoint redirects", async () => {
+    const payload = new TextEncoder().encode("cached archive");
+    const digest = await sha256Hex(payload);
+    const resolved = "https://registry.npmjs.org/answer/-/answer-1.0.0.tgz";
+    const manifest = {
+      requirements: [{ ecosystem: "npm" as const, name: "answer", requirement: "1.0.0" }],
+      sourceFiles: [{
+        ecosystem: "npm" as const,
+        role: "lockfile" as const,
+        path: "package-lock.json",
+        contents: JSON.stringify({
+          lockfileVersion: 3,
+          packages: {
+            "": { dependencies: { answer: "1.0.0" } },
+            "node_modules/answer": {
+              name: "answer",
+              version: "1.0.0",
+              resolved,
+              integrity: "sha512-AA==",
+            },
+          },
+        }),
+      }],
+    };
+    const cache = new MemoryDependencyCache();
+    const priming = new ForgeDependencyManager(cache, [{
+      ecosystem: "npm",
+      resolve: async () => ({
+        roots: ["npm:answer@1.0.0"],
+        packages: [{
+          id: "npm:answer@1.0.0",
+          ecosystem: "npm" as const,
+          name: "answer",
+          version: "1.0.0",
+          source: resolved,
+          integritySha256: digest,
+          dependencies: [],
+        }],
+        payloads: { "npm:answer@1.0.0": payload },
+      }),
+    }]);
+    const previousLock = await priming.resolve(manifest);
+    const networkAccess = {
+      sourceKey: "github:wasm-oj/fixture@main:collection/index.json",
+      bundleDigest: "a".repeat(64),
+      hosts: ["registry.npmjs.org"],
+    };
+    const fetcher = async () => new Response(null, {
+      status: 302,
+      headers: { location: "https://packages.example.com/answer-1.0.0.tgz" },
+    });
+    const manager = new ForgeDependencyManager(cache, [new NpmLockDependencyResolver({
+      fetch: fetcher,
+      networkAuthorizer: { authorize: async () => undefined },
+    })]);
+
+    const error = await manager.resolve(manifest, {
+      previousLock,
+      previousLockNetworkScope: networkAccess,
+      networkAccess,
+    }).then(() => undefined, (failure: unknown) => failure);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(DependencyNetworkError);
+    expect((error as Error).message).toContain("redirected unexpectedly");
+  });
+
+  it("rejects an oversized manifest before invoking a resolver", async () => {
+    const resolver: ForgeDependencyResolver = {
+      ecosystem: "npm",
+      async resolve() { throw new Error("resolver must not run"); },
+    };
+    const manager = new ForgeDependencyManager(new MemoryDependencyCache(), [resolver]);
+    const requirements = Array.from(
+      { length: DEPENDENCY_RESOLUTION_LIMITS.requirements + 1 },
+      (_, index) => ({ ecosystem: "npm" as const, name: `package-${index}`, requirement: "1.0.0" }),
+    );
+    await expect(manager.resolve({ requirements })).rejects.toThrow(
+      `${DEPENDENCY_RESOLUTION_LIMITS.requirements}-item limit`,
+    );
+  });
+
+  it("accepts the exact manifest-count boundary for canonical hashing", async () => {
+    const requirements = Array.from(
+      { length: DEPENDENCY_RESOLUTION_LIMITS.requirements },
+      (_, index) => ({ ecosystem: "npm" as const, name: `package-${index}`, requirement: "1.0.0" }),
+    );
+    await expect(dependencyManifestSha256({ requirements })).resolves.toMatch(/^[0-9a-f]{64}$/);
   });
 });

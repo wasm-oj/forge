@@ -1,6 +1,6 @@
 import vinext from "vinext";
 import { defineConfig, type UserConfig } from "vite";
-import { sites } from "./build/sites-vite-plugin";
+import { sites } from "./build/sites-vite-plugin.ts";
 
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
@@ -30,10 +30,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
       sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: {
-          main: "./worker/index.ts",
-          compatibility_flags: ["nodejs_compat"],
-        },
+        configPath: "./wrangler.jsonc",
       }),
     ],
   };

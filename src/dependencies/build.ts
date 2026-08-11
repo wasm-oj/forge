@@ -2,13 +2,14 @@ import { Gunzip, unzipSync } from "fflate";
 import { sha256Hex } from "../core/sha256.ts";
 import { assertSafeRelativePath } from "../core/project-files.ts";
 import { assertValidDependencyLock, dependencyLockSha256 } from "./lock.ts";
+import { DEPENDENCY_RESOLUTION_LIMITS } from "./limits.ts";
 import type { DependencyEcosystem, DependencyLock, LockedDependencyPackage } from "./types.ts";
 
 export const DEPENDENCY_BUILD_LIMITS = Object.freeze({
-  packages: 512,
-  filesPerPackage: 16_384,
+  packages: DEPENDENCY_RESOLUTION_LIMITS.packages,
+  filesPerPackage: DEPENDENCY_RESOLUTION_LIMITS.archiveFiles,
   bytesPerFile: 64 * 1024 * 1024,
-  totalBytes: 512 * 1024 * 1024,
+  totalBytes: DEPENDENCY_RESOLUTION_LIMITS.unpackedBytes,
 });
 
 export interface MaterializedDependencyPackage {

@@ -3,6 +3,7 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { resolveTypeScriptCli } from "./typescript-cli.mjs";
 import { unpackPublishPackage } from "./packed-package.mjs";
 
 const run = promisify(execFile);
@@ -301,7 +302,7 @@ export const consumerImplementations = {
 };
 `);
 
-  const typescript = path.join(repositoryRoot, "node_modules/typescript/lib/tsc.js");
+  const typescript = await resolveTypeScriptCli();
   try {
     await run(process.execPath, [typescript, "--project", path.join(consumerRoot, "tsconfig.json"), "--pretty", "false"], {
       cwd: consumerRoot,

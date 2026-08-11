@@ -23,7 +23,22 @@ export {
 } from "../core/cost";
 export type { CostBudget, RawExecutionMetrics } from "../core/cost";
 export { costProfileId, isCostProfileFor } from "../core/cost-profile";
-export { COST_BASELINE_EVIDENCE, GENERATED_COST_BASELINES } from "../core/generated/cost-baselines";
+export {
+  forgeRuntimeIdentityBytes,
+  FORGE_RUNTIME_COMPONENTS,
+  FORGE_RUNTIME_IDENTITY_SHA256,
+  verifyForgeRuntimeIdentity,
+} from "../core/runtime-identity";
+export {
+  createForgeReleaseManifest,
+  forgeReleaseManifestBytes,
+  forgeReleaseManifestSha256,
+  FORGE_CONTAINER_PROTOCOL_VERSION,
+  FORGE_RELEASE_MANIFEST_SCHEMA,
+  parseForgeReleaseManifest,
+  verifyForgeReleaseManifestBytes,
+} from "../release-manifest";
+export type { ArtifactDigest, ForgeReleaseManifest } from "../release-manifest";
 export { assertLanguageIdentifier, isBuiltinLanguage, LANGUAGES } from "../core/types";
 export { assertValidProject } from "../core/project-validation";
 export { PROJECT_SOURCE_LIMITS } from "../core/project-files";
@@ -133,11 +148,13 @@ export {
   tokenMatcher,
   validateJudgeSpec,
   wasmCheckerMatcher,
+  assertJudgeGuestFilePath,
 } from "../judge/spec";
 export type {
   JudgeCaseSpec,
   BatchJudgeCaseSpec,
   InteractiveJudgeCaseSpec,
+  JudgeFileInputSpec,
   JudgeInputSpec,
   JudgeMatcherSpec,
   JudgeProgramSpec,
@@ -145,6 +162,76 @@ export type {
 } from "../judge/spec";
 export { normalizeOutput } from "../judge/normalization";
 export type { OutputNormalization } from "../judge/normalization";
+export {
+  BROWSER_COLLECTION_SCHEMA,
+  BROWSER_PROBLEM_SCHEMA,
+  PROBLEM_STARTER_LIMITS,
+  parseProblemBundle,
+  parseProblemCollectionIndex,
+  parseStandaloneProblemBundle,
+  problemCollectionRevision,
+  verifyProblemBundleBytes,
+  verifyProblemCollectionRevision,
+} from "../judge/problem-catalog-loader";
+export { assertProblemCostProfile, scoreProblemResults } from "../judge/problem-scoring";
+export { MANAGED_COLLECTION_SCHEMA, parseManagedCollectionContract } from "../online-judge/managed-collection";
+export type {
+  ManagedCollectionContract,
+  ManagedJudgeContract,
+  ManagedJudgeProgram,
+  ManagedProblemContract,
+  ManagedReferenceProgram,
+  ManagedRuntimeAsset,
+  ManagedSourceFile,
+} from "../online-judge/managed-collection";
+export {
+  createForgeValidationSource,
+  forgeValidationSourceBytes,
+  forgeValidationSourceSha256,
+  parseForgeValidationSource,
+  VALIDATION_SOURCE_SCHEMA,
+  verifyForgeValidationSourceBytes,
+  verifyForgeValidationSourceObjects,
+} from "../online-judge/validation-source";
+export {
+  createManagedJudgeRuntimeProjection,
+  createTrustedWasmArtifactProjection,
+  decodeTrustedWasmArtifactProjection,
+  MANAGED_JUDGE_RUNTIME_SCHEMA,
+  managedJudgeSpec,
+  parseManagedJudgeRuntimeProjection,
+  parseTrustedWasmArtifactProjection,
+  redactJudgeCasesForAudit,
+  TRUSTED_WASM_ARTIFACT_SCHEMA,
+} from "../online-judge/managed-judge";
+export type {
+  ManagedJudgeAssetProjection,
+  ManagedJudgeRuntimeProjection,
+  RedactedJudgeAuditCase,
+  TrustedWasmArtifactProjection,
+} from "../online-judge/managed-judge";
+export type {
+  CreatedValidationSource,
+  ForgeValidationSource,
+  ValidationSourceObjectReference,
+  ValidationSourceJudge,
+  ValidationSourceJudgeProgram,
+  ValidationSourceProvenance,
+  ValidationSourceProgram,
+  ValidationSourceRepositoryFile,
+  VerifiedValidationSource,
+} from "../online-judge/validation-source";
+export type { ProblemScore, ScoredProblemCase } from "../judge/problem-scoring";
+export type {
+  ProblemBundleDescriptor,
+  ProblemCollectionEntry,
+  ProblemCollectionIndex,
+} from "../judge/problem-catalog-loader";
+export type {
+  JudgeProblem,
+  JudgeStarterTemplate,
+  JudgeStarterTemplates,
+} from "../judge/problem-model";
 export {
   assertValidDependencyBuildBundle,
   createDefaultDependencyBuildAdapters,
@@ -167,11 +254,21 @@ export {
   CargoLockDependencyResolver,
   CppLockDependencyResolver,
   createDefaultDependencyResolvers,
+  DependencyNetworkError,
   GoLockDependencyResolver,
   goModuleZipHash,
   NpmLockDependencyResolver,
   PyPiLockDependencyResolver,
 } from "../dependencies/resolvers";
+export {
+  BrowserDependencyNetworkConsent,
+  normalizeDependencyNetworkAccess,
+  normalizeDependencyNetworkScope,
+} from "../dependencies/network-consent";
+export type {
+  DependencyConsentStorage,
+  DependencyNetworkConsentPrompt,
+} from "../dependencies/network-consent";
 export type {
   CppDependencyLockSource,
   DependencyFetch,
@@ -187,6 +284,9 @@ export type {
   DependencyEcosystem,
   DependencyLock,
   DependencyManifest,
+  DependencyNetworkAccess,
+  DependencyNetworkAuthorizer,
+  DependencyNetworkScope,
   DependencyOfflineBundle,
   DependencyRequirement,
   DependencyResolutionContext,

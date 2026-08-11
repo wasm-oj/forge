@@ -23,7 +23,7 @@ The fastest evaluation path is the public browser deployment:
 3. Choose **Build** to compile the source locally, **Self Test** to run the sample input, and **Submit** to execute all four judge cases.
 4. Inspect the Accepted result, per-case instruction cost, normalized baseline, peak memory, logical time, and cumulative scoring tiers.
 
-The public demo is verified on Chromium and requires WebAssembly, Web Workers, `SharedArrayBuffer`, and cross-origin isolation. The package requires Node.js 22.13 or newer; the native server build is continuously verified on Ubuntu 24.04. See [Run locally](#run-locally) for installation and [the integration guide](docs/integration-guide.md) for browser and server library use.
+The public demo is verified on Chromium and requires WebAssembly, Web Workers, `SharedArrayBuffer`, and cross-origin isolation. The package requires Node.js 24.18; the native server build is continuously verified on Ubuntu 24.04. See [Run locally](#run-locally) for installation and [the integration guide](docs/integration-guide.md) for browser and server library use.
 
 <details>
 <summary>Verified problem 01 solution</summary>
@@ -87,8 +87,8 @@ localization, generation, and cumulative scoring behavior.
 
 The learner-facing order starts with five foundations problems, then progresses through metering
 and resource limits, filesystems and packaging, build scheduling and caching, graph algorithms,
-and knapsack variants. Stable source manifest IDs remain unchanged so calibration evidence and
-GitHub API paths do not drift when the pedagogical sequence changes. No original 20-problem
+and knapsack variants. Stable source manifest IDs remain unchanged so GitHub API paths do not
+drift when the pedagogical sequence changes. No original 20-problem
 fixture or compatibility catalog remains.
 
 ## Language support
@@ -103,7 +103,7 @@ fixture or compatibility catalog remains.
 | JavaScript | TypeScript 7.0.2/WASI checking and emit | CommonJS runtime bundle executed by QuickJS-ng 0.15.1 plus the pinned Forge adapter |
 | TypeScript | Native TypeScript 7.0.2 compiler built for WASI | CommonJS runtime bundle executed by QuickJS-ng 0.15.1 plus the pinned Forge adapter |
 
-For C and C++, `target: "wasip1"` and `target: "wasix"` do not select different compiler ABIs. Both use the same `wasm32-unknown-wasip1` cc1 configurations and LLD command from one verified manifest. Given the same language, optimization, and sources, the emitted module bytes are the same; `wasix` changes the artifact, cache, cost-calibration, and runtime-profile identity. The current Forge runner uses the same runtime implementation for both labels and validates the module's actual imports.
+For C and C++, `target: "wasip1"` and `target: "wasix"` do not select different compiler ABIs. Both use the same `wasm32-unknown-wasip1` cc1 configurations and LLD command from one verified manifest. Given the same language, optimization, and sources, the emitted module bytes are the same; `wasix` changes the artifact, cache, and runtime-profile identity. The current Forge runner uses the same runtime implementation for both labels and validates the module's actual imports.
 
 The Rust path uses a source-traceable browser-runnable `rustc` 1.91.1-dev build, its matching `wasm32-wasip1-threads` standard library, and a digest-pinned `wasm-ld` 22 stage. Forge restricts rustc to one codegen thread, emits the crate object plus rustc's allocator-shim bitcode, then links them in a fresh Wasmer command instance. In the browser, builds are serialized through one persistent Rust stage per compiler Worker generation. That stage keeps its verified Runtime, WebC package, `rustc`/`wasm-ld` command handles, and Wasmer SDK thread pool warm while giving every build a fresh project `Directory` and fresh command instances. The server still uses a fresh isolated child per build; no host compiler or linker participates on either host. The resulting shared-memory module is admitted as Forge `wasip1`; submitted programs do not receive thread-spawn capability. Collections, traits, structs, enums, macros, iterators, and normal `std` I/O compile normally.
 
@@ -134,7 +134,7 @@ Every submitted module passes through the same `wasm-oj-forge-runtime-core` befo
 | Emergency wall deadline | Browser Workers and native child processes are forcibly replaced or killed if the engine itself stops making progress. |
 | Determinism | WASI/WASIX clock and random imports, language-level time/random APIs, locale, timezone, and Python hash seed are controlled by an explicit run contract. |
 
-`RunResult` reports `termination`, baseline-normalized `cost`, unadjusted `rawCost`, `baselineCost`, `logicalTimeNs`, profile provenance, meter model, peak linear-memory/VFS occupancy, and output byte counts. The requested 10,000,000,000-point instruction budget is a net budget: the runner enforces `raw budget = calibrated empty-program baseline + net budget`, then reports `cost = max(0, rawCost - baselineCost)`. The profile covers the Forge contract, language, target, optimization, exact compiler/runtime content identity, and meter model; mismatched or uncalibrated artifacts are rejected. This removes fixed CPython/QuickJS/CRT startup without making it free to parse input, import modules, initialize APIs, I/O, allocation, or execute user code. Logical time, memory, captured output, writable VFS occupancy, and the 60-second emergency wall boundary remain hard limits. Contract 1 calibration evidence and exact values are recorded in [the calibration experiment](experiments/forge-contract-1-cost-baseline/).
+`RunResult` reports `termination`, weighted instruction `cost`, `rawCost`, `baselineCost`, `logicalTimeNs`, profile identity, meter model, peak linear-memory/VFS occupancy, and output byte counts. The runner applies the requested instruction budget directly; `baselineCost` is zero. The profile still binds language, target, optimization, and runtime shape so a mismatched artifact is rejected. Logical time, memory, captured output, writable VFS occupancy, and the emergency wall boundary remain hard limits.
 
 ## Library API
 
@@ -356,7 +356,7 @@ Every run requires a validated random seed, realtime epoch, and virtual-clock st
 
 ## Run locally
 
-Requirements: Node.js 22.13 or newer and a modern browser with
+Requirements: Node.js 24.18 and a modern browser with
 `SharedArrayBuffer` support. Building the optional native server runner also
 requires rustup/Cargo; the package pins Rust 1.97.1.
 
@@ -378,7 +378,6 @@ pnpm run library:build
 pnpm run library:verify
 pnpm run runtime:test
 pnpm run runtime:check-web
-pnpm run cost-baseline:transform <primary-raw-record.json>
 pnpm run build
 ```
 
@@ -395,3 +394,5 @@ pnpm run build
 
 See [Architecture](docs/architecture.md) for the worker protocol, compilation pipelines, artifact model, and trust boundaries.
 The latest recorded browser/server parity and efficiency measurements are in [the conformance report](docs/conformance-report.md).
+The open Git repository contract is documented in [Problem collection loading](docs/problem-catalog.md),
+and the managed service is covered by [Cloudflare Online Judge deployment](docs/cloudflare-online-judge.md).

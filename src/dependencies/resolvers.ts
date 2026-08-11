@@ -4,25 +4,44 @@ import { sha256Hex } from "../core/hash.ts";
 import type {
   DependencyEcosystem,
   DependencyManifest,
+  DependencyNetworkAuthorizer,
   DependencyRequirement,
+  DependencyResolutionContext,
   DependencySourceFile,
   ForgeDependencyResolver,
   LockedDependencyPackage,
   ResolvedDependencyGraph,
 } from "./types.ts";
+import { normalizeDependencyNetworkAccess } from "./network-consent.ts";
+import {
+  assertBoundedCount,
+  assertDependencyDownloadBudget,
+  createDependencyDownloadBudget,
+  DEPENDENCY_RESOLUTION_LIMITS,
+} from "./limits.ts";
+import { publicDependencyUrl } from "./url-policy.ts";
 
 const SHA256 = /^[0-9a-f]{64}$/;
-const DEFAULT_MAX_METADATA_BYTES = 8 * 1024 * 1024;
-const DEFAULT_MAX_PACKAGE_BYTES = 256 * 1024 * 1024;
-const DEFAULT_MAX_UNPACKED_BYTES = 512 * 1024 * 1024;
+const DEFAULT_MAX_METADATA_BYTES = DEPENDENCY_RESOLUTION_LIMITS.metadataBytes;
+const DEFAULT_MAX_PACKAGE_BYTES = DEPENDENCY_RESOLUTION_LIMITS.packageBytes;
+const DEFAULT_MAX_UNPACKED_BYTES = DEPENDENCY_RESOLUTION_LIMITS.unpackedBytes;
 
 export type DependencyFetch = (
   input: RequestInfo | URL,
   init?: RequestInit,
 ) => Promise<Response>;
 
+/** A transport failure before an HTTP response exists; the only cache-fallback trigger. */
+export class DependencyNetworkError extends Error {
+  constructor(hostname: string, options?: ErrorOptions) {
+    super(`Dependency network request to '${hostname}' failed before an HTTP response.`, options);
+    this.name = "DependencyNetworkError";
+  }
+}
+
 export interface DependencyResolverOptions {
   fetch?: DependencyFetch;
+  networkAuthorizer?: DependencyNetworkAuthorizer;
   maxMetadataBytes?: number;
   maxPackageBytes?: number;
   maxUnpackedBytes?: number;
@@ -34,6 +53,9 @@ export interface DependencyResolverOptions {
 
 interface ResolvedOptions {
   fetch: DependencyFetch;
+  /** Only the platform Fetch contract may translate its specified TypeError network rejection. */
+  classifyPlatformFetchRejections: boolean;
+  networkAuthorizer?: DependencyNetworkAuthorizer;
   maxMetadataBytes: number;
   maxPackageBytes: number;
   maxUnpackedBytes: number;
@@ -73,9 +95,10 @@ export class CargoLockDependencyResolver implements ForgeDependencyResolver {
     this.options = isResolvedOptions(options) ? options : resolveOptions(options);
   }
 
-  async resolve(manifest: DependencyManifest): Promise<ResolvedDependencyGraph> {
+  async resolve(manifest: DependencyManifest, context: DependencyResolutionContext): Promise<ResolvedDependencyGraph> {
     const lock = requireSource(manifest, "cargo", "lockfile", "Cargo.lock");
     const parsed = parseCargoLock(lock.contents);
+    assertBoundedCount(parsed.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "Cargo.lock packages");
     const external = parsed.filter((item) => item.source !== undefined);
     const byName = groupBy(external, (item) => item.name);
     const roots = manifest.requirements.map((requirement) => {
@@ -87,6 +110,8 @@ export class CargoLockDependencyResolver implements ForgeDependencyResolver {
       return packageId("cargo", matches[0]!.name, matches[0]!.version);
     });
     const packageIds = new Map(external.map((item) => [cargoIdentity(item.name, item.version, item.source!), packageId("cargo", item.name, item.version)]));
+    const network = await authorizeDependencyNetwork(this.options, context);
+    const downloadBudget = resolutionDownloadBudget(context);
     const packages = await mapLimited(external, this.options.concurrency, async (item): Promise<DownloadedPackage> => {
       if (!isCratesIoSource(item.source!)) {
         throw new Error(`Cargo package '${item.name} ${item.version}' uses unsupported source '${item.source}'.`);
@@ -98,7 +123,7 @@ export class CargoLockDependencyResolver implements ForgeDependencyResolver {
         `${encodeURIComponent(item.name)}/${encodeURIComponent(item.name)}-${encodeURIComponent(item.version)}.crate`,
         this.options.cargoCrateBaseUrl,
       ).href;
-      const payload = await fetchBytes(this.options, url, this.options.maxPackageBytes);
+      const payload = await fetchBytes(this.options, network, url, this.options.maxPackageBytes, downloadBudget);
       const digest = await sha256Hex(payload);
       if (digest !== item.checksum) throw integrityError("Cargo", item.name, item.version);
       const dependencies = item.dependencies.map((reference) => {
@@ -133,7 +158,7 @@ export class NpmLockDependencyResolver implements ForgeDependencyResolver {
     this.options = isResolvedOptions(options) ? options : resolveOptions(options);
   }
 
-  async resolve(manifest: DependencyManifest): Promise<ResolvedDependencyGraph> {
+  async resolve(manifest: DependencyManifest, context: DependencyResolutionContext): Promise<ResolvedDependencyGraph> {
     const source = requireSource(manifest, "npm", "lockfile", "package-lock.json");
     const lock = parseJson(source.contents, "package-lock.json") as NpmPackageLock;
     if (lock.lockfileVersion !== 2 && lock.lockfileVersion !== 3) {
@@ -142,11 +167,15 @@ export class NpmLockDependencyResolver implements ForgeDependencyResolver {
     if (!isRecord(lock.packages) || !isRecord(lock.packages[""])) {
       throw new Error("package-lock.json must contain its root packages entry.");
     }
-    const entries = Object.entries(lock.packages)
-      .filter(([path]) => path !== "")
+    const lockPackages = lock.packages;
+    const packagePaths = Object.keys(lockPackages);
+    const packageEntryPaths = packagePaths.filter((path) => path !== "");
+    assertBoundedCount(packageEntryPaths.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "package-lock.json packages");
+    const rawEntries = packageEntryPaths.map((path) => [path, lockPackages[path]] as const);
+    const entries = rawEntries
       .map(([path, value]) => parseNpmEntry(path, value));
     const entryByPath = new Map(entries.map((entry) => [entry.path, entry]));
-    const rootEntry = lock.packages[""] as Record<string, unknown>;
+    const rootEntry = lockPackages[""] as Record<string, unknown>;
     const roots = manifest.requirements.map((requirement) => {
       const rootSpec = npmRootSpec(rootEntry, requirement.name);
       if (rootSpec !== undefined && rootSpec !== requirement.requirement) {
@@ -156,8 +185,10 @@ export class NpmLockDependencyResolver implements ForgeDependencyResolver {
       if (!entry) throw new Error(`package-lock.json does not contain root package '${requirement.name}'.`);
       return packageId("npm", entry.name, entry.version);
     });
+    const network = await authorizeDependencyNetwork(this.options, context);
+    const downloadBudget = resolutionDownloadBudget(context);
     const packages = await mapLimited(entries, this.options.concurrency, async (entry): Promise<DownloadedPackage> => {
-      const payload = await fetchBytes(this.options, entry.resolved, this.options.maxPackageBytes);
+      const payload = await fetchBytes(this.options, network, entry.resolved, this.options.maxPackageBytes, downloadBudget);
       await verifySri(payload, entry.integrity, `npm package '${entry.name}@${entry.version}'`);
       const dependencies = Object.keys(entry.dependencies).map((name) => {
         const target = resolveNpmDependency(entry.path, name, entryByPath);
@@ -189,9 +220,10 @@ export class PyPiLockDependencyResolver implements ForgeDependencyResolver {
     this.options = isResolvedOptions(options) ? options : resolveOptions(options);
   }
 
-  async resolve(manifest: DependencyManifest): Promise<ResolvedDependencyGraph> {
+  async resolve(manifest: DependencyManifest, context: DependencyResolutionContext): Promise<ResolvedDependencyGraph> {
     const source = requireSource(manifest, "pypi", "lockfile", "requirements.txt");
     const locked = parsePythonRequirements(source.contents);
+    assertBoundedCount(locked.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "requirements.txt packages");
     const byName = new Map(locked.map((item) => [item.name, item]));
     const roots = manifest.requirements.map((requirement) => {
       const name = normalizePythonName(requirement.name);
@@ -202,17 +234,19 @@ export class PyPiLockDependencyResolver implements ForgeDependencyResolver {
       }
       return packageId("pypi", name, version);
     });
+    const network = await authorizeDependencyNetwork(this.options, context);
+    const downloadBudget = resolutionDownloadBudget(context);
     const packages = await mapLimited(locked, this.options.concurrency, async (item): Promise<DownloadedPackage> => {
       const metadataUrl = new URL(
         `${encodeURIComponent(item.name)}/${encodeURIComponent(item.version)}/json`,
         this.options.pypiApiUrl,
       ).href;
       const metadata = parseJson(
-        new TextDecoder().decode(await fetchBytes(this.options, metadataUrl, this.options.maxMetadataBytes)),
+        new TextDecoder().decode(await fetchBytes(this.options, network, metadataUrl, this.options.maxMetadataBytes, downloadBudget)),
         `PyPI metadata for ${item.name}`,
       );
       const file = selectPyPiFile(metadata, item.hashes, item.name, item.version);
-      const payload = await fetchBytes(this.options, file.url, this.options.maxPackageBytes);
+      const payload = await fetchBytes(this.options, network, file.url, this.options.maxPackageBytes, downloadBudget);
       const digest = await sha256Hex(payload);
       if (!item.hashes.has(digest)) throw integrityError("PyPI", item.name, item.version);
       return {
@@ -240,10 +274,11 @@ export class GoLockDependencyResolver implements ForgeDependencyResolver {
     this.options = isResolvedOptions(options) ? options : resolveOptions(options);
   }
 
-  async resolve(manifest: DependencyManifest): Promise<ResolvedDependencyGraph> {
+  async resolve(manifest: DependencyManifest, context: DependencyResolutionContext): Promise<ResolvedDependencyGraph> {
     const goMod = requireSource(manifest, "go", "manifest", "go.mod");
     const goSum = requireSource(manifest, "go", "lockfile", "go.sum");
     const required = parseGoMod(goMod.contents);
+    assertBoundedCount(required.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "go.mod packages");
     const sums = parseGoSum(goSum.contents);
     const byPath = new Map(required.map((item) => [item.name, item]));
     const roots = manifest.requirements.map((requirement) => {
@@ -254,6 +289,8 @@ export class GoLockDependencyResolver implements ForgeDependencyResolver {
       }
       return packageId("go", item.name, item.version);
     });
+    const network = await authorizeDependencyNetwork(this.options, context);
+    const downloadBudget = resolutionDownloadBudget(context);
     const packages = await mapLimited(required, this.options.concurrency, async (item): Promise<DownloadedPackage> => {
       const expected = sums.get(`${item.name} ${item.version}`);
       if (!expected) throw new Error(`go.sum is missing '${item.name} ${item.version}' module content hash.`);
@@ -261,7 +298,7 @@ export class GoLockDependencyResolver implements ForgeDependencyResolver {
         `${escapeGoPath(item.name)}/@v/${escapeGoPath(item.version)}.zip`,
         this.options.goProxyUrl,
       ).href;
-      const payload = await fetchBytes(this.options, url, this.options.maxPackageBytes);
+      const payload = await fetchBytes(this.options, network, url, this.options.maxPackageBytes, downloadBudget);
       const actual = await goModuleZipHash(payload, this.options.maxUnpackedBytes);
       if (actual !== expected) throw integrityError("Go", item.name, item.version);
       return {
@@ -313,7 +350,7 @@ export class CppLockDependencyResolver implements ForgeDependencyResolver {
     this.options = isResolvedOptions(options) ? options : resolveOptions(options);
   }
 
-  async resolve(manifest: DependencyManifest): Promise<ResolvedDependencyGraph> {
+  async resolve(manifest: DependencyManifest, context: DependencyResolutionContext): Promise<ResolvedDependencyGraph> {
     const source = requireSource(manifest, "cpp", "lockfile", "forge-cpp.lock.json");
     const lock = parseCppLock(parseJson(source.contents, "forge-cpp.lock.json"));
     const records = new Map(lock.packages.map((item) => [`${item.name}@${item.version}`, item]));
@@ -327,8 +364,10 @@ export class CppLockDependencyResolver implements ForgeDependencyResolver {
     if (JSON.stringify(requiredRoots) !== JSON.stringify(lock.roots)) {
       throw new Error("forge-cpp.lock.json roots do not exactly match the C/C++ dependency manifest.");
     }
+    const network = await authorizeDependencyNetwork(this.options, context);
+    const downloadBudget = resolutionDownloadBudget(context);
     const packages = await mapLimited(lock.packages, this.options.concurrency, async (item): Promise<DownloadedPackage> => {
-      const payload = await fetchBytes(this.options, item.url, this.options.maxPackageBytes);
+      const payload = await fetchBytes(this.options, network, item.url, this.options.maxPackageBytes, downloadBudget);
       const digest = await sha256Hex(payload);
       if (digest !== item.sha256) throw integrityError("C/C++", item.name, item.version);
       return {
@@ -356,15 +395,46 @@ export class CppLockDependencyResolver implements ForgeDependencyResolver {
 }
 
 /** Implements Go's official `dirhash.HashZip` h1 checksum over module ZIP entries. */
-export async function goModuleZipHash(payload: Uint8Array, maxUnpackedBytes = DEFAULT_MAX_UNPACKED_BYTES): Promise<string> {
+export async function goModuleZipHash(
+  payload: Uint8Array,
+  maxUnpackedBytes: number = DEFAULT_MAX_UNPACKED_BYTES,
+  maxFiles: number = DEPENDENCY_RESOLUTION_LIMITS.archiveFiles,
+): Promise<string> {
+  boundedPositiveInteger(maxUnpackedBytes, DEPENDENCY_RESOLUTION_LIMITS.unpackedBytes, "Go module unpacked byte limit");
+  boundedPositiveInteger(maxFiles, DEPENDENCY_RESOLUTION_LIMITS.archiveFiles, "Go module file limit");
   let files: Record<string, Uint8Array>;
+  let rejected: Error | undefined;
+  let headerBytes = 0;
+  let headerFiles = 0;
+  const namesSeen = new Set<string>();
   try {
-    files = unzipSync(payload);
+    files = unzipSync(payload, {
+      filter(file) {
+        try {
+          validateZipPath(file.name);
+          if (namesSeen.has(file.name)) throw new Error(`Go module ZIP contains duplicate path '${file.name}'.`);
+          namesSeen.add(file.name);
+          headerFiles += 1;
+          if (headerFiles > maxFiles) throw new RangeError(`Go module ZIP exceeds the ${maxFiles}-file limit.`);
+          if (!Number.isSafeInteger(file.originalSize) || file.originalSize < 0) throw new Error("Go module ZIP has invalid uncompressed size metadata.");
+          headerBytes += file.originalSize;
+          if (!Number.isSafeInteger(headerBytes) || headerBytes > maxUnpackedBytes) {
+            throw new RangeError("Go module ZIP exceeds the unpacked byte limit.");
+          }
+          return true;
+        } catch (error) {
+          rejected = error instanceof Error ? error : new Error("Go module ZIP preflight failed.");
+          throw rejected;
+        }
+      },
+    });
   } catch (error) {
+    if (rejected) throw rejected;
     throw new Error("Go module payload is not a valid ZIP archive.", { cause: error });
   }
   const names = Object.keys(files).sort();
   if (!names.length) throw new Error("Go module ZIP is empty.");
+  if (names.length !== headerFiles) throw new Error("Go module ZIP entry inventory changed during extraction.");
   let unpacked = 0;
   let summary = "";
   for (const name of names) {
@@ -383,59 +453,173 @@ function resolveOptions(options: DependencyResolverOptions): ResolvedOptions {
   if (typeof fetcher !== "function") throw new Error("Dependency adapters require a Fetch-compatible implementation.");
   return {
     fetch: fetcher.bind(globalThis),
-    maxMetadataBytes: positiveInteger(options.maxMetadataBytes ?? DEFAULT_MAX_METADATA_BYTES, "metadata byte limit"),
-    maxPackageBytes: positiveInteger(options.maxPackageBytes ?? DEFAULT_MAX_PACKAGE_BYTES, "package byte limit"),
-    maxUnpackedBytes: positiveInteger(options.maxUnpackedBytes ?? DEFAULT_MAX_UNPACKED_BYTES, "unpacked byte limit"),
-    concurrency: positiveInteger(options.concurrency ?? 6, "dependency concurrency"),
+    classifyPlatformFetchRejections: options.fetch === undefined,
+    ...(options.networkAuthorizer === undefined ? {} : { networkAuthorizer: options.networkAuthorizer }),
+    maxMetadataBytes: boundedPositiveInteger(
+      options.maxMetadataBytes ?? DEFAULT_MAX_METADATA_BYTES,
+      DEPENDENCY_RESOLUTION_LIMITS.metadataBytes,
+      "metadata byte limit",
+    ),
+    maxPackageBytes: boundedPositiveInteger(
+      options.maxPackageBytes ?? DEFAULT_MAX_PACKAGE_BYTES,
+      DEPENDENCY_RESOLUTION_LIMITS.packageBytes,
+      "package byte limit",
+    ),
+    maxUnpackedBytes: boundedPositiveInteger(
+      options.maxUnpackedBytes ?? DEFAULT_MAX_UNPACKED_BYTES,
+      DEPENDENCY_RESOLUTION_LIMITS.unpackedBytes,
+      "unpacked byte limit",
+    ),
+    concurrency: boundedPositiveInteger(
+      options.concurrency ?? 6,
+      DEPENDENCY_RESOLUTION_LIMITS.concurrency,
+      "dependency concurrency",
+    ),
     cargoCrateBaseUrl: baseUrl(options.cargoCrateBaseUrl ?? "https://static.crates.io/crates/"),
     pypiApiUrl: baseUrl(options.pypiApiUrl ?? "https://pypi.org/pypi/"),
     goProxyUrl: baseUrl(options.goProxyUrl ?? "https://proxy.golang.org/"),
   };
 }
 
-function isResolvedOptions(value: DependencyResolverOptions | ResolvedOptions): value is ResolvedOptions {
-  return "maxMetadataBytes" in value && "maxPackageBytes" in value && "fetch" in value
-    && "cargoCrateBaseUrl" in value && "goProxyUrl" in value;
+async function authorizeDependencyNetwork(
+  options: ResolvedOptions,
+  context: DependencyResolutionContext,
+): Promise<ReadonlySet<string>> {
+  if (!options.networkAuthorizer) {
+    throw new Error("Dependency network access requires an explicit authorizer.");
+  }
+  const access = normalizeDependencyNetworkAccess(context.networkAccess!);
+  await options.networkAuthorizer.authorize(access);
+  return new Set(access.hosts);
 }
 
-async function fetchBytes(options: ResolvedOptions, rawUrl: string, maximum: number): Promise<Uint8Array> {
-  const url = requireHttpsUrl(rawUrl);
-  const response = await options.fetch(url, {
-    method: "GET",
-    cache: "no-store",
-    credentials: "omit",
-    redirect: "error",
-  });
+function isResolvedOptions(value: DependencyResolverOptions | ResolvedOptions): value is ResolvedOptions {
+  return "maxMetadataBytes" in value && "maxPackageBytes" in value && "fetch" in value
+    && "classifyPlatformFetchRejections" in value && "cargoCrateBaseUrl" in value && "goProxyUrl" in value;
+}
+
+function dependencyTransportFailure(options: ResolvedOptions, hostname: string, cause: unknown): never {
+  // An injected transport owns its error semantics and must use the explicit
+  // marker for a genuine network failure. Treating an arbitrary TypeError from
+  // application code as a transport outage would reopen verified-cache
+  // fallback for policy or implementation failures.
+  if (cause instanceof DependencyNetworkError) throw cause;
+  if (options.classifyPlatformFetchRejections && cause instanceof TypeError) {
+    throw new DependencyNetworkError(hostname, { cause });
+  }
+  throw cause;
+}
+
+async function fetchBytes(
+  options: ResolvedOptions,
+  authorizedHosts: ReadonlySet<string>,
+  rawUrl: string,
+  maximum: number,
+  budget: DependencyResolutionContext["downloadBudget"],
+): Promise<Uint8Array> {
+  if (!budget) throw new Error("Dependency download budget is required.");
+  const parsed = publicDependencyUrl(rawUrl);
+  if (!authorizedHosts.has(parsed.hostname)) {
+    throw new Error(`Dependency host '${parsed.hostname}' is outside the explicitly authorized host set.`);
+  }
+  const url = parsed.href;
+  let response: Response;
+  try {
+    response = await options.fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      credentials: "omit",
+      // `redirect: "error"` turns a redirect into the same rejected promise
+      // browsers use for a transport failure. Keeping redirects observable is
+      // what lets the manager reserve verified-cache fallback for genuine
+      // network failures only.
+      redirect: "manual",
+    });
+  } catch (cause) {
+    dependencyTransportFailure(options, parsed.hostname, cause);
+  }
+  if (
+    response.type === "opaqueredirect"
+    || response.redirected
+    || (response.status >= 300 && response.status < 400)
+  ) {
+    throw new Error(`Dependency fetch redirected unexpectedly for '${url}'.`);
+  }
   if (!response.ok) throw new Error(`Dependency fetch failed with HTTP ${response.status} for '${url}'.`);
   const declared = response.headers.get("content-length");
-  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > maximum)) {
+  const declaredBytes = declared === null ? undefined : Number(declared);
+  if (declared !== null && (!/^\d+$/.test(declared) || !Number.isSafeInteger(declaredBytes) || declaredBytes! > maximum)) {
     throw new Error(`Dependency response for '${url}' exceeds the ${maximum}-byte limit.`);
   }
-  if (!response.body) {
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > maximum) throw new Error(`Dependency response for '${url}' exceeds the ${maximum}-byte limit.`);
-    return bytes;
-  }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+  let reserved = 0;
   let length = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    length += value.byteLength;
-    if (length > maximum) {
-      await reader.cancel("Dependency response exceeded its byte limit.");
-      throw new Error(`Dependency response for '${url}' exceeds the ${maximum}-byte limit.`);
+  if (declaredBytes !== undefined) {
+    try {
+      budget.reserve(declaredBytes);
+    } catch (error) {
+      try { await response.body?.cancel("Dependency response exceeded its aggregate byte limit."); } catch { /* preserve the admission error */ }
+      throw error;
     }
-    chunks.push(value);
+    reserved = declaredBytes;
   }
-  const result = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.byteLength;
+  try {
+    if (!response.body) {
+      let bytes: Uint8Array;
+      try {
+        bytes = new Uint8Array(await response.arrayBuffer());
+      } catch (cause) {
+        dependencyTransportFailure(options, parsed.hostname, cause);
+      }
+      if (bytes.byteLength > maximum) throw new Error(`Dependency response for '${url}' exceeds the ${maximum}-byte limit.`);
+      if (bytes.byteLength > reserved) {
+        budget.consume(bytes.byteLength - reserved);
+        reserved = bytes.byteLength;
+      }
+      length = bytes.byteLength;
+      return bytes;
+    }
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    try {
+      while (true) {
+        let chunk: ReadableStreamReadResult<Uint8Array>;
+        try {
+          chunk = await reader.read();
+        } catch (cause) {
+          dependencyTransportFailure(options, parsed.hostname, cause);
+        }
+        const { done, value } = chunk;
+        if (done) break;
+        const next = length + value.byteLength;
+        if (!Number.isSafeInteger(next) || next > maximum) {
+          await reader.cancel("Dependency response exceeded its byte limit.");
+          throw new Error(`Dependency response for '${url}' exceeds the ${maximum}-byte limit.`);
+        }
+        if (next > reserved) {
+          try {
+            budget.consume(next - reserved);
+            reserved = next;
+          } catch (error) {
+            await reader.cancel("Dependency response exceeded its aggregate byte limit.");
+            throw error;
+          }
+        }
+        length = next;
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const result = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return result;
+  } finally {
+    if (reserved > length) budget.release(reserved - length);
   }
-  return result;
 }
 
 function requireSource(
@@ -464,6 +648,7 @@ function parseCargoLock(contents: string): CargoPackage[] {
   if (version !== "3" && version !== "4") throw new Error("Cargo adapter requires Cargo.lock format version 3 or 4.");
   const blocks = contents.split(/^\[\[package\]\]\s*$/m).slice(1);
   if (!blocks.length) throw new Error("Cargo.lock does not contain packages.");
+  assertBoundedCount(blocks.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "Cargo.lock packages");
   return blocks.map((block) => {
     const name = cargoString(block, "name", true)!;
     const packageVersion = cargoString(block, "version", true)!;
@@ -496,6 +681,7 @@ function cargoStringArray(block: string, key: string): string[] {
   if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
     throw new Error(`Cargo.lock '${key}' must be a string array.`);
   }
+  assertBoundedCount(parsed.length, DEPENDENCY_RESOLUTION_LIMITS.referencesPerPackage, `Cargo.lock '${key}' references`);
   return parsed;
 }
 
@@ -608,8 +794,13 @@ function parsePythonRequirements(contents: string): PythonLockedRequirement[] {
     const name = normalizePythonName(match[1]!);
     if (names.has(name)) throw new Error(`requirements.txt contains duplicate package '${name}'.`);
     names.add(name);
-    const hashes = new Set([...match[3]!.matchAll(/--hash=sha256:([0-9a-fA-F]{64})/g)].map((item) => item[1]!.toLowerCase()));
+    const hashes = new Set<string>();
+    for (const item of match[3]!.matchAll(/--hash=sha256:([0-9a-fA-F]{64})/g)) {
+      hashes.add(item[1]!.toLowerCase());
+      assertBoundedCount(hashes.size, DEPENDENCY_RESOLUTION_LIMITS.referencesPerPackage, `requirements.txt hashes for '${name}'`);
+    }
     result.push({ name, version: match[2]!, hashes });
+    assertBoundedCount(result.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "requirements.txt packages");
   }
   if (!result.length) throw new Error("requirements.txt does not contain hash-locked packages.");
   return result.sort((left, right) => left.name.localeCompare(right.name));
@@ -627,6 +818,7 @@ function exactPythonVersion(requirement: DependencyRequirement): string {
 
 function selectPyPiFile(metadata: unknown, hashes: ReadonlySet<string>, name: string, version: string): { url: string } {
   if (!isRecord(metadata) || !Array.isArray(metadata.urls)) throw new Error(`PyPI metadata for '${name}' has no release files.`);
+  assertBoundedCount(metadata.urls.length, DEPENDENCY_RESOLUTION_LIMITS.referencesPerPackage, `PyPI release files for '${name}'`);
   const candidates = metadata.urls.flatMap((value): Array<{ url: string; filename: string; rank: number }> => {
     if (!isRecord(value) || value.yanked === true || !isRecord(value.digests)
       || typeof value.digests.sha256 !== "string" || !hashes.has(value.digests.sha256.toLowerCase())
@@ -657,6 +849,7 @@ function parseGoMod(contents: string): GoRequirement[] {
     const parts = value.split(/\s+/);
     if (parts.length !== 2) throw new Error(`Unsupported go.mod require entry '${value}'.`);
     result.push({ name: parts[0]!, version: parts[1]! });
+    assertBoundedCount(result.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "go.mod packages");
   }
   if (inRequire) throw new Error("go.mod has an unterminated require block.");
   const keys = result.map((item) => item.name);
@@ -675,6 +868,7 @@ function parseGoSum(contents: string): Map<string, string> {
     const key = `${parts[0]} ${parts[1]}`;
     if (result.has(key)) throw new Error(`go.sum contains duplicate module hash '${key}'.`);
     result.set(key, parts[2]!);
+    assertBoundedCount(result.size, DEPENDENCY_RESOLUTION_LIMITS.packages, "go.sum module hashes");
   }
   return result;
 }
@@ -689,6 +883,8 @@ function parseCppLock(value: unknown): NormalizedCppDependencyLock {
     || !Array.isArray(value.roots) || !Array.isArray(value.packages)) {
     throw new Error("forge-cpp.lock.json does not use the active Forge C/C++ dependency schema.");
   }
+  assertBoundedCount(value.roots.length, DEPENDENCY_RESOLUTION_LIMITS.roots, "C/C++ dependency roots");
+  assertBoundedCount(value.packages.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "C/C++ locked packages");
   const roots = sortedUnique(value.roots.map((item) => requireText(item, "C/C++ dependency root")));
   const packages = value.packages.map((raw) => {
     if (!isRecord(raw)) throw new Error("C/C++ locked package must be an object.");
@@ -697,6 +893,7 @@ function parseCppLock(value: unknown): NormalizedCppDependencyLock {
     const url = requireHttpsUrl(requireText(raw.url, "C/C++ package URL"));
     const sha256 = requireText(raw.sha256, "C/C++ package SHA-256").toLowerCase();
     if (!SHA256.test(sha256)) throw new Error(`C/C++ package '${name}' has an invalid SHA-256.`);
+    if (Array.isArray(raw.dependencies)) assertBoundedCount(raw.dependencies.length, DEPENDENCY_RESOLUTION_LIMITS.referencesPerPackage, "C/C++ package dependencies");
     const dependencies = raw.dependencies === undefined ? [] : sortedUnique(stringArray(raw.dependencies, "C/C++ dependencies"));
     return { name, version, url, sha256, dependencies };
   }).sort((left, right) => `${left.name}@${left.version}`.localeCompare(`${right.name}@${right.version}`));
@@ -757,12 +954,7 @@ function packageId(ecosystem: DependencyEcosystem, name: string, version: string
 }
 
 function requireHttpsUrl(value: string): string {
-  let url: URL;
-  try { url = new URL(value); } catch { throw new Error(`Dependency URL '${value}' is invalid.`); }
-  if (url.protocol !== "https:" || url.username || url.password || url.hash) {
-    throw new Error(`Dependency URL '${value}' must be credential-free HTTPS without a fragment.`);
-  }
-  return url.href;
+  return publicDependencyUrl(value).href;
 }
 
 function baseUrl(value: string): string {
@@ -774,9 +966,9 @@ function parseJson(value: string, label: string): unknown {
   try { return JSON.parse(value) as unknown; } catch (error) { throw new Error(`${label} is not valid JSON.`, { cause: error }); }
 }
 
-function requireText(value: unknown, label: string): string {
-  if (typeof value !== "string" || !value || value !== value.trim() || value.includes("\0")) {
-    throw new Error(`${label} must be a non-empty, trimmed, NUL-free string.`);
+function requireText(value: unknown, label: string, maximum = 4_096): string {
+  if (typeof value !== "string" || !value || value !== value.trim() || value.length > maximum || value.includes("\0")) {
+    throw new Error(`${label} must be a non-empty, trimmed, NUL-free string of at most ${maximum} characters.`);
   }
   return value;
 }
@@ -788,6 +980,7 @@ function stringArray(value: unknown, label: string): string[] {
 
 function stringRecord(value: unknown, label: string): Record<string, string> {
   if (!isRecord(value)) throw new Error(`${label} must be an object.`);
+  assertBoundedCount(Object.keys(value).length, DEPENDENCY_RESOLUTION_LIMITS.referencesPerPackage, label);
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, requireText(item, label)]));
 }
 
@@ -853,13 +1046,25 @@ function constantTimeEqualBytes(left: Uint8Array, right: Uint8Array): boolean {
 }
 
 function validateZipPath(path: string): void {
-  if (!path || path.startsWith("/") || path.includes("\\") || path.split("/").includes("..") || path.includes("\0")) {
+  if (!path || path.length > 4_096 || path.startsWith("/") || path.includes("\\") || path.split("/").includes("..") || path.includes("\0")) {
     throw new Error(`Go module ZIP contains unsafe path '${path}'.`);
   }
 }
 
+function resolutionDownloadBudget(context: DependencyResolutionContext) {
+  const budget = context.downloadBudget ?? createDependencyDownloadBudget();
+  assertDependencyDownloadBudget(budget);
+  return budget;
+}
+
 function positiveInteger(value: number, label: string): number {
   if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${label} must be a positive safe integer.`);
+  return value;
+}
+
+function boundedPositiveInteger(value: number, maximum: number, label: string): number {
+  positiveInteger(value, label);
+  if (value > maximum) throw new RangeError(`${label} exceeds the ${maximum} hard limit.`);
   return value;
 }
 

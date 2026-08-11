@@ -1,0 +1,52 @@
+# The judge image is security-sensitive. Keep its build context explicit so
+# local caches, submissions, test output, and unrelated repository content can
+# never be copied into a layer by a broad `COPY . .`.
+*
+
+!package.json
+!pnpm-lock.yaml
+!tsconfig.json
+!tsconfig.lib.json
+!vite-env.d.ts
+
+!lib/
+!lib/**
+
+!src/
+!src/**
+!scripts/
+!scripts/build-library.mjs
+!scripts/typescript-cli.mjs
+
+!container/
+!container/server.mjs
+!container/identity.mjs
+!container/generate-identity.mjs
+!container/tree-digest.mjs
+!container/submission-result.mjs
+!container/output-budget.mjs
+!container/validation-budget.mjs
+
+!public/
+!public/toolchains/
+!public/toolchains/**
+
+!crates/
+!crates/runtime-core/
+!crates/runtime-core/Cargo.toml
+!crates/runtime-core/Cargo.lock
+!crates/runtime-core/src/
+!crates/runtime-core/src/**
+
+!vendor/
+!vendor/shared-buffer/
+!vendor/shared-buffer/Cargo.toml
+!vendor/shared-buffer/src/
+!vendor/shared-buffer/src/**
+!vendor/virtual-fs/
+!vendor/virtual-fs/Cargo.toml
+!vendor/virtual-fs/src/
+!vendor/virtual-fs/src/**
+
+# A negated parent directory must still exclude generated Rust state.
+crates/runtime-core/target/

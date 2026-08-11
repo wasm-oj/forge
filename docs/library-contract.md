@@ -69,7 +69,7 @@ exceptions.
 
 Every `BuildArtifact` carries `forgeContract: 1`. `assertValidBuildArtifact()`
 is the shared fail-closed boundary used after compilation, on artifact-cache
-loads, and before runtime-driver selection or cost-baseline lookup. For built-in
+loads, and before runtime-driver selection or resource-budget lookup. For built-in
 languages it binds the exact artifact kind, target, toolchain identities, cost
 profile, and runtime package/command. It also verifies payload size and canonical,
 path-safe runtime-bundle manifests. This makes serialized artifacts self-describing
@@ -100,7 +100,7 @@ requests expose no project-selectable determinism fields. This keeps C/C++
 features such as `__TIMESTAMP__` compatible with the cache identity while run
 requests remain free to select their own deterministic clock and seed.
 
-Compile-ahead never shares a mutable compiler process across concurrent requests. Browser C/C++ bounds each Worker generation to eight output-ready compiler stages and retains only immutable toolchain handles plus content-addressed object bytes. Both Forge target labels use the same pinned `wasm32-unknown-wasip1` cc1 and LLD arguments; `wasix` changes artifact, cache, cost-calibration, and runtime-profile identity rather than selecting a second compiler ABI or runtime implementation. The runner validates the module's actual imports. Before a C/C++ build, the client reserves the maximum number of translation-unit, runtime-shim, and linker stages; after success it records the actual cache misses plus linker. Reuse requires the exact pinned toolchain and cc1 argv identity, source digest, and a fresh digest check of every recorded project dependency; an unchanged unit is verified, never assumed.
+Compile-ahead never shares a mutable compiler process across concurrent requests. Browser C/C++ bounds each Worker generation to eight output-ready compiler stages and retains only immutable toolchain handles plus content-addressed object bytes. Both Forge target labels use the same pinned `wasm32-unknown-wasip1` cc1 and LLD arguments; `wasix` changes artifact, cache, and runtime-profile identity rather than selecting a second compiler ABI or runtime implementation. The runner validates the module's actual imports. Before a C/C++ build, the client reserves the maximum number of translation-unit, runtime-shim, and linker stages; after success it records the actual cache misses plus linker. Reuse requires the exact pinned toolchain and cc1 argv identity, source digest, and a fresh digest check of every recorded project dependency; an unchanged unit is verified, never assumed.
 
 Browser Rust and Go requests are serialized through persistent language stages per compiler Worker generation. Rust retains its verified Wasmer Runtime, WebC package, compiler/linker command handles, and SDK thread pool; every Rust build receives a fresh project filesystem and command instances. Go retains the initialized runtime-core binding plus verified WebC, manifest, and decoded standard-library bytes; every Go build creates and drops a fresh two-stage compile/link pipeline. Rust conservatively reserves two output-ready stages per build and caps a generation at four. Before crossing that boundary, the stage frees its commands, package, and Runtime and acknowledges shutdown; the outer compiler then releases its own resources and acknowledges quiescence before the client creates the replacement generation. The outer Wasmer Runtime is lazy and is not initialized for Rust, Go, or Python. The server contract remains one fresh Node/Wasmer child per build. Browser Python compilation uses a disposable stage Worker per build and retains no Python Runtime or package handles.
 
@@ -134,7 +134,19 @@ constraints/cgo/assembly, and prebuilt C/C++ native/Wasm objects fail explicitly
 Mixed ecosystems or a language/ecosystem mismatch also fail.
 
 ```ts
-const manager = createDefaultDependencyManager(cache, { fetch });
+// The host policy must reject access that was not explicitly approved. It is
+// intentionally not an allow-all callback supplied by Forge.
+declare const dependencyNetworkAuthorizer: DependencyNetworkAuthorizer;
+declare const verifiedProblem: {
+  repositorySourceKey: string;
+  problemBundleSha256: string;
+  completeDependencyHosts: readonly string[];
+};
+
+const manager = createDefaultDependencyManager(cache, {
+  fetch,
+  networkAuthorizer: dependencyNetworkAuthorizer,
+});
 const manifest = {
   requirements: [
     { ecosystem: "cargo", name: "serde", requirement: "=1.0.228" },
@@ -146,7 +158,13 @@ const manifest = {
     contents: cargoLock,
   }],
 } as const;
-const lock = await manager.resolve(manifest);
+const lock = await manager.resolve(manifest, {
+  networkAccess: {
+    sourceKey: verifiedProblem.repositorySourceKey,
+    bundleDigest: verifiedProblem.problemBundleSha256,
+    hosts: verifiedProblem.completeDependencyHosts,
+  },
+});
 const dependencies = await manager.prepareBuild(lock);
 const build = await forge.compile({
   language: "rust",
@@ -200,7 +218,7 @@ supplies an expected SHA-256 digest, its data is verified before execution.
 
 Applications register custom `JudgeInputProvider` and `JudgeMatcher` implementations through `ForgeEngineOptions.judge` or `engine.judging`. A matcher receives the artifact, resolved stdin, complete `RunResult`, stdout, stderr, captured files, and case descriptor. Built-ins cover text, digest, token, floating-point tolerance, set/multiset, and exact output-file-set policies.
 
-`wasmCheckerMatcher(checker, expected)` mounts case input, expected output, contestant stdout/stderr, and captured output files under `/checker`, then executes the standalone checker artifact through the same `JudgeExecutor` and `ForgeRunner` sandbox. Checker exit 0 accepts, exit 1 rejects, and any other exit or resource termination is a judge error. The checker does not receive a host callback or escape the normal deterministic/resource policy.
+`wasmCheckerMatcher(checker, expected, args, trustedFiles)` mounts case input, expected output, contestant stdout/stderr, captured output files, and defensive copies of explicitly supplied trusted bytes below `/checker/assets/`, then executes the standalone checker artifact through the same `JudgeExecutor` and `ForgeRunner` sandbox. Checker exit 0 accepts, exit 1 rejects, and any other exit or resource termination is a judge error. Checker output and diagnostics never become a formal result message. The checker does not receive a host callback or escape the normal deterministic/resource policy.
 
 An `interactive` case supplies a standalone Wasm interactor artifact and an `inputPath`. Forge prepares contestant and interactor using streaming-capable runtime drivers, starts them concurrently, and connects contestant stdout to interactor stdin and the reverse direction. Each side has independent arguments, environment, filesystem, cwd, instruction/logical-time/memory/output limits, metering state, and virtual-clock elapsed counter while using the same explicit determinism configuration. Keeping clocks process-local avoids making virtual time depend on host thread scheduling. Primary input and provider-backed secret files are mounted only for the interactor; the contestant receives none of them. The result retains both protocol directions and both stderr/termination records. Interactor exit 0 accepts, exit 1 is wrong answer, and any other interactor failure is a judge error. QuickJS bundles are rejected for interaction because their adapter consumes a complete prebuilt stdin script instead of a streaming fd 0; standalone Wasm and CPython declare streaming support explicitly.
 
@@ -208,16 +226,16 @@ An `interactive` case supplies a standalone Wasm interactor artifact and an `inp
 
 Resource termination remains distinct from runtime failure: `instruction-limit`, `logical-time-limit`, `memory-limit`, `output-limit`, `filesystem-limit`, and `wall-time-limit` are stable verdicts. `logicalTimeLimitMs` bounds deterministic virtual elapsed time; sleep and clock polling fast-forward it without host waiting. `filesystemWriteLimitBytes` and `filesystemEntryLimit` bound additional live VFS occupancy above mounted inputs; growth and creation are transactional, and deletion releases reusable headroom. Every completed case retains its complete deterministic `RunResult`. The aggregate reports total net cost, total raw cost, the sum of the applied baselines, total logical time, maximum linear-memory/VFS occupancy, and stream byte counts; an unavailable host metric propagates as `null` instead of becoming a guessed value.
 
-`instructionBudget` is the portable net CPU-scoring boundary. For the artifact's exact Forge contract, language, target, optimization, compiler/runtime content identity, and meter model, the runner resolves a calibrated empty-program baseline and applies:
+`instructionBudget` is the portable CPU-scoring boundary. The runner validates the artifact's Forge contract, language, target, optimization, and meter model, then applies:
 
 ```text
-raw instruction budget = empty-program baseline + requested net instruction budget
-reported net cost      = max(0, observed raw cost - empty-program baseline)
+raw instruction budget = requested instruction budget
+reported cost          = observed raw cost
 ```
 
-`RunResult.metrics` retains `cost`, `rawCost`, `baselineCost`, and `costProfile`. The subtraction removes only the fixed cost of starting the compiled runtime profile. Parsing or loading user modules, imports, stdin/args/environment handling, deterministic API initialization, I/O, allocation, and user code remain charged. Static `operations` are intentionally raw because they describe the executed module rather than a derived score.
+`RunResult.metrics` retains `cost`, `rawCost`, `baselineCost`, and `costProfile`; `baselineCost` is zero. Parsing or loading user modules, imports, stdin/args/environment handling, deterministic API initialization, I/O, allocation, and user code are charged. Static `operations` describe the executed module.
 
-The runner recomputes the expected profile from trusted artifact metadata and rejects mismatches or missing calibrations. A caller cannot attach another language's higher baseline to gain budget. `logicalTimeLimitMs` is portable contract data and may be used for deterministic elapsed-time judging. `wallTimeLimitMs` starts only when runtime preparation reaches the guest and is a deliberately generous emergency host boundary used to stop a broken or non-yielding engine; it is not deterministic and must not be used to compare submissions across machines. Browser and server hosts separately enforce a fixed 120-second preparation/control boundary, so package extraction or runtime setup cannot evade host termination by never reaching the guest.
+The runner recomputes the expected profile from trusted artifact metadata and rejects mismatches. `logicalTimeLimitMs` is portable contract data and may be used for deterministic elapsed-time judging. `wallTimeLimitMs` starts only when runtime preparation reaches the guest and is a deliberately generous emergency host boundary used to stop a broken or non-yielding engine; it is not deterministic and must not be used to compare submissions across machines. Browser and server hosts separately enforce a fixed 120-second preparation/control boundary, so package extraction or runtime setup cannot evade host termination by never reaching the guest.
 
 ## Conformance contract
 
@@ -251,9 +269,9 @@ const profile = costProfileId(
 const baselines = createExtendedCostBaselineRegistry({ [profile]: measuredEmptyCost });
 ```
 
-The explicit content identity is required for non-built-in languages. `resolveArtifactCostBudget()` validates the artifact coordinates before granting the calibrated baseline, and an unknown profile fails closed. `createExtendedCostBaselineRegistry()` adds downstream calibration without allowing a caller to replace any canonical Forge baseline.
+The explicit content identity is required for non-built-in languages. `resolveArtifactCostBudget()` validates the artifact coordinates before applying the requested instruction budget. `createExtendedCostBaselineRegistry()` remains available for a host that explicitly wants a non-zero startup adjustment; Forge itself uses zero.
 
-A standalone `wasm` artifact uses the built-in runtime driver, so a downstream compiler can run on either host after its baseline is installed. A new `runtime-bundle` format additionally requires a `RuntimeDriver` registered in `RuntimeDriverRegistry`; `ServerForgeRunner` accepts that registry directly. `createDefaultRuntimeDrivers(baselines)` is the starting point when the extension should retain Forge's standalone, QuickJS, and CPython drivers.
+A standalone `wasm` artifact uses the built-in runtime driver, so a downstream compiler can run on either host. A new `runtime-bundle` format additionally requires a `RuntimeDriver` registered in `RuntimeDriverRegistry`; `ServerForgeRunner` accepts that registry directly.
 
 When a runtime driver calls `RuntimeResolver.packageFileSystem()`, its
 `PackageFileSystemRequest` must include the exact `expectedSha256` of the
@@ -283,7 +301,7 @@ inside the Worker. This makes new runtime-bundle drivers deployable without a
 custom Forge Worker build while keeping the host extension explicit and
 content-pinned. Plug-ins execute with runner-Worker authority, are not guest
 sandbox code, and must preserve the prepared request's deterministic,
-resource, and calibrated-cost contract.
+resource and instruction-cost contract.
 
 Forge starts its emitted module Workers through same-origin `blob:` bootstraps. Every Wasmer SDK initialization supplies Forge's secondary-worker asset through the official `workerUrl` protocol. That worker validates the SDK initialization envelope (including `sdkUrl`), disables registry access, calls `initSync` with the transferred module and memory plus a page-aligned 1 MiB stack, installs the validated `sdkUrl`, and constructs the official `ThreadPoolWorker`. The packed build emits the facade, SDK/runtime Wasm, and nested Workers as external content-hashed assets rather than library-mode data URLs. This is host compiler/runtime scheduling policy and never grants guest thread-spawn capability.
 

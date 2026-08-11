@@ -15,7 +15,7 @@ meter, resource, cost, or judge contract counters.
 
 An incompatible change increments `FORGE_CONTRACT_VERSION` once and updates all
 schema/storage identities atomically. A new contract starts with a new browser
-database and caches, new cost calibration, and new browser/server conformance
+database and caches, a new cost-profile identity, and new browser/server conformance
 evidence. Forge does not silently migrate or accept an older contract.
 
 Two other kinds of identifiers are deliberately separate:

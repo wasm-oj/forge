@@ -14,6 +14,7 @@ import {
   validateJudgeSpec,
   type BatchJudgeCaseSpec,
   type InteractiveJudgeCaseSpec,
+  assertJudgeGuestFilePath,
   type JudgeCaseSpec,
   type JudgeInputSpec,
   type JudgeMatcherSpec,
@@ -36,6 +37,8 @@ export type JudgeCaseVerdict =
 export interface JudgeMatchResult {
   accepted: boolean;
   message?: string;
+  /** Output produced by a trusted matcher subprocess while deciding this case. */
+  auxiliaryOutputBytes?: number;
 }
 
 export interface JudgeMatcherContext {
@@ -105,6 +108,25 @@ export interface JudgeEngineOptions {
 
 export interface JudgeRunOptions {
   onCase?(result: JudgeCaseResult, completed: number, total: number): void | Promise<void>;
+  /**
+   * Receives the exact retained-output byte count before `metrics-only`
+   * redaction. Server orchestration uses this to enforce one budget across
+   * several compile/judge invocations without retaining contestant bytes.
+   */
+  onOutputBytes?(caseBytes: number, aggregateBytes: number): void | Promise<void>;
+  /**
+   * Controls whether per-case stdout, stderr, output files, and interactive
+   * transcripts remain attached to the returned result. Formal server judging
+   * should use `metrics-only`; browser/local callers default to `full`.
+   */
+  retention?: "full" | "metrics-only";
+  /**
+   * Hard cumulative byte budget for contestant-visible output across the job.
+   * Crossing it adjudicates the current and remaining cases as output-limit and
+   * stops executing more cases. Each individual process remains subject to its
+   * own ResourcePolicy output limit.
+   */
+  aggregateOutputLimitBytes?: number;
 }
 
 export class JudgeEngine {
@@ -142,11 +164,42 @@ export class JudgeEngine {
   async judge(artifact: BuildArtifact, spec: JudgeSpec, options: JudgeRunOptions = {}): Promise<JudgeResult> {
     assertValidBuildArtifact(artifact);
     validateJudgeSpec(spec);
+    const retention = options.retention ?? "full";
+    if (retention !== "full" && retention !== "metrics-only") {
+      throw new TypeError("Judge result retention must be 'full' or 'metrics-only'.");
+    }
+    if (
+      options.aggregateOutputLimitBytes !== undefined
+      && (!Number.isSafeInteger(options.aggregateOutputLimitBytes) || options.aggregateOutputLimitBytes < 1)
+    ) {
+      throw new RangeError("Judge aggregateOutputLimitBytes must be a positive safe integer.");
+    }
     const cases: JudgeCaseResult[] = [];
-    for (const caseSpec of spec.cases) {
-      const result = await this.runCase(artifact, caseSpec);
+    let aggregateOutputBytes = 0;
+    for (const [index, caseSpec] of spec.cases.entries()) {
+      let result = await this.runCase(artifact, caseSpec);
+      const caseOutputBytes = retainedOutputBytes(result);
+      const exceedsAggregateLimit = options.aggregateOutputLimitBytes !== undefined
+        && caseOutputBytes > options.aggregateOutputLimitBytes - aggregateOutputBytes;
+      aggregateOutputBytes += caseOutputBytes;
+      await options.onOutputBytes?.(caseOutputBytes, aggregateOutputBytes);
+      if (exceedsAggregateLimit && result.verdict !== "judge-error") {
+        result = {
+          ...result,
+          verdict: "output-limit",
+          message: "The submission exceeded the judge job's cumulative output limit.",
+        };
+      }
+      result = retainCaseResult(result, retention);
       cases.push(result);
       await options.onCase?.(result, cases.length, spec.cases.length);
+      if (result.verdict === "judge-error") break;
+      if (exceedsAggregateLimit) {
+        for (const remaining of spec.cases.slice(index + 1)) {
+          cases.push({ id: remaining.id, verdict: "output-limit" });
+        }
+        break;
+      }
       if ((spec.failFast ?? true) && result.verdict !== "accepted") break;
     }
     return summarize(cases, spec.cases.length);
@@ -161,7 +214,7 @@ export class JudgeEngine {
         return {
           id: caseSpec.id,
           verdict,
-          ...(verdict === "wrong-answer" ? { message: interaction.interactor.stderr.trim() || "Interactor rejected the protocol." } : {}),
+          ...(verdict === "wrong-answer" ? { message: "Interactor rejected the protocol." } : {}),
           interaction,
         };
       }
@@ -179,12 +232,16 @@ export class JudgeEngine {
         stderr: run.stderr,
         files: run.files,
       });
-      return {
+      if (
+        matched.auxiliaryOutputBytes !== undefined
+        && (!Number.isSafeInteger(matched.auxiliaryOutputBytes) || matched.auxiliaryOutputBytes < 0)
+      ) throw new Error("Judge matcher auxiliary output bytes must be a non-negative safe integer.");
+      return withAuxiliaryOutput({
         id: caseSpec.id,
         verdict: matched.accepted ? "accepted" : "wrong-answer",
         message: matched.message,
         run,
-      };
+      }, matched.auxiliaryOutputBytes ?? 0);
     } catch (error) {
       return {
         id: caseSpec.id,
@@ -198,7 +255,9 @@ export class JudgeEngine {
     const stdin = await this.resolveInputSpec(caseSpec.input, caseSpec);
     const files: Record<string, Uint8Array> = {};
     for (const [path, input] of Object.entries(caseSpec.files ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
-      files[path] = new TextEncoder().encode(await this.resolveInputSpec(input, caseSpec));
+      files[path] = input.kind === "inline-bytes"
+        ? input.value.slice()
+        : new TextEncoder().encode(await this.resolveInputSpec(input, caseSpec));
     }
     return { stdin, files };
   }
@@ -213,6 +272,69 @@ export class JudgeEngine {
     }
     return value;
   }
+}
+
+const AUXILIARY_OUTPUT_BYTES = Symbol("judge-auxiliary-output-bytes");
+type InternalJudgeCaseResult = JudgeCaseResult & { readonly [AUXILIARY_OUTPUT_BYTES]?: number };
+
+function withAuxiliaryOutput(result: JudgeCaseResult, bytes: number): JudgeCaseResult {
+  if (bytes === 0) return result;
+  Object.defineProperty(result, AUXILIARY_OUTPUT_BYTES, { value: bytes, enumerable: false });
+  return result;
+}
+
+function retainedOutputBytes(result: JudgeCaseResult): number {
+  const auxiliary = (result as InternalJudgeCaseResult)[AUXILIARY_OUTPUT_BYTES] ?? 0;
+  if (result.run) {
+    return auxiliary
+      + utf8Bytes(result.run.stdout)
+      + utf8Bytes(result.run.stderr)
+      + Object.values(result.run.files).reduce((total, bytes) => total + bytes.byteLength, 0);
+  }
+  if (result.interaction) {
+    return auxiliary
+      + utf8Bytes(result.interaction.contestant.stderr)
+      + utf8Bytes(result.interaction.interactor.stderr)
+      + utf8Bytes(result.interaction.contestantToInteractor)
+      + utf8Bytes(result.interaction.interactorToContestant);
+  }
+  return auxiliary;
+}
+
+function utf8Bytes(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function retainCaseResult(result: JudgeCaseResult, retention: "full" | "metrics-only"): JudgeCaseResult {
+  if (retention === "full") return result;
+  const run = result.run === undefined
+    ? undefined
+    : {
+      code: result.run.code,
+      stdout: "",
+      stderr: "",
+      files: {},
+      durationMs: result.run.durationMs,
+      determinism: result.run.determinism,
+      resources: result.run.resources,
+      termination: result.run.termination,
+      metrics: result.run.metrics,
+    };
+  const interaction = result.interaction === undefined
+    ? undefined
+    : {
+      ...result.interaction,
+      contestant: { ...result.interaction.contestant, stderr: "" },
+      interactor: { ...result.interaction.interactor, stderr: "" },
+      contestantToInteractor: "",
+      interactorToContestant: "",
+    };
+  return {
+    id: result.id,
+    verdict: result.verdict,
+    ...(run === undefined ? {} : { run }),
+    ...(interaction === undefined ? {} : { interaction }),
+  };
 }
 
 export interface JudgeExecutionAdapter {
@@ -403,6 +525,17 @@ function wasmCheckerOutputMatcher(executor: JudgeExecutor): JudgeMatcher {
         "/checker/actual.txt": new TextEncoder().encode(context.stdout),
         "/checker/stderr.txt": new TextEncoder().encode(context.stderr),
       };
+      const trustedFiles = spec.config.files;
+      if (!trustedFiles || typeof trustedFiles !== "object" || Array.isArray(trustedFiles)) {
+        throw new Error("wasm-checker matcher requires a trusted file record.");
+      }
+      for (const [path, contents] of Object.entries(trustedFiles)) {
+        assertJudgeGuestFilePath(path, "Custom checker trusted file path");
+        if (!path.startsWith("/checker/assets/")) throw new Error("Custom checker trusted files must be inside '/checker/assets/'.");
+        if (!(contents instanceof Uint8Array)) throw new Error("Custom checker trusted file contents must be bytes.");
+        if (Object.hasOwn(files, path)) throw new Error("Custom checker trusted file collides with a reserved path.");
+        files[path] = contents.slice();
+      }
       for (const [path, contents] of Object.entries(context.files)) files[`/checker/files${path}`] = contents.slice();
       const checkerCase: BatchJudgeCaseSpec = {
         kind: "batch",
@@ -422,11 +555,15 @@ function wasmCheckerOutputMatcher(executor: JudgeExecutor): JudgeMatcher {
       };
       const result = await executor.run(checker, checkerCase, { stdin: "", files });
       if (result.termination !== "exited" || (result.code !== 0 && result.code !== 1)) {
-        throw new Error(`Custom checker failed with ${result.termination} and exit code ${result.code}: ${result.stderr.trim()}`);
+        throw new Error("Custom checker failed inside the judge sandbox.");
       }
       return result.code === 0
-        ? { accepted: true, ...(result.stdout.trim() ? { message: result.stdout.trim() } : {}) }
-        : { accepted: false, message: result.stdout.trim() || result.stderr.trim() || "Custom checker rejected the output." };
+        ? { accepted: true, auxiliaryOutputBytes: retainedOutputBytes({ id: checkerCase.id, verdict: "accepted", run: result }) }
+        : {
+          accepted: false,
+          message: "Custom checker rejected the output.",
+          auxiliaryOutputBytes: retainedOutputBytes({ id: checkerCase.id, verdict: "wrong-answer", run: result }),
+        };
     },
   };
 }

@@ -214,31 +214,31 @@
     {
       "id": "runtime-core-dependencies",
       "name": "Forge runtime-core locked normal dependency closure",
-      "version": "Cargo.lock-a13be9c004f5bc721623c8ff32555371fdbdefa242dde09f555387488cc3f1ae",
+      "version": "Cargo.lock-62dbddd87c77cf922bd45cdadb56972abed412ee442428a20ef6402d9837b934",
       "source": {
         "url": "https://crates.io/",
-        "revision": "a13be9c004f5bc721623c8ff32555371fdbdefa242dde09f555387488cc3f1ae"
+        "revision": "62dbddd87c77cf922bd45cdadb56972abed412ee442428a20ef6402d9837b934"
       },
       "distributions": [
         {
           "kind": "file",
           "path": "licenses/runtime-core-dependencies.html",
-          "sha256": "a8ea582d5a8b02e12712b8f65f5d9751d8d4fecd4b18ce93322c51a62f58cc5c"
+          "sha256": "d093fdf7b7d3db40e3392f92f5c1773fb3a9c7001a30041ddceb08df0fa16aad"
         },
         {
           "kind": "file",
           "path": "licenses/runtime-core-dependencies.json",
-          "sha256": "19bcf9f9f33bc9759f1eda03fcf279948998c94201e1615262105267d3360af5"
+          "sha256": "5ac8a039c04d9178391b58b2fbe001a18d84a261641db3f4a322c8686043c3b4"
         }
       ],
       "licenseFiles": [
         {
           "path": "licenses/runtime-core-dependencies.html",
-          "sha256": "a8ea582d5a8b02e12712b8f65f5d9751d8d4fecd4b18ce93322c51a62f58cc5c"
+          "sha256": "d093fdf7b7d3db40e3392f92f5c1773fb3a9c7001a30041ddceb08df0fa16aad"
         },
         {
           "path": "licenses/runtime-core-dependencies.json",
-          "sha256": "19bcf9f9f33bc9759f1eda03fcf279948998c94201e1615262105267d3360af5"
+          "sha256": "5ac8a039c04d9178391b58b2fbe001a18d84a261641db3f4a322c8686043c3b4"
         }
       ]
     },

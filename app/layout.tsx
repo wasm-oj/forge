@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { resolveRequestOrigin } from "@/src/core/request-origin";
+import { AppShell } from "@/src/components/app-shell";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
@@ -14,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     forwardedProtocol: requestHeaders.get("x-forwarded-proto"),
     host: requestHeaders.get("host"),
   });
-  const description = "A private, fully in-browser online judge with 45 original challenges and seven Wasmer-powered languages.";
+  const description = "Learn programming with official practice problems, browser-local runs, contests, and verified submissions.";
   return {
     metadataBase,
     title: "WASM OJ Forge",
@@ -22,14 +23,14 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: { icon: "/favicon.svg" },
     openGraph: {
       title: "WASM OJ Forge",
-      description: "45 challenges. Seven languages. Zero code uploads.",
+      description: "Official practice, browser-local runs, contests, and verified submissions.",
       type: "website",
       images: [{ url: new URL("/og.png", metadataBase).toString(), width: 1200, height: 630, alt: "WASM OJ Forge — deterministic browser-local compilation and judging" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "WASM OJ Forge",
-      description: "45 challenges. Seven languages. Zero code uploads.",
+      description: "Official practice, browser-local runs, contests, and verified submissions.",
       images: [new URL("/og.png", metadataBase).toString()],
     },
   };
@@ -37,8 +38,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable}`}><AppShell>{children}</AppShell></body>
     </html>
   );
 }

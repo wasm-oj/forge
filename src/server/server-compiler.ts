@@ -275,7 +275,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
             ));
             return;
           }
-          progressBuffer += chunk.toString("utf8");
+          progressBuffer += chunk.toString();
           const lines = progressBuffer.split("\n");
           progressBuffer = lines.pop() ?? "";
           for (const line of lines) {

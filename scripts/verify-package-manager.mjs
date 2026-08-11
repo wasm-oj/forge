@@ -2,7 +2,7 @@ import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const PNPM_VERSION = "10.21.0";
+const PNPM_VERSION = "10.34.5";
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 

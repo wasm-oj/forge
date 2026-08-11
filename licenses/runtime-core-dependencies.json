@@ -18,7 +18,7 @@
   },
   "report": {
     "path": "licenses/runtime-core-dependencies.html",
-    "sha256": "a8ea582d5a8b02e12712b8f65f5d9751d8d4fecd4b18ce93322c51a62f58cc5c"
+    "sha256": "d093fdf7b7d3db40e3392f92f5c1773fb3a9c7001a30041ddceb08df0fa16aad"
   },
   "packages": [
     {
@@ -141,6 +141,15 @@
     {
       "name": "base64",
       "version": "0.22.1",
+      "repository": "https://github.com/marshallpierce/rust-base64",
+      "declaredLicense": "MIT OR Apache-2.0",
+      "selectedLicenses": [
+        "MIT"
+      ]
+    },
+    {
+      "name": "base64",
+      "version": "0.23.1",
       "repository": "https://github.com/marshallpierce/rust-base64",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -833,7 +842,7 @@
     },
     {
       "name": "futures",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -842,7 +851,7 @@
     },
     {
       "name": "futures-channel",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -851,7 +860,7 @@
     },
     {
       "name": "futures-core",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -860,7 +869,7 @@
     },
     {
       "name": "futures-executor",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -869,7 +878,7 @@
     },
     {
       "name": "futures-io",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -878,7 +887,7 @@
     },
     {
       "name": "futures-macro",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -887,7 +896,7 @@
     },
     {
       "name": "futures-sink",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -896,7 +905,7 @@
     },
     {
       "name": "futures-task",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -905,7 +914,7 @@
     },
     {
       "name": "futures-util",
-      "version": "0.3.32",
+      "version": "0.3.33",
       "repository": "https://github.com/rust-lang/futures-rs",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -1256,7 +1265,7 @@
     },
     {
       "name": "js-sys",
-      "version": "0.3.103",
+      "version": "0.3.104",
       "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/js-sys",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -1958,7 +1967,7 @@
     },
     {
       "name": "serde",
-      "version": "1.0.228",
+      "version": "1.0.229",
       "repository": "https://github.com/serde-rs/serde",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -1985,7 +1994,7 @@
     },
     {
       "name": "serde_core",
-      "version": "1.0.228",
+      "version": "1.0.229",
       "repository": "https://github.com/serde-rs/serde",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -1994,7 +2003,7 @@
     },
     {
       "name": "serde_derive",
-      "version": "1.0.228",
+      "version": "1.0.229",
       "repository": "https://github.com/serde-rs/serde",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2012,7 +2021,7 @@
     },
     {
       "name": "serde_json",
-      "version": "1.0.150",
+      "version": "1.0.151",
       "repository": "https://github.com/serde-rs/json",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2182,6 +2191,15 @@
       ]
     },
     {
+      "name": "syn",
+      "version": "3.0.3",
+      "repository": "https://github.com/dtolnay/syn",
+      "declaredLicense": "MIT OR Apache-2.0",
+      "selectedLicenses": [
+        "MIT"
+      ]
+    },
+    {
       "name": "synstructure",
       "version": "0.13.2",
       "repository": "https://github.com/mystor/synstructure",
@@ -2219,7 +2237,7 @@
     },
     {
       "name": "thiserror",
-      "version": "2.0.18",
+      "version": "2.0.20",
       "repository": "https://github.com/dtolnay/thiserror",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2228,7 +2246,7 @@
     },
     {
       "name": "thiserror-impl",
-      "version": "2.0.18",
+      "version": "2.0.20",
       "repository": "https://github.com/dtolnay/thiserror",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2282,7 +2300,7 @@
     },
     {
       "name": "tokio",
-      "version": "1.53.0",
+      "version": "1.53.1",
       "repository": "https://github.com/tokio-rs/tokio",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2526,7 +2544,7 @@
     },
     {
       "name": "virtual-fs",
-      "version": "0.702.0",
+      "version": "0.702.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2535,7 +2553,7 @@
     },
     {
       "name": "virtual-mio",
-      "version": "0.702.0",
+      "version": "0.702.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2544,7 +2562,7 @@
     },
     {
       "name": "virtual-net",
-      "version": "0.702.0",
+      "version": "0.702.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2643,7 +2661,7 @@
     },
     {
       "name": "wasm-bindgen",
-      "version": "0.2.126",
+      "version": "0.2.127",
       "repository": "https://github.com/wasm-bindgen/wasm-bindgen",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2652,7 +2670,7 @@
     },
     {
       "name": "wasm-bindgen-futures",
-      "version": "0.4.76",
+      "version": "0.4.77",
       "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/futures",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2661,7 +2679,7 @@
     },
     {
       "name": "wasm-bindgen-macro",
-      "version": "0.2.126",
+      "version": "0.2.127",
       "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2670,7 +2688,7 @@
     },
     {
       "name": "wasm-bindgen-macro-support",
-      "version": "0.2.126",
+      "version": "0.2.127",
       "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro-support",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2679,7 +2697,7 @@
     },
     {
       "name": "wasm-bindgen-shared",
-      "version": "0.2.126",
+      "version": "0.2.127",
       "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [
@@ -2706,7 +2724,7 @@
     },
     {
       "name": "wasm-encoder",
-      "version": "0.253.0",
+      "version": "0.255.0",
       "repository": "https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-encoder",
       "declaredLicense": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
       "selectedLicenses": [
@@ -2724,7 +2742,7 @@
     },
     {
       "name": "wasmer",
-      "version": "7.2.0",
+      "version": "7.2.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2733,7 +2751,7 @@
     },
     {
       "name": "wasmer-compiler",
-      "version": "7.2.0",
+      "version": "7.2.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2742,7 +2760,7 @@
     },
     {
       "name": "wasmer-config",
-      "version": "0.702.0",
+      "version": "0.702.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2751,7 +2769,7 @@
     },
     {
       "name": "wasmer-derive",
-      "version": "7.2.0",
+      "version": "7.2.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2760,7 +2778,7 @@
     },
     {
       "name": "wasmer-journal",
-      "version": "0.702.0",
+      "version": "0.702.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2769,7 +2787,7 @@
     },
     {
       "name": "wasmer-package",
-      "version": "0.702.0",
+      "version": "0.702.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2778,7 +2796,7 @@
     },
     {
       "name": "wasmer-types",
-      "version": "7.2.0",
+      "version": "7.2.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT OR Apache-2.0 WITH LLVM-exception",
       "selectedLicenses": [
@@ -2787,7 +2805,7 @@
     },
     {
       "name": "wasmer-wasix",
-      "version": "0.702.0",
+      "version": "0.702.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2796,7 +2814,7 @@
     },
     {
       "name": "wasmer-wasix-types",
-      "version": "0.702.0",
+      "version": "0.702.1",
       "repository": "https://github.com/wasmerio/wasmer",
       "declaredLicense": "MIT",
       "selectedLicenses": [
@@ -2850,7 +2868,7 @@
     },
     {
       "name": "wast",
-      "version": "253.0.0",
+      "version": "255.0.0",
       "repository": "https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wast",
       "declaredLicense": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
       "selectedLicenses": [
@@ -2859,7 +2877,7 @@
     },
     {
       "name": "wat",
-      "version": "1.253.0",
+      "version": "1.255.0",
       "repository": "https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wat",
       "declaredLicense": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
       "selectedLicenses": [
@@ -2868,7 +2886,7 @@
     },
     {
       "name": "web-sys",
-      "version": "0.3.103",
+      "version": "0.3.104",
       "repository": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/web-sys",
       "declaredLicense": "MIT OR Apache-2.0",
       "selectedLicenses": [

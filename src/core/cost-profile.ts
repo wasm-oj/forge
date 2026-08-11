@@ -1,6 +1,7 @@
 import { WEIGHTED_METER_MODEL } from "./resources.ts";
 import { FORGE_CONTRACT_VERSION } from "./contract.ts";
 import { toolchainContentIdentity } from "./toolchains.ts";
+import { FORGE_RUNTIME_IDENTITY_SHA256 } from "./runtime-identity.ts";
 import {
   assertLanguageIdentifier,
   isBuiltinLanguage,
@@ -44,6 +45,7 @@ export function costProfileId(
   return [
     ...coordinates(language, target, optimization),
     `content-${content}`,
+    `runtime-${FORGE_RUNTIME_IDENTITY_SHA256}`,
     WEIGHTED_METER_MODEL,
   ].join(":");
 }
@@ -55,7 +57,7 @@ export function isCostProfileFor(
   optimization: OptimizationLevel,
 ): boolean {
   const prefix = `${coordinates(language, target, optimization).join(":")}:content-`;
-  const suffix = `:${WEIGHTED_METER_MODEL}`;
+  const suffix = `:runtime-${FORGE_RUNTIME_IDENTITY_SHA256}:${WEIGHTED_METER_MODEL}`;
   if (!profile.startsWith(prefix) || !profile.endsWith(suffix)) return false;
   const content = profile.slice(prefix.length, -suffix.length);
   return Boolean(content) && /^[A-Za-z0-9._-]+$/.test(content);

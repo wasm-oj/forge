@@ -5,6 +5,7 @@ import { ForgeEngine } from "./engine";
 import type { BrowserRuntimeDriverPlugin } from "../core/types";
 import { IndexedDbDependencyCache } from "../dependencies/indexeddb-cache";
 import { createDefaultDependencyManager } from "../dependencies/manager";
+import type { DependencyNetworkAuthorizer } from "../dependencies/types";
 
 export type { CompileOptions, ExecuteResult, RunOptions } from "./types";
 
@@ -17,6 +18,8 @@ export interface ForgeOptions {
   additionalCostBaselines?: Readonly<Record<string, number>>;
   /** Trusted same-origin, content-pinned RuntimeDriver modules loaded inside the runner Worker. */
   runtimeDriverPlugins?: readonly BrowserRuntimeDriverPlugin[];
+  /** Required authorizer for any online dependency resolution. No implicit network access exists. */
+  dependencyNetworkAuthorizer?: DependencyNetworkAuthorizer;
 }
 
 /** Browser host for the environment-neutral ForgeEngine library. */
@@ -37,7 +40,9 @@ export class Forge extends ForgeEngine {
       artifactStore: options.artifactCache === false
         ? undefined
         : { load: loadArtifact, save: saveArtifact, delete: deleteArtifact, clear: clearArtifactCache },
-      dependencyManager: createDefaultDependencyManager(dependencyCache),
+      dependencyManager: createDefaultDependencyManager(dependencyCache, {
+        networkAuthorizer: options.dependencyNetworkAuthorizer,
+      }),
     });
     this.dependencyCache = dependencyCache;
   }

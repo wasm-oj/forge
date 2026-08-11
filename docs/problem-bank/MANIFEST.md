@@ -209,12 +209,8 @@ Manifest 以
 
 實際 manifest 的 `profiles` 必須完整明列七種語言；上例為節省篇幅只展示兩個 key。
 
-原始逐案 metrics、source/test digest 與 runtime content digest 位於
-`calibration/forge-v1/reference-costs.json`；機器推導結果位於
-`calibration/forge-v1/derived-policies.json`。`node tools/derive_cost_policies.mjs` 會重新
-雜湊所有 solution 與 test、要求完整 45 × 7 records、重算三層 multi-language derivation，並
-核對 45 份 manifest。任何輸入或證據改變都 fail closed；要套用經人工審閱的新證據，使用
-`node tools/derive_cost_policies.mjs --write`。
+每份 manifest 直接保存已審閱的 language/profile 與三層 scoring policy。正式執行使用這些
+固定設定，不依賴另一套 calibration evidence 或重新推導 gate。
 
 ## Validation
 

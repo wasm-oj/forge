@@ -138,6 +138,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "入門基礎",
       "en": "Foundations"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 1: 逐步放寬的 Cost Budget\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 1: 逐步放寬的 Cost Budget\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 1: 逐步放寬的 Cost Budget\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 1: 逐步放寬的 Cost Budget\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 1: 逐步放寬的 Cost Budget\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 1: 逐步放寬的 Cost Budget\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 1: 逐步放寬的 Cost Budget\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -276,6 +320,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "入門基礎",
       "en": "Foundations"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 2: 判決區間計數\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 2: 判決區間計數\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 2: 判決區間計數\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 2: 判決區間計數\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 2: 判決區間計數\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 2: 判決區間計數\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 2: 判決區間計數\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -415,6 +503,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "入門基礎",
       "en": "Foundations"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 3: 第一份重複測資\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 3: 第一份重複測資\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 3: 第一份重複測資\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 3: 第一份重複測資\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 3: 第一份重複測資\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 3: 第一份重複測資\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 3: 第一份重複測資\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -554,6 +686,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "入門基礎",
       "en": "Foundations"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 4: 最近重複的 Submission\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 4: 最近重複的 Submission\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 4: 最近重複的 Submission\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 4: 最近重複的 Submission\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 4: 最近重複的 Submission\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 4: 最近重複的 Submission\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 4: 最近重複的 Submission\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -692,6 +868,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "入門基礎",
       "en": "Foundations"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 5: 持續追蹤第 K 慢測試\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 5: 持續追蹤第 K 慢測試\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 5: 持續追蹤第 K 慢測試\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 5: 持續追蹤第 K 慢測試\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 5: 持續追蹤第 K 慢測試\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 5: 持續追蹤第 K 慢測試\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 5: 持續追蹤第 K 慢測試\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -830,6 +1050,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "計量與資源限制",
       "en": "Metering & Resource Limits"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 6: 操作碼秤重站\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 6: 操作碼秤重站\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 6: 操作碼秤重站\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 6: 操作碼秤重站\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 6: 操作碼秤重站\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 6: 操作碼秤重站\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 6: 操作碼秤重站\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -968,6 +1232,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "計量與資源限制",
       "en": "Metering & Resource Limits"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 7: 空程式基線校正\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 7: 空程式基線校正\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 7: 空程式基線校正\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 7: 空程式基線校正\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 7: 空程式基線校正\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 7: 空程式基線校正\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 7: 空程式基線校正\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -1097,6 +1405,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "計量與資源限制",
       "en": "Metering & Resource Limits"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 8: 64 KiB 記憶體閘門\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 8: 64 KiB 記憶體閘門\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 8: 64 KiB 記憶體閘門\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 8: 64 KiB 記憶體閘門\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 8: 64 KiB 記憶體閘門\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 8: 64 KiB 記憶體閘門\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 8: 64 KiB 記憶體閘門\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -1235,6 +1587,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "計量與資源限制",
       "en": "Metering & Resource Limits"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 9: 三流共用輸出池\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 9: 三流共用輸出池\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 9: 三流共用輸出池\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 9: 三流共用輸出池\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 9: 三流共用輸出池\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 9: 三流共用輸出池\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 9: 三流共用輸出池\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -1364,6 +1760,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "計量與資源限制",
       "en": "Metering & Resource Limits"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 10: 交易式 VFS 配額\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 10: 交易式 VFS 配額\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 10: 交易式 VFS 配額\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 10: 交易式 VFS 配額\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 10: 交易式 VFS 配額\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 10: 交易式 VFS 配額\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 10: 交易式 VFS 配額\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -1502,6 +1942,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "計量與資源限制",
       "en": "Metering & Resource Limits"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 11: 稀疏檔案不是免費的\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 11: 稀疏檔案不是免費的\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 11: 稀疏檔案不是免費的\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 11: 稀疏檔案不是免費的\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 11: 稀疏檔案不是免費的\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 11: 稀疏檔案不是免費的\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 11: 稀疏檔案不是免費的\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -1631,6 +2115,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "計量與資源限制",
       "en": "Metering & Resource Limits"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 12: 瀏覽器儲存疏散令\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 12: 瀏覽器儲存疏散令\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 12: 瀏覽器儲存疏散令\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 12: 瀏覽器儲存疏散令\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 12: 瀏覽器儲存疏散令\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 12: 瀏覽器儲存疏散令\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 12: 瀏覽器儲存疏散令\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -1760,6 +2288,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 13: Guest Path 防火牆\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 13: Guest Path 防火牆\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 13: Guest Path 防火牆\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 13: Guest Path 防火牆\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 13: Guest Path 防火牆\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 13: Guest Path 防火牆\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 13: Guest Path 防火牆\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -1898,6 +2470,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 14: 目錄樹的掛載基線\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 14: 目錄樹的掛載基線\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 14: 目錄樹的掛載基線\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 14: 目錄樹的掛載基線\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 14: 目錄樹的掛載基線\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 14: 目錄樹的掛載基線\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 14: 目錄樹的掛載基線\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -2037,6 +2653,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 15: 掛載樹衝突檢查\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 15: 掛載樹衝突檢查\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 15: 掛載樹衝突檢查\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 15: 掛載樹衝突檢查\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 15: 掛載樹衝突檢查\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 15: 掛載樹衝突檢查\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 15: 掛載樹衝突檢查\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -2167,6 +2827,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 16: 512-byte 封存檔\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 16: 512-byte 封存檔\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 16: 512-byte 封存檔\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 16: 512-byte 封存檔\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 16: 512-byte 封存檔\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 16: 512-byte 封存檔\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 16: 512-byte 封存檔\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -2306,6 +3010,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 17: 全有或全無的輸出蒐集\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 17: 全有或全無的輸出蒐集\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 17: 全有或全無的輸出蒐集\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 17: 全有或全無的輸出蒐集\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 17: 全有或全無的輸出蒐集\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 17: 全有或全無的輸出蒐集\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 17: 全有或全無的輸出蒐集\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -2435,6 +3183,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 18: Build Fingerprint\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 18: Build Fingerprint\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 18: Build Fingerprint\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 18: Build Fingerprint\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 18: Build Fingerprint\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 18: Build Fingerprint\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 18: Build Fingerprint\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -2565,6 +3357,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 19: 不可混淆的 Runtime Bundle\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 19: 不可混淆的 Runtime Bundle\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 19: 不可混淆的 Runtime Bundle\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 19: 不可混淆的 Runtime Bundle\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 19: 不可混淆的 Runtime Bundle\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 19: 不可混淆的 Runtime Bundle\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 19: 不可混淆的 Runtime Bundle\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -2694,6 +3530,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 20: 原始碼樹證據\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 20: 原始碼樹證據\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 20: 原始碼樹證據\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 20: 原始碼樹證據\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 20: 原始碼樹證據\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 20: 原始碼樹證據\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 20: 原始碼樹證據\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -2835,6 +3715,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "檔案系統與封裝",
       "en": "Filesystems & Packaging"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 21: 唯一的 Replay Bundle\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 21: 唯一的 Replay Bundle\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 21: 唯一的 Replay Bundle\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 21: 唯一的 Replay Bundle\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 21: 唯一的 Replay Bundle\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 21: 唯一的 Replay Bundle\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 21: 唯一的 Replay Bundle\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -2965,6 +3889,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 22: 可重現的套件建置順序\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 22: 可重現的套件建置順序\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 22: 可重現的套件建置順序\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 22: 可重現的套件建置順序\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 22: 可重現的套件建置順序\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 22: 可重現的套件建置順序\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 22: 可重現的套件建置順序\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -3095,6 +4063,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 23: 標頭改了，誰必須重編？\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 23: 標頭改了，誰必須重編？\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 23: 標頭改了，誰必須重編？\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 23: 標頭改了，誰必須重編？\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 23: 標頭改了，誰必須重編？\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 23: 標頭改了，誰必須重編？\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 23: 標頭改了，誰必須重編？\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -3224,6 +4236,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 24: 編譯管線的關鍵路徑\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 24: 編譯管線的關鍵路徑\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 24: 編譯管線的關鍵路徑\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 24: 編譯管線的關鍵路徑\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 24: 編譯管線的關鍵路徑\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 24: 編譯管線的關鍵路徑\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 24: 編譯管線的關鍵路徑\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -3354,6 +4410,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 25: 八階段編譯器\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 25: 八階段編譯器\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 25: 八階段編譯器\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 25: 八階段編譯器\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 25: 八階段編譯器\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 25: 八階段編譯器\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 25: 八階段編譯器\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -3483,6 +4583,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 26: 編譯工作世代競賽\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 26: 編譯工作世代競賽\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 26: 編譯工作世代競賽\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 26: 編譯工作世代競賽\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 26: 編譯工作世代競賽\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 26: 編譯工作世代競賽\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 26: 編譯工作世代競賽\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -3612,6 +4756,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 27: Submission 輸送帶\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 27: Submission 輸送帶\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 27: Submission 輸送帶\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 27: Submission 輸送帶\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 27: Submission 輸送帶\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 27: Submission 輸送帶\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 27: Submission 輸送帶\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -3748,6 +4936,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 28: 離線依賴行李箱\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 28: 離線依賴行李箱\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 28: 離線依賴行李箱\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 28: 離線依賴行李箱\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 28: 離線依賴行李箱\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 28: 離線依賴行李箱\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 28: 離線依賴行李箱\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -3887,6 +5119,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 29: 精確依賴快取\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 29: 精確依賴快取\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 29: 精確依賴快取\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 29: 精確依賴快取\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 29: 精確依賴快取\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 29: 精確依賴快取\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 29: 精確依賴快取\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -4017,6 +5293,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 30: Graph Blob LRU\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 30: Graph Blob LRU\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 30: Graph Blob LRU\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 30: Graph Blob LRU\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 30: Graph Blob LRU\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 30: Graph Blob LRU\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 30: Graph Blob LRU\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -4146,6 +5466,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 31: Judge 總帳區間查詢\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 31: Judge 總帳區間查詢\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 31: Judge 總帳區間查詢\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 31: Judge 總帳區間查詢\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 31: Judge 總帳區間查詢\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 31: Judge 總帳區間查詢\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 31: Judge 總帳區間查詢\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -4284,6 +5648,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 32: 七種答案比對器\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 32: 七種答案比對器\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 32: 七種答案比對器\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 32: 七種答案比對器\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 32: 七種答案比對器\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 32: 七種答案比對器\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 32: 七種答案比對器\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -4413,6 +5821,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 33: 雙向互動管線\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 33: 雙向互動管線\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 33: 雙向互動管線\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 33: 雙向互動管線\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 33: 雙向互動管線\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 33: 雙向互動管線\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 33: 雙向互動管線\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -4542,6 +5994,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 34: 不等待的虛擬時鐘\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 34: 不等待的虛擬時鐘\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 34: 不等待的虛擬時鐘\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 34: 不等待的虛擬時鐘\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 34: 不等待的虛擬時鐘\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 34: 不等待的虛擬時鐘\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 34: 不等待的虛擬時鐘\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -4671,6 +6167,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 35: 分塊無關的確定性亂數\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 35: 分塊無關的確定性亂數\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 35: 分塊無關的確定性亂數\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 35: 分塊無關的確定性亂數\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 35: 分塊無關的確定性亂數\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 35: 分塊無關的確定性亂數\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 35: 分塊無關的確定性亂數\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -4800,6 +6340,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "編譯、排程與快取",
       "en": "Build, Scheduling & Caching"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 36: 跨 Host 一致性矩陣\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 36: 跨 Host 一致性矩陣\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 36: 跨 Host 一致性矩陣\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 36: 跨 Host 一致性矩陣\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 36: 跨 Host 一致性矩陣\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 36: 跨 Host 一致性矩陣\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 36: 跨 Host 一致性矩陣\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -4930,6 +6514,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "圖論演算法",
       "en": "Graph Algorithms"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 37: Toolchain 鏡像網路\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 37: Toolchain 鏡像網路\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 37: Toolchain 鏡像網路\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 37: Toolchain 鏡像網路\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 37: Toolchain 鏡像網路\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 37: Toolchain 鏡像網路\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 37: Toolchain 鏡像網路\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -5060,6 +6688,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "圖論演算法",
       "en": "Graph Algorithms"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 38: 互動程式的等待環\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 38: 互動程式的等待環\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 38: 互動程式的等待環\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 38: 互動程式的等待環\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 38: 互動程式的等待環\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 38: 互動程式的等待環\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 38: 互動程式的等待環\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -5199,6 +6871,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "圖論演算法",
       "en": "Graph Algorithms"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 39: 最少隔離的衝突套件\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 39: 最少隔離的衝突套件\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 39: 最少隔離的衝突套件\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 39: 最少隔離的衝突套件\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 39: 最少隔離的衝突套件\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 39: 最少隔離的衝突套件\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 39: 最少隔離的衝突套件\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -5329,6 +7045,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "圖論演算法",
       "en": "Graph Algorithms"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 40: 切斷危險 Capability\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 40: 切斷危險 Capability\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 40: 切斷危險 Capability\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 40: 切斷危險 Capability\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 40: 切斷危險 Capability\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 40: 切斷危險 Capability\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 40: 切斷危險 Capability\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -5467,6 +7227,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "背包與集合最佳化",
       "en": "Knapsack & Selection"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 41: Artifact Cache 的取捨\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 41: Artifact Cache 的取捨\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 41: Artifact Cache 的取捨\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 41: Artifact Cache 的取捨\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 41: Artifact Cache 的取捨\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 41: Artifact Cache 的取捨\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 41: Artifact Cache 的取捨\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -5605,6 +7409,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "背包與集合最佳化",
       "en": "Knapsack & Selection"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 42: Calibration 實驗排程\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 42: Calibration 實驗排程\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 42: Calibration 實驗排程\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 42: Calibration 實驗排程\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 42: Calibration 實驗排程\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 42: Calibration 實驗排程\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 42: Calibration 實驗排程\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -5744,6 +7592,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "背包與集合最佳化",
       "en": "Knapsack & Selection"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 43: 有依賴的快取背包\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 43: 有依賴的快取背包\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 43: 有依賴的快取背包\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 43: 有依賴的快取背包\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 43: 有依賴的快取背包\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 43: 有依賴的快取背包\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 43: 有依賴的快取背包\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -5882,6 +7774,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "背包與集合最佳化",
       "en": "Knapsack & Selection"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 44: 雙限制輸出蒐集\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 44: 雙限制輸出蒐集\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 44: 雙限制輸出蒐集\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 44: 雙限制輸出蒐集\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 44: 雙限制輸出蒐集\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 44: 雙限制輸出蒐集\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 44: 雙限制輸出蒐集\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   },
   {
@@ -6011,6 +7947,50 @@ export const GENERATED_PROBLEMS = [
     "track": {
       "zh-TW": "背包與集合最佳化",
       "en": "Knapsack & Selection"
+    },
+    "starterTemplates": {
+      "c": {
+        "entry": "src/main.c",
+        "files": {
+          "src/main.c": "#include <stdio.h>\n\nint main(void) {\n    // Problem 45: 最划算的 Conformance Suite\n    // TODO: read from stdin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "cpp": {
+        "entry": "src/main.cpp",
+        "files": {
+          "src/main.cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // Problem 45: 最划算的 Conformance Suite\n    // TODO: read from cin and print the required answer.\n    return 0;\n}\n"
+        }
+      },
+      "rust": {
+        "entry": "src/main.rs",
+        "files": {
+          "src/main.rs": "use std::io::{self, Read};\n\nfn main() {\n    // Problem 45: 最划算的 Conformance Suite\n    let mut input = String::new();\n    io::stdin().read_to_string(&mut input).unwrap();\n    // TODO: parse input, compute, and print the required answer.\n}\n"
+        }
+      },
+      "go": {
+        "entry": "src/main.go",
+        "files": {
+          "src/main.go": "package main\n\nimport (\n    \"bufio\"\n    \"fmt\"\n    \"os\"\n)\n\nfunc main() {\n    // Problem 45: 最划算的 Conformance Suite\n    in := bufio.NewReader(os.Stdin)\n    _ = in\n    // TODO: read input, compute, and print the required answer.\n    fmt.Print(\"\")\n}\n"
+        }
+      },
+      "python": {
+        "entry": "src/main.py",
+        "files": {
+          "src/main.py": "import sys\n\ninput_data = sys.stdin.read()\n# Problem 45: 最划算的 Conformance Suite\n# TODO: compute and print the required answer.\n"
+        }
+      },
+      "javascript": {
+        "entry": "src/main.js",
+        "files": {
+          "src/main.js": "import * as std from \"std\";\n\nconst input = std.in.readAsString();\n// Problem 45: 最划算的 Conformance Suite\n// TODO: compute and print the required answer.\n"
+        }
+      },
+      "typescript": {
+        "entry": "src/main.ts",
+        "files": {
+          "src/main.ts": "import * as std from \"std\";\n\nconst input: string = std.in.readAsString();\n// Problem 45: 最划算的 Conformance Suite\n// TODO: compute and print the required answer.\n"
+        }
+      }
     }
   }
 ] as const satisfies readonly JudgeProblem[];

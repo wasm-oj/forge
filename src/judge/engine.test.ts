@@ -160,6 +160,94 @@ describe("JudgeEngine", () => {
     expect(executor.run).toHaveBeenCalledTimes(1);
   });
 
+  it("bounds aggregate formal-job output and does not retain case I/O", async () => {
+    const onOutputBytes = vi.fn();
+    const executor = judgeExecutor(vi.fn()
+      .mockResolvedValueOnce(run("1234", { stderr: "56" }))
+      .mockResolvedValueOnce(run("7890")));
+    const result = await new JudgeEngine(executor).judge(artifact, {
+      version: FORGE_CONTRACT_VERSION,
+      failFast: false,
+      cases: [
+        { kind: "batch", id: "first", input: { kind: "inline", value: "" }, matcher: textMatcher("1234") },
+        { kind: "batch", id: "limited", input: { kind: "inline", value: "" }, matcher: textMatcher("7890") },
+        { kind: "batch", id: "not-run", input: { kind: "inline", value: "" }, matcher: textMatcher("") },
+      ],
+    }, { retention: "metrics-only", aggregateOutputLimitBytes: 8, onOutputBytes });
+
+    expect(executor.run).toHaveBeenCalledTimes(2);
+    expect(result.verdict).toBe("output-limit");
+    expect(result.cases.map(({ id, verdict }) => ({ id, verdict }))).toEqual([
+      { id: "first", verdict: "accepted" },
+      { id: "limited", verdict: "output-limit" },
+      { id: "not-run", verdict: "output-limit" },
+    ]);
+    expect(result.cases[0]?.run).toMatchObject({ stdout: "", stderr: "", files: {} });
+    expect(result.cases[1]?.run).toMatchObject({ stdout: "", stderr: "", files: {} });
+    expect(JSON.stringify(result.cases)).not.toContain("1234");
+    expect(JSON.stringify(result.cases)).not.toContain("7890");
+    expect(onOutputBytes.mock.calls).toEqual([[6, 6], [4, 10]]);
+  });
+
+  it("validates aggregate judge options before executing", async () => {
+    const executor = judgeExecutor(vi.fn());
+    const spec: JudgeSpec = {
+      version: FORGE_CONTRACT_VERSION,
+      cases: [{ kind: "batch", id: "case", input: { kind: "inline", value: "" }, matcher: textMatcher("") }],
+    };
+    await expect(new JudgeEngine(executor).judge(artifact, spec, { aggregateOutputLimitBytes: 0 })).rejects.toThrow("positive safe integer");
+    await expect(new JudgeEngine(executor).judge(artifact, spec, { retention: "invalid" as "full" })).rejects.toThrow("retention");
+    expect(executor.run).not.toHaveBeenCalled();
+  });
+
+  it("counts UTF-8, output files, and trusted matcher subprocess output at the exact boundary", async () => {
+    const executor = judgeExecutor(vi.fn().mockResolvedValue(run("界", {
+      files: { "/answer.bin": new Uint8Array([1, 2]) },
+    })));
+    const judge = new JudgeEngine(executor, {
+      matchers: [{
+        id: "bounded-checker",
+        async match() { return { accepted: true, auxiliaryOutputBytes: 3 }; },
+      }],
+    });
+    const spec: JudgeSpec = {
+      version: FORGE_CONTRACT_VERSION,
+      cases: [{
+        kind: "batch",
+        id: "bounded",
+        input: { kind: "inline", value: "" },
+        outputPaths: ["/answer.bin"],
+        matcher: { id: "bounded-checker", config: {} },
+      }],
+    };
+    await expect(judge.judge(artifact, spec, { aggregateOutputLimitBytes: 8 })).resolves.toMatchObject({ verdict: "accepted" });
+    await expect(judge.judge(artifact, spec, { aggregateOutputLimitBytes: 7 })).resolves.toMatchObject({ verdict: "output-limit" });
+  });
+
+  it("keeps judge-error authoritative, stops immediately, and strips trap diagnostics before callbacks", async () => {
+    const callback = vi.fn();
+    const executor = judgeExecutor(vi.fn()
+      .mockResolvedValueOnce(run("large", { trapMessage: "SECRET_TRAP" }))
+      .mockRejectedValueOnce(new Error("SECRET_JUDGE_FAILURE")));
+    const result = await new JudgeEngine(executor).judge(artifact, {
+      version: FORGE_CONTRACT_VERSION,
+      failFast: false,
+      cases: [
+        { kind: "batch", id: "first", input: { kind: "inline", value: "" }, matcher: textMatcher("large") },
+        { kind: "batch", id: "judge", input: { kind: "inline", value: "" }, matcher: textMatcher("") },
+        { kind: "batch", id: "not-run", input: { kind: "inline", value: "" }, matcher: textMatcher("") },
+      ],
+    }, { retention: "metrics-only", aggregateOutputLimitBytes: 100, onCase: callback });
+
+    expect(result.verdict).toBe("judge-error");
+    expect(result.completed).toBe(2);
+    expect(executor.run).toHaveBeenCalledTimes(2);
+    expect(callback).toHaveBeenCalledTimes(2);
+    const encoded = JSON.stringify(callback.mock.calls);
+    expect(encoded).not.toContain("SECRET_TRAP");
+    expect(encoded).not.toContain("SECRET_JUDGE_FAILURE");
+  });
+
   it("preserves logical-time-limit independently from the emergency wall deadline", async () => {
     const executor = judgeExecutor(
       vi.fn().mockResolvedValue(run("", { code: 137, termination: "logical-time-limit" })),
@@ -261,7 +349,9 @@ describe("JudgeEngine", () => {
         kind: "batch",
         id: "custom-checker",
         input: { kind: "inline", value: "input\n" },
-        matcher: wasmCheckerMatcher(checker, "expected\n", ["--strict"]),
+        matcher: wasmCheckerMatcher(checker, "expected\n", ["--strict"], {
+          "/checker/assets/policy.bin": new Uint8Array([0, 255, 1]),
+        }),
       }],
     });
     expect(result.verdict).toBe("accepted");
@@ -272,6 +362,7 @@ describe("JudgeEngine", () => {
         "/checker/input.txt": new TextEncoder().encode("input\n"),
         "/checker/expected.txt": new TextEncoder().encode("expected\n"),
         "/checker/actual.txt": new TextEncoder().encode("candidate output\n"),
+        "/checker/assets/policy.bin": new Uint8Array([0, 255, 1]),
       },
     });
   });
@@ -317,7 +408,10 @@ describe("JudgeEngine", () => {
         kind: "interactive",
         id: "dialogue",
         input: { kind: "inline", value: "41\n" },
-        files: { "/judge/secret.txt": { kind: "provider", provider: "fixtures", key: "secret" } },
+        files: {
+          "/judge/secret.txt": { kind: "provider", provider: "fixtures", key: "secret" },
+          "/judge/binary.dat": { kind: "inline-bytes", value: new Uint8Array([0, 255, 1]) },
+        },
         contestant: { args: ["--contestant"] },
         interactor: {
           artifact: interactor,
@@ -340,10 +434,51 @@ describe("JudgeEngine", () => {
           files: {
             "/judge/input.txt": new TextEncoder().encode("41\n"),
             "/judge/secret.txt": new TextEncoder().encode("secret file\n"),
+            "/judge/binary.dat": new Uint8Array([0, 255, 1]),
           },
         }),
       }),
     );
+  });
+
+  it("counts and redacts both interactive protocol directions and process diagnostics", async () => {
+    const metrics = run("").metrics;
+    const interaction: InteractiveRunResult = {
+      contestant: { code: 0, stderr: "é", termination: "exited", metrics },
+      interactor: { code: 0, stderr: "i", termination: "exited", metrics },
+      contestantToInteractor: "ab",
+      interactorToContestant: "cd",
+      durationMs: 1,
+      determinism: DEFAULT_DETERMINISM,
+    };
+    const executor: JudgeExecutor = {
+      run: vi.fn(),
+      interact: vi.fn().mockResolvedValue(interaction),
+    };
+    const spec: JudgeSpec = {
+      version: FORGE_CONTRACT_VERSION,
+      cases: [{
+        kind: "interactive",
+        id: "interactive-output",
+        input: { kind: "inline", value: "" },
+        interactor: { artifact, inputPath: "/judge/input.txt" },
+      }],
+    };
+    const accepted = await new JudgeEngine(executor).judge(artifact, spec, {
+      retention: "metrics-only",
+      aggregateOutputLimitBytes: 7,
+    });
+    expect(accepted.verdict).toBe("accepted");
+    expect(accepted.cases[0]?.interaction).toMatchObject({
+      contestant: { stderr: "" },
+      interactor: { stderr: "" },
+      contestantToInteractor: "",
+      interactorToContestant: "",
+    });
+    await expect(new JudgeEngine(executor).judge(artifact, spec, {
+      retention: "metrics-only",
+      aggregateOutputLimitBytes: 6,
+    })).resolves.toMatchObject({ verdict: "output-limit" });
   });
 
   it("validates every case before running any user program", async () => {

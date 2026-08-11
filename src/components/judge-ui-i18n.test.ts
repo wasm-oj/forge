@@ -24,14 +24,17 @@ describe("judge UI localization", () => {
     const zh = judgeUiText("zh-TW");
     const en = judgeUiText("en");
 
-    expect(zh.topbar.submit).toBe("提交判題");
-    expect(en.topbar.submit).toBe("Submit");
+    expect(zh.topbar.judgeLocally).toBe("本機判題");
+    expect(en.topbar.judgeLocally).toBe("Judge Locally");
     expect(zh.panel.diagnostics).toBe("編譯診斷");
     expect(en.panel.diagnostics).toBe("Diagnostics");
     expect(zh.settings.localDataTitle).toBe("本機資料與隱私");
     expect(en.settings.localDataTitle).toBe("Local data and privacy");
     expect(en.judge.casesAndPoints(2, 3, 4, 5)).toBe("2 / 3 cases · 4.00 / 5 points");
     expect(zh.judge.casesAndPoints(2, 3, 4, 5)).toBe("2 / 3 筆測資 · 4.00 / 5 分");
+    expect(en.official.cursor(7)).toBe("Event cursor: 7");
+    expect(zh.official.resources(1234, "1 MiB")).toContain("1 MiB");
+    expect(en.official.reconnecting(2, 7)).toContain("cursor 7");
   });
 
   it("keeps all static English copy free of Chinese characters", () => {
@@ -42,6 +45,7 @@ describe("judge UI localization", () => {
     const storage = memoryStorage();
     expect(DEFAULT_JUDGE_UI_LOCALE).toBe("en");
     expect(readJudgeUiLocale(storage)).toBe("en");
+    expect(readJudgeUiLocale(storage, "zh-TW")).toBe("zh-TW");
 
     writeJudgeUiLocale(storage, "zh-TW");
     expect(readJudgeUiLocale(storage)).toBe("zh-TW");

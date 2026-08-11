@@ -67,7 +67,11 @@ normalized POSIX relative path。
   偷渡次佳解法。
 - Solution 只輸出題目要求的內容，不得包含提示、debug log 或 fallback。
 
-## Tests and independent review
+## Author-owned quality review (not a publish gate)
+
+The following checks are optional authoring guidance for the official repository. Forge does not
+run them during Organizer import or publication and does not decide whether a reference solution
+is correct, optimal, or deserving of a particular score.
 
 - `validator.py` 對任意輸入 fail closed。
 - `oracle.py` 是與最佳解結構不同的直接解，只供小型測資 differential test。
@@ -75,8 +79,8 @@ normalized POSIX relative path。
   同一組參數必須 byte-identical，`INDEX` 用來選擇不同形狀／規模。generator
   的輸出必須落在 oracle 可承受的範圍。
 - 每個 sample output 由 oracle 產生或再次核對。
-- 每個 reference solution 都必須通過 samples、固定 adversarial cases 與 seeded
-  oracle differential tests。
+- 題庫作者可自行讓 reference solution 通過 samples、固定 adversarial cases 與 seeded
+  oracle differential tests；結果由題庫作者負責，不是平台發布條件。
 - 獨立 reviewer 僅讀 statement，先自行推導解法，再檢查 editorial、solutions
   與 constraints 是否一致，並確認宣稱的時間／空間複雜度為可達最佳解。
 
@@ -101,9 +105,8 @@ normalized POSIX relative path。
   deterministic policy metric。
 - `safetyLimits.wallTimeLimitMs` 只負責終止失控 host execution，不參與計分，也不得
   作為跨 host 的演算法效率指標。
-- `calibration.status=measured` 必須能由固定 Forge contract/toolchain、完整 tests 與
-  `calibration/forge-v1/` 下的證據重算；solution、test 或 runtime identity 改變時必須
-  fail closed 並重新量測，不得沿用舊 budget。
+- `calibration.profiles` 在 v1 是 manifest 內的固定 language/profile mapping；部署不要求
+  額外 calibration evidence。
 
 ## Metadata
 

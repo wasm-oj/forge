@@ -1,140 +1,34 @@
-name: Release
+name: Release npm package
 
 on:
   push:
-    tags:
-      - "v*.*.*"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing annotated release tag to resume
-        required: true
-        type: string
+    tags: ["v*.*.*"]
 
 permissions:
-  contents: read
-
-concurrency:
-  group: release-${{ inputs.tag || github.ref }}
-  cancel-in-progress: false
+  contents: write
+  id-token: write
 
 jobs:
   publish:
-    name: publish
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 30
     environment: npm
-    env:
-      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    defaults:
-      run:
-        working-directory: source
     steps:
-      - name: Check out release automation
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          path: .release-automation
           persist-credentials: false
-      - name: Check out the release tag and LFS assets
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
         with:
-          ref: ${{ env.RELEASE_TAG }}
-          path: source
-          fetch-depth: 0
-          lfs: true
-          persist-credentials: false
-      - name: Install pinned pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-        with:
-          version: 10.21.0
+          version: 10.34.5
           run_install: false
-      - name: Install Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 24
+          node-version: 24.18.0
           registry-url: https://registry.npmjs.org/
-          package-manager-cache: false
-      - name: Verify LFS object integrity
-        run: git lfs fsck
-      - name: Install exact dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Install Chromium system dependencies
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Run the complete release gate
-        run: pnpm run ci:verify
-      - name: Pack and verify the release candidate
-        id: candidate
-        shell: bash
-        run: |
-          set -euo pipefail
-          candidate_dir="$RUNNER_TEMP/forge-candidate"
-          mkdir -p "$candidate_dir"
-          pnpm pack --pack-destination "$candidate_dir"
-          mapfile -t tarballs < <(find "$candidate_dir" -maxdepth 1 -type f -name '*.tgz' -print)
-          test "${#tarballs[@]}" -eq 1
-          pnpm run release:verify "$RELEASE_TAG" "${tarballs[0]}"
-          echo "tarball=${tarballs[0]}" >> "$GITHUB_OUTPUT"
-      - name: Publish candidate and resolve canonical registry artifact
-        id: registry
-        env:
-          NPM_CONFIG_PROVENANCE: "true"
-          CANDIDATE: ${{ steps.candidate.outputs.tarball }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          package_spec="$(node -p "const p=require('./package.json'); p.name+'@'+p.version")"
-          if ! pnpm view "$package_spec" version >/dev/null 2>&1; then
-            pnpm publish "$CANDIDATE" --access public --no-git-checks
-          fi
-
-          registry_dir="$RUNNER_TEMP/forge-registry"
-          metadata="$registry_dir/dist.json"
-          tarball="$registry_dir/$(basename "$CANDIDATE")"
-          mkdir -p "$registry_dir"
-          for attempt in {1..12}; do
-            if pnpm view "$package_spec" dist --json > "$metadata"; then
-              break
-            fi
-            if [ "$attempt" -eq 12 ]; then
-              exit 1
-            fi
-            sleep 5
-          done
-          node ../.release-automation/scripts/download-registry-artifact.mjs "$metadata" "$tarball"
-          node ../.release-automation/scripts/verify-release-artifacts.mjs "$CANDIDATE" "$tarball"
-          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
-          echo "checksum=$tarball.sha256" >> "$GITHUB_OUTPUT"
-      - name: Attest the canonical registry artifact
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
-        with:
-          subject-path: ${{ steps.registry.outputs.tarball }}
-      - name: Create or update the draft GitHub Release
-        env:
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run ci:verify
+      - run: pnpm publish --access public --no-git-checks
+      - env:
           GH_TOKEN: ${{ github.token }}
-          TARBALL: ${{ steps.registry.outputs.tarball }}
-          CHECKSUM: ${{ steps.registry.outputs.checksum }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_metadata="$RUNNER_TEMP/forge-github-release.json"
-          if gh release view "$RELEASE_TAG" --json assets > "$release_metadata" 2>/dev/null; then
-            if node ../.release-automation/scripts/verify-github-release-assets.mjs \
-              "$release_metadata" "$TARBALL" "$CHECKSUM"; then
-              echo "Canonical GitHub Release assets already exist; skipping upload."
-            else
-              status="$?"
-              test "$status" -eq 10
-              gh release upload "$RELEASE_TAG" "$TARBALL" "$CHECKSUM" --clobber
-            fi
-          else
-            gh release create "$RELEASE_TAG" "$TARBALL" "$CHECKSUM" \
-              --draft --verify-tag --generate-notes --title "$RELEASE_TAG"
-          fi
-      - name: Publish the GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$RELEASE_TAG" --draft=false --latest
+        run: gh release create "${GITHUB_REF_NAME}" --verify-tag --generate-notes --latest

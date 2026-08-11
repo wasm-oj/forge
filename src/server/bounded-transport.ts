@@ -40,7 +40,7 @@ export class BoundedByteCollector {
   }
 
   text(): string {
-    return this.bytes().toString("utf8");
+    return this.bytes().toString();
   }
 }
 

@@ -70,8 +70,8 @@ function observedMetrics(
   language: BuiltinLanguage,
   result: JudgeCaseResult,
 ): ObservedCaseMetrics | null {
-  if (!result.run) return null;
-  const metrics = result.run.metrics;
+  const metrics = result.run?.metrics ?? result.interaction?.contestant.metrics;
+  if (!metrics) return null;
   assertProblemCostProfile(problem, language, metrics.costProfile);
   if (metrics.costModel !== "weighted") {
     throw new Error(`Problem '${problem.id}' received an unsupported cost model.`);
@@ -141,11 +141,12 @@ export function scoreProblemResults(
     problem.scoring.policies.map((policy) => [policy.id, 0]),
   );
   const cases = results.map((result): ScoredProblemCase => {
-    if (result.verdict === "accepted" && result.run?.termination !== "exited") {
+    const contestantTermination = result.run?.termination ?? result.interaction?.contestant.termination;
+    if (result.verdict === "accepted" && contestantTermination !== "exited") {
       throw new Error(`Problem '${problem.id}' accepted a case without a successful execution.`);
     }
     const metrics = observedMetrics(problem, language, result);
-    const outputAccepted = result.verdict === "accepted" && result.run?.termination === "exited";
+    const outputAccepted = result.verdict === "accepted" && contestantTermination === "exited";
     if (
       outputAccepted
       && (

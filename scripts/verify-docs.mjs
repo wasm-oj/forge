@@ -13,7 +13,6 @@ const markdownFiles = [
   ...(await markdownBelow("experiments")).filter((file) => file.endsWith("/SPEC.md")),
 ].sort(compareCodePoints);
 const immutableCommandRecords = new Set([
-  "experiments/forge-contract-1-cost-baseline/SPEC.md",
 ]);
 
 for (const relative of markdownFiles) {
@@ -57,6 +56,73 @@ for (const required of [
   "pnpm install --frozen-lockfile",
 ]) {
   if (!readme.includes(required)) throw new Error(`README.md does not document '${required}'.`);
+}
+
+const integrationGuide = await readFile(path.join(root, "docs/integration-guide.md"), "utf8");
+for (const required of [
+  "BrowserDependencyNetworkConsent",
+  "dependencyNetworkAuthorizer: dependencyConsent",
+  "repositorySourceKey",
+  "problemBundleSha256",
+  "completeDependencyHosts",
+  "networkAccess:",
+]) {
+  if (!integrationGuide.includes(required)) {
+    throw new Error(`docs/integration-guide.md does not bind browser dependency resolution to '${required}'.`);
+  }
+}
+if (integrationGuide.includes("resolveDependencies(manifest);")) {
+  throw new Error("docs/integration-guide.md resolves online dependencies without an explicit network scope.");
+}
+
+const libraryContract = await readFile(path.join(root, "docs/library-contract.md"), "utf8");
+for (const required of [
+  "networkAuthorizer: dependencyNetworkAuthorizer",
+  "repositorySourceKey",
+  "problemBundleSha256",
+  "completeDependencyHosts",
+  "networkAccess:",
+]) {
+  if (!libraryContract.includes(required)) {
+    throw new Error(`docs/library-contract.md does not bind dependency resolution to '${required}'.`);
+  }
+}
+if (libraryContract.includes("manager.resolve(manifest);")) {
+  throw new Error("docs/library-contract.md resolves online dependencies without an explicit network scope.");
+}
+
+const onlineJudgeDocs = [
+  "docs/cloudflare-online-judge.md",
+  "docs/cloudflare-deployment-plan.md",
+];
+for (const relative of onlineJudgeDocs) {
+  const source = await readFile(path.join(root, relative), "utf8");
+  for (const removed of [
+    "SubmissionDO",
+    "UserQuotaDO",
+    "AdmissionControlDO",
+    "ProblemLeaderboardDO",
+    "ContestDO",
+    "WebSocket",
+    "lease TTL",
+  ]) {
+    if (source.includes(removed)) {
+      throw new Error(`${relative} still documents removed product state '${removed}'.`);
+    }
+  }
+}
+
+const onlineJudge = await readFile(path.join(root, "docs/cloudflare-online-judge.md"), "utf8");
+for (const required of [
+  "submission_events",
+  "events?after=<cursor>",
+  "formal_mutations_enabled",
+  "SubmissionJudgeContainer",
+  "ValidationJudgeContainer",
+]) {
+  if (!onlineJudge.includes(required)) {
+    throw new Error(`docs/cloudflare-online-judge.md does not document '${required}'.`);
+  }
 }
 
 await access(path.join(root, "pnpm-lock.yaml"));

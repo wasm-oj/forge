@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { rollup } from "rollup";
 import { dts } from "rollup-plugin-dts";
 import { build } from "vite";
+import { resolveTypeScriptCli } from "./typescript-cli.mjs";
 
 const run = promisify(execFile);
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -106,10 +107,28 @@ async function buildJavaScript() {
       },
     },
   });
+
+  await build({
+    configFile: false,
+    publicDir: false,
+    resolve: { alias },
+    build: {
+      outDir: stagingDir,
+      emptyOutDir: false,
+      target: "es2022",
+      sourcemap: false,
+      ssr: true,
+      lib: {
+        entry: path.join(root, "src/collection-cli.ts"),
+        formats: ["es"],
+        fileName: () => "forge-collection-cli.js",
+      },
+    },
+  });
 }
 
 async function emitDeclarations() {
-  const typescript = path.join(root, "node_modules/typescript/lib/tsc.js");
+  const typescript = await resolveTypeScriptCli();
   try {
     await run(process.execPath, [
       typescript,

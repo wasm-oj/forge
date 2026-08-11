@@ -18,9 +18,6 @@ export const FORGE_SCHEMAS = Object.freeze({
   conformance: `${FORGE_CONTRACT_ID}/conformance`,
   conformanceEvidence: `${FORGE_CONTRACT_ID}/conformance-evidence`,
   conformanceMatrix: `${FORGE_CONTRACT_ID}/conformance-matrix`,
-  costBaselineManifest: `${FORGE_CONTRACT_ID}/cost-baseline-manifest`,
-  costBaselineRaw: `${FORGE_CONTRACT_ID}/cost-baseline-raw`,
-  costBaselineTable: `${FORGE_CONTRACT_ID}/cost-baseline-table`,
   cppDependencyLock: `${FORGE_CONTRACT_ID}/cpp-dependency-lock`,
   dependencyLock: `${FORGE_CONTRACT_ID}/dependency-lock`,
   dependencyOfflineBundle: `${FORGE_CONTRACT_ID}/dependency-offline-bundle`,
@@ -30,12 +27,14 @@ export const FORGE_SCHEMAS = Object.freeze({
   objectCache: `${FORGE_CONTRACT_ID}/object-cache`,
   pythonToolchain: `${FORGE_CONTRACT_ID}/python-toolchain`,
   replayBundle: `${FORGE_CONTRACT_ID}/replay-bundle`,
+  releaseManifest: `${FORGE_CONTRACT_ID}/release-manifest`,
   rustToolchain: `${FORGE_CONTRACT_ID}/rust-toolchain`,
   runRequest: `${FORGE_CONTRACT_ID}/run-request`,
   runtimeBundle: `${FORGE_CONTRACT_ID}/runtime-bundle`,
   runtimeCoreLicenses: `${FORGE_CONTRACT_ID}/runtime-core-licenses`,
   thirdPartyComponents: `${FORGE_CONTRACT_ID}/third-party-components`,
   wasmerSdkLicenses: `${FORGE_CONTRACT_ID}/wasmer-sdk-licenses`,
+  validationSource: `${FORGE_CONTRACT_ID}/validation-source`,
 } as const);
 
 export const FORGE_STORAGE = Object.freeze({

@@ -35,6 +35,41 @@ describe("judge project drafts", () => {
     expect(createJudgeProject(collectionKey, bundleSha256, PROBLEMS[0], "typescript").files[0].content).toContain("const input: string");
   });
 
+  it("copies every author-supplied starter file exactly and uses its declared entry", () => {
+    const problem = PROBLEMS[0];
+    const authored = {
+      ...problem,
+      starterTemplates: {
+        ...problem.starterTemplates,
+        c: {
+          entry: "solution/main.c",
+          files: {
+            "solution/support.h": "#define ANSWER 42\n",
+            "solution/main.c": "#include \"support.h\"\nint main(void) { return ANSWER; }\n",
+          },
+        },
+      },
+    };
+    const project = createJudgeProject(collectionKey, bundleSha256, authored, "c");
+    expect(project.config.entry).toBe("solution/main.c");
+    expect(project.activeFile).toBe("solution/main.c");
+    expect(project.files).toEqual([
+      { path: "solution/main.c", language: "c", content: authored.starterTemplates.c.files["solution/main.c"] },
+      { path: "solution/support.h", language: "c", content: authored.starterTemplates.c.files["solution/support.h"] },
+    ]);
+  });
+
+  it("does not synthesize a starter when the declared entry is absent", () => {
+    const problem = PROBLEMS[0];
+    expect(() => createJudgeProject(collectionKey, bundleSha256, {
+      ...problem,
+      starterTemplates: {
+        ...problem.starterTemplates,
+        c: { entry: "src/main.c", files: { "src/other.c": "int helper;\n" } },
+      },
+    }, "c")).toThrow("has no entry source");
+  });
+
   it("isolates drafts from collections that reuse the same problem id", () => {
     const project = createJudgeProject(collectionKey, bundleSha256, PROBLEMS[0], "cpp");
     expect(problemIdentityFromProject(project, "github:other/problems@main:collection/index.json")).toBeUndefined();

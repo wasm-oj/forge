@@ -1,12 +1,5 @@
-"use client";
-
-import dynamic from "next/dynamic";
-
-const JudgeStudioLoader = dynamic(
-  () => import("@/src/components/judge-studio").then((module) => module.JudgeStudioLoader),
-  { ssr: false },
-);
+import { LearningDashboard } from "@/src/components/learning-dashboard";
 
 export default function Home() {
-  return <JudgeStudioLoader />;
+  return <LearningDashboard />;
 }

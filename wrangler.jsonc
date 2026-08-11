@@ -1,0 +1,54 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "wasm-oj-forge-development",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-08-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "upload_source_maps": true,
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": false, "persist": true },
+    "traces": { "enabled": false, "head_sampling_rate": 0, "persist": false }
+  },
+  "assets": { "directory": "./dist/client", "binding": "ASSETS", "run_worker_first": true },
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "PUBLIC_ORIGIN": "http://localhost:3000",
+    "FORGE_RELEASE_ID": "01988dc1-5c00-7000-8000-000000000000",
+    "FORGE_RELEASE_MANIFEST_SHA256": "875b9380866e9d56e7110b0ee310962c16d9d4ae103f829d62bdffd2cbe7c61d",
+    "GITHUB_OAUTH_CLIENT_ID": "development-only",
+    "GITHUB_APP_ID": "development-only",
+    "GITHUB_APP_SLUG": "development-only",
+    "STAGING_ALLOWED_GITHUB_USER_IDS": "",
+    "TURNSTILE_SITE_KEY": "development-only",
+    "OFFICIAL_GITHUB_REPOSITORY_ID": "1328710736"
+  },
+  "d1_databases": [
+    { "binding": "CORE_DB", "database_name": "wasm-oj-core-development", "database_id": "local-forge-core", "migrations_dir": "migrations/core" },
+    { "binding": "SUBMISSIONS_DB", "database_name": "wasm-oj-submissions-development-00", "database_id": "local-forge-submissions-00", "migrations_dir": "migrations/submissions" }
+  ],
+  "r2_buckets": [
+    { "binding": "JUDGE_BUCKET", "bucket_name": "wasm-oj-judge-development" },
+    { "binding": "JUDGE_MIRROR_BUCKET", "bucket_name": "wasm-oj-judge-mirror-development" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "SUBMISSION_CONTAINER", "class_name": "SubmissionJudgeContainer" },
+      { "name": "VALIDATION_CONTAINER", "class_name": "ValidationJudgeContainer" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["SubmissionDO", "ProblemLeaderboardDO", "ContestDO", "UserQuotaDO", "AdmissionControlDO", "SubmissionJudgeContainer", "ValidationJudgeContainer"] },
+    { "tag": "v2", "deleted_classes": ["SubmissionDO", "ProblemLeaderboardDO", "ContestDO", "UserQuotaDO", "AdmissionControlDO"] }
+  ],
+  "workflows": [
+    { "name": "wasm-oj-submission-development", "binding": "SUBMISSION_WORKFLOW", "class_name": "SubmissionWorkflow" },
+    { "name": "wasm-oj-validation-development", "binding": "VALIDATION_WORKFLOW", "class_name": "ValidationWorkflow" }
+  ],
+  "containers": [
+    { "name": "wasm-oj-submission-development", "class_name": "SubmissionJudgeContainer", "image": "./Dockerfile", "instance_type": "standard-2", "max_instances": 50, "ssh": { "enabled": false } },
+    { "name": "wasm-oj-validation-development", "class_name": "ValidationJudgeContainer", "image": "./Dockerfile", "instance_type": "standard-2", "max_instances": 5, "ssh": { "enabled": false } }
+  ],
+  "triggers": { "crons": ["* * * * *"] }
+}

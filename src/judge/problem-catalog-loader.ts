@@ -7,6 +7,8 @@ import {
 import {
   PROBLEM_LOCALES,
   type JudgeProblem,
+  type JudgeStarterTemplate,
+  type JudgeStarterTemplates,
   type JudgeProblemSummary,
   type LocalizedText,
   type ProblemComplexity,
@@ -15,8 +17,13 @@ import {
   type ProblemScoringPolicy,
 } from "./problem-model";
 
-export const BROWSER_COLLECTION_SCHEMA = "wasm-oj-browser-collection-v4";
-export const BROWSER_PROBLEM_SCHEMA = "wasm-oj-browser-problem-v3";
+export const BROWSER_COLLECTION_SCHEMA = "wasm-oj-browser-collection-v5";
+export const BROWSER_PROBLEM_SCHEMA = "wasm-oj-browser-problem-v4";
+export const PROBLEM_STARTER_LIMITS = Object.freeze({
+  filesPerLanguage: 128,
+  bytesPerFile: 256 * 1024,
+  totalBytesPerLanguage: 1024 * 1024,
+});
 export const PROBLEM_COLLECTION_SOURCE_KEY = "wasm-oj-forge-v1:problem-collection-source";
 export const DEFAULT_PROBLEM_COLLECTION_SOURCE = Object.freeze({
   provider: "github",
@@ -29,13 +36,18 @@ export const DEFAULT_PROBLEM_COLLECTION_SOURCE = Object.freeze({
 const INDEX_MAX_BYTES = 512 * 1024;
 const BUNDLE_MAX_BYTES = 32 * 1024 * 1024;
 const MAX_PROBLEMS = 1_000;
-const CACHE_NAME = "wasm-oj-verified-problem-collections-v4";
+const CACHE_NAME = "wasm-oj-verified-problem-collections-v5";
 const LANGUAGES = ["c", "cpp", "rust", "go", "python", "javascript", "typescript"] as const;
 const POLICY_IDS = ["baseline", "efficient", "optimal"] as const;
 const CALIBRATION_METHOD = "forge-v1-compiled-average-optimal-rounded-v1";
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const GITHUB_NAME_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?$/;
+const SHARE_PROVIDER_PARAMETER = "collection-provider";
+const SHARE_REPOSITORY_PARAMETER = "collection-repository";
+const SHARE_REF_PARAMETER = "collection-ref";
+const SHARE_INDEX_PARAMETER = "collection-index";
+const UTF8_ENCODER = new TextEncoder();
 
 export interface GithubProblemCollectionSource {
   readonly provider: "github";
@@ -126,6 +138,83 @@ export function problemCollectionSourceKey(sourceValue: GithubProblemCollectionS
   return `github:${source.owner}/${source.repository}@${source.ref}:${source.indexPath}`;
 }
 
+export function parseGithubRepositoryUrl(value: string): Pick<GithubProblemCollectionSource, "owner" | "repository"> {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch (error) {
+    throw new ProblemCollectionError("The repository URL is not a valid URL.", "configuration", { cause: error });
+  }
+  if (
+    url.protocol !== "https:"
+    || url.hostname !== "github.com"
+    || url.username
+    || url.password
+    || url.search
+    || url.hash
+  ) {
+    throw new ProblemCollectionError("Use a credential-free https://github.com/owner/repository URL.", "configuration");
+  }
+  const segments = url.pathname.split("/").filter(Boolean);
+  if (segments.length !== 2) {
+    throw new ProblemCollectionError("The GitHub URL must identify one repository, not a file or directory.", "configuration");
+  }
+  const repository = segments[1]?.endsWith(".git") ? segments[1].slice(0, -4) : segments[1];
+  return {
+    owner: normalizedGithubName(segments[0], "owner"),
+    repository: normalizedGithubName(repository, "repository"),
+  };
+}
+
+export function problemCollectionShareUrl(
+  sourceValue: GithubProblemCollectionSource,
+  pageUrl: string | URL,
+): string {
+  const source = normalizeProblemCollectionSource(sourceValue);
+  const current = new URL(pageUrl);
+  if (current.protocol !== "https:" && current.protocol !== "http:") {
+    throw new ProblemCollectionError("The application URL cannot be shared.", "configuration");
+  }
+  const share = new URL(current.pathname, current.origin);
+  share.searchParams.set(SHARE_PROVIDER_PARAMETER, source.provider);
+  share.searchParams.set(SHARE_REPOSITORY_PARAMETER, `${source.owner}/${source.repository}`);
+  share.searchParams.set(SHARE_REF_PARAMETER, source.ref);
+  share.searchParams.set(SHARE_INDEX_PARAMETER, source.indexPath);
+  return share.toString();
+}
+
+export function problemCollectionSourceFromShareUrl(
+  pageUrl: string | URL,
+): GithubProblemCollectionSource | undefined {
+  const url = new URL(pageUrl);
+  const parameterNames = [
+    SHARE_PROVIDER_PARAMETER,
+    SHARE_REPOSITORY_PARAMETER,
+    SHARE_REF_PARAMETER,
+    SHARE_INDEX_PARAMETER,
+  ];
+  const present = parameterNames.filter((name) => url.searchParams.has(name));
+  if (present.length === 0) return undefined;
+  if (present.length !== parameterNames.length) {
+    throw new ProblemCollectionError("The shared collection URL is incomplete.", "configuration");
+  }
+  if (url.searchParams.get(SHARE_PROVIDER_PARAMETER) !== "github") {
+    throw new ProblemCollectionError("Only GitHub problem collections are supported.", "configuration");
+  }
+  const repositoryIdentity = url.searchParams.get(SHARE_REPOSITORY_PARAMETER) ?? "";
+  const segments = repositoryIdentity.split("/");
+  if (segments.length !== 2) {
+    throw new ProblemCollectionError("The shared GitHub repository identity is invalid.", "configuration");
+  }
+  return normalizeProblemCollectionSource({
+    provider: "github",
+    owner: segments[0],
+    repository: segments[1],
+    ref: url.searchParams.get(SHARE_REF_PARAMETER),
+    indexPath: url.searchParams.get(SHARE_INDEX_PARAMETER),
+  });
+}
+
 export function githubRawContentUrl(sourceValue: GithubProblemCollectionSource, repositoryPath: string): string {
   const source = normalizeProblemCollectionSource(sourceValue);
   const normalizedPath = normalizedRelativePath(repositoryPath, "repository path");
@@ -167,10 +256,7 @@ export function parseProblemBundle(
   value: unknown,
   expected: ProblemCollectionEntry,
 ): JudgeProblem {
-  if (!isRecord(value) || !hasExactKeys(value, ["schema", "problem"]) || value.schema !== BROWSER_PROBLEM_SCHEMA) {
-    throw schemaError("The problem bundle uses an unsupported schema.");
-  }
-  const problem = parseJudgeProblem(value.problem);
+  const problem = parseStandaloneProblemBundle(value);
   if (
     problem.id !== expected.id
     || problem.number !== expected.number
@@ -184,6 +270,13 @@ export function parseProblemBundle(
     throw schemaError(`Problem bundle '${expected.id}' disagrees with its collection index entry.`);
   }
   return problem;
+}
+
+export function parseStandaloneProblemBundle(value: unknown): JudgeProblem {
+  if (!isRecord(value) || !hasExactKeys(value, ["schema", "problem"]) || value.schema !== BROWSER_PROBLEM_SCHEMA) {
+    throw schemaError("The problem bundle uses an unsupported schema.");
+  }
+  return parseJudgeProblem(value.problem);
 }
 
 export async function loadProblemCollection(
@@ -208,7 +301,7 @@ export async function loadProblemCollection(
     origin = "verified-cache";
   }
   const index = parseProblemCollectionIndex(parseUtf8Json(indexBytes, "problem collection index"));
-  await verifyCollectionRevision(index);
+  await verifyProblemCollectionRevision(index);
   if (origin === "network") await ignoreCacheWrite(() => cache.putIndex(sourceKey, indexBytes));
 
   const entryById = new Map(index.problems.map((entry) => [entry.id, entry]));
@@ -245,7 +338,7 @@ async function loadVerifiedProblem(
   const cached = await readCachedBytes(() => cache.getBundle(entry.bundle.sha256));
   if (cached) {
     try {
-      return await verifyProblemBytes(cached, entry);
+      return await verifyProblemBundleBytes(cached, entry);
     } catch {
       await ignoreCacheWrite(() => cache.deleteBundle(entry.bundle.sha256));
     }
@@ -257,7 +350,7 @@ async function loadVerifiedProblem(
     entry.bundle.bytes,
     signal,
   );
-  const problem = await verifyProblemBytes(bytes, entry);
+  const problem = await verifyProblemBundleBytes(bytes, entry);
   await ignoreCacheWrite(() => cache.putBundle(entry.bundle.sha256, bytes));
   return problem;
 }
@@ -278,7 +371,7 @@ async function ignoreCacheWrite(write: () => Promise<void>): Promise<void> {
   }
 }
 
-async function verifyProblemBytes(bytes: Uint8Array, entry: ProblemCollectionEntry): Promise<JudgeProblem> {
+export async function verifyProblemBundleBytes(bytes: Uint8Array, entry: ProblemCollectionEntry): Promise<JudgeProblem> {
   if (bytes.byteLength !== entry.bundle.bytes) {
     throw new ProblemCollectionError(`Problem '${entry.id}' byte length does not match its index.`, "integrity");
   }
@@ -414,7 +507,7 @@ function parseCollectionEntry(
 }
 
 function parseJudgeProblem(value: unknown): JudgeProblem {
-  if (!isRecord(value) || !hasExactKeys(value, ["id", "number", "title", "trackId", "track", "difficulty", "tags", "statement", "editorial", "judgeCases", "scoring", "complexities"])) {
+  if (!isRecord(value) || !hasExactKeys(value, ["id", "number", "title", "trackId", "track", "difficulty", "tags", "statement", "editorial", "starterTemplates", "judgeCases", "scoring", "complexities"])) {
     throw schemaError("The judge problem has an invalid shape.");
   }
   if (typeof value.id !== "string" || !ID_PATTERN.test(value.id) || !Number.isSafeInteger(value.number) || (value.number as number) < 1) {
@@ -428,6 +521,7 @@ function parseJudgeProblem(value: unknown): JudgeProblem {
   const track = parseLocalizedText(value.track, `problem '${id}' track`);
   const statement = parseLocalizedText(value.statement, `problem '${id}' statement`, false);
   const editorial = parseLocalizedText(value.editorial, `problem '${id}' editorial`, false);
+  const starterTemplates = parseStarterTemplates(value.starterTemplates, id);
   const difficulty = parseDifficulty(value.difficulty, `problem '${id}'`);
   const tags = parseTags(value.tags, `problem '${id}'`);
   if (!Array.isArray(value.judgeCases) || value.judgeCases.length < 1 || value.judgeCases.length > 10_000) {
@@ -450,7 +544,80 @@ function parseJudgeProblem(value: unknown): JudgeProblem {
   }
   const complexities = value.complexities.map((complexity, index) => parseComplexity(complexity, id, index));
   if (!complexities.at(-1)?.accepted) throw schemaError(`Problem '${id}' must end with its accepted complexity.`);
-  return { id, number: value.number as number, title, trackId: value.trackId, track, difficulty, tags, statement, editorial, judgeCases, scoring, complexities };
+  return { id, number: value.number as number, title, trackId: value.trackId, track, difficulty, tags, statement, editorial, starterTemplates, judgeCases, scoring, complexities };
+}
+
+function parseStarterTemplates(value: unknown, problemId: string): JudgeStarterTemplates {
+  if (!isRecord(value) || !hasExactKeys(value, LANGUAGES)) {
+    throw schemaError(`Problem '${problemId}' must provide starter templates for every built-in language.`);
+  }
+  return Object.fromEntries(LANGUAGES.map((language) => [
+    language,
+    parseStarterTemplate(value[language], problemId, language),
+  ])) as unknown as JudgeStarterTemplates;
+}
+
+function parseStarterTemplate(value: unknown, problemId: string, language: typeof LANGUAGES[number]): JudgeStarterTemplate {
+  if (!isRecord(value) || !hasExactKeys(value, ["entry", "files"]) || !isRecord(value.files)) {
+    throw schemaError(`Problem '${problemId}' has an invalid '${language}' starter template.`);
+  }
+  const entry = parseStarterPath(value.entry, `problem '${problemId}' '${language}' starter entry`);
+  const paths = Object.keys(value.files).sort();
+  if (paths.length < 1 || paths.length > PROBLEM_STARTER_LIMITS.filesPerLanguage) {
+    throw schemaError(`Problem '${problemId}' '${language}' starter must contain between 1 and ${PROBLEM_STARTER_LIMITS.filesPerLanguage} files.`);
+  }
+  let totalBytes = 0;
+  const entries: Array<[string, string]> = [];
+  for (const rawPath of paths) {
+    const path = parseStarterPath(rawPath, `problem '${problemId}' '${language}' starter file`);
+    const content = value.files[rawPath];
+    if (typeof content !== "string" || hasUnpairedSurrogate(content)) {
+      throw schemaError(`Problem '${problemId}' '${language}' starter file '${path}' is not valid Unicode source text.`);
+    }
+    const bytes = UTF8_ENCODER.encode(content).byteLength;
+    if (bytes > PROBLEM_STARTER_LIMITS.bytesPerFile) {
+      throw schemaError(`Problem '${problemId}' '${language}' starter file '${path}' exceeds ${PROBLEM_STARTER_LIMITS.bytesPerFile} UTF-8 bytes.`);
+    }
+    totalBytes += bytes;
+    if (totalBytes > PROBLEM_STARTER_LIMITS.totalBytesPerLanguage) {
+      throw schemaError(`Problem '${problemId}' '${language}' starter files exceed ${PROBLEM_STARTER_LIMITS.totalBytesPerLanguage} UTF-8 bytes in total.`);
+    }
+    entries.push([path, content]);
+  }
+  const files = Object.fromEntries(entries);
+  if (!Object.hasOwn(files, entry) || UTF8_ENCODER.encode(files[entry]!).byteLength === 0) {
+    throw schemaError(`Problem '${problemId}' '${language}' starter entry must name a non-empty file in its file map.`);
+  }
+  return { entry, files };
+}
+
+function parseStarterPath(value: unknown, label: string): string {
+  if (
+    typeof value !== "string"
+    || !value
+    || value !== value.trim()
+    || value.length > 4_096
+    || value.startsWith("/")
+    || value.endsWith("/")
+    || value.includes("\\")
+    || value.includes("\0")
+    || value.split("/").some((segment) => !segment || segment === "." || segment === "..")
+  ) throw schemaError(`The ${label} is not a normalized relative path.`);
+  return value;
+}
+
+function hasUnpairedSurrogate(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      index += 1;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function parseScoring(value: unknown, problemId: string): JudgeProblem["scoring"] {
@@ -567,11 +734,15 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function verifyCollectionRevision(index: ProblemCollectionIndex): Promise<void> {
+export async function problemCollectionRevision(index: Pick<ProblemCollectionIndex, "problems">): Promise<string> {
   const revisionInput = index.problems
     .map((entry) => `${entry.number}\0${entry.bundle.sha256}\0${entry.statementPaths["zh-TW"]}\0${entry.statementPaths.en}\n`)
     .join("");
-  if (await sha256Hex(new TextEncoder().encode(revisionInput)) !== index.revision) {
+  return sha256Hex(new TextEncoder().encode(revisionInput));
+}
+
+export async function verifyProblemCollectionRevision(index: ProblemCollectionIndex): Promise<void> {
+  if (await problemCollectionRevision(index) !== index.revision) {
     throw new ProblemCollectionError("The problem collection revision does not match its ordered bundles.", "integrity");
   }
 }

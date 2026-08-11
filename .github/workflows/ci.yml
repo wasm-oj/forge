@@ -11,35 +11,24 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: verify
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
-      - name: Check out exact source and LFS assets
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          lfs: true
           persist-credentials: false
-      - name: Install pinned pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
         with:
-          version: 10.21.0
+          version: 10.34.5
           run_install: false
-      - name: Install minimum supported Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 22.13.0
-          package-manager-cache: false
-      - name: Verify LFS object integrity
-        run: git lfs fsck
-      - name: Install exact dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Install Chromium system dependencies
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Run the complete CI contract
-        run: pnpm run ci:verify
+          node-version: 24.18.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run ci:verify

@@ -27,30 +27,34 @@ interface IndexEntry {
 }
 
 /**
- * Bind evidence to exact staged Git blobs. Generated evidence directories are
- * excluded so writing a record cannot change its own digest. Unstaged and
- * untracked source is rejected instead of acquiring host-specific clean-filter,
- * line-ending, executable-mode, or LFS checkout semantics.
+ * Identify the current committed source tree. Local edits are intentionally
+ * ignored; this helper is descriptive and is not a deployment gate.
  */
 export async function sourceTreeProvenance(root = process.cwd()): Promise<SourceTreeProvenance> {
-  const [tracked, unstaged, untracked] = await Promise.all([
-    gitBytes(root, ["ls-files", "--cached", "--stage", "-z"]),
-    gitBytes(root, ["diff", "--name-only", "-z"]),
-    gitBytes(root, ["ls-files", "--others", "--exclude-standard", "-z"]),
-  ]);
-  const dirty = [...new Set([...nulPaths(unstaged), ...nulPaths(untracked)])]
-    .filter((value) => includedSource(value))
-    .sort(compareUtf8);
-  if (dirty.length > 0) {
-    throw new Error(`Stage every source change before collecting provenance: ${dirty.join(", ")}.`);
+  const headBytes = await gitBytes(root, ["rev-parse", "--verify", "HEAD^{commit}"]);
+  const head = Buffer.from(headBytes).toString("ascii").trim();
+  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(head)) {
+    throw new Error("Formal source provenance requires one immutable HEAD commit.");
   }
-  const index = trackedFileEntries(tracked)
+  return sourceTreeProvenanceAtCommit(root, head);
+}
+
+/** Recompute the same source identity from one immutable Git commit tree. */
+export async function sourceTreeProvenanceAtCommit(
+  root: string,
+  commit: string,
+): Promise<SourceTreeProvenance> {
+  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(commit)) {
+    throw new Error("Historical source provenance requires a full lowercase Git commit ID.");
+  }
+  const tree = await gitBytes(root, ["ls-tree", "-r", "-z", "--full-tree", commit]);
+  const index = treeFileEntries(tree)
     .filter((entry) => includedSource(entry.path))
     .sort((left, right) => compareUtf8(left.path, right.path));
   const blobs = await readGitBlobs(root, [...new Set(index.map((entry) => entry.objectId))]);
   const entries = index.map((entry): SourceEntry => {
     const contents = blobs.get(entry.objectId);
-    if (!contents) throw new Error(`Git did not return staged blob '${entry.objectId}' for '${entry.path}'.`);
+    if (!contents) throw new Error(`Git did not return committed blob '${entry.objectId}' for '${entry.path}'.`);
     return {
       path: entry.path,
       kind: entry.mode === "120000" ? "symlink" : "file",
@@ -77,14 +81,14 @@ async function gitBytes(root: string, arguments_: string[]): Promise<Buffer> {
 }
 
 function nulPaths(bytes: Buffer): string[] {
-  return bytes.toString("utf8").split("\0").filter(Boolean);
+  return bytes.toString().split("\0").filter(Boolean);
 }
 
-function trackedFileEntries(bytes: Buffer): IndexEntry[] {
+function treeFileEntries(bytes: Buffer): IndexEntry[] {
   const entries: IndexEntry[] = [];
   for (const entry of nulPaths(bytes)) {
-    const match = /^(100644|100755|120000) ([0-9a-f]{40,64}) 0\t(.+)$/.exec(entry);
-    if (!match) throw new Error(`Unexpected Git index entry '${entry}'.`);
+    const match = /^(100644|100755|120000) blob ([0-9a-f]{40,64})\t(.+)$/.exec(entry);
+    if (!match) throw new Error(`Unexpected Git tree entry '${entry}'.`);
     entries.push({
       path: match[3]!,
       mode: match[1]! as IndexEntry["mode"],
@@ -129,7 +133,7 @@ async function readGitBlobs(root: string, objectIds: string[]): Promise<Map<stri
     const start = headerEnd + 1;
     const end = start + size;
     if (!Number.isSafeInteger(size) || output.byteLength <= end || output[end] !== 0x0a) {
-      throw new Error(`git cat-file returned an invalid staged blob for '${requested}'.`);
+      throw new Error(`git cat-file returned an invalid immutable blob for '${requested}'.`);
     }
     blobs.set(requested, output.subarray(start, end));
     offset = end + 1;

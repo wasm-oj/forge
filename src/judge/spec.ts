@@ -9,6 +9,11 @@ export type JudgeInputSpec =
   | { kind: "inline"; value: string }
   | { kind: "provider"; provider: string; key: string; sha256?: string };
 
+/** Binary-safe materialized input accepted only for mounted guest files. */
+export type JudgeFileInputSpec =
+  | JudgeInputSpec
+  | { kind: "inline-bytes"; value: Uint8Array };
+
 /** Serializable matcher descriptor. Libraries may register additional matcher IDs. */
 export interface JudgeMatcherSpec {
   id: string;
@@ -26,7 +31,7 @@ interface JudgeCaseBase {
   id: string;
   input: JudgeInputSpec;
   /** Additional secret inputs resolved with the same provider contract as stdin. */
-  files?: Readonly<Record<string, JudgeInputSpec>>;
+  files?: Readonly<Record<string, JudgeFileInputSpec>>;
   determinism?: Partial<DeterminismConfig>;
 }
 
@@ -100,8 +105,17 @@ export function wasmCheckerMatcher(
   checker: BuildArtifact,
   expected: string,
   args: readonly string[] = [],
+  files: Readonly<Record<string, Uint8Array>> = {},
 ): JudgeMatcherSpec {
-  return { id: "wasm-checker", config: { checker, expected, args: [...args] } };
+  return {
+    id: "wasm-checker",
+    config: {
+      checker,
+      expected,
+      args: [...args],
+      files: Object.fromEntries(Object.entries(files).map(([path, contents]) => [path, contents.slice()])),
+    },
+  };
 }
 
 function assertTolerance(value: number, label: string): void {
@@ -150,9 +164,9 @@ export function validateJudgeSpec(spec: JudgeSpec): void {
         throw new TypeError(`Judge case '${item.id}' files must be a record.`);
       }
       if (Object.keys(item.files).length > 256) throw new Error(`Judge case '${item.id}' has too many input files.`);
-      for (const [path, input] of Object.entries(item.files as Readonly<Record<string, JudgeInputSpec>>)) {
+      for (const [path, input] of Object.entries(item.files as Readonly<Record<string, JudgeFileInputSpec>>)) {
         assertGuestFilePath(path, `Judge case '${item.id}' input file path`);
-        validateInputSpec(input, `Judge case '${item.id}' input file '${path}'`);
+        validateFileInputSpec(input, `Judge case '${item.id}' input file '${path}'`);
       }
     }
     if (item.input.kind === "inline") {
@@ -234,6 +248,19 @@ function validateInputSpec(input: JudgeInputSpec, label: string): void {
   if (input.sha256 !== undefined && !/^[0-9a-f]{64}$/.test(input.sha256)) {
     throw new Error(`${label} SHA-256 digest must be lowercase hexadecimal.`);
   }
+}
+
+function validateFileInputSpec(input: JudgeFileInputSpec, label: string): void {
+  if (input?.kind === "inline-bytes") {
+    if (!(input.value instanceof Uint8Array)) throw new TypeError(`${label} inline bytes must be a Uint8Array.`);
+    return;
+  }
+  validateInputSpec(input, label);
+}
+
+/** Shared strict guest-path boundary for trusted judge assets. */
+export function assertJudgeGuestFilePath(value: unknown, label = "Judge guest file path"): string {
+  return assertGuestFilePath(value, label);
 }
 
 function assertGuestFilePath(value: unknown, label: string): string {

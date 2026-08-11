@@ -58,7 +58,7 @@ const WASIP1_FUNCTIONS: &[&str] = &[
     "thread-spawn",
 ];
 
-// Exact function surface exported by pinned wasmer-wasix 0.702.0 for both
+// Exact function surface exported by pinned wasmer-wasix 0.702.1 for both
 // wasix_32v1 and wasix_64v1. Updating Wasmer requires an explicit ABI and
 // capability review before new host functions become reachable.
 const WASIX_V1_FUNCTIONS: &[&str] = &[

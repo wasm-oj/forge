@@ -56,6 +56,7 @@ const publicJavaScript = [
   "lib/core.js",
   "lib/browser.js",
   "lib/server.js",
+  "lib/collection-cli.js",
 ];
 const serverCompilerStages = [
   "lib/server-build-stage.mjs",
@@ -504,6 +505,9 @@ try {
   failSetDifference("Package export keys", new Set(Object.keys(expectedExports)), new Set(Object.keys(packageJson.exports ?? {})));
   if (packageJson.types !== "./lib/core.d.ts") {
     throw new Error("Package-level types must resolve to './lib/core.d.ts'.");
+  }
+  if (packageJson.bin?.["forge-collection"] !== "./lib/collection-cli.js") {
+    throw new Error("The Forge package must expose the forge-collection CLI entrypoint.");
   }
   if (
     packageJson.scripts?.["runtime:build-native"]

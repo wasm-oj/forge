@@ -13,7 +13,7 @@
 edition = "2024"
 rust-version = "1.93"
 name = "virtual-fs"
-version = "0.702.0"
+version = "0.702.1"
 authors = ["Wasmer Engineering Team <engineering@wasmer.io>"]
 build = false
 autolib = false
@@ -148,11 +148,11 @@ version = "0.1"
 default-features = true
 
 [dependencies.virtual-mio]
-version = "0.702.0"
+version = "0.702.1"
 default-features = false
 
 [dependencies.wasmer-package]
-version = "0.702.0"
+version = "0.702.1"
 
 [dependencies.web-time]
 version = "1.1"

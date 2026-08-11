@@ -83,10 +83,19 @@ export function moduleWorkerBaseUrl(): URL {
 }
 
 function resolveModuleWorkerUrl(scriptUrl: string | URL): string {
-  if (scriptUrl instanceof URL) return scriptUrl.href;
+  const baseUrl = moduleWorkerBaseUrl();
+  let resolved: URL;
   try {
-    return new URL(scriptUrl).href;
+    resolved = new URL(scriptUrl instanceof URL ? scriptUrl.href : scriptUrl, baseUrl);
   } catch {
-    return new URL(scriptUrl, moduleWorkerBaseUrl()).href;
+    throw new Error("A module Worker URL must be a valid same-origin HTTP(S) URL.");
   }
+  if (resolved.origin !== baseUrl.origin
+    || resolved.username
+    || resolved.password
+    || resolved.search
+    || resolved.hash) {
+    throw new Error("A module Worker URL must be same-origin and contain no credentials, query, or fragment.");
+  }
+  return resolved.href;
 }

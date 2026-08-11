@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { BuiltinLanguage, RunResult } from "../core/types";
+import { LANGUAGES, type BuiltinLanguage, type RunResult } from "../core/types";
 import type { JudgeCaseResult } from "./engine";
 import { assertProblemCostProfile, scoreProblemResults } from "./problem-scoring";
 import type { JudgeProblem } from "./problems";
 
 const language: BuiltinLanguage = "c";
 const profile = "calibrated-c-profile";
+const starterTemplates = Object.fromEntries(LANGUAGES.map((starterLanguage) => [
+  starterLanguage,
+  { entry: "main.txt", files: { "main.txt": "starter\n" } },
+])) as unknown as JudgeProblem["starterTemplates"];
 const problem: JudgeProblem = {
   id: "test-problem",
   number: 1,
@@ -16,6 +20,7 @@ const problem: JudgeProblem = {
   tags: ["test"],
   statement: { "zh-TW": "statement", en: "statement" },
   editorial: { "zh-TW": "editorial", en: "editorial" },
+  starterTemplates,
   judgeCases: [
     { id: "sample-01", kind: "sample", input: "", output: "" },
     { id: "adversarial-01", kind: "adversarial", input: "", output: "" },
@@ -156,6 +161,34 @@ describe("problem policy scoring", () => {
     expect(score.cases[0].points).toBe(0);
     expect(score.cases[0].policyEvaluations.every((policy) => policy.resourcePassed)).toBe(true);
     expect(score.cases[0].policyEvaluations.every((policy) => !policy.earned)).toBe(true);
+  });
+
+  it("scores only the contestant side of an interactive session", () => {
+    const first = accepted("sample-01", 200);
+    const second = accepted("adversarial-01", 800);
+    const interactive = [first, second].map((result): JudgeCaseResult => ({
+      id: result.id,
+      verdict: "accepted",
+      interaction: {
+        contestant: {
+          code: 0,
+          stderr: "",
+          termination: "exited",
+          metrics: structuredClone(result.run!.metrics),
+        },
+        interactor: {
+          code: 0,
+          stderr: "hidden interactor diagnostics",
+          termination: "exited",
+          metrics: { ...structuredClone(result.run!.metrics), cost: 999_999, rawCost: 1_000_009 },
+        },
+        contestantToInteractor: "hidden protocol",
+        interactorToContestant: "hidden protocol",
+        durationMs: 1,
+        determinism: structuredClone(result.run!.determinism),
+      },
+    }));
+    expect(scoreProblemResults(problem, language, interactive).points).toBe(60);
   });
 
   it("fails closed on profile and execution-inventory mismatches", () => {

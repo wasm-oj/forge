@@ -85,7 +85,7 @@ async function runVinextBuild(): Promise<void> {
 
 async function finalizeSitesOutput(assets: readonly ChunkedAssetRecord[]): Promise<void> {
   for (const asset of assets) await rm(path.join(clientRoot, asset.path.slice(1)));
-  await removeDuplicatedBrowserWasmFromServer();
+  await removeVerifiedBrowserOnlyDuplicatesFromServer();
   const manifest = JSON.parse(await readFile(path.join(clientRoot, "toolchains", manifestName), "utf8"));
   if (manifest.schema !== `${FORGE_CONTRACT_ID}/sites-toolchain-chunks`
     || JSON.stringify(manifest.assets) !== JSON.stringify(assets)) {
@@ -116,21 +116,41 @@ async function finalizeSitesOutput(assets: readonly ChunkedAssetRecord[]): Promi
   process.stdout.write(`Prepared ${assets.length} chunked Sites toolchains in ${assets.reduce((total, item) => total + item.chunks.length, 0)} verified parts.\n`);
 }
 
-async function removeDuplicatedBrowserWasmFromServer(): Promise<void> {
-  const serverRoots = [path.join(distRoot, "server/assets"), path.join(distRoot, "server/ssr/assets")];
+async function removeVerifiedBrowserOnlyDuplicatesFromServer(): Promise<void> {
+  const serverRoots = [
+    path.join(distRoot, "server/_next/static"),
+    path.join(distRoot, "server/ssr/_next/static"),
+  ];
+  const clientAssets = path.join(clientRoot, "_next/static");
   for (const directory of serverRoots) {
-    const wasmNames = (await readdir(directory)).filter((name) => name.endsWith(".wasm"));
+    const entries = await readdir(directory);
+    const wasmNames = entries.filter((name) => name.endsWith(".wasm"));
+    const monacoWorkerNames = entries.filter((name) => /^(?:css|editor|html|json|ts)\.worker-.*\.js$/.test(name));
     for (const name of wasmNames) {
       if (!/^(?:runtime-core_bg|wasmer_js_bg)-[A-Za-z0-9_-]+\.wasm$/.test(name)) {
         throw new Error(`Sites build emitted unexpected server Wasm module '${name}'.`);
       }
+    }
+    for (const name of monacoWorkerNames) {
+      if (!/^(?:css|editor|html|json|ts)\.worker-[A-Za-z0-9_-]+\.js$/.test(name)) {
+        throw new Error(`Sites build emitted an invalid Monaco Worker asset '${name}'.`);
+      }
+    }
+    const expectedMonacoWorkers = ["css", "editor", "html", "json", "ts"];
+    const actualMonacoWorkers = monacoWorkerNames
+      .map((name) => name.slice(0, name.indexOf(".worker-")))
+      .sort();
+    if (JSON.stringify(actualMonacoWorkers) !== JSON.stringify(expectedMonacoWorkers)) {
+      throw new Error(`Sites build emitted an incomplete or duplicate Monaco Worker set in '${path.relative(root, directory)}'.`);
+    }
+    for (const name of [...wasmNames, ...monacoWorkerNames]) {
       const [serverBytes, clientBytes] = await Promise.all([
         readFile(path.join(directory, name)),
-        readFile(path.join(clientRoot, "assets", name)),
+        readFile(path.join(clientAssets, name)),
       ]);
       if (serverBytes.byteLength !== clientBytes.byteLength
         || sha256(serverBytes) !== sha256(clientBytes)) {
-        throw new Error(`Server Wasm module '${name}' is not identical to its browser-static copy.`);
+        throw new Error(`Server browser-only module '${name}' is not identical to its browser-static copy.`);
       }
       await rm(path.join(directory, name));
     }
