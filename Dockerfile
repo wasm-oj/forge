@@ -16,6 +16,16 @@ COPY packages/toolchain-javascript/package.json ./packages/toolchain-javascript/
 COPY packages/toolchain-go/package.json ./packages/toolchain-go/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
+RUN generated_package_state="$(find packages -type d \( -name dist -o -name tmp -o -name '.wasm-oj-build-*' \) -print)" \
+  && if [ -n "$generated_package_state" ]; then \
+      printf 'Generated package state entered the judge build context:\n%s\n' "$generated_package_state" >&2; \
+      exit 1; \
+    fi \
+  && temporary_package_links="$(find packages -type l -lname '*/tmp/*' -print)" \
+  && if [ -n "$temporary_package_links" ]; then \
+      printf 'Host-temporary package symlink entered the judge build context:\n%s\n' "$temporary_package_links" >&2; \
+      exit 1; \
+    fi
 RUN pnpm run library:build \
   && pnpm install --prod --frozen-lockfile --config.confirmModulesPurge=false
 
