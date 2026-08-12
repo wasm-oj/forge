@@ -4,6 +4,33 @@ export interface ApiFailure {
   readonly error?: { readonly code?: unknown; readonly message?: unknown };
 }
 
+const MAINTENANCE_SMOKE_HEADER = "x-wasm-oj-maintenance-smoke-token";
+const MAINTENANCE_SMOKE_TOKEN = /^[\x21-\x7e]{32,256}$/;
+let maintenanceSmokeToken: string | undefined;
+
+/**
+ * Arms the production maintenance smoke lane for this in-memory browser
+ * session only. The token is deliberately never persisted to web storage.
+ */
+export function configureWasmOjMaintenanceSmokeToken(token?: string): void {
+  if (token === undefined || token === "") {
+    maintenanceSmokeToken = undefined;
+    return;
+  }
+  if (!MAINTENANCE_SMOKE_TOKEN.test(token)) {
+    throw new TypeError("Maintenance smoke token must contain 32–256 printable ASCII characters.");
+  }
+  maintenanceSmokeToken = token;
+}
+
+export function wasmOjMaintenanceSmokeArmed(): boolean {
+  return maintenanceSmokeToken !== undefined;
+}
+
+export function wasmOjMaintenanceSmokeHeaders(): Readonly<Record<string, string>> {
+  return maintenanceSmokeToken === undefined ? {} : { [MAINTENANCE_SMOKE_HEADER]: maintenanceSmokeToken };
+}
+
 export function wasmOjCsrfToken(): string | undefined {
   for (const item of document.cookie.split(";")) {
     const [name, ...value] = item.trim().split("=");
@@ -31,7 +58,12 @@ export async function wasmOjMutation<T>(input: RequestInfo | URL, body: unknown,
   if (!token) throw new Error("Sign in again: the CSRF token is missing.");
   return wasmOjJson<T>(input, {
     method,
-    headers: { "content-type": "application/json", accept: "application/json", "x-wasm-oj-csrf": token },
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+      "x-wasm-oj-csrf": token,
+      ...wasmOjMaintenanceSmokeHeaders(),
+    },
     body: JSON.stringify(body),
   });
 }
