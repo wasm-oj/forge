@@ -56,7 +56,7 @@
     "package-manager:verify": "node scripts/verify-package-manager.mjs",
     "docs:verify": "node scripts/verify-docs.mjs",
     "architecture-reset:preflight": "node scripts/architecture-reset-preflight.mjs",
-    "github:verify": "node --test scripts/architecture-reset-migration.test.mjs scripts/architecture-reset-preflight.test.mjs scripts/architecture-reset-r2.test.mjs scripts/configure-production-release.test.mjs scripts/container-build-context.test.mjs scripts/prepare-production-release.test.mjs scripts/production-migrations.test.mjs scripts/single-store-migration.test.mjs && node scripts/verify-github-workflows.mjs",
+    "github:verify": "node --test scripts/architecture-reset-migration.test.mjs scripts/architecture-reset-preflight.test.mjs scripts/architecture-reset-r2.test.mjs scripts/configure-production-release.test.mjs scripts/container-build-context.test.mjs scripts/generate-production-release-inputs.test.mjs scripts/library-private-path.test.mjs scripts/prepare-production-release.test.mjs scripts/production-migrations.test.mjs scripts/single-store-migration.test.mjs scripts/verify-oci-release-image.test.mjs && node scripts/verify-github-workflows.mjs",
     "conformance:server": "WASM_OJ_RUN_CONFORMANCE=1 vitest run --config vitest.config.ts src/server/conformance.integration.test.ts --reporter=verbose",
     "conformance:browser": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/run-browser-conformance.mjs",
     "conformance:compare": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/compare-conformance.ts",

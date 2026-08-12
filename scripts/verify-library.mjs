@@ -16,6 +16,7 @@ import {
   packagesRoot,
   repositoryRoot,
 } from "./library-packages.mjs";
+import { containsPrivateSourcePath } from "./library-private-path.mjs";
 
 const run = promisify(execFile);
 const selectedName = parseSelection(process.argv.slice(2));
@@ -356,7 +357,7 @@ async function verifyNoSourceLeaks(definition, packedRoot, files) {
     }
     if (textExtensions.test(file)) {
       const source = bytes.toString("utf8");
-      if (source.includes(repositoryRoot) || source.includes("@/")) {
+      if (containsPrivateSourcePath(source, repositoryRoot) || source.includes("@/")) {
         throw new Error(`${definition.name} packed '${file}' with a private source path.`);
       }
     }

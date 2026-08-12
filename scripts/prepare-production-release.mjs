@@ -3,17 +3,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { sourceTreeProvenanceAtCommit } from "../src/conformance/provenance.ts";
-import { canonicalJsonBytes, parseCanonicalJsonBytes } from "../src/core/canonical-json.ts";
-import {
-  parseReleaseManifest,
-  releaseManifestBytes,
-} from "../src/release-manifest.ts";
+import { parseCanonicalJsonBytes, canonicalJsonBytes } from "../src/core/canonical-json.ts";
+import { WASM_OJ_RUNTIME_IDENTITY_SHA256 } from "../src/core/runtime-identity.ts";
+import { WEIGHTED_METER_MODEL } from "../src/core/resources.ts";
+import { parseReleaseManifest, releaseManifestBytes } from "../src/release-manifest.ts";
+import { verifyProductionReleaseInputs } from "./production-release-inputs.mjs";
 
 const SHA256 = /^[0-9a-f]{64}$/;
-const OCI_DIGEST = /^sha256:[0-9a-f]{64}$/;
-const GIT_COMMIT = /^[0-9a-f]{40}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const IDENTITY_KEYS = [
   "compilerSha256",
   "contract",
@@ -31,166 +27,127 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function requireDigest(value, label) {
-  if (typeof value !== "string" || !SHA256.test(value)) {
-    throw new TypeError(`${label} must be a lowercase SHA-256 digest.`);
-  }
+function object(value, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError(`${label} must be an object.`);
   return value;
 }
 
-function requireObject(value, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new TypeError(`${label} must be an object.`);
-  }
-  return value;
-}
-
-function requireExactKeys(value, expected, label) {
+function exactKeys(value, expected, label) {
   if (JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...expected].sort())) {
     throw new TypeError(`${label} has an invalid shape.`);
   }
 }
 
-function parseContainerIdentity(bytes, expectedReleaseId, expectedGitCommit) {
-  const identity = requireObject(parseCanonicalJsonBytes(bytes, "container identity"), "container identity");
-  requireExactKeys(identity, IDENTITY_KEYS, "container identity");
+function requireDigest(value, label) {
+  if (typeof value !== "string" || !SHA256.test(value)) throw new TypeError(`${label} must be a lowercase SHA-256 digest.`);
+  return value;
+}
+
+export function parseContainerIdentity(bytes, expectedReleaseId, expectedGitCommit) {
+  const identity = object(parseCanonicalJsonBytes(bytes, "container identity"), "container identity");
+  exactKeys(identity, IDENTITY_KEYS, "container identity");
   if (
     identity.schema !== "wasm-oj-platform/container-identity/v2"
     || identity.contract !== 2
     || identity.protocol !== "wasm-oj-container-v2"
     || identity.releaseId !== expectedReleaseId
     || identity.gitCommit !== expectedGitCommit
-  ) {
-    throw new TypeError("Container identity does not match the requested release coordinates.");
-  }
+  ) throw new TypeError("Container identity does not match the release-input coordinates.");
   for (const key of [
-    "compilerSha256",
-    "executionRootSha256",
-    "runnerSha256",
-    "runtimeRootSha256",
-    "toolchainRootSha256",
+    "compilerSha256", "executionRootSha256", "runnerSha256", "runtimeRootSha256", "toolchainRootSha256",
   ]) requireDigest(identity[key], `container identity.${key}`);
   return identity;
 }
 
-function parseArtifact(value, label) {
-  const artifact = requireObject(value, label);
-  requireExactKeys(artifact, ["bytes", "sha256"], label);
-  if (!Number.isSafeInteger(artifact.bytes) || artifact.bytes < 1) {
-    throw new TypeError(`${label}.bytes must be a positive safe integer.`);
-  }
-  return { bytes: artifact.bytes, sha256: requireDigest(artifact.sha256, `${label}.sha256`) };
+function inputPath(root, record) {
+  return path.join(root, ...record.path.split("/"));
 }
 
-/**
- * Prepare immutable release bytes and an authenticated atomic activation request.
- * This is deliberately offline: callers decide when and how to upload/execute.
- */
-export function prepareProductionRelease({
-  template,
-  releaseId,
-  version,
-  gitCommit,
-  sourceTreeSha256,
-  containerIdentityBytes,
-  containerImageDigest,
-  databaseSha256,
-  createdAt,
-  expectedCurrentReleaseId = null,
-  sourceTag,
-  workerBundleArtifact,
-  staticAssetsArtifact,
-}) {
-  if (!UUID.test(releaseId)) throw new TypeError("releaseId must be a UUID.");
-  if (expectedCurrentReleaseId !== null && !UUID.test(expectedCurrentReleaseId)) {
-    throw new TypeError("expectedCurrentReleaseId must be null or a UUID.");
+/** Re-hash the complete input bundle, then derive one immutable release manifest. */
+export async function prepareProductionRelease(inputManifestPath) {
+  const { inputs, root } = await verifyProductionReleaseInputs(inputManifestPath);
+  const identityBytes = await readFile(inputPath(root, inputs.records.containerIdentity));
+  const identity = parseContainerIdentity(identityBytes, inputs.release.releaseId, inputs.source.commit);
+  if (identity.toolchainRootSha256 !== inputs.records.toolchains.sha256) {
+    throw new Error("Container identity toolchain root does not match the preserved toolchain bytes.");
   }
-  if (!GIT_COMMIT.test(gitCommit)) throw new TypeError("gitCommit must be a full lowercase Git commit SHA.");
-  if (!OCI_DIGEST.test(containerImageDigest)) {
-    throw new TypeError("containerImageDigest must be an immutable sha256 OCI digest.");
-  }
-  requireDigest(sourceTreeSha256, "sourceTreeSha256");
-  requireDigest(databaseSha256, "databaseSha256");
-  const identity = parseContainerIdentity(containerIdentityBytes, releaseId, gitCommit);
-  const source = requireObject(requireObject(template, "release template").source, "release template.source");
-  const artifacts = requireObject(template.artifacts, "release template.artifacts");
-  const runtime = requireObject(template.runtime, "release template.runtime");
-  const toolchains = requireObject(template.toolchains, "release template.toolchains");
-
   const manifest = parseReleaseManifest({
-    ...template,
-    releaseId,
-    version,
-    createdAt,
-    source: {
-      repository: source.repository,
-      commit: gitCommit,
-      sourceTreeSha256,
-      ...(sourceTag === undefined ? {} : { tag: sourceTag }),
+    schema: "wasm-oj-v2/release-manifest",
+    releaseId: inputs.release.releaseId,
+    version: inputs.release.version,
+    wasmOjContract: 2,
+    createdAt: inputs.release.createdAt,
+    source: inputs.source,
+    build: {
+      nodeVersion: inputs.build.nodeVersion,
+      pnpmVersion: inputs.build.pnpmVersion,
+      rustVersion: inputs.build.rustVersion,
+      lockSha256: inputs.records.lock.sha256,
+      sbomSha256: inputs.records.sbom.sha256,
+      licensesSha256: inputs.records.licenses.sha256,
+      auditSha256: inputs.records.audit.sha256,
     },
     artifacts: {
-      ...artifacts,
-      ...(workerBundleArtifact === undefined
-        ? {}
-        : { workerBundle: parseArtifact(workerBundleArtifact, "worker bundle artifact") }),
-      ...(staticAssetsArtifact === undefined
-        ? {}
-        : { staticAssets: parseArtifact(staticAssetsArtifact, "static assets artifact") }),
+      npmPackage: { bytes: inputs.records.npmPackage.bytes, sha256: inputs.records.npmPackage.sha256 },
+      workerBundle: { bytes: inputs.records.workerBundle.bytes, sha256: inputs.records.workerBundle.sha256 },
+      staticAssets: { bytes: inputs.records.staticAssets.bytes, sha256: inputs.records.staticAssets.sha256 },
       containerImage: {
-        ...requireObject(artifacts.containerImage, "release template.artifacts.containerImage"),
-        digest: containerImageDigest,
-        identitySha256: sha256(containerIdentityBytes),
+        registry: inputs.container.registry,
+        digest: inputs.container.digest,
+        identitySha256: inputs.records.containerIdentity.sha256,
+        platform: "linux/amd64",
+        dockerfileSha256: inputs.records.dockerfile.sha256,
+        baseImages: inputs.container.baseImages,
       },
     },
     runtime: {
-      ...runtime,
       protocolVersion: identity.protocol,
       executionRootSha256: identity.executionRootSha256,
       rootSha256: identity.runtimeRootSha256,
+      runtimeIdentitySha256: WASM_OJ_RUNTIME_IDENTITY_SHA256,
+      runtimeCoreSha256: inputs.records.runtimeCore.sha256,
+      wasmerVersion: inputs.build.wasmerVersion,
+      wasmerSha256: inputs.records.wasmer.sha256,
       compilerSha256: identity.compilerSha256,
       runnerSha256: identity.runnerSha256,
     },
     toolchains: {
-      ...toolchains,
       rootSha256: identity.toolchainRootSha256,
+      manifestSha256: inputs.records.toolchains.sha256,
     },
-    migrations: { databaseSha256 },
+    cost: {
+      model: WEIGHTED_METER_MODEL,
+      profileRootSha256: inputs.records.costProfiles.sha256,
+      baselineSha256: inputs.records.costBaseline.sha256,
+    },
+    evidence: {
+      conformanceSha256: inputs.records.conformance.sha256,
+      testsSha256: inputs.records.tests.sha256,
+      costCalibrationSha256: inputs.records.costCalibration.sha256,
+    },
+    migrations: { databaseSha256: inputs.records.migrations.sha256 },
+    provenance: inputs.provenance,
   });
   const manifestBytes = releaseManifestBytes(manifest);
   const manifestSha256 = sha256(manifestBytes);
-  const activationRequest = { expectedCurrentReleaseId, manifest };
-  return {
+  const activationRequest = {
+    expectedCurrentReleaseId: inputs.release.expectedCurrentReleaseId,
+    manifest,
+  };
+  return Object.freeze({
+    activationRequest,
+    activationRequestBytes: canonicalJsonBytes(activationRequest),
     manifest,
     manifestBytes,
     manifestSha256,
-    activationRequest,
-    activationRequestBytes: canonicalJsonBytes(activationRequest),
-  };
-}
-
-async function readJson(pathname, label) {
-  let value;
-  try {
-    value = JSON.parse(await readFile(pathname, "utf8"));
-  } catch (error) {
-    throw new TypeError(`${label} is not valid JSON.`, { cause: error });
-  }
-  return value;
+  });
 }
 
 function usage() {
   return `Usage: node scripts/prepare-production-release.mjs \\
-  --template <canonical-manifest.json> \\
-  --release-id <uuid> --version <semver> --git-commit <sha> \\
-  --container-identity <container-identity.json> \\
-  --container-image-digest <sha256:...> --database-sha256 <sha256> \\
-  --output-dir <directory> [--created-at <ISO timestamp>] \\
-  (--expected-current-release-id <uuid> | --expect-no-active-release) \\
-  [--source-tag <tag>] \\
-  [--worker-bundle-artifact <artifact.json>] \\
-  [--static-assets-artifact <artifact.json>]
+  --inputs <release-inputs/release-inputs.json> --output-dir <new-directory>
 
-The helper only writes local files. artifact.json is {"bytes":123,"sha256":"..."}.
+Every release digest is re-derived from the preserved bytes in the generated input bundle.
 `;
 }
 
@@ -198,20 +155,8 @@ async function main() {
   const { values } = parseArgs({
     args: process.argv.slice(2),
     options: {
-      template: { type: "string" },
-      "release-id": { type: "string" },
-      version: { type: "string" },
-      "git-commit": { type: "string" },
-      "container-identity": { type: "string" },
-      "container-image-digest": { type: "string" },
-      "database-sha256": { type: "string" },
+      inputs: { type: "string" },
       "output-dir": { type: "string" },
-      "created-at": { type: "string" },
-      "expected-current-release-id": { type: "string" },
-      "expect-no-active-release": { type: "boolean" },
-      "source-tag": { type: "string" },
-      "worker-bundle-artifact": { type: "string" },
-      "static-assets-artifact": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
     strict: true,
@@ -220,52 +165,9 @@ async function main() {
     process.stdout.write(usage());
     return;
   }
-  const required = [
-    "template",
-    "release-id",
-    "version",
-    "git-commit",
-    "container-identity",
-    "container-image-digest",
-    "database-sha256",
-    "output-dir",
-  ];
-  for (const key of required) {
-    if (!values[key]) throw new TypeError(`--${key} is required.\n\n${usage()}`);
-  }
-  if (Boolean(values["expected-current-release-id"]) === Boolean(values["expect-no-active-release"])) {
-    throw new TypeError(`Exactly one release activation precondition is required.\n\n${usage()}`);
-  }
-
-  const [templateBytes, containerIdentityBytes, sourceTree, workerBundleArtifact, staticAssetsArtifact] = await Promise.all([
-    readFile(values.template),
-    readFile(values["container-identity"]),
-    sourceTreeProvenanceAtCommit(process.cwd(), values["git-commit"]),
-    values["worker-bundle-artifact"]
-      ? readJson(values["worker-bundle-artifact"], "worker bundle artifact")
-      : undefined,
-    values["static-assets-artifact"]
-      ? readJson(values["static-assets-artifact"], "static assets artifact")
-      : undefined,
-  ]);
-  const template = parseCanonicalJsonBytes(templateBytes, "release template");
-  const prepared = prepareProductionRelease({
-    template,
-    releaseId: values["release-id"],
-    version: values.version,
-    gitCommit: values["git-commit"],
-    sourceTreeSha256: sourceTree.sha256,
-    containerIdentityBytes,
-    containerImageDigest: values["container-image-digest"],
-    databaseSha256: values["database-sha256"],
-    createdAt: values["created-at"] ?? new Date().toISOString(),
-    expectedCurrentReleaseId: values["expected-current-release-id"] ?? null,
-    sourceTag: values["source-tag"],
-    workerBundleArtifact,
-    staticAssetsArtifact,
-  });
-
-  await mkdir(values["output-dir"], { recursive: true });
+  if (!values.inputs || !values["output-dir"]) throw new TypeError(`--inputs and --output-dir are required.\n\n${usage()}`);
+  const prepared = await prepareProductionRelease(values.inputs);
+  await mkdir(values["output-dir"], { recursive: false });
   const manifestPath = path.join(values["output-dir"], "manifest.json");
   const activationRequestPath = path.join(values["output-dir"], "activation-request.json");
   await Promise.all([
@@ -277,7 +179,7 @@ async function main() {
     manifestSha256: prepared.manifestSha256,
     manifestPath,
     activationRequestPath,
-  }, null, 2)}\n`);
+  })}\n`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
