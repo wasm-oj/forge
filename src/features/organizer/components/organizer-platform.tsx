@@ -338,21 +338,17 @@ function CollectionsContent() {
         githubRepositoryId: Number(repositoryId),
         indexPath,
       });
-      const result = await post<{ validation: { readonly id: string; readonly collectionId: string; readonly commitSha: string; readonly state: "queued" } }>(
+      const result = await post<{ validation: CatalogValidation }>(
         `/api/organizer/collections/${encodeURIComponent(collectionResult.collection.id)}/validations`,
         { ref },
       );
-      setValidation({
-        ...result.validation,
-        requestedRef: ref,
-        errorCode: null,
-        revisionId: null,
-        summary: null,
-      });
+      setValidation(result.validation);
       setPublication(undefined);
       publicationRequestKeys.current.clear();
       await load();
-      setMessage(`Resolved ${result.validation.commitSha.slice(0, 12)} once. Static validation is queued.`);
+      setMessage(result.validation.state === "valid"
+        ? `Resolved ${result.validation.commitSha.slice(0, 12)} to an existing valid revision. Publication is ready.`
+        : `Resolved ${result.validation.commitSha.slice(0, 12)} once. Static validation is queued.`);
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : String(reason)); } finally { setBusy(false); }
   }
   async function publish() {
