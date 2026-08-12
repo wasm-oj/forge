@@ -7,6 +7,7 @@ import {
   assertNormalProductionReleaseState,
   configuredProductionRelease,
   pendingMigrationNames,
+  RETIRED_PRODUCTION_MIGRATIONS,
 } from "./production-migrations.mjs";
 import { assertArchitectureResetToken } from "./architecture-reset-safety.mjs";
 
@@ -70,7 +71,7 @@ test("architecture reset must be the only pending migration", () => {
   );
   assert.doesNotThrow(() => assertArchitectureResetMigrationState(
     migrations,
-    ["0001_initial.sql", "0016_single_store.sql"],
+    ["0001_initial.sql", ...RETIRED_PRODUCTION_MIGRATIONS, "0016_single_store.sql"],
   ));
   assert.throws(
     () => assertArchitectureResetMigrationState(
