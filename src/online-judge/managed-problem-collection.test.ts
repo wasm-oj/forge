@@ -131,6 +131,40 @@ describe("managed problem v2 content adapter", () => {
     await expect(collection.loadProblem("wrong-problem")).rejects.toThrow("Unknown managed problem");
   });
 
+  it("compares localized metadata by locale rather than JSON property order", async () => {
+    const contentProblem = {
+      ...practiceProblem,
+      title: { en: practiceProblem.title.en, "zh-TW": practiceProblem.title["zh-TW"] },
+      track: { en: practiceProblem.track.en, "zh-TW": practiceProblem.track["zh-TW"] },
+    };
+    const responses = await managedResponses({
+      contentValue: { schema: BROWSER_PROBLEM_SCHEMA, problem: contentProblem },
+      metadataPatch: {
+        title: { "zh-TW": practiceProblem.title["zh-TW"], en: practiceProblem.title.en },
+        track: { "zh-TW": practiceProblem.track["zh-TW"], en: practiceProblem.track.en },
+      },
+    });
+    const fetchMock = vi.fn(async (url: string | URL | Request) => (
+      String(url) === responses.metadataUrl ? responses.metadataResponse : responses.contentResponse
+    )) as unknown as typeof fetch;
+
+    const collection = await loadManagedProblemCollection(responses.context, { fetch: fetchMock });
+
+    expect(await collection.loadProblem(practiceProblem.id)).toEqual(contentProblem);
+
+    const changedTitle = await managedResponses({
+      contentValue: { schema: BROWSER_PROBLEM_SCHEMA, problem: contentProblem },
+      metadataPatch: {
+        title: { "zh-TW": practiceProblem.title["zh-TW"], en: `${practiceProblem.title.en} changed` },
+      },
+    });
+    await expect(loadManagedProblemCollection(changedTitle.context, {
+      fetch: (async (url) => String(url) === changedTitle.metadataUrl
+        ? changedTitle.metadataResponse
+        : changedTitle.contentResponse) as typeof fetch,
+    })).rejects.toMatchObject({ kind: "integrity" } satisfies Partial<ManagedProblemCollectionError>);
+  });
+
   it("rejects wrong identifiers before network access", async () => {
     const fetchMock = vi.fn();
     await expect(loadManagedProblemCollection({ problemVersionId: "not-a-uuid" }, {

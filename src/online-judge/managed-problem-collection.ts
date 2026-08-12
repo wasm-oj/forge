@@ -424,8 +424,8 @@ function assertMetadataMatchesProblem(metadata: ManagedProblemContentPointer, pr
     || problem.number !== metadata.problemNumber
     || problem.difficulty !== metadata.difficulty
     || problem.trackId !== metadata.trackId
-    || JSON.stringify(problem.title) !== JSON.stringify(metadata.title)
-    || JSON.stringify(problem.track) !== JSON.stringify(metadata.track)
+    || !sameLocalizedText(problem.title, metadata.title)
+    || !sameLocalizedText(problem.track, metadata.track)
     || JSON.stringify(problem.tags) !== JSON.stringify(metadata.tags)
     || metadataLanguages.some((language) => (
       !problemLanguages.has(language) || typeof problem.scoring.calibration.profiles[language] !== "string"
@@ -435,6 +435,13 @@ function assertMetadataMatchesProblem(metadata: ManagedProblemContentPointer, pr
   if (problem.judgeCases.some((testCase) => testCase.kind !== "sample")) {
     throw new ManagedProblemCollectionError("Managed public content contains hidden judge cases.", "integrity");
   }
+}
+
+function sameLocalizedText(
+  left: Readonly<Record<"zh-TW" | "en", string>>,
+  right: Readonly<Record<"zh-TW" | "en", string>>,
+): boolean {
+  return PROBLEM_LOCALES.every((locale) => left[locale] === right[locale]);
 }
 
 function localized(value: unknown, label: string): Readonly<Record<"zh-TW" | "en", string>> {
