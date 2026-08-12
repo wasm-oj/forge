@@ -67,7 +67,7 @@ export function createSdkProject(input: CompileInput): Project {
   if (optimization !== "debug" && optimization !== "release") {
     throw new Error(`Unsupported optimization level '${String(optimization)}'.`);
   }
-  const inferredName = entry.split("/").at(-1)?.replace(/\.[^.]+$/, "") || "forge-project";
+  const inferredName = entry.split("/").at(-1)?.replace(/\.[^.]+$/, "") || "wasm-oj-project";
   const name = optionalMetadata(input.name, "Project name", 4_096) ?? inferredName;
   const projectId = optionalMetadata(input.projectId, "Project ID", 16_384) ?? `sdk:${name}`;
   if (input.dependencies !== undefined) assertValidDependencyBuildBundle(input.dependencies);

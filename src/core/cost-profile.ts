@@ -1,7 +1,7 @@
 import { WEIGHTED_METER_MODEL } from "./resources.ts";
-import { FORGE_CONTRACT_VERSION } from "./contract.ts";
+import { WASM_OJ_CONTRACT_VERSION } from "./contract.ts";
 import { toolchainContentIdentity } from "./toolchains.ts";
-import { FORGE_RUNTIME_IDENTITY_SHA256 } from "./runtime-identity.ts";
+import { WASM_OJ_RUNTIME_IDENTITY_SHA256 } from "./runtime-identity.ts";
 import {
   assertLanguageIdentifier,
   isBuiltinLanguage,
@@ -17,8 +17,8 @@ function coordinates(
 ): string[] {
   assertLanguageIdentifier(language);
   return [
-    "wasm-oj-forge-cost",
-    `contract-${FORGE_CONTRACT_VERSION}`,
+    "wasm-oj-cost",
+    `contract-${WASM_OJ_CONTRACT_VERSION}`,
     encodeURIComponent(language),
     target,
     optimization,
@@ -38,14 +38,14 @@ export function costProfileId(
   if (!content || !/^[A-Za-z0-9._-]+$/.test(content)) {
     throw new Error(
       isBuiltinLanguage(language)
-        ? `Forge toolchain content identity is invalid for '${language}'.`
+        ? `WASM-OJ toolchain content identity is invalid for '${language}'.`
         : `Downstream language '${language}' requires an explicit content identity using letters, digits, '.', '_' or '-'.`,
     );
   }
   return [
     ...coordinates(language, target, optimization),
     `content-${content}`,
-    `runtime-${FORGE_RUNTIME_IDENTITY_SHA256}`,
+    `runtime-${WASM_OJ_RUNTIME_IDENTITY_SHA256}`,
     WEIGHTED_METER_MODEL,
   ].join(":");
 }
@@ -57,7 +57,7 @@ export function isCostProfileFor(
   optimization: OptimizationLevel,
 ): boolean {
   const prefix = `${coordinates(language, target, optimization).join(":")}:content-`;
-  const suffix = `:runtime-${FORGE_RUNTIME_IDENTITY_SHA256}:${WEIGHTED_METER_MODEL}`;
+  const suffix = `:runtime-${WASM_OJ_RUNTIME_IDENTITY_SHA256}:${WEIGHTED_METER_MODEL}`;
   if (!profile.startsWith(prefix) || !profile.endsWith(suffix)) return false;
   const content = profile.slice(prefix.length, -suffix.length);
   return Boolean(content) && /^[A-Za-z0-9._-]+$/.test(content);

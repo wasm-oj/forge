@@ -8,15 +8,26 @@ import { fileURLToPath } from "node:url";
 import { deserialize, serialize } from "node:v8";
 import { gunzipSync } from "node:zlib";
 import { Runtime } from "@wasmer/sdk/node";
-import type { ForgeCompiler } from "../compiler/compiler.ts";
+import type { Compiler } from "@wasm-oj/core";
+import {
+  assertCompilerCacheKey,
+  assertValidProject,
+  toolchainAssetSource,
+  toolchainCacheIdentity,
+} from "@wasm-oj/core";
+import { WASM_OJ_SCHEMAS } from "@wasm-oj/contracts";
+import type {
+  BuildResult,
+  Project,
+  ServerToolchainSource,
+  WorkerProgress,
+} from "@wasm-oj/contracts";
 import { clearSdkDirectClangCaches } from "../compiler/sdk-direct-clang.ts";
 import {
   buildProject,
   clearCompilerHostCaches,
   configureWasmerCompilerHost,
 } from "../compiler/wasmer-engine.ts";
-import type { BuildResult, Project, WorkerProgress } from "../core/types.ts";
-import { FORGE_SCHEMAS } from "../core/contract.ts";
 import { parseGoDiagnostics, parsePythonDiagnostics, parseRustDiagnostics } from "../core/diagnostics.ts";
 import type { PythonFrontendRequest, PythonFrontendResult } from "../compiler/python-toolchain.ts";
 import { PYTHON_COMPILE_TIMEOUT_MS } from "../compiler/python-toolchain.ts";
@@ -24,24 +35,40 @@ import type {
   RustCompileRequest,
   RustCompileResult,
 } from "../compiler/rust-toolchain.ts";
-import { RUST_COMPILE_TIMEOUT_MS } from "../compiler/rust-toolchain.ts";
+import { RUST_COMPILE_TIMEOUT_MS, RUST_TOOLCHAIN } from "../compiler/rust-toolchain.ts";
 import type { GoCompileRequest, GoCompileResult } from "../compiler/go-toolchain.ts";
-import { GO_COMPILE_TIMEOUT_MS } from "../compiler/go-toolchain.ts";
+import { GO_COMPILE_TIMEOUT_MS, GO_TOOLCHAIN } from "../compiler/go-toolchain.ts";
 import { initializeServerWasmerSdk } from "./wasmer-runtime.ts";
-import { expectedToolchainAssetSha256, toolchainCacheIdentity } from "../core/toolchains.ts";
-import { assertValidProject } from "../core/project-validation.ts";
-import { assertCompilerCacheKey } from "../core/hash.ts";
+import {
+  PYTHON_PACKAGE_ASSET_PATH,
+} from "../core/toolchains.ts";
 import { BoundedByteCollector, readBoundedRegularFile } from "./bounded-transport.ts";
 import { buildControlTimeoutMs } from "../compiler/build-timeout-policy.ts";
+import {
+  assertVerifiedToolchainDistribution,
+  type VerifiedServerDistribution,
+} from "./verified-distribution.ts";
+import {
+  assertServerToolchainProfile,
+  serializeServerToolchainSources,
+  serverToolchainAssetFile,
+  serverToolchainAssetFiles,
+  serverToolchainDirectories,
+  snapshotServerToolchainSources,
+} from "./toolchain-sources.ts";
 
-export interface ServerForgeCompilerOptions {
-  /** Native `forge-compiler` executable built from `crates/runtime-core`. */
+export interface ServerCompilerOptions {
+  /** Native `wasm-oj-compiler` executable built from `crates/runtime-core`. */
   compilerExecutable: string;
-  /** Directory containing the pinned files from `public/toolchains`. */
-  toolchainDirectory: string;
+  /** Explicit package-owned toolchain sources. */
+  toolchains: readonly ServerToolchainSource[];
+  /** @internal Verified immutable-container capability. */
+  verifiedDistribution?: VerifiedServerDistribution;
+  /** @internal Inherited only by the private isolated build stage. */
+  verifiedToolchain?: boolean;
 }
 
-const IN_PROCESS_STAGE = Symbol("forge-in-process-server-compiler");
+const IN_PROCESS_STAGE = Symbol("wasm-oj-in-process-server-compiler");
 const SERVER_STAGE_LOG_LIMIT_BYTES = 1024 * 1024;
 const SERVER_STAGE_PROGRESS_LINE_LIMIT_BYTES = 1024 * 1024;
 const SERVER_BUILD_RESPONSE_LIMIT_BYTES = 256 * 1024 * 1024;
@@ -64,28 +91,42 @@ interface ServerCompilerOperation {
  * Node/server compiler host using the exact language drivers and Wasmer
  * packages used by the browser Worker.
  */
-export class ServerForgeCompiler implements ForgeCompiler {
+export class ServerCompiler implements Compiler {
   private readonly progressListeners = new Set<(progress: WorkerProgress) => void>();
   private readonly compilerExecutable: string;
-  private readonly toolchainDirectory: string;
+  private readonly toolchains: readonly ServerToolchainSource[];
   private initialization: Promise<void> | undefined;
   private generation = 0;
   private disposed = false;
   private readonly inProcess: boolean;
+  private readonly verifiedToolchain: boolean;
   private readonly activeChildren = new Set<ReturnType<typeof spawn>>();
   private activeOperation: ServerCompilerOperation | undefined;
 
-  constructor(options: ServerForgeCompilerOptions);
+  constructor(options: ServerCompilerOptions);
   /** @internal */
-  constructor(options: ServerForgeCompilerOptions, stage: typeof IN_PROCESS_STAGE);
-  constructor(options: ServerForgeCompilerOptions, stage?: typeof IN_PROCESS_STAGE) {
+  constructor(options: ServerCompilerOptions, stage: typeof IN_PROCESS_STAGE);
+  constructor(options: ServerCompilerOptions, stage?: typeof IN_PROCESS_STAGE) {
     this.compilerExecutable = path.resolve(options.compilerExecutable);
-    this.toolchainDirectory = path.resolve(options.toolchainDirectory);
+    this.toolchains = snapshotServerToolchainSources(options.toolchains);
+    if (options.verifiedDistribution) {
+      assertVerifiedToolchainDistribution(options.verifiedDistribution, this.toolchains);
+    }
+    if (options.verifiedToolchain === true && stage !== IN_PROCESS_STAGE) {
+      throw new Error("Verified toolchain inheritance is reserved for the isolated compiler stage.");
+    }
+    this.verifiedToolchain = options.verifiedDistribution !== undefined || options.verifiedToolchain === true;
     this.inProcess = stage === IN_PROCESS_STAGE;
   }
 
   cacheIdentity(project: Project): string {
     this.assertActive();
+    assertServerToolchainProfile(
+      this.toolchains,
+      project.config.language,
+      project.config.target,
+      project.config.optimization,
+    );
     return JSON.stringify(toolchainCacheIdentity(project.config.language));
   }
 
@@ -176,7 +217,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
   restart(): void {
     this.assertActive();
     if (this.activeOperation?.kind === "cache-clear") {
-      throw new Error("Cannot restart ServerForgeCompiler while clearing its cache.");
+      throw new Error("Cannot restart ServerCompiler while clearing its cache.");
     }
     this.cancel();
     if (this.inProcess) clearCompilerHostCaches();
@@ -197,7 +238,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
   private async initialize(): Promise<void> {
     await Promise.all([
       access(this.compilerExecutable, fsConstants.X_OK),
-      access(this.toolchainDirectory, fsConstants.R_OK),
+      ...serverToolchainDirectories(this.toolchains).map((directory) => access(directory, fsConstants.R_OK)),
       this.inProcess ? initializeServerWasmerSdk() : Promise.resolve(),
     ]);
   }
@@ -207,7 +248,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
     cacheKey: string,
     operation: ServerCompilerOperation,
   ): Promise<BuildResult> {
-    const transportDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-build-response-"));
+    const transportDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-build-response-"));
     const responsePath = path.join(transportDirectory, "response.v8");
     const requestPath = path.join(transportDirectory, "request.v8");
     const timeoutMs = buildControlTimeoutMs(project.config.language);
@@ -215,7 +256,8 @@ export class ServerForgeCompiler implements ForgeCompiler {
       this.assertCurrent(operation, "Server compilation was cancelled before its isolated stage started.");
       const encodedRequest = serialize({
         compilerExecutable: this.compilerExecutable,
-        toolchainDirectory: this.toolchainDirectory,
+        toolchains: serializeServerToolchainSources(this.toolchains),
+        verifiedToolchain: this.verifiedToolchain,
         project,
         cacheKey,
       });
@@ -235,8 +277,8 @@ export class ServerForgeCompiler implements ForgeCompiler {
           stdio: ["pipe", "pipe", "pipe", "pipe"],
           env: {
             ...process.env,
-            FORGE_BUILD_REQUEST: requestPath,
-            FORGE_BUILD_RESPONSE: responsePath,
+            WASM_OJ_BUILD_REQUEST: requestPath,
+            WASM_OJ_BUILD_RESPONSE: responsePath,
           },
         });
         this.activeChildren.add(child);
@@ -286,7 +328,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
                 for (const listener of this.progressListeners) listener(progress);
               }
             } catch {
-              // ForgeCompiler internals may write non-protocol data to fd 3.
+              // Compiler internals may write non-protocol data to fd 3.
             }
           }
         });
@@ -339,6 +381,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
       "rustc-stage.mjs",
       { request },
       RUST_COMPILE_TIMEOUT_MS,
+      [RUST_TOOLCHAIN.packageAsset, RUST_TOOLCHAIN.manifestAsset],
     );
     return {
       ...result,
@@ -354,6 +397,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
       "python-stage.mjs",
       { request },
       PYTHON_COMPILE_TIMEOUT_MS,
+      [PYTHON_PACKAGE_ASSET_PATH],
     );
     return {
       ...result,
@@ -368,8 +412,9 @@ export class ServerForgeCompiler implements ForgeCompiler {
   private async compileGo(request: GoCompileRequest): Promise<GoCompileResult> {
     const result = await this.runCompilerStage<Omit<GoCompileResult, "wasm" | "diagnostics"> & { wasmBase64?: string }>(
       "go-stage.mjs",
-      { compilerExecutable: this.compilerExecutable, compileBatchSchema: FORGE_SCHEMAS.compileBatch, request },
+      { compilerExecutable: this.compilerExecutable, compileBatchSchema: WASM_OJ_SCHEMAS.compileBatch, request },
       GO_COMPILE_TIMEOUT_MS,
+      [GO_TOOLCHAIN.packageAsset, GO_TOOLCHAIN.manifestAsset, GO_TOOLCHAIN.standardLibraryAsset],
     );
     return {
       ...result,
@@ -380,7 +425,12 @@ export class ServerForgeCompiler implements ForgeCompiler {
     };
   }
 
-  private runCompilerStage<T>(scriptName: string, input: object, timeoutMs: number): Promise<T> {
+  private runCompilerStage<T>(
+    scriptName: string,
+    input: object,
+    timeoutMs: number,
+    assetPaths: readonly string[],
+  ): Promise<T> {
     const operation = this.activeOperation;
     if (!operation || operation.kind !== "build") {
       return Promise.reject(new Error("Server compilation was cancelled before its compiler stage started."));
@@ -455,36 +505,30 @@ export class ServerForgeCompiler implements ForgeCompiler {
           reject(error);
         }
       });
-      child.stdin.end(JSON.stringify({ toolchainDirectory: this.toolchainDirectory, ...input }));
+      child.stdin.end(JSON.stringify({
+        toolchainAssets: serverToolchainAssetFiles(this.toolchains, assetPaths),
+        verifiedToolchain: this.verifiedToolchain,
+        ...input,
+      }));
     });
   }
 
   private async loadToolchainAsset(assetPath: string): Promise<Uint8Array> {
-    const filename = path.basename(assetPath);
-    const resolved = path.resolve(this.toolchainDirectory, filename);
-    const relative = path.relative(this.toolchainDirectory, resolved);
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
-      throw new Error(`Toolchain asset escapes the configured directory: '${assetPath}'.`);
-    }
+    const resolved = serverToolchainAssetFile(this.toolchains, assetPath);
     const compressed = await readFile(resolved);
-    this.verifyToolchainAsset(assetPath, compressed);
-    return new Uint8Array(gunzipSync(compressed));
+    if (!this.verifiedToolchain) this.verifyToolchainAsset(assetPath, compressed);
+    return uint8View(gunzipSync(compressed));
   }
 
   private async loadToolchainFile(assetPath: string): Promise<Uint8Array> {
-    const filename = path.basename(assetPath);
-    const resolved = path.resolve(this.toolchainDirectory, filename);
-    const relative = path.relative(this.toolchainDirectory, resolved);
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
-      throw new Error(`Toolchain file escapes the configured directory: '${assetPath}'.`);
-    }
+    const resolved = serverToolchainAssetFile(this.toolchains, assetPath);
     const bytes = await readFile(resolved);
-    this.verifyToolchainAsset(assetPath, bytes);
+    if (!this.verifiedToolchain) this.verifyToolchainAsset(assetPath, bytes);
     return new Uint8Array(bytes);
   }
 
   private verifyToolchainAsset(assetPath: string, bytes: Uint8Array): void {
-    const expected = expectedToolchainAssetSha256(assetPath);
+    const expected = toolchainAssetSource(this.toolchains, assetPath).asset.sha256;
     const actual = createHash("sha256").update(bytes).digest("hex");
     if (actual !== expected) {
       throw new Error(`Pinned toolchain asset '${assetPath}' has digest ${actual}; expected ${expected}.`);
@@ -493,7 +537,7 @@ export class ServerForgeCompiler implements ForgeCompiler {
 
   private beginOperation(kind: ServerCompilerOperation["kind"]): ServerCompilerOperation {
     this.assertActive();
-    if (this.activeOperation) throw new Error("ServerForgeCompiler accepts one active operation at a time.");
+    if (this.activeOperation) throw new Error("ServerCompiler accepts one active operation at a time.");
     const operation = { kind, generation: this.generation, superseded: false };
     this.activeOperation = operation;
     return operation;
@@ -526,8 +570,12 @@ export class ServerForgeCompiler implements ForgeCompiler {
   }
 
   private assertActive(): void {
-    if (this.disposed) throw new Error("ServerForgeCompiler is disposed.");
+    if (this.disposed) throw new Error("ServerCompiler is disposed.");
   }
+}
+
+function uint8View(bytes: Buffer): Uint8Array {
+  return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
 function resolveStageScript(scriptName: string): string {
@@ -543,19 +591,19 @@ function resolveStageScript(scriptName: string): string {
   } else if (moduleFilename === "server-compiler.js" && path.basename(moduleDirectory) === "chunks") {
     stageDirectory = path.dirname(moduleDirectory);
   } else {
-    throw new Error(`Unsupported ServerForgeCompiler module layout '${modulePath}'.`);
+    throw new Error(`Unsupported ServerCompiler module layout '${modulePath}'.`);
   }
   return path.join(stageDirectory, scriptName);
 }
 
 /** @internal Entry point used only by the isolated Node compiler process. */
 export async function buildServerProjectInProcess(
-  options: ServerForgeCompilerOptions,
+  options: ServerCompilerOptions,
   project: Project,
   cacheKey: string,
   onProgress: (progress: WorkerProgress) => void,
 ): Promise<BuildResult> {
-  const compiler = new ServerForgeCompiler(options, IN_PROCESS_STAGE);
+  const compiler = new ServerCompiler(options, IN_PROCESS_STAGE);
   const removeProgress = compiler.onProgress(onProgress);
   const terminate = () => compiler.dispose();
   process.once("SIGTERM", terminate);

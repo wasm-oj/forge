@@ -24,7 +24,7 @@ export const PROBLEM_STARTER_LIMITS = Object.freeze({
   bytesPerFile: 256 * 1024,
   totalBytesPerLanguage: 1024 * 1024,
 });
-export const PROBLEM_COLLECTION_SOURCE_KEY = "wasm-oj-forge-v1:problem-collection-source";
+export const PROBLEM_COLLECTION_SOURCE_KEY = "wasm-oj-v2:problem-collection-source";
 export const DEFAULT_PROBLEM_COLLECTION_SOURCE = Object.freeze({
   provider: "github",
   owner: "wasm-oj",
@@ -39,7 +39,7 @@ const MAX_PROBLEMS = 1_000;
 const CACHE_NAME = "wasm-oj-verified-problem-collections-v5";
 const LANGUAGES = ["c", "cpp", "rust", "go", "python", "javascript", "typescript"] as const;
 const POLICY_IDS = ["baseline", "efficient", "optimal"] as const;
-const CALIBRATION_METHOD = "forge-v1-compiled-average-optimal-rounded-v1";
+const CALIBRATION_METHOD = "wasm-oj-v2/compiled-average-optimal-rounded/v1";
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const GITHUB_NAME_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?$/;
@@ -750,8 +750,8 @@ export async function verifyProblemCollectionRevision(index: ProblemCollectionIn
 function createBrowserProblemCollectionCache(): ProblemCollectionCache {
   if (!globalThis.caches) return new MemoryProblemCollectionCache();
   const open = () => globalThis.caches.open(CACHE_NAME);
-  const indexKey = (sourceKey: string) => `https://forge.problem-cache.invalid/index/${encodeURIComponent(sourceKey)}`;
-  const bundleKey = (digest: string) => `https://forge.problem-cache.invalid/bundle/${digest}`;
+  const indexKey = (sourceKey: string) => `https://wasm-oj.problem-cache.invalid/index/${encodeURIComponent(sourceKey)}`;
+  const bundleKey = (digest: string) => `https://wasm-oj.problem-cache.invalid/bundle/${digest}`;
   const read = async (key: string) => {
     const response = await (await open()).match(key);
     return response ? new Uint8Array(await response.arrayBuffer()) : undefined;

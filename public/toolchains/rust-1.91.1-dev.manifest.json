@@ -14,7 +14,7 @@
   },
   "linker": {
     "arguments": {
-      "allocatorPlaceholder": "__FORGE_RUST_ALLOCATOR_BITCODE__",
+      "allocatorPlaceholder": "__WASM_OJ_RUST_ALLOCATOR_BITCODE__",
       "debug": [
         "--shared-memory",
         "--max-memory=1073741824",
@@ -31,8 +31,8 @@
         "--shared-memory",
         "--max-memory=1073741824",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/self-contained/crt1-command.o",
-        "__FORGE_RUST_OBJECT__",
-        "__FORGE_RUST_ALLOCATOR_BITCODE__",
+        "__WASM_OJ_RUST_OBJECT__",
+        "__WASM_OJ_RUST_ALLOCATOR_BITCODE__",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/libpanic_abort-002321c68b564344.rlib",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/libstd-c78ebdb3f1c01718.rlib",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/libwasi-24df99176abbff27.rlib",
@@ -52,12 +52,12 @@
         "-L",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/self-contained",
         "-o",
-        "__FORGE_RUST_OUTPUT__",
+        "__WASM_OJ_RUST_OUTPUT__",
         "--gc-sections",
         "-O0"
       ],
-      "objectPlaceholder": "__FORGE_RUST_OBJECT__",
-      "outputPlaceholder": "__FORGE_RUST_OUTPUT__",
+      "objectPlaceholder": "__WASM_OJ_RUST_OBJECT__",
+      "outputPlaceholder": "__WASM_OJ_RUST_OUTPUT__",
       "release": [
         "--shared-memory",
         "--max-memory=1073741824",
@@ -74,8 +74,8 @@
         "--shared-memory",
         "--max-memory=1073741824",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/self-contained/crt1-command.o",
-        "__FORGE_RUST_OBJECT__",
-        "__FORGE_RUST_ALLOCATOR_BITCODE__",
+        "__WASM_OJ_RUST_OBJECT__",
+        "__WASM_OJ_RUST_ALLOCATOR_BITCODE__",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/libpanic_abort-002321c68b564344.rlib",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/libstd-c78ebdb3f1c01718.rlib",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/libwasi-24df99176abbff27.rlib",
@@ -95,7 +95,7 @@
         "-L",
         "/rust/lib/rustlib/wasm32-wasip1-threads/lib/self-contained",
         "-o",
-        "__FORGE_RUST_OUTPUT__",
+        "__WASM_OJ_RUST_OUTPUT__",
         "--gc-sections",
         "-O2"
       ]
@@ -120,7 +120,7 @@
     "objectEmission": "rustc --emit=obj -C save-temps=yes",
     "strategy": "rustc-object-then-wasm-ld"
   },
-  "schema": "wasm-oj-forge-v1/rust-toolchain",
+  "schema": "wasm-oj-v2/rust-toolchain",
   "source": {
     "archiveSha256": "ba0096d05275954d852a3fb3a9c4c9438dad501f8e428b867c0b88cfa7301c14",
     "repository": "https://github.com/olimpiadi-informatica/wasm-compilers",

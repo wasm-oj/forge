@@ -66,7 +66,7 @@ impl GasBudget {
         if amount > state.remaining {
             state.remaining = 0;
             state.exhausted = true;
-            return Err(RuntimeError::new("Forge instruction budget exhausted"));
+            return Err(RuntimeError::new("WASM-OJ instruction budget exhausted"));
         }
         state.remaining -= amount;
         Ok(())
@@ -89,7 +89,7 @@ struct GasEnv(Arc<GasBudget>);
 
 fn charge_gas(env: FunctionEnvMut<GasEnv>, amount: i64) -> Result<(), RuntimeError> {
     let amount = u64::try_from(amount)
-        .map_err(|_| RuntimeError::new("Forge received a negative instruction charge"))?;
+        .map_err(|_| RuntimeError::new("WASM-OJ received a negative instruction charge"))?;
     env.data().0.charge(amount)
 }
 
@@ -585,7 +585,9 @@ fn interactive_runtime(
                 INTERACTOR_METERING_MODULE => Some(INTERACTOR_METERING_MODULE),
                 _ => None,
             })
-            .ok_or_else(|| io::Error::other("interactive module has no Forge metering identity"))?;
+            .ok_or_else(|| {
+                io::Error::other("interactive module has no WASM-OJ metering identity")
+            })?;
         let gas_env = FunctionEnv::new(&mut *store, GasEnv(gas.clone()));
         imports.define(
             metering_module,

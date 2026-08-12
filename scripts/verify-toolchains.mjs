@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { gunzipSync } from "node:zlib";
-import { FORGE_SCHEMAS } from "../src/core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../src/core/contract.ts";
 import {
   CLANG_CC1_PINS_ASSET_PATH,
   CLANG_LIBCXX_PCH,
@@ -31,7 +31,7 @@ import {
 } from "../src/core/toolchains.ts";
 import {
   decodeLibcxxPchManifest,
-  FORGE_LIBCXX_PCH_HEADER,
+  WASM_OJ_LIBCXX_PCH_HEADER,
 } from "../src/compiler/libcxx-pch.ts";
 import {
   RUST_DETERMINISTIC_REPLACEMENTS,
@@ -45,7 +45,7 @@ import {
 } from "../src/compiler/go-toolchain.ts";
 
 const run = promisify(execFile);
-const QUICKJS_WASM_SHA256 = "21fcf23a5fdf3e64b803344c9af86be01e95feabf4779d02aef325c852bc2c2e";
+const QUICKJS_WASM_SHA256 = "956bf2b3700690e1817034eb8e063cfd9781c66b4bffa244ef4f9445656ccfa1";
 const QUICKJS_LLVM_PRODUCER = "18.1.2-wasi-sdk (https://github.com/llvm/llvm-project 26a1d6601d727a96f4301d0d8647b5a42760ae0c)";
 const QUICKJS_IMPORTS = Object.freeze([
   "wasi_snapshot_preview1.args_get:function",
@@ -182,23 +182,40 @@ for (const forbidden of ["/Users/", "/private/tmp/", "Homebrew clang"]) {
     throw new Error(`QuickJS contains a non-reproducible build-host marker '${forbidden}'.`);
   }
 }
-process.stdout.write("verified QuickJS expanded digest, WASI import/export contract, stripping, and producer\n");
+for (const required of [
+  "WASM_OJ_RANDOM_SEED",
+  "WASM_OJ_REALTIME_EPOCH_MS",
+  "WASM_OJ_CLOCK_STEP_NS",
+  "__wasm_oj_write_stdout",
+  "__wasm_oj_write_stderr",
+  "__wasm_oj_determinism_seed",
+  "__wasm_oj_determinism_epoch_ms",
+  "__wasm_oj_determinism_step_ns",
+]) {
+  if (!quickJsWasm.includes(Buffer.from(required))) {
+    throw new Error(`QuickJS is missing required WASM-OJ runtime token '${required}'.`);
+  }
+}
+if (quickJsWasm.includes(Buffer.from("FORGE_")) || quickJsWasm.includes(Buffer.from("__forge_"))) {
+  throw new Error("QuickJS retains a retired Forge runtime token.");
+}
+process.stdout.write("verified QuickJS expanded digest, WASI import/export contract, deterministic hooks, stripping, and producer\n");
 
 const pins = JSON.parse(await readFile(
   path.join(directory, path.basename(CLANG_CC1_PINS_ASSET_PATH)),
   "utf8",
 ));
-if (pins.schema !== FORGE_SCHEMAS.clangPins) {
+if (pins.schema !== WASM_OJ_SCHEMAS.clangPins) {
   throw new Error(`Unexpected Clang pins schema '${String(pins.schema)}'.`);
 }
 if (pins.version !== CLANG_VERSION || pins.source !== `clang-${CLANG_VERSION}.webc`) {
   throw new Error("Clang pins do not identify the canonical package.");
 }
 const expectedPlaceholders = {
-  input: "__FORGE_INPUT__",
-  output: "__FORGE_OUTPUT__",
-  mainFileName: "__FORGE_MAIN_FILE_NAME__",
-  objects: "__FORGE_OBJECTS__",
+  input: "__WASM_OJ_INPUT__",
+  output: "__WASM_OJ_OUTPUT__",
+  mainFileName: "__WASM_OJ_MAIN_FILE_NAME__",
+  objects: "__WASM_OJ_OBJECTS__",
 };
 if (JSON.stringify(pins.placeholders) !== JSON.stringify(expectedPlaceholders)) {
   throw new Error("Clang pins contain non-canonical placeholders.");
@@ -208,7 +225,7 @@ const libcxxPchManifestBytes = await readFile(
   path.join(directory, path.basename(CLANG_LIBCXX_PCH_MANIFEST_ASSET_PATH)),
 );
 const libcxxPchManifest = await decodeLibcxxPchManifest(new Uint8Array(libcxxPchManifestBytes));
-if (libcxxPchManifest.header !== FORGE_LIBCXX_PCH_HEADER) {
+if (libcxxPchManifest.header !== WASM_OJ_LIBCXX_PCH_HEADER) {
   throw new Error("Clang libc++ PCH manifest does not contain the canonical opt-in header.");
 }
 for (const profile of ["cpp-debug", "cpp-release"]) {
@@ -234,7 +251,7 @@ const rustManifestBytes = await readFile(
 const rustManifest = JSON.parse(rustManifestBytes.toString("utf8"));
 decodeRustToolchainManifest(new Uint8Array(rustManifestBytes));
 if (
-  rustManifest.schema !== FORGE_SCHEMAS.rustToolchain
+  rustManifest.schema !== WASM_OJ_SCHEMAS.rustToolchain
   || rustManifest.version !== RUST_VERSION
   || rustManifest.target !== RUST_TARGET_TRIPLE
   || rustManifest.compiler?.command !== "rustc"
@@ -274,7 +291,7 @@ const pythonLicenseDigests = (pythonManifest.licenses ?? [])
   .map((license) => license?.sha256)
   .sort();
 if (
-  pythonManifest.schema !== FORGE_SCHEMAS.pythonToolchain
+  pythonManifest.schema !== WASM_OJ_SCHEMAS.pythonToolchain
   || pythonManifest.version !== PYTHON_VERSION
   || pythonManifest.target !== PYTHON_TARGET_TRIPLE
   || pythonManifest.source?.url !== PYTHON_SOURCE.url
@@ -292,9 +309,9 @@ if (
   || pythonManifest.wasiSdk?.archiveSha256 !== PYTHON_WASI_SDK.archiveSha256
   || JSON.stringify(pythonManifest.build?.disabledModules) !== '["_socket"]'
   || pythonManifest.runtimeFiles?.archiveSha256 !== PYTHON_RUNTIME_FILES_ARCHIVE_SHA256
-  || pythonManifest.runtimeFiles?.archiveBytes !== 10_652_546
-  || pythonManifest.runtimeFiles?.cacheKey !== "wasm-oj-forge-v1:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip"
-  || pythonManifest.runtimeFiles?.format !== "FORGEFS1"
+  || pythonManifest.runtimeFiles?.archiveBytes !== 10_652_540
+  || pythonManifest.runtimeFiles?.cacheKey !== "wasm-oj-v2:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip"
+  || pythonManifest.runtimeFiles?.format !== "WOJFS002"
   || pythonManifest.runtimeFiles?.guestPath !== "/cpython/lib/python314.zip"
   || pythonManifest.filesystemMount !== "/usr/local"
   || JSON.stringify(pythonLicenseDigests) !== JSON.stringify(PYTHON_LICENSE_SHA256)
@@ -325,7 +342,7 @@ if (
   throw new Error("Go manifest does not identify the canonical source, package, and standard library.");
 }
 
-const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-forge-verify-webc-"));
+const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-verify-webc-"));
 try {
   const compressed = await readFile(path.join(directory, rustPackageFilename));
   const webcPath = path.join(temporary, `rust-${RUST_VERSION}.webc`);
@@ -370,14 +387,14 @@ try {
     path.resolve("scripts/inspect-python-runtime-files.mjs"),
     path.join(directory, pythonPackageFilename),
   ], { maxBuffer: 16 * 1024 * 1024 });
-  const prefix = "FORGE_PYTHON_INSPECTION:";
+  const prefix = "WASM_OJ_PYTHON_INSPECTION:";
   const line = inspection.stdout.split("\n").findLast((entry) => entry.startsWith(prefix));
   if (!line) throw new Error(`Python runtime inspection emitted no result:\n${inspection.stdout}`);
   const result = JSON.parse(line.slice(prefix.length));
   if (
     result.archiveSha256 !== PYTHON_RUNTIME_FILES_ARCHIVE_SHA256
-    || result.archiveBytes !== 10_652_546
-    || JSON.stringify(result.files) !== JSON.stringify({ "/cpython/lib/python314.zip": 10_652_488 })
+    || result.archiveBytes !== 10_652_540
+    || JSON.stringify(result.files) !== JSON.stringify({ "/cpython/lib/python314.zip": 10_652_482 })
   ) {
     throw new Error(`Python runtime-files archive differs from the manifest: ${JSON.stringify(result)}.`);
   }

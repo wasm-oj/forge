@@ -3,7 +3,7 @@ import {
   Wasmer,
   type Output,
 } from "@wasmer/sdk";
-import { FORGE_CONTRACT_VERSION } from "../core/contract.ts";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract.ts";
 import {
   canonicalRuntimeBundleFiles,
   createRuntimeBundleManifest,
@@ -95,7 +95,7 @@ async function getTypeScriptCompiler(): Promise<Wasmer> {
 
 function createArtifactBase(project: Project, cacheKey: string, started: number, size: number, toolchains: string[]) {
   return {
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: crypto.randomUUID(),
     projectId: project.id,
     cacheKey,
@@ -192,7 +192,7 @@ async function buildPython(project: Project, cacheKey: string, requestId: string
   }
   const entry = `build/${project.config.entry.replace(/\.py$/, ".pyc")}`;
   const manifest = createRuntimeBundleManifest(project, PYTHON_PACKAGE, "python", entry);
-  files["forge.manifest.json"] = manifest;
+  files["wasm-oj.manifest.json"] = manifest;
   const bundleFiles = canonicalRuntimeBundleFiles(files);
   const size = sumFileSize(bundleFiles);
   const artifact: RuntimeBundleArtifact = {
@@ -276,7 +276,7 @@ async function transpileScriptProject(project: Project, requestId: string): Prom
   const entrypoint = compiler.entrypoint;
   if (!entrypoint) throw new Error("The TypeScript/WASI compiler has no executable entrypoint.");
   const outputPaths = emittedFiles.map((file) => emittedScriptPath(file.path));
-  const declarationPath = "/project/.forge/quickjs.d.ts";
+  const declarationPath = "/project/.wasm-oj/quickjs.d.ts";
   const instance = await entrypoint.run({
     stdin: JSON.stringify({
       files: {
@@ -355,7 +355,7 @@ async function buildScript(project: Project, cacheKey: string, requestId: string
   }
   const entry = emittedScriptPath(project.config.entry);
   const manifest = createRuntimeBundleManifest(project, QUICKJS_PACKAGE, "qjs", entry);
-  files["forge.manifest.json"] = manifest;
+  files["wasm-oj.manifest.json"] = manifest;
   const bundleFiles = canonicalRuntimeBundleFiles(files);
   const size = sumFileSize(bundleFiles);
   const artifact: RuntimeBundleArtifact = {

@@ -63,7 +63,7 @@ describe("FileSystemDependencyCache", () => {
 });
 
 async function temporaryDirectory(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "forge-dependency-cache-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "wasm-oj-dependency-cache-"));
   directories.push(directory);
   return directory;
 }

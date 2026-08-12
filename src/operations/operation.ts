@@ -1,16 +1,16 @@
 import type { WorkerProgress } from "../core/types";
-import { asForgeError, ForgeError, type ForgeErrorRecord } from "../core/errors";
+import { asWasmOjError, WasmOjError, type WasmOjErrorRecord } from "../core/errors";
 import type { JudgeProjectResult } from "../sdk/engine";
 import type { JudgeCaseVerdict, JudgeRunOptions } from "../judge/engine";
 import type { JudgeSpec } from "../judge/spec";
 import type { CompileInput } from "../sdk/project";
 import type { CompileOptions } from "../sdk/types";
 
-export type ForgeOperationKind = "submission";
-export type ForgeOperationState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type OperationKind = "submission";
+export type OperationState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
-export type ForgeOperationEventPayload =
-  | { type: "state"; state: ForgeOperationState }
+export type OperationEventPayload =
+  | { type: "state"; state: OperationState }
   | { type: "progress"; progress: WorkerProgress }
   | { type: "stream"; stream: "stdout" | "stderr"; chunk: string }
   | {
@@ -28,14 +28,14 @@ export type ForgeOperationEventPayload =
     completed: number;
     total: number;
   }
-  | { type: "error"; error: ForgeErrorRecord };
+  | { type: "error"; error: WasmOjErrorRecord };
 
-export type ForgeOperationEvent = ForgeOperationEventPayload & {
+export type OperationEvent = OperationEventPayload & {
   operationId: string;
   sequence: number;
 };
 
-export interface ForgeSubmissionRequest {
+export interface SubmissionRequest {
   id?: string;
   input: CompileInput;
   spec: JudgeSpec;
@@ -44,56 +44,56 @@ export interface ForgeSubmissionRequest {
   signal?: AbortSignal;
 }
 
-export interface ForgeOperation<T> {
+export interface Operation<T> {
   readonly id: string;
-  readonly kind: ForgeOperationKind;
+  readonly kind: OperationKind;
   readonly signal: AbortSignal;
   readonly result: Promise<T>;
-  state(): ForgeOperationState;
+  state(): OperationState;
   cancel(reason?: string): void;
-  onEvent(listener: (event: ForgeOperationEvent) => void): () => void;
+  onEvent(listener: (event: OperationEvent) => void): () => void;
 }
 
-export type ForgeSubmissionOperation = ForgeOperation<JudgeProjectResult>;
+export type SubmissionOperation = Operation<JudgeProjectResult>;
 
-export interface ForgeOperationSchedulerHost {
+export interface OperationSchedulerHost {
   executeSubmission(
-    request: ForgeSubmissionRequest,
-    observe: (event: ForgeOperationEventPayload) => void,
+    request: SubmissionRequest,
+    observe: (event: OperationEventPayload) => void,
   ): Promise<JudgeProjectResult>;
   cancelActiveSubmission(): void;
 }
 
-export class ForgeOperationScheduler {
+export class OperationScheduler {
   private readonly queue: SubmissionEntry[] = [];
   private readonly identities = new Set<string>();
   private active: SubmissionEntry | undefined;
   private disposed = false;
 
   constructor(
-    private readonly host: ForgeOperationSchedulerHost,
-    private readonly observe?: (event: ForgeOperationEvent) => void,
+    private readonly host: OperationSchedulerHost,
+    private readonly observe?: (event: OperationEvent) => void,
   ) {
     if (!host || typeof host.executeSubmission !== "function"
       || typeof host.cancelActiveSubmission !== "function") {
-      throw new TypeError("ForgeOperationScheduler requires a submission execution host.");
+      throw new TypeError("OperationScheduler requires a submission execution host.");
     }
   }
 
-  submit(request: ForgeSubmissionRequest): ForgeSubmissionOperation {
-    if (this.disposed) throw new ForgeError("Forge operation scheduler is disposed.", {
+  submit(request: SubmissionRequest): SubmissionOperation {
+    if (this.disposed) throw new WasmOjError("WASM-OJ operation scheduler is disposed.", {
       code: "disposed",
       stage: "operation",
     });
     if (!request || typeof request !== "object") {
-      throw new ForgeError("Forge submission request must be an object.", {
+      throw new WasmOjError("WASM-OJ submission request must be an object.", {
         code: "invalid-input",
         stage: "operation",
       });
     }
     const id = submissionId(request.id);
     if (this.identities.has(id)) {
-      throw new ForgeError(`Forge submission operation '${id}' already exists.`, {
+      throw new WasmOjError(`WASM-OJ submission operation '${id}' already exists.`, {
         code: "operation-conflict",
         stage: "operation",
         operationId: id,
@@ -117,12 +117,12 @@ export class ForgeOperationScheduler {
     this.disposed = true;
     if (this.active) {
       this.active.disposal = true;
-      this.active.cancel("Forge operation scheduler was disposed.");
+      this.active.cancel("WASM-OJ operation scheduler was disposed.");
       this.host.cancelActiveSubmission();
     }
     for (const entry of this.queue.splice(0)) {
       entry.disposal = true;
-      entry.cancel("Forge operation scheduler was disposed.");
+      entry.cancel("WASM-OJ operation scheduler was disposed.");
       this.settleCancellation(entry);
     }
   }
@@ -131,7 +131,7 @@ export class ForgeOperationScheduler {
     return this.active !== undefined || this.queue.some((entry) => !entry.settled);
   }
 
-  cancelActive(reason = "Forge submission operation was cancelled."): boolean {
+  cancelActive(reason = "WASM-OJ submission operation was cancelled."): boolean {
     if (!this.active) return false;
     this.active.cancel(reason);
     return true;
@@ -171,7 +171,7 @@ export class ForgeOperationScheduler {
     } catch (error) {
       if (entry.signal.aborted) this.settleCancellation(entry, error);
       else {
-        const failure = asForgeError(error, {
+        const failure = asWasmOjError(error, {
           code: "internal-failure",
           stage: "operation",
           retryable: false,
@@ -190,8 +190,8 @@ export class ForgeOperationScheduler {
 
   private settleCancellation(entry: SubmissionEntry, cause?: unknown): void {
     if (entry.settled) return;
-    const failure = new ForgeError(
-      entry.cancelReason ?? "Forge submission operation was cancelled.",
+    const failure = new WasmOjError(
+      entry.cancelReason ?? "WASM-OJ submission operation was cancelled.",
       {
         code: entry.disposal ? "disposed" : "operation-cancelled",
         stage: "operation",
@@ -205,12 +205,12 @@ export class ForgeOperationScheduler {
     entry.cleanup();
   }
 
-  private emit(entry: SubmissionEntry, payload: ForgeOperationEventPayload): void {
+  private emit(entry: SubmissionEntry, payload: OperationEventPayload): void {
     const event = Object.freeze({
       ...payload,
       operationId: entry.id,
       sequence: entry.nextSequence(),
-    }) as ForgeOperationEvent;
+    }) as OperationEvent;
     entry.notify(event);
     this.observe?.(event);
   }
@@ -219,25 +219,25 @@ export class ForgeOperationScheduler {
 class SubmissionEntry {
   readonly controller = new AbortController();
   readonly signal = this.controller.signal;
-  readonly operation: ForgeSubmissionOperation;
+  readonly operation: SubmissionOperation;
   readonly result: Promise<JudgeProjectResult>;
-  readonly emit: (payload: ForgeOperationEventPayload) => void;
-  private readonly listeners = new Set<(event: ForgeOperationEvent) => void>();
-  private lastStateEvent?: ForgeOperationEvent;
+  readonly emit: (payload: OperationEventPayload) => void;
+  private readonly listeners = new Set<(event: OperationEvent) => void>();
+  private lastStateEvent?: OperationEvent;
   private readonly externalSignal?: AbortSignal;
   private readonly onExternalAbort: () => void;
   private sequence = 0;
-  private currentState: ForgeOperationState = "queued";
+  private currentState: OperationState = "queued";
   private resolveResult!: (result: JudgeProjectResult) => void;
-  private rejectResult!: (error: ForgeError) => void;
+  private rejectResult!: (error: WasmOjError) => void;
   settled = false;
   disposal = false;
   cancelReason: string | undefined;
 
   constructor(
     readonly id: string,
-    readonly request: ForgeSubmissionRequest,
-    emit: (payload: ForgeOperationEventPayload) => void,
+    readonly request: SubmissionRequest,
+    emit: (payload: OperationEventPayload) => void,
     cancelEntry: () => void,
   ) {
     this.emit = emit;
@@ -263,8 +263,8 @@ class SubmissionEntry {
         this.cancel(reason);
         cancelEntry();
       },
-      onEvent: (listener: (event: ForgeOperationEvent) => void) => {
-        if (typeof listener !== "function") throw new TypeError("Forge operation event listener must be a function.");
+      onEvent: (listener: (event: OperationEvent) => void) => {
+        if (typeof listener !== "function") throw new TypeError("WASM-OJ operation event listener must be a function.");
         this.listeners.add(listener);
         if (this.lastStateEvent) this.notifyListener(listener, this.lastStateEvent);
         return () => this.listeners.delete(listener);
@@ -278,7 +278,7 @@ class SubmissionEntry {
     this.controller.abort(this.cancelReason);
   }
 
-  setState(state: ForgeOperationState): void {
+  setState(state: OperationState): void {
     if (this.settled) return;
     this.currentState = state;
     this.emit({ type: "state", state });
@@ -290,7 +290,7 @@ class SubmissionEntry {
     this.resolveResult(result);
   }
 
-  reject(error: ForgeError): void {
+  reject(error: WasmOjError): void {
     if (!this.settled) this.settled = true;
     this.rejectResult(error);
   }
@@ -299,12 +299,12 @@ class SubmissionEntry {
     return this.sequence++;
   }
 
-  notify(event: ForgeOperationEvent): void {
+  notify(event: OperationEvent): void {
     if (event.type === "state") this.lastStateEvent = event;
     for (const listener of this.listeners) this.notifyListener(listener, event);
   }
 
-  private notifyListener(listener: (event: ForgeOperationEvent) => void, event: ForgeOperationEvent): void {
+  private notifyListener(listener: (event: OperationEvent) => void, event: OperationEvent): void {
     try {
       listener(event);
     } catch {
@@ -320,7 +320,7 @@ class SubmissionEntry {
 function submissionId(requested: string | undefined): string {
   if (requested === undefined) return crypto.randomUUID();
   if (typeof requested !== "string" || !requested || requested !== requested.trim() || requested.length > 128) {
-    throw new ForgeError("Forge submission ID must be non-empty, trimmed, and at most 128 characters.", {
+    throw new WasmOjError("WASM-OJ submission ID must be non-empty, trimmed, and at most 128 characters.", {
       code: "invalid-input",
       stage: "operation",
     });
@@ -329,9 +329,9 @@ function submissionId(requested: string | undefined): string {
 }
 
 function validCancelReason(reason: string | undefined): string {
-  if (reason === undefined) return "Forge submission operation was cancelled.";
+  if (reason === undefined) return "WASM-OJ submission operation was cancelled.";
   if (typeof reason !== "string" || !reason || reason !== reason.trim() || reason.length > 512) {
-    throw new TypeError("Forge cancellation reason must be non-empty, trimmed, and at most 512 characters.");
+    throw new TypeError("WASM-OJ cancellation reason must be non-empty, trimmed, and at most 512 characters.");
   }
   return reason;
 }
@@ -339,5 +339,5 @@ function validCancelReason(reason: string | undefined): string {
 function abortReason(reason: unknown): string {
   return typeof reason === "string" && reason && reason === reason.trim() && reason.length <= 512
     ? reason
-    : "Forge submission operation was aborted.";
+    : "WASM-OJ submission operation was aborted.";
 }

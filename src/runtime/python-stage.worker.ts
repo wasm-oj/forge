@@ -120,7 +120,7 @@ function compileScript(files: readonly string[]): string {
   return [
     "import json, pathlib, py_compile",
     `files = ${JSON.stringify(files)}`,
-    "completion = pathlib.Path('/project/build/.forge-python-complete.json')",
+    "completion = pathlib.Path('/project/build/.wasm-oj-python-complete.json')",
     "try:",
     "    for name in files:",
     "        output = pathlib.Path('/project/build') / pathlib.Path(name).with_suffix('.pyc')",
@@ -144,7 +144,7 @@ async function waitForCompletion(project: Directory): Promise<PythonCompletion> 
   const decoder = new TextDecoder("utf-8", { fatal: true });
   while (performance.now() < deadline) {
     try {
-      const bytes = await project.readFile("/build/.forge-python-complete.json");
+      const bytes = await project.readFile("/build/.wasm-oj-python-complete.json");
       const parsed = JSON.parse(decoder.decode(bytes)) as Partial<PythonCompletion>;
       if (typeof parsed.success === "boolean" && typeof parsed.stderr === "string") {
         return { success: parsed.success, stderr: parsed.stderr };

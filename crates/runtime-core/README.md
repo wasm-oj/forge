@@ -1,11 +1,11 @@
-# wasm-oj-forge-runtime-core
+# wasm-oj-runtime-core
 
-Portable deterministic WASI/WASIX execution core for WASM OJ Forge.
+Portable deterministic WASI/WASIX execution core for WASM-OJ.
 
 The crate exposes `run(RunRequest) -> Result<RunResult, RunError>` and the serialization-friendly `run_response(RunRequest) -> RunResponse`. Both native and `wasm32-unknown-unknown` builds apply the same module transforms, deterministic imports, filesystem construction, metering model, and result contract.
 
 ```rust
-use wasm_oj_forge_runtime_core::{
+use wasm_oj_runtime_core::{
     run, DeterminismConfig, ResourcePolicy, RunRequest,
 };
 use std::collections::BTreeMap;
@@ -35,7 +35,7 @@ let result = run(RunRequest {
 })?;
 ```
 
-Instruction, logical-time, memory, output, and filesystem limits are enforced inside the core. Sleep and clock polling fast-forward a shared virtual clock and never wait for host time. A hard emergency wall deadline must live outside an in-process Wasmer call; `ServerForgeRunner` therefore invokes the native runner binary as a killable child process, while the browser adapter invokes the WebAssembly build in a replaceable Worker.
+Instruction, logical-time, memory, output, and filesystem limits are enforced inside the core. Sleep and clock polling fast-forward a shared virtual clock and never wait for host time. A hard emergency wall deadline must live outside an in-process Wasmer call; `ServerRunner` therefore invokes the native runner binary as a killable child process, while the browser adapter invokes the WebAssembly build in a replaceable Worker.
 
 Build targets:
 
@@ -44,4 +44,4 @@ pnpm run runtime:build-native
 pnpm run runtime:build
 ```
 
-The native CLI accepts Forge contract 1 `wasm-oj-forge-v1/run-request` JSON on stdin or through `--request REQUEST.json`, with binary fields encoded as base64. The browser binding uses the same logical `RunRequest` and `RunResult` fields through its JavaScript interface, with binary values transferred as typed arrays; the transports are intentionally host-specific.
+The native CLI accepts WASM-OJ contract 2 `wasm-oj-v2/run-request` JSON on stdin or through `--request REQUEST.json`, with binary fields encoded as base64. The browser binding uses the same logical `RunRequest` and `RunResult` fields through its JavaScript interface, with binary values transferred as typed arrays; the transports are intentionally host-specific.

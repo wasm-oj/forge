@@ -13,7 +13,7 @@ await publishCargoLicenseInventory({
   stagedReportPath,
   reportPath,
   inventoryPath,
-  schema: "wasm-oj-forge-v1/wasmer-sdk-licenses",
+  schema: "wasm-oj-v2/wasmer-sdk-licenses",
   graph: {
     package: "@wasmer/sdk@0.10.0",
     sourceRevision: "93b8b738ebd3ee57e118da0f0eb795b97d5b999e",

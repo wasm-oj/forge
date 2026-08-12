@@ -1,0 +1,66 @@
+{
+  "name": "@wasm-oj/server",
+  "version": "0.2.0",
+  "description": "Node.js compiler and runner host for the WASM-OJ SDK.",
+  "license": "MIT",
+  "author": "JacobLinCool",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wasm-oj/forge.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://github.com/wasm-oj/forge#readme",
+  "bugs": {
+    "url": "https://github.com/wasm-oj/forge/issues"
+  },
+  "keywords": ["online-judge", "wasi", "wasm", "node"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "crates/runtime-core/Cargo.lock",
+    "crates/runtime-core/Cargo.toml",
+    "crates/runtime-core/README.md",
+    "crates/runtime-core/src",
+    "vendor/shared-buffer/Cargo.toml",
+    "vendor/shared-buffer/LICENSE_APACHE.md",
+    "vendor/shared-buffer/LICENSE_MIT.md",
+    "vendor/shared-buffer/README.md",
+    "vendor/shared-buffer/src",
+    "vendor/virtual-fs/Cargo.toml",
+    "vendor/virtual-fs/LICENSE",
+    "vendor/virtual-fs/src",
+    "testdata/wojjdg02-v2-text.hex",
+    "rust-toolchain.toml",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "licenses"
+  ],
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-library.mjs --package @wasm-oj/server",
+    "prepack": "pnpm run build",
+    "runtime:build-native": "cargo build --locked --manifest-path crates/runtime-core/Cargo.toml --release --bins"
+  },
+  "dependencies": {
+    "@wasm-oj/contracts": "workspace:0.2.0",
+    "@wasm-oj/core": "workspace:0.2.0",
+    "@wasmer/sdk": "0.10.0",
+    "fflate": "0.8.3"
+  }
+}

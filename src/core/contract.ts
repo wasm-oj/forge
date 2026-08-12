@@ -1,47 +1,47 @@
 /**
- * The single compatibility boundary shared by Forge compilers, runners,
+ * The single compatibility boundary shared by WASM-OJ compilers, runners,
  * artifacts, judge specifications, caches, and conformance evidence.
  *
  * Package and upstream toolchain versions remain independent release metadata;
- * they do not define Forge protocol compatibility.
+ * they do not define WASM-OJ protocol compatibility.
  */
-export const FORGE_CONTRACT_VERSION = 1 as const;
+export const WASM_OJ_CONTRACT_VERSION = 2 as const;
 
-export const FORGE_CONTRACT_ID = `wasm-oj-forge-v${FORGE_CONTRACT_VERSION}` as const;
+export const WASM_OJ_CONTRACT_ID = `wasm-oj-v${WASM_OJ_CONTRACT_VERSION}` as const;
 
-export const FORGE_SCHEMAS = Object.freeze({
-  clangPins: `${FORGE_CONTRACT_ID}/clang-pins`,
-  clangLibcxxPch: `${FORGE_CONTRACT_ID}/clang-libcxx-pch`,
-  clangToolchain: `${FORGE_CONTRACT_ID}/clang-toolchain`,
-  compileBatch: `${FORGE_CONTRACT_ID}/compile-batch`,
-  compileTrace: `${FORGE_CONTRACT_ID}/compile-trace`,
-  conformance: `${FORGE_CONTRACT_ID}/conformance`,
-  conformanceEvidence: `${FORGE_CONTRACT_ID}/conformance-evidence`,
-  conformanceMatrix: `${FORGE_CONTRACT_ID}/conformance-matrix`,
-  cppDependencyLock: `${FORGE_CONTRACT_ID}/cpp-dependency-lock`,
-  dependencyLock: `${FORGE_CONTRACT_ID}/dependency-lock`,
-  dependencyOfflineBundle: `${FORGE_CONTRACT_ID}/dependency-offline-bundle`,
-  incrementalBuildGraph: `${FORGE_CONTRACT_ID}/incremental-build-graph`,
-  interactiveRequest: `${FORGE_CONTRACT_ID}/interactive-request`,
-  goToolchain: `${FORGE_CONTRACT_ID}/go-toolchain`,
-  objectCache: `${FORGE_CONTRACT_ID}/object-cache`,
-  pythonToolchain: `${FORGE_CONTRACT_ID}/python-toolchain`,
-  replayBundle: `${FORGE_CONTRACT_ID}/replay-bundle`,
-  releaseManifest: `${FORGE_CONTRACT_ID}/release-manifest`,
-  rustToolchain: `${FORGE_CONTRACT_ID}/rust-toolchain`,
-  runRequest: `${FORGE_CONTRACT_ID}/run-request`,
-  runtimeBundle: `${FORGE_CONTRACT_ID}/runtime-bundle`,
-  runtimeCoreLicenses: `${FORGE_CONTRACT_ID}/runtime-core-licenses`,
-  thirdPartyComponents: `${FORGE_CONTRACT_ID}/third-party-components`,
-  wasmerSdkLicenses: `${FORGE_CONTRACT_ID}/wasmer-sdk-licenses`,
-  validationSource: `${FORGE_CONTRACT_ID}/validation-source`,
+export const WASM_OJ_SCHEMAS = Object.freeze({
+  clangPins: `${WASM_OJ_CONTRACT_ID}/clang-pins`,
+  clangLibcxxPch: `${WASM_OJ_CONTRACT_ID}/clang-libcxx-pch`,
+  clangToolchain: `${WASM_OJ_CONTRACT_ID}/clang-toolchain`,
+  compileBatch: `${WASM_OJ_CONTRACT_ID}/compile-batch`,
+  compileTrace: `${WASM_OJ_CONTRACT_ID}/compile-trace`,
+  conformance: `${WASM_OJ_CONTRACT_ID}/conformance`,
+  conformanceEvidence: `${WASM_OJ_CONTRACT_ID}/conformance-evidence`,
+  conformanceMatrix: `${WASM_OJ_CONTRACT_ID}/conformance-matrix`,
+  cppDependencyLock: `${WASM_OJ_CONTRACT_ID}/cpp-dependency-lock`,
+  dependencyLock: `${WASM_OJ_CONTRACT_ID}/dependency-lock`,
+  dependencyOfflineBundle: `${WASM_OJ_CONTRACT_ID}/dependency-offline-bundle`,
+  incrementalBuildGraph: `${WASM_OJ_CONTRACT_ID}/incremental-build-graph`,
+  interactiveRequest: `${WASM_OJ_CONTRACT_ID}/interactive-request`,
+  goToolchain: `${WASM_OJ_CONTRACT_ID}/go-toolchain`,
+  objectCache: `${WASM_OJ_CONTRACT_ID}/object-cache`,
+  pythonToolchain: `${WASM_OJ_CONTRACT_ID}/python-toolchain`,
+  replayBundle: `${WASM_OJ_CONTRACT_ID}/replay-bundle`,
+  releaseManifest: `${WASM_OJ_CONTRACT_ID}/release-manifest`,
+  rustToolchain: `${WASM_OJ_CONTRACT_ID}/rust-toolchain`,
+  runRequest: `${WASM_OJ_CONTRACT_ID}/run-request`,
+  runtimeBundle: `${WASM_OJ_CONTRACT_ID}/runtime-bundle`,
+  runtimeCoreLicenses: `${WASM_OJ_CONTRACT_ID}/runtime-core-licenses`,
+  thirdPartyComponents: `${WASM_OJ_CONTRACT_ID}/third-party-components`,
+  wasmerSdkLicenses: `${WASM_OJ_CONTRACT_ID}/wasmer-sdk-licenses`,
+  toolchainPackage: `${WASM_OJ_CONTRACT_ID}/toolchain-package`,
 } as const);
 
-export const FORGE_STORAGE = Object.freeze({
-  database: `${FORGE_CONTRACT_ID}:storage`,
-  databaseVersion: FORGE_CONTRACT_VERSION,
-  dependencyCache: `${FORGE_CONTRACT_ID}:dependencies`,
-  incrementalBuildCache: `${FORGE_CONTRACT_ID}:incremental-build-cache`,
-  runtimeFilesCache: `${FORGE_CONTRACT_ID}:runtime-files`,
-  toolchainCache: `${FORGE_CONTRACT_ID}:toolchains`,
+export const WASM_OJ_STORAGE = Object.freeze({
+  database: `${WASM_OJ_CONTRACT_ID}:storage`,
+  databaseVersion: WASM_OJ_CONTRACT_VERSION,
+  dependencyCache: `${WASM_OJ_CONTRACT_ID}:dependencies`,
+  incrementalBuildCache: `${WASM_OJ_CONTRACT_ID}:incremental-build-cache`,
+  runtimeFilesCache: `${WASM_OJ_CONTRACT_ID}:runtime-files`,
+  toolchainCache: `${WASM_OJ_CONTRACT_ID}:toolchains`,
 } as const);

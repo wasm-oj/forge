@@ -3,7 +3,7 @@ set -euo pipefail
 umask 022
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/forge-toolchains.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/wasm-oj-toolchains.XXXXXX")"
 cleanup() {
   rm -rf "$WORK"
   if [[ -n "${TYPESCRIPT_STAGED:-}" ]]; then rm -f "$TYPESCRIPT_STAGED"; fi
@@ -13,13 +13,13 @@ trap cleanup EXIT
 
 TYPESCRIPT_VERSION="7.0.2"
 TYPESCRIPT_COMMIT="2bd066d87f5bafd315be9f40889d0a60b9e58e0b"
-TYPESCRIPT_SHA256="287c1a1e48179014821b8acbaa78000c17df4d072cab2cb9e8d7477cd55878f7"
+TYPESCRIPT_SHA256="06e58ce887d95d1895055699b8dc96a1cde7d1f2baa48de40f9b790e3271dc16"
 QUICKJS_UPSTREAM_VERSION="0.15.1"
 QUICKJS_COMMIT="fd0a0210b7be00957751871e7e01b8291268fc29"
 QUICKJS_SOURCE_DATE_EPOCH="1780584979"
 QUICKJS_VERSION="$QUICKJS_UPSTREAM_VERSION"
-QUICKJS_WASM_SHA256="21fcf23a5fdf3e64b803344c9af86be01e95feabf4779d02aef325c852bc2c2e"
-QUICKJS_SHA256="5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582"
+QUICKJS_WASM_SHA256="956bf2b3700690e1817034eb8e063cfd9781c66b4bffa244ef4f9445656ccfa1"
+QUICKJS_SHA256="8c7f0588210490e7d77f198fc91f72c1b94787ab4c359c4786ca59a363c4f5e8"
 WASI_SDK_VERSION="24.0"
 WASI_SDK_REVISION="d2bea01edcc46f731156a817f710cdd9fc9c1c19"
 WASI_SDK_LLVM_REVISION="26a1d6601d727a96f4301d0d8647b5a42760ae0c"
@@ -108,9 +108,9 @@ git -C "$TYPESCRIPT_SOURCE" checkout -q --detach FETCH_HEAD
   echo "TypeScript-Go checkout does not match the pinned commit." >&2
   exit 1
 }
-mkdir -p "$TYPESCRIPT_SOURCE/cmd/forge"
-cp "$ROOT/toolchains/typescript-wasi/main.go" "$TYPESCRIPT_SOURCE/cmd/forge/main.go"
-gofmt -w "$TYPESCRIPT_SOURCE/cmd/forge/main.go"
+mkdir -p "$TYPESCRIPT_SOURCE/cmd/wasm-oj"
+cp "$ROOT/toolchains/typescript-wasi/main.go" "$TYPESCRIPT_SOURCE/cmd/wasm-oj/main.go"
+gofmt -w "$TYPESCRIPT_SOURCE/cmd/wasm-oj/main.go"
 (
   cd "$TYPESCRIPT_SOURCE"
   GOOS=wasip1 GOARCH=wasm go build \
@@ -118,7 +118,7 @@ gofmt -w "$TYPESCRIPT_SOURCE/cmd/forge/main.go"
     -gcflags=all=-l \
     -ldflags='-s -w -buildid=' \
     -o "$WORK/typescript.wasm" \
-    ./cmd/forge
+    ./cmd/wasm-oj
 )
 gzip -n -9 -c "$WORK/typescript.wasm" > "$TYPESCRIPT_STAGED"
 
@@ -136,9 +136,9 @@ SOURCE_DATE_EPOCH="$QUICKJS_SOURCE_DATE_EPOCH" "$WASI_CLANG" \
   -D_GNU_SOURCE \
   -D_WASI_EMULATED_SIGNAL \
   "-DCONFIG_VERSION=\"$QUICKJS_UPSTREAM_VERSION\"" \
-  "-ffile-prefix-map=$ROOT=/wasm-oj-forge" \
-  "-fdebug-prefix-map=$ROOT=/wasm-oj-forge" \
-  "-fmacro-prefix-map=$ROOT=/wasm-oj-forge" \
+  "-ffile-prefix-map=$ROOT=/wasm-oj" \
+  "-fdebug-prefix-map=$ROOT=/wasm-oj" \
+  "-fmacro-prefix-map=$ROOT=/wasm-oj" \
   "-ffile-prefix-map=$QUICKJS_SOURCE=/quickjs-ng" \
   "-fdebug-prefix-map=$QUICKJS_SOURCE=/quickjs-ng" \
   "-fmacro-prefix-map=$QUICKJS_SOURCE=/quickjs-ng" \

@@ -18,14 +18,14 @@ interface WorkerHarness {
   configure(path: string | null): Promise<unknown>;
 }
 
-const persistedManifestUrl = "https://forge.test/__forge__/sites-toolchain-chunks";
+const persistedManifestUrl = "https://wasm-oj.test/__wasm-oj__/sites-toolchain-chunks";
 
 async function serviceWorkerHarness(options: { persistedManifest?: string } = {}): Promise<WorkerHarness> {
   const listeners = new Map<string, (event: Record<string, unknown>) => void>();
   const claim = vi.fn(async () => undefined);
   const cache = {
     match: vi.fn(async (input: RequestInfo | URL) => {
-      const url = input instanceof Request ? input.url : new URL(input.toString(), "https://forge.test").href;
+      const url = input instanceof Request ? input.url : new URL(input.toString(), "https://wasm-oj.test").href;
       return url === persistedManifestUrl && options.persistedManifest !== undefined
         ? new Response(options.persistedManifest)
         : undefined;
@@ -52,7 +52,7 @@ async function serviceWorkerHarness(options: { persistedManifest?: string } = {}
       open: async () => cache,
     },
     self: {
-      location: { origin: "https://forge.test" },
+      location: { origin: "https://wasm-oj.test" },
       clients: { claim },
       skipWaiting: async () => undefined,
       addEventListener(type: string, listener: (event: Record<string, unknown>) => void) {
@@ -83,6 +83,7 @@ function acceptingWorker(state: ServiceWorkerState = "activated") {
 
 describe("toolchain cache service worker", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -97,11 +98,11 @@ describe("toolchain cache service worker", () => {
     vi.stubGlobal("navigator", { serviceWorker: { register } });
 
     await expect(registerToolchainCache({
-      scriptUrl: "/assets/forge-toolchains.js",
+      scriptUrl: "/assets/wasm-oj-toolchains.js",
       scope: "/judge/",
     })).resolves.toBe(registration);
     expect(register).toHaveBeenCalledWith(
-      "/assets/forge-toolchains.js",
+      "/assets/wasm-oj-toolchains.js",
       { scope: "/judge/", updateViaCache: "none" },
     );
     expect(worker.postMessage).toHaveBeenCalledWith(
@@ -199,7 +200,7 @@ describe("toolchain cache service worker", () => {
     let lifetime: Promise<unknown> | undefined;
 
     harness.listeners.get("fetch")?.({
-      request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${sha256}`),
+      request: new Request(`https://wasm-oj.test/toolchains/compiler.bin?sha256=${sha256}`),
       respondWith(promise: Promise<Response>) { response = promise; },
       waitUntil(promise: Promise<unknown>) { lifetime = promise; },
     });
@@ -211,6 +212,46 @@ describe("toolchain cache service worker", () => {
     expect(harness.warnings).toHaveBeenCalledOnce();
   });
 
+  it("reuses a cache entry verified in this worker lifecycle without hashing its body again", async () => {
+    const digest = vi.spyOn(webcrypto.subtle, "digest");
+    const harness = await serviceWorkerHarness();
+    const body = "immutable cached toolchain";
+    const sha256 = createHash("sha256").update(body).digest("hex");
+    const request = new Request(`https://wasm-oj.test/toolchains/compiler.bin?sha256=${sha256}`);
+    harness.fetch.mockResolvedValue(new Response(body));
+    let firstResponse: Promise<Response> | undefined;
+    let firstLifetime: Promise<unknown> | undefined;
+
+    harness.listeners.get("fetch")?.({
+      request,
+      respondWith(promise: Promise<Response>) { firstResponse = promise; },
+      waitUntil(promise: Promise<unknown>) { firstLifetime = promise; },
+    });
+    expect(await (await firstResponse!).text()).toBe(body);
+    await firstLifetime;
+    const stored = harness.cache.put.mock.calls[0]?.[1];
+    expect(stored).toBeInstanceOf(Response);
+    const cached = (stored as Response).clone();
+    const clone = vi.spyOn(cached, "clone");
+    harness.cache.match.mockResolvedValue(cached);
+    const digestCalls = digest.mock.calls.length;
+    harness.fetch.mockClear();
+    let cachedResponse: Promise<Response> | undefined;
+    let cachedLifetime: Promise<unknown> | undefined;
+
+    harness.listeners.get("fetch")?.({
+      request,
+      respondWith(promise: Promise<Response>) { cachedResponse = promise; },
+      waitUntil(promise: Promise<unknown>) { cachedLifetime = promise; },
+    });
+    expect(await cachedResponse!).toBe(cached);
+    await cachedLifetime;
+
+    expect(harness.fetch).not.toHaveBeenCalled();
+    expect(clone).not.toHaveBeenCalled();
+    expect(digest).toHaveBeenCalledTimes(digestCalls);
+  });
+
   it("does not cache or return a network response with the wrong digest", async () => {
     const harness = await serviceWorkerHarness();
     harness.fetch.mockResolvedValue(new Response("tampered"));
@@ -218,7 +259,7 @@ describe("toolchain cache service worker", () => {
     const expected = "0".repeat(64);
 
     harness.listeners.get("fetch")?.({
-      request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${expected}`),
+      request: new Request(`https://wasm-oj.test/toolchains/compiler.bin?sha256=${expected}`),
       respondWith(promise: Promise<Response>) { response = promise; },
       waitUntil() {},
     });
@@ -231,13 +272,13 @@ describe("toolchain cache service worker", () => {
   });
 
   it("assembles a build-configured chunk transport and verifies every part", async () => {
-    const manifestPath = "/toolchains/forge-sites-chunks.json";
+    const manifestPath = "/toolchains/wasm-oj-sites-chunks.json";
     const harness = await serviceWorkerHarness();
     const parts = [new TextEncoder().encode("verified "), new TextEncoder().encode("toolchain")];
     const body = Buffer.concat(parts);
     const sha256 = createHash("sha256").update(body).digest("hex");
     const chunks = parts.map((part, index) => ({
-      path: `/toolchains/compiler.bin.forge-chunk-${String(index).padStart(3, "0")}`,
+      path: `/toolchains/compiler.bin.wasm-oj-chunk-${String(index).padStart(3, "0")}`,
       byteLength: part.byteLength,
       sha256: createHash("sha256").update(part).digest("hex"),
     }));
@@ -245,7 +286,7 @@ describe("toolchain cache service worker", () => {
       const url = new URL(input instanceof Request ? input.url : input.toString());
       if (url.pathname === manifestPath) {
         return new Response(JSON.stringify({
-          schema: "wasm-oj-forge-v1/sites-toolchain-chunks",
+          schema: "wasm-oj-v2/sites-toolchain-chunks",
           assets: [{ path: "/toolchains/compiler.bin", byteLength: body.byteLength, sha256, chunks }],
         }));
       }
@@ -258,7 +299,7 @@ describe("toolchain cache service worker", () => {
     harness.cache.put.mockClear();
     let response: Promise<Response> | undefined;
     harness.listeners.get("fetch")?.({
-      request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${sha256}`),
+      request: new Request(`https://wasm-oj.test/toolchains/compiler.bin?sha256=${sha256}`),
       respondWith(promise: Promise<Response>) { response = promise; },
       waitUntil() {},
     });
@@ -267,8 +308,71 @@ describe("toolchain cache service worker", () => {
     expect(harness.cache.put).toHaveBeenCalledTimes(parts.length);
   });
 
+  it("streams lifecycle-verified cached chunks without rematerializing or rehashing them", async () => {
+    const digest = vi.spyOn(webcrypto.subtle, "digest");
+    const manifestPath = "/toolchains/wasm-oj-sites-chunks.json";
+    const harness = await serviceWorkerHarness();
+    const parts = [new TextEncoder().encode("cached "), new TextEncoder().encode("chunks")];
+    const body = Buffer.concat(parts);
+    const sha256 = createHash("sha256").update(body).digest("hex");
+    const chunks = parts.map((part, index) => ({
+      path: `/toolchains/compiler.bin.wasm-oj-chunk-${String(index).padStart(3, "0")}`,
+      byteLength: part.byteLength,
+      sha256: createHash("sha256").update(part).digest("hex"),
+    }));
+    harness.fetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      if (url.pathname === manifestPath) {
+        return new Response(JSON.stringify({
+          schema: "wasm-oj-v2/sites-toolchain-chunks",
+          assets: [{ path: "/toolchains/compiler.bin", byteLength: body.byteLength, sha256, chunks }],
+        }));
+      }
+      const index = chunks.findIndex((chunk) => chunk.path === url.pathname);
+      if (index >= 0) return new Response(parts[index]);
+      throw new Error(`Unexpected network request '${url.pathname}'.`);
+    });
+    await harness.configure(manifestPath);
+    harness.cache.put.mockClear();
+    const request = new Request(`https://wasm-oj.test/toolchains/compiler.bin?sha256=${sha256}`);
+    let firstResponse: Promise<Response> | undefined;
+    harness.listeners.get("fetch")?.({
+      request,
+      respondWith(promise: Promise<Response>) { firstResponse = promise; },
+      waitUntil() {},
+    });
+    expect(await (await firstResponse!).text()).toBe("cached chunks");
+    const stored = new Map(harness.cache.put.mock.calls.map(([chunkRequest, response]) => [
+      (chunkRequest as Request).url,
+      response as Response,
+    ]));
+    expect(stored.size).toBe(parts.length);
+    const returnedClones: Array<ReturnType<typeof vi.spyOn>> = [];
+    harness.cache.match.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : new URL(input.toString(), "https://wasm-oj.test").href;
+      const response = stored.get(url)?.clone();
+      if (response) returnedClones.push(vi.spyOn(response, "clone"));
+      return response;
+    });
+    const digestCalls = digest.mock.calls.length;
+    const networkCalls = harness.fetch.mock.calls.length;
+    let cachedResponse: Promise<Response> | undefined;
+
+    harness.listeners.get("fetch")?.({
+      request,
+      respondWith(promise: Promise<Response>) { cachedResponse = promise; },
+      waitUntil() {},
+    });
+    expect(await (await cachedResponse!).text()).toBe("cached chunks");
+
+    expect(harness.fetch).toHaveBeenCalledTimes(networkCalls);
+    expect(digest).toHaveBeenCalledTimes(digestCalls);
+    expect(returnedClones).toHaveLength(parts.length);
+    expect(returnedClones.every((clone) => clone.mock.calls.length === 0)).toBe(true);
+  });
+
   it("fails closed when a deployment chunk does not match its manifest", async () => {
-    const manifestPath = "/toolchains/forge-sites-chunks.json";
+    const manifestPath = "/toolchains/wasm-oj-sites-chunks.json";
     const harness = await serviceWorkerHarness();
     const expected = createHash("sha256").update("expected").digest("hex");
     const chunkSha256 = createHash("sha256").update("expected").digest("hex");
@@ -276,13 +380,13 @@ describe("toolchain cache service worker", () => {
       const url = new URL(input instanceof Request ? input.url : input.toString());
       if (url.pathname === manifestPath) {
         return new Response(JSON.stringify({
-          schema: "wasm-oj-forge-v1/sites-toolchain-chunks",
+          schema: "wasm-oj-v2/sites-toolchain-chunks",
           assets: [{
             path: "/toolchains/compiler.bin",
             byteLength: 8,
             sha256: expected,
             chunks: [{
-              path: "/toolchains/compiler.bin.forge-chunk-000",
+              path: "/toolchains/compiler.bin.wasm-oj-chunk-000",
               byteLength: 8,
               sha256: chunkSha256,
             }],
@@ -295,7 +399,7 @@ describe("toolchain cache service worker", () => {
     harness.cache.put.mockClear();
     let response: Promise<Response> | undefined;
     harness.listeners.get("fetch")?.({
-      request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${expected}`),
+      request: new Request(`https://wasm-oj.test/toolchains/compiler.bin?sha256=${expected}`),
       respondWith(promise: Promise<Response>) { response = promise; },
       waitUntil() {},
     });
@@ -309,13 +413,13 @@ describe("toolchain cache service worker", () => {
     const sha256 = createHash("sha256").update(body).digest("hex");
     const chunkSha256 = createHash("sha256").update(body).digest("hex");
     const manifest = JSON.stringify({
-      schema: "wasm-oj-forge-v1/sites-toolchain-chunks",
+      schema: "wasm-oj-v2/sites-toolchain-chunks",
       assets: [{
         path: "/toolchains/compiler.bin",
         byteLength: body.length,
         sha256,
         chunks: [{
-          path: "/toolchains/compiler.bin.forge-chunk-000",
+          path: "/toolchains/compiler.bin.wasm-oj-chunk-000",
           byteLength: body.length,
           sha256: chunkSha256,
         }],
@@ -326,7 +430,7 @@ describe("toolchain cache service worker", () => {
     let response: Promise<Response> | undefined;
 
     harness.listeners.get("fetch")?.({
-      request: new Request(`https://forge.test/toolchains/compiler.bin?sha256=${sha256}`),
+      request: new Request(`https://wasm-oj.test/toolchains/compiler.bin?sha256=${sha256}`),
       respondWith(promise: Promise<Response>) { response = promise; },
       waitUntil() {},
     });

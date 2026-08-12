@@ -12,7 +12,7 @@ export interface LanguageDriver {
   build(context: LanguageBuildContext): Promise<BuildResult>;
 }
 
-/** Internal registry for Forge's built-in compiler pipelines. */
+/** Internal registry for WASM-OJ's built-in compiler pipelines. */
 export class LanguageDriverRegistry {
   private readonly drivers = new Map<Language, LanguageDriver>();
   private readonly ids = new Set<string>();

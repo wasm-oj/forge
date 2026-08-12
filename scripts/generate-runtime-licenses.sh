@@ -32,8 +32,8 @@ cargo fetch \
   --locked \
   --manifest-path "$ROOT/crates/runtime-core/Cargo.toml"
 
-STAGED_HTML="$(mktemp "${TMPDIR:-/tmp}/forge-runtime-licenses.XXXXXX.html")"
-RAW_JSON="$(mktemp "${TMPDIR:-/tmp}/forge-runtime-licenses.XXXXXX.raw.json")"
+STAGED_HTML="$(mktemp "${TMPDIR:-/tmp}/wasm-oj-runtime-licenses.XXXXXX.html")"
+RAW_JSON="$(mktemp "${TMPDIR:-/tmp}/wasm-oj-runtime-licenses.XXXXXX.raw.json")"
 trap 'rm -f "$STAGED_HTML" "$RAW_JSON"' EXIT
 
 "$CARGO_ABOUT" "${COMMON[@]}" \

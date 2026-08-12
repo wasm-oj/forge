@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { DEFAULT_RESOURCE_POLICY, WEIGHTED_METER_MODEL } from "../core/resources";
 import type { BuildArtifact, RunResult } from "../core/types";
@@ -14,7 +14,7 @@ import {
 
 const artifact: BuildArtifact = {
   kind: "wasm",
-  forgeContract: FORGE_CONTRACT_VERSION,
+  wasmOjContract: WASM_OJ_CONTRACT_VERSION,
   id: "ignored-host-observation",
   projectId: "project",
   cacheKey: "cache",
@@ -200,7 +200,7 @@ describe("conformance matrix", () => {
       ...result(""),
       code: 1,
       termination: "trap" as const,
-      trapMessage: "Forge denied nondeterministic capability wasix_32v1.thread_spawn",
+      trapMessage: "WASM-OJ denied nondeterministic capability wasix_32v1.thread_spawn",
     };
     expect(deterministicTranscript(trapped)).toMatchObject({
       code: 1,

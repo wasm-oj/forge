@@ -1,39 +1,66 @@
-# Forge integration guide
+# WASM-OJ SDK integration guide
 
-This is the host-facing guide for embedding Forge in another online judge. The
-same `ForgeEngine` submission, error, observation, dependency, artifact, judge,
-and replay contracts are used in browsers and Node.js servers; only compiler,
-runner, and storage adapters differ.
+WASM-OJ exposes one host-neutral contract and separate browser, server, and Organizer adapters.
+Choose imports by ownership boundary; do not import browser code into a Node.js service or server
+code into a client bundle.
 
-## Install and import boundaries
+## Package boundaries
 
-```bash
-pnpm add @wasm-oj/forge
+```text
+@wasm-oj/contracts → @wasm-oj/core
+                   ↘ @wasm-oj/browser ┐
+                   ↘ @wasm-oj/server  ├→ @wasm-oj/sdk
+                   ↘ @wasm-oj/organizer ┘
 ```
-
-Use only the public export that owns the code's execution environment:
 
 | Import | Purpose |
 | --- | --- |
-| `@wasm-oj/forge` | Host-neutral types, `ForgeEngine`, judge, dependencies, replay, and conformance |
-| `@wasm-oj/forge/browser` | Browser Workers, IndexedDB storage, runtime-driver plug-ins, and service-worker registration |
-| `@wasm-oj/forge/server` | Node.js/Wasmer compiler and runner, filesystem stores, and `createServerForge()` |
+| `@wasm-oj/contracts` | Contract constants, wire/error types, and toolchain source models |
+| `@wasm-oj/core` | Host-neutral engine, compiler/runner interfaces, judge, dependency, replay, and conformance APIs |
+| `@wasm-oj/browser` | Browser Workers, browser storage, runtime-driver plug-ins, and `createBrowserEngine()` |
+| `@wasm-oj/server` | Node.js/Wasmer processes, filesystem stores, and `createServerEngine()` |
+| `@wasm-oj/organizer` | Collection and immutable judge-package publication validation |
+| `@wasm-oj/sdk` | Convenience root re-export of the host-neutral contracts and core APIs |
+| `@wasm-oj/sdk/contracts`, `@wasm-oj/sdk/browser`, `@wasm-oj/sdk/server`, `@wasm-oj/sdk/organizer` | Explicit convenience subpaths that re-export those same package instances |
 
-Forge contract version `1` supports `wasip1` and `wasix`. A target label never
-silently selects another ABI: unsupported language/target pairs fail before a
-build begins.
+All active APIs implement `WASM_OJ_CONTRACT_VERSION === 2` and
+`WASM_OJ_CONTRACT_ID === "wasm-oj-v2"`. Unsupported language/target/profile pairs and older wire
+shapes fail before execution.
+
+## Explicit toolchain sources
+
+Toolchains are installed separately from code packages:
+
+```sh
+pnpm add @wasm-oj/browser \
+  @wasm-oj/toolchain-clang \
+  @wasm-oj/toolchain-rust \
+  @wasm-oj/toolchain-go \
+  @wasm-oj/toolchain-python \
+  @wasm-oj/toolchain-javascript
+```
+
+Each package exports an immutable contract-2 `descriptor`, `browserSource(baseUrl)`, and
+`serverSource()`. A descriptor binds its package identity, languages, build profiles, logical asset
+paths, byte lengths, SHA-256 digests, and package export paths.
+
+Hosts require a non-empty source array. They do not use a default CDN, package search, current
+working directory, or `/toolchains/` fallback. A language, profile, or asset can have exactly one
+owner.
 
 ## Browser host
-
-Deploy the package's emitted Worker assets without renaming them and serve the
-exported `public/toolchains/` files at `assetBaseUrl`. Then construct one host:
 
 ```ts
 import {
   BrowserDependencyNetworkConsent,
-  Forge,
+  createBrowserEngine,
   registerToolchainCache,
-} from "@wasm-oj/forge/browser";
+} from "@wasm-oj/browser";
+import { browserSource as clangSource } from "@wasm-oj/toolchain-clang";
+import { browserSource as rustSource } from "@wasm-oj/toolchain-rust";
+import { browserSource as goSource } from "@wasm-oj/toolchain-go";
+import { browserSource as pythonSource } from "@wasm-oj/toolchain-python";
+import { browserSource as javascriptSource } from "@wasm-oj/toolchain-javascript";
 
 await registerToolchainCache({
   scriptUrl: "/toolchain-cache-sw.js",
@@ -47,79 +74,119 @@ const dependencyConsent = new BrowserDependencyNetworkConsent(
   ),
 );
 
-const forge = await Forge.create({
-  assetBaseUrl: "/toolchains/",
+const baseUrl = "/toolchains/";
+const engine = await createBrowserEngine({
+  toolchains: [
+    clangSource(baseUrl),
+    rustSource(baseUrl),
+    goSource(baseUrl),
+    pythonSource(baseUrl),
+    javascriptSource(baseUrl),
+  ],
   artifactCache: true,
   dependencyNetworkAuthorizer: dependencyConsent,
 });
 ```
 
-The page must be cross-origin isolated. Its responses need COOP
-`same-origin`, COEP `require-corp`, and CORP `same-origin`; CSP must permit
-`worker-src 'self' blob:`.
-Toolchain requests are static, digest-pinned GETs and contain no source code,
-stdin, diagnostics, or artifacts.
+`baseUrl` identifies the HTTP directory containing the descriptor's asset basenames. It may be
+root-relative or an absolute HTTP(S) URL; `browserSource()` canonicalizes the stored directory URL
+with a trailing `/`. Every fetched response is checked against the descriptor's exact byte length
+and digest before use.
+
+The page must be cross-origin isolated: COOP `same-origin`, COEP `require-corp`, CORP
+`same-origin`, and `worker-src 'self' blob:` are required. Cross-origin asset servers must emit
+compatible CORS/CORP headers.
 
 ## Server host
 
-Provision the native binaries once, before application startup:
+Build the packaged native executables while constructing the deployment image:
 
-```bash
-pnpm --dir node_modules/@wasm-oj/forge run runtime:build-native
+```sh
+pnpm --dir node_modules/@wasm-oj/server run runtime:build-native
 ```
 
-When binaries and toolchains remain in their package-relative locations,
-server initialization is one line:
+Create a host with explicit runtime and toolchain locations:
 
 ```ts
-import { createServerForge } from "@wasm-oj/forge/server";
+import { createServerEngine } from "@wasm-oj/server";
+import { serverSource as clangSource } from "@wasm-oj/toolchain-clang";
+import { serverSource as rustSource } from "@wasm-oj/toolchain-rust";
+import { serverSource as goSource } from "@wasm-oj/toolchain-go";
+import { serverSource as pythonSource } from "@wasm-oj/toolchain-python";
+import { serverSource as javascriptSource } from "@wasm-oj/toolchain-javascript";
 
-const forge = await createServerForge();
-```
-
-For immutable application images, build into an external directory and name it
-explicitly:
-
-```ts
-const forge = await createServerForge({
-  runtimeDirectory: "/srv/forge-runtime/release",
-  cacheDirectory: "/var/cache/forge",
+const engine = await createServerEngine({
+  runtimeDirectory: "/srv/wasm-oj/runtime/release",
+  cacheDirectory: "/var/cache/wasm-oj",
+  toolchains: [
+    clangSource(),
+    rustSource(),
+    goSource(),
+    pythonSource(),
+    javascriptSource(),
+  ],
 });
 ```
 
-Startup verifies both executables as real executable files and streams a
-SHA-256 check over every pinned toolchain asset. It never downloads, builds, or
-falls back to another distribution. An invalid distribution rejects with a
-`ForgeError` whose code is `initialization-failure`.
+`runtimeDirectory` must contain executable regular files named `wasm-oj-compiler` and
+`wasm-oj-runner` (with `.exe` on Windows). `serverSource()` resolves only its installed package's
+read-only `assets/` directory. Startup checks file type, size, and digest and never downloads,
+builds, searches for, or substitutes a missing distribution.
 
-## Submission-scoped operation
+## Compile and run
 
-A submission is the unit of queueing, observation, cancellation, and result
-ownership. Register the engine-wide observer before `submit()` when the host
-needs the complete trace. A scoped `operation.onEvent()` subscription begins
-with the operation's current state snapshot, then receives subsequent events:
+```ts
+const build = await engine.compile({
+  language: "typescript",
+  target: "wasip1",
+  optimization: "release",
+  entry: "src/main.ts",
+  files: {
+    "src/main.ts": 'import * as std from "std";\nconst answer: number = 42;\nstd.out.puts(`${answer}\\n`);',
+  },
+});
+
+if (!build.success || !build.artifact) {
+  renderDiagnostics(build.diagnostics);
+} else {
+  const run = await engine.run(build.artifact, {
+    args: [],
+    stdin: "",
+    env: {},
+  });
+  renderOutput(run.stdout, run.stderr, run.termination);
+}
+```
+
+Compiler diagnostics, guest termination, and judge verdicts are result data. Infrastructure
+failures use `WasmOjError`, whose `code`, `stage`, `retryable`, optional operation ID, and bounded
+details can be serialized with `toJSON()`.
+
+## Submission-scoped operations
+
+`submit()` is the queueing, observation, cancellation, and ownership boundary:
 
 ```ts
 import {
-  FORGE_CONTRACT_VERSION,
-  ForgeError,
+  WASM_OJ_CONTRACT_VERSION,
+  WasmOjError,
   textMatcher,
-} from "@wasm-oj/forge";
+} from "@wasm-oj/core";
 
-const stopObserving = forge.onObservation((event) => {
+const stopObserving = engine.onObservation((event) => {
   persistObservation(event.operationId, event.sequence, event);
 });
 
-const operation = forge.submit({
+const operation = engine.submit({
   id: "submission-018f",
   input: {
     language: "rust",
     target: "wasip1",
-    entry: "src/main.rs",
-    files: { "src/main.rs": 'fn main() { println!("42"); }' },
+    entry: "main.rs",
+    files: { "main.rs": 'fn main() { println!("42"); }' },
   },
   spec: {
-    version: FORGE_CONTRACT_VERSION,
+    version: WASM_OJ_CONTRACT_VERSION,
     failFast: false,
     cases: [{
       kind: "batch",
@@ -131,13 +198,12 @@ const operation = forge.submit({
 });
 
 const stopOperationEvents = operation.onEvent(renderLiveEvent);
-
 try {
   const { build, judge } = await operation.result;
   renderDiagnostics(build.diagnostics);
   renderVerdict(judge?.verdict);
 } catch (error) {
-  if (error instanceof ForgeError) recordInfrastructureFailure(error.toJSON());
+  if (error instanceof WasmOjError) recordInfrastructureFailure(error.toJSON());
   else throw error;
 } finally {
   stopOperationEvents();
@@ -145,62 +211,24 @@ try {
 }
 ```
 
-Operations run FIFO within one engine. IDs are unique for the engine's
-lifetime. `operation.cancel(reason)` and an input `AbortSignal` cancel only that
-operation; cancelling a queued operation does not touch the active compiler or
-runner. While any submission is pending, direct `compile()`, `run()`,
-`judge()`, replay, and cache clearing reject with `operation-conflict` so work
-cannot cross the submission boundary.
+Operations are FIFO within one engine. Cancelling a queued operation does not cancel the active
+one. While a submission is pending, direct execution and cache mutation reject with
+`operation-conflict`, preventing work from crossing submission ownership.
 
-Every observation contains an `operationId` and monotonically increasing
-zero-based `sequence`. Event types are `state`, `progress`, `stream`, `build`,
-`case`, and `error`. Listener failures are isolated from execution and remove
-the failing listener.
+## Dependency network authorization
 
-## Errors, diagnostics, and verdicts
-
-`ForgeError` is the stable infrastructure exception. Its serializable shape is:
+Resolution and archive materialization are separate verified steps. Online resolution requires
+both the host's authorizer and an immutable per-request scope:
 
 ```ts
-interface ForgeErrorRecord {
-  name: "ForgeError";
-  message: string;
-  code: ForgeErrorCode;
-  stage: ForgeErrorStage;
-  retryable: boolean;
-  operationId?: string;
-  details?: Readonly<Record<string, string | number | boolean | null>>;
-}
-```
+declare const loadedProblem: {
+  repositorySourceKey: string;
+  problemBundleSha256: string;
+  completeDependencyHosts: readonly string[];
+};
 
-Codes are `operation-cancelled`, `operation-conflict`, `invalid-input`,
-`unsupported`, `integrity-failure`, `compiler-failure`, `runner-failure`,
-`judge-failure`, `replay-failure`, `dependency-failure`, `storage-failure`,
-`initialization-failure`, `disposed`, and `internal-failure`. Stages are
-`operation`, `compile`, `prepare`, `run`, `judge`, `replay`, `dependency`,
-`storage`, and `initialize`.
-`FORGE_ERROR_CODES` and `FORGE_ERROR_STAGES` expose these closed vocabularies at
-runtime so telemetry schemas do not duplicate string lists.
-
-Compiler errors and warnings are normal `BuildResult.diagnostics` with source,
-severity, filename, line, column, and ranges where the toolchain provides them.
-Guest resource termination is normal `RunResult.termination`. Wrong answers
-and checker failures are normal judge verdicts. Hosts must not treat those
-expected contestant outcomes as infrastructure exceptions.
-
-## Dependencies enter the compiler
-
-Resolution and archive extraction are separate, verified steps. The resulting
-file-tree bundle is passed to `compile()` and becomes part of the compiler
-input, artifact provenance, incremental build graph, and cache identity:
-
-```ts
 const manifest = {
-  requirements: [{
-    ecosystem: "npm",
-    name: "left-pad",
-    requirement: "1.3.0",
-  }],
+  requirements: [{ ecosystem: "npm", name: "left-pad", requirement: "1.3.0" }],
   sourceFiles: [{
     ecosystem: "npm",
     role: "lockfile",
@@ -209,95 +237,62 @@ const manifest = {
   }],
 } as const;
 
-// These values come from the already verified collection load. Do not derive
-// them from package metadata, editor state, or a placeholder repository.
-declare const loadedProblem: {
-  repositorySourceKey: string;
-  problemBundleSha256: string;
-  completeDependencyHosts: readonly string[];
-};
-
-const lock = await forge.resolveDependencies(manifest, {
+const lock = await engine.resolveDependencies(manifest, {
   networkAccess: {
     sourceKey: loadedProblem.repositorySourceKey,
     bundleDigest: loadedProblem.problemBundleSha256,
     hosts: loadedProblem.completeDependencyHosts,
   },
 });
-const dependencies = await forge.prepareDependencies(lock);
-const build = await forge.compile({
+const dependencies = await engine.prepareDependencies(lock);
+const build = await engine.compile({
   language: "javascript",
   target: "wasip1",
   entry: "src/main.js",
   files: {
-    "src/main.js": 'const pad = require("left-pad"); print(pad("7", 3, "0"));',
+    "src/main.js": 'const std = require("std");\nconst pad = require("left-pad");\nstd.out.puts(`${pad("7", 3, "0")}\\n`);',
   },
   dependencies,
 });
 ```
 
-The built-in mapping and admitted portable subset are deliberately strict:
+The built-in resolvers accept only their documented lock-based portable subsets. Redirects,
+credentials, insecure/private hosts, ranges, scripts, native extensions, unsupported source forms,
+and integrity mismatches fail closed. Explicit offline resolution uses verified cached payloads and
+never invokes `fetch`.
 
-| Ecosystem | Languages | Lock input | Admitted compiler input |
-| --- | --- | --- | --- |
-| Cargo | Rust | Cargo.lock v3/v4 with checksums | Rust source crates; no build scripts, proc macros, renamed crates, or native links |
-| npm | JavaScript, TypeScript | package-lock v2/v3 with SRI | Flat, uniquely named CommonJS packages; no lifecycle scripts, ESM, or native modules |
-| PyPI | Python | Exact hash-locked requirements | Pure Python wheels; no sdists, native extensions, or `.data` remapping |
-| Go modules | Go | go.mod and go.sum | Reachable pure-Go packages; no cgo, assembly, or build constraints |
-| C/C++ | C, C++ | `forge-cpp.lock.json` with HTTPS archives | Source and headers; no prebuilt native or Wasm objects |
+## Runtime-driver plug-ins
 
-Mixed ecosystems or a language/ecosystem mismatch fail instead of mounting
-unused files. `DependencyBuildBundle.lockSha256` and every package's canonical
-`filesSha256` are reverified before build-key computation. Browser and server
-default hosts provide IndexedDB and symlink-resistant filesystem dependency
-caches respectively. `exportOffline()` and `importOffline()` move the exact
-lock plus digest-keyed package payloads without invoking a registry.
-
-## Browser runtime-driver plug-ins
-
-Runtime-driver plug-ins are trusted host code, not contestant code. Bundle each
-driver into one self-contained ESM file, compute SHA-256 over the exact served
-bytes, and register only the descriptor:
+Browser runtime-driver plug-ins are trusted host code, not contestant extensions. Bundle each as
+one self-contained same-origin ESM module and pin the exact bytes:
 
 ```ts
-import { costProfileId } from "@wasm-oj/forge";
-
-const acmeCostProfile = costProfileId("acme", "wasip1", "release", "acme-runtime-1");
-const forge = await Forge.create({
+const engine = await createBrowserEngine({
+  toolchains,
   runtimeDriverPlugins: [{
-    id: "acme-runtime",
-    moduleUrl: "/forge-plugins/acme-runtime.mjs",
-    sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    id: "acme-runtime-v1",
+    moduleUrl: "/wasm-oj-plugins/acme-runtime.mjs",
+    sha256: "<lowercase SHA-256>",
   }],
-  additionalCostBaselines: {
-    [acmeCostProfile]: 123_456,
-  },
 });
 ```
 
-The module must export `createRuntimeDriver()` (or the configured named
-factory) and return a `RuntimeDriver` with exactly the descriptor ID. The
-runner Worker fetches it with same-origin credentials, rejects redirects,
-limits source to 1 MiB, verifies its digest, rejects every static or dynamic
-import, imports it from a temporary Blob URL, and registers it before runtime
-driver selection. At most 16 plug-ins are accepted. `supports()` must match
-exactly the custom artifacts it owns; zero or multiple matching drivers fail.
+The Worker rejects redirects, cross-origin URLs, unpinned bytes, nested imports, duplicate IDs,
+missing factory exports, and drivers whose runtime identity differs from the descriptor.
 
-Because the module executes with runner-Worker authority, a plug-in can see
-artifacts and run configuration and must be reviewed and pinned like host
-application code. It does not weaken Forge's native metering, memory, output,
-VFS, logical-time, or emergency wall limits; its `PreparedRunRequest` must
-preserve those inputs and use the artifact's declared cost profile.
+## Replay and binary formats
+
+`createReplayBundle()`, `encodeReplayBundle()`, and `decodeReplayBundle()` use the canonical
+`WOJRPL02` envelope. Judge packages use `WOJJDG02`; runtime filesystem archives use `WOJFS002`;
+Go shared files use `WOJGO002`. Decoders reject older magic, non-canonical manifests, digest
+mismatches, unused/missing blobs, trailing bytes, and contract drift.
 
 ## Lifecycle
 
-Use one engine for a host scheduling domain. `clearCache()` first closes the
-operation gate, cancels and awaits compiler/runner quiescence, then clears
-toolchains, runtime files, artifacts, dependency payloads, and build-graph
-state. `dispose()` is idempotent and permanently closes the engine. A host must
-dispose during shutdown; it must not delete cache directories behind a live
-engine.
+Call `dispose()` when a host is no longer used. `clearCache()` is an exclusive engine operation: it
+cancels accepted compiler work, waits for runner work to stop, then clears configured compiler,
+runtime, dependency, and artifact storage. Browser worker replacement and server child processes
+remain hard isolation boundaries for cancellation, timeout, restart, and infrastructure failure.
 
-For the complete data contracts, see [Library contract](library-contract.md).
-For trust and process boundaries, see [Architecture](architecture.md). For
-portable reproduction, see the replay section of the library contract.
+See [library-contract.md](library-contract.md) for invariant-level details and
+[versioning.md](versioning.md) for compatibility rules.

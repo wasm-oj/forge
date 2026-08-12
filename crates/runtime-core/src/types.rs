@@ -147,15 +147,6 @@ pub struct CompileResponse {
     pub error: Option<RunFailure>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct CompilePipelineRequest {
-    pub toolchain: CompilerToolchainConfig,
-    #[serde(default)]
-    pub files: BTreeMap<String, serde_bytes::ByteBuf>,
-    pub stages: Vec<CompileRequest>,
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilePipelineResult {
@@ -168,6 +159,46 @@ pub struct CompilePipelineResponse {
     pub ok: bool,
     pub result: Option<CompilePipelineResult>,
     pub error: Option<RunFailure>,
+}
+
+/// One-time immutable inputs for a browser Go compiler session.
+///
+/// `digest` is the SHA-256 of the already verified Go toolchain manifest. The
+/// manifest binds the WebC package and standard-library archive digests.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct GoCompilerSessionConfig {
+    pub digest: String,
+    pub toolchain: CompilerToolchainConfig,
+    pub standard_library_files: BTreeMap<String, serde_bytes::ByteBuf>,
+}
+
+/// A monotonic update to the mutable `/work` source snapshot.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct GoCompilerSourceDelta {
+    pub generation: u32,
+    #[serde(default)]
+    pub upsert_files: BTreeMap<String, serde_bytes::ByteBuf>,
+    #[serde(default)]
+    pub remove_paths: Vec<String>,
+}
+
+/// A compile request against an existing digest-bound browser Go session.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct GoCompilerSessionRequest {
+    pub digest: String,
+    pub source_delta: GoCompilerSourceDelta,
+    pub stages: Vec<CompileRequest>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GoCompilerSessionResponse {
+    pub digest: String,
+    pub generation: u32,
+    pub response: CompilePipelineResponse,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

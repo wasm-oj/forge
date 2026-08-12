@@ -1,5 +1,5 @@
 import { sha256Hex } from "../core/hash.ts";
-import { FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import {
   CLANG_CC1_PINS_SHA256,
   CLANG_PACKAGE_SHA256,
@@ -7,7 +7,7 @@ import {
 import type { ClangPins } from "./clang-pins.ts";
 import {
   IncrementalBuildGraph,
-  type IncrementalBuildGraphArchive,
+  type IncrementalBuildGraphState,
   type BuildGraphInput,
   type IncrementalBuildGraphSnapshot,
 } from "./incremental-build-graph.ts";
@@ -37,7 +37,7 @@ export class ClangObjectCache {
     const config = pins.configs[configKey];
     if (!config) throw new Error(`Unknown pinned Clang configuration '${configKey}'.`);
     return sha256Hex(JSON.stringify({
-      schema: FORGE_SCHEMAS.objectCache,
+      schema: WASM_OJ_SCHEMAS.objectCache,
       pinsSha256: CLANG_CC1_PINS_SHA256,
       sourceToolchainSha256: pins.sourceSha256,
       packageSha256: CLANG_PACKAGE_SHA256,
@@ -96,12 +96,12 @@ export class ClangObjectCache {
     return this.graph.snapshot();
   }
 
-  exportArchive(): IncrementalBuildGraphArchive {
-    return this.graph.exportArchive();
+  exportState(): IncrementalBuildGraphState {
+    return this.graph.exportState();
   }
 
-  restoreArchive(archive: IncrementalBuildGraphArchive): Promise<void> {
-    return this.graph.restoreArchive(archive);
+  restoreState(state: IncrementalBuildGraphState): Promise<void> {
+    return this.graph.restoreState(state);
   }
 
   clear(): void {

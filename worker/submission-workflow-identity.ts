@@ -2,7 +2,8 @@ import { base64Url, constantTimeEqual, hmacSha256Hex, sha256Hex } from "./crypto
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
-const ATTEMPT_CREDENTIAL_DOMAIN = "forge-submission-attempt-v1\0";
+const ATTEMPT_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+const ATTEMPT_CREDENTIAL_DOMAIN = "wasm-oj-submission-attempt-v2\0";
 
 /**
  * The only values persisted in Cloudflare Workflow parameters or a
@@ -15,6 +16,11 @@ export interface SubmissionWorkflowParameters {
   readonly attempt: number;
   readonly expectedReleaseId: string;
   readonly expectedManifestSha256: string;
+}
+
+export function parseSubmissionAttemptToken(value: unknown): string {
+  if (typeof value !== "string" || !ATTEMPT_TOKEN.test(value)) throw new TypeError("Submission attempt token is invalid.");
+  return value;
 }
 
 export function parseSubmissionWorkflowParameters(value: unknown): SubmissionWorkflowParameters {

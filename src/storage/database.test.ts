@@ -1,6 +1,6 @@
 import { forceCloseDatabase, IDBFactory, IDBVersionChangeEvent } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { costProfileId } from "../core/cost-profile";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { sha256Hex } from "../core/hash";
@@ -21,6 +21,22 @@ function openDatabase(
     }, { once: true });
     request.addEventListener("blocked", () => {
       reject(new Error(`Test database open '${name}' at version ${version} was blocked.`));
+    }, { once: true });
+  });
+}
+
+function openLegacyProjectDatabase(
+  factory: IDBFactory,
+  name: string,
+): Promise<IDBDatabase> {
+  const request = factory.open(name, 1);
+  request.addEventListener("upgradeneeded", () => {
+    request.result.createObjectStore("projects", { keyPath: "id" }).createIndex("updatedAt", "updatedAt");
+  }, { once: true });
+  return new Promise((resolve, reject) => {
+    request.addEventListener("success", () => resolve(request.result), { once: true });
+    request.addEventListener("error", () => {
+      reject(request.error ?? new Error("Legacy test database open failed without an error."));
     }, { once: true });
   });
 }
@@ -109,7 +125,7 @@ function project(id: string, updatedAt: number): Project {
 function artifact(cacheKey: string, bytes = new Uint8Array([0, 97, 115, 109])): WasmArtifact {
   return {
     kind: "wasm",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: `artifact-${cacheKey}`,
     projectId: "project",
     cacheKey,
@@ -144,28 +160,28 @@ describe("browser storage database lifecycle", () => {
   });
 
   it("evicts a rejected open so storage can retry after the external failure is removed", async () => {
-    const { FORGE_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
+    const { WASM_OJ_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
     const incompatible = await openDatabase(
       factory,
-      FORGE_STORAGE.database,
-      FORGE_STORAGE.databaseVersion + 1,
+      WASM_OJ_STORAGE.database,
+      WASM_OJ_STORAGE.databaseVersion + 1,
     );
     incompatible.close();
     const storage = await import("./database");
 
     await expect(storage.listProjects()).rejects.toMatchObject({ name: "VersionError" });
-    await deleteDatabase(factory, FORGE_STORAGE.database);
+    await deleteDatabase(factory, WASM_OJ_STORAGE.database);
     await expect(storage.listProjects()).resolves.toEqual([]);
   });
 
   it("closes an eventual connection that succeeds after its blocked open already rejected", async () => {
     const actual = await vi.importActual<typeof import("../core/contract")>("../core/contract");
-    const database = `${actual.FORGE_STORAGE.database}:blocked-open-test`;
+    const database = `${actual.WASM_OJ_STORAGE.database}:blocked-open-test`;
     const blocker = await openDatabase(factory, database, 1);
     vi.doMock("../core/contract", () => ({
       ...actual,
-      FORGE_STORAGE: {
-        ...actual.FORGE_STORAGE,
+      WASM_OJ_STORAGE: {
+        ...actual.WASM_OJ_STORAGE,
         database,
         databaseVersion: 2,
       },
@@ -182,21 +198,44 @@ describe("browser storage database lifecycle", () => {
   });
 
   it("releases and forgets the cached connection on versionchange", async () => {
-    const { FORGE_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
+    const { WASM_OJ_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
     const storage = await import("./database");
     await expect(storage.listProjects()).resolves.toEqual([]);
 
-    // A live cached Forge connection would block this upgrade. The
+    // A live cached WASM-OJ connection would block this upgrade. The
     // versionchange handler must close it and clear the memoized Promise.
     const upgrade = await openDatabase(
       factory,
-      FORGE_STORAGE.database,
-      FORGE_STORAGE.databaseVersion + 1,
+      WASM_OJ_STORAGE.database,
+      WASM_OJ_STORAGE.databaseVersion + 1,
     );
     upgrade.close();
-    await deleteDatabase(factory, FORGE_STORAGE.database);
+    await deleteDatabase(factory, WASM_OJ_STORAGE.database);
 
     await expect(storage.listProjects()).resolves.toEqual([]);
+  });
+
+  it("preserves project drafts while upgrading the cache schema", async () => {
+    const actual = await vi.importActual<typeof import("../core/contract")>("../core/contract");
+    const databaseName = `${actual.WASM_OJ_STORAGE.database}:draft-upgrade-test`;
+    const legacy = await openLegacyProjectDatabase(factory, databaseName);
+    await putRawProject(legacy, project("survives-upgrade", 12));
+    legacy.close();
+    vi.doMock("../core/contract", () => ({
+      ...actual,
+      WASM_OJ_STORAGE: {
+        ...actual.WASM_OJ_STORAGE,
+        database: databaseName,
+        databaseVersion: 2,
+      },
+    }));
+    const storage = await import("./database");
+
+    await expect(storage.listProjects()).resolves.toMatchObject([{ id: "survives-upgrade" }]);
+    const upgraded = await openDatabase(factory, databaseName, 2);
+    await expect(rawProject(upgraded, "survives-upgrade")).resolves.toBeDefined();
+    expect(upgraded.objectStoreNames.contains("artifacts")).toBe(true);
+    upgraded.close();
   });
 
   it("forgets an unexpectedly closed connection and opens a fresh one", async () => {
@@ -242,13 +281,13 @@ describe("browser storage database lifecycle", () => {
   });
 
   it("verifies direct Wasm payload SHA-256 and evicts only a mutated artifact", async () => {
-    const { FORGE_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
+    const { WASM_OJ_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
     const storage = await import("./database");
     const clean = artifact("clean");
     const corrupted = artifact("corrupted", new Uint8Array([0, 97, 115, 109, 1]));
     await storage.saveArtifact(clean);
     await storage.saveArtifact(corrupted);
-    const database = await openDatabase(factory, FORGE_STORAGE.database, FORGE_STORAGE.databaseVersion);
+    const database = await openDatabase(factory, WASM_OJ_STORAGE.database, WASM_OJ_STORAGE.databaseVersion);
     const stored = await rawArtifact(database, corrupted.cacheKey) as {
       artifact: WasmArtifact;
       payloadSha256: string;
@@ -287,27 +326,27 @@ describe("browser storage database lifecycle", () => {
     expect(open).not.toHaveBeenCalled();
   });
 
-  it("evicts an invalid newest record and returns the next valid draft", async () => {
-    const { FORGE_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
+  it("retains an invalid newest record and returns the next valid draft", async () => {
+    const { WASM_OJ_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
     const storage = await import("./database");
     await storage.saveProject(project("valid-older", 10));
-    const database = await openDatabase(factory, FORGE_STORAGE.database, FORGE_STORAGE.databaseVersion);
+    const database = await openDatabase(factory, WASM_OJ_STORAGE.database, WASM_OJ_STORAGE.databaseVersion);
     await putRawProject(database, {
       ...project("invalid-newest", 20),
       config: { ...project("invalid-newest", 20).config, target: "preview2" },
     });
 
     await expect(storage.loadLatestProject()).resolves.toMatchObject({ id: "valid-older" });
-    await expect(rawProject(database, "invalid-newest")).resolves.toBeUndefined();
+    await expect(rawProject(database, "invalid-newest")).resolves.toBeDefined();
     database.close();
   });
 
-  it("removes every malformed record while preserving and sorting valid drafts", async () => {
-    const { FORGE_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
+  it("retains every malformed record while preserving and sorting valid drafts", async () => {
+    const { WASM_OJ_STORAGE } = await vi.importActual<typeof import("../core/contract")>("../core/contract");
     const storage = await import("./database");
     await storage.saveProject(project("valid-old", 10));
     await storage.saveProject(project("valid-new", 20));
-    const database = await openDatabase(factory, FORGE_STORAGE.database, FORGE_STORAGE.databaseVersion);
+    const database = await openDatabase(factory, WASM_OJ_STORAGE.database, WASM_OJ_STORAGE.databaseVersion);
     await putRawProject(database, { ...project("invalid-files", 30), files: [] });
     await putRawProject(database, { ...project("invalid-extra", 40), obsoleteVersion: 2 });
 
@@ -315,8 +354,8 @@ describe("browser storage database lifecycle", () => {
       { id: "valid-new" },
       { id: "valid-old" },
     ]);
-    await expect(rawProject(database, "invalid-files")).resolves.toBeUndefined();
-    await expect(rawProject(database, "invalid-extra")).resolves.toBeUndefined();
+    await expect(rawProject(database, "invalid-files")).resolves.toBeDefined();
+    await expect(rawProject(database, "invalid-extra")).resolves.toBeDefined();
     database.close();
   });
 });

@@ -1,0 +1,21 @@
+{
+  "workspace": {
+    "challenge_list": [8, 200, 252, 780],
+    "language_picker": [1310, 7, 260, 36],
+    "scoring": [294, 154, 550, 90],
+    "editor": [870, 50, 1045, 640],
+    "build_button": [1635, 7, 92, 36]
+  },
+  "self_test": {
+    "custom_input": [880, 738, 640, 232],
+    "stdout": [1532, 833, 380, 138],
+    "metrics": [1532, 786, 380, 44],
+    "instruction_cost": [1724, 786, 188, 44]
+  },
+  "accepted": {
+    "accepted_banner": [880, 740, 1032, 49],
+    "case_cards": [880, 795, 715, 64],
+    "case_metrics": [880, 795, 715, 64],
+    "resource_chart": [890, 985, 700, 68]
+  }
+}

@@ -22,12 +22,15 @@ try {
   const pythonFiles = encoded.request.files.filter((file) => file.path.endsWith(".py"));
   const project = new Directory(Object.fromEntries(encoded.request.files.map((file) => [`/${file.path}`, file.content])));
   await project.createDir("/build");
-  const packagePath = path.join(encoded.toolchainDirectory, path.basename(PYTHON_PACKAGE_ASSET_PATH));
+  const packagePath = encoded?.toolchainAssets?.[PYTHON_PACKAGE_ASSET_PATH];
+  if (typeof packagePath !== "string" || !path.isAbsolute(packagePath)) {
+    throw new Error(`The Python compiler stage did not receive absolute asset '${PYTHON_PACKAGE_ASSET_PATH}'.`);
+  }
   const compressed = await readFile(packagePath);
-  verifyDigest(packagePath, compressed, PYTHON_COMPRESSED_PACKAGE_SHA256);
-  const packageBytes = gunzipSync(compressed);
-  verifyDigest(packagePath, packageBytes, PYTHON_PACKAGE_SHA256);
-  const pkg = await Wasmer.fromFile(new Uint8Array(packageBytes), runtime);
+  if (encoded.verifiedToolchain !== true) verifyDigest(packagePath, compressed, PYTHON_COMPRESSED_PACKAGE_SHA256);
+  const packageBytes = uint8View(gunzipSync(compressed));
+  if (encoded.verifiedToolchain !== true) verifyDigest(packagePath, packageBytes, PYTHON_PACKAGE_SHA256);
+  const pkg = await Wasmer.fromFile(packageBytes, runtime);
   const command = pkg.commands.python;
   if (!command) throw new Error(`Package '${PYTHON_PACKAGE}' does not expose python.`);
   const instance = await command.run({
@@ -81,6 +84,10 @@ function verifyDigest(filename, bytes, expected) {
   if (actual !== expected) {
     throw new Error(`Pinned Python package '${filename}' has digest ${actual}; expected ${expected}.`);
   }
+}
+
+function uint8View(bytes) {
+  return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
 function compileScript(files) {

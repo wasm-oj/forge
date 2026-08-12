@@ -2,12 +2,19 @@
 
 import { Runtime, init } from "@wasmer/sdk";
 import wasmerWasmUrl from "@wasmer/sdk/wasm?url";
-import { FORGE_SCHEMAS } from "../core/contract";
+import { WASM_OJ_SCHEMAS } from "../core/contract";
 import { sha256Hex } from "../core/hash";
 import {
-  contentAddressedToolchainAssetUrl,
-  expectedToolchainAssetSha256,
+  GO_PACKAGE_ASSET_PATH,
+  PYTHON_PACKAGE_ASSET_PATH,
+  RUST_PACKAGE_ASSET_PATH,
 } from "../core/toolchains";
+import {
+  browserToolchainAssetBaseUrl,
+  browserToolchainAssetUrl,
+  snapshotBrowserToolchainSources,
+  toolchainAssetSource,
+} from "../core/toolchain-sources";
 import {
   buildProject,
   clearCompilerHostCaches,
@@ -19,18 +26,20 @@ import {
 } from "@/src/compiler/browser-clang-policy";
 import {
   disposeSdkDirectClangToolchain,
-  exportSdkDirectClangBuildGraph,
-  restoreSdkDirectClangBuildGraph,
+  exportSdkDirectClangBuildGraphState,
+  restoreSdkDirectClangBuildGraphState,
 } from "@/src/compiler/sdk-direct-clang";
 import {
-  loadClangBuildGraphArchive,
-  saveClangBuildGraphArchive,
+  ClangBuildGraphPersistenceController,
+  loadClangBuildGraphState,
+  saveClangBuildGraphState,
 } from "@/src/compiler/indexeddb-build-graph-cache";
 import type {
   CompilerRequest,
   CompilerResponse,
   CompilerTraceEvent,
   CompilerTraceOperation,
+  BrowserToolchainSource,
   WorkerPhase,
 } from "@/src/core/types";
 import type {
@@ -57,12 +66,18 @@ import wasmerThreadWorkerUrl from "./wasmer-thread.worker?worker&url";
 
 const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 const workerBaseUrl = moduleWorkerBaseUrl();
-let toolchainAssetBaseUrl = new URL("/toolchains/", workerBaseUrl);
+let toolchainSources: readonly BrowserToolchainSource[] | undefined;
 let runtime: Runtime | undefined;
 let runtimeInitialization: Promise<void> | undefined;
 let wasmerThreadWorkerBootstrap: ModuleWorkerBootstrap | undefined;
 let rustStage: PersistentIsolatedStage<RustcStageRequest, RustCompileResult> | undefined;
 let goStage: PersistentIsolatedStage<GoStageRequest, GoCompileResult> | undefined;
+const clangBuildGraphPersistence = new ClangBuildGraphPersistenceController({
+  load: loadClangBuildGraphState,
+  restore: restoreSdkDirectClangBuildGraphState,
+  capture: exportSdkDirectClangBuildGraphState,
+  save: saveClangBuildGraphState,
+});
 let quiescing = false;
 
 function post(response: CompilerResponse): void {
@@ -82,7 +97,7 @@ function trace(
     type: "compile-trace",
     requestId,
     event: {
-      schema: FORGE_SCHEMAS.compileTrace,
+      schema: WASM_OJ_SCHEMAS.compileTrace,
       operation,
       state,
       monotonicMs: performance.now(),
@@ -91,7 +106,7 @@ function trace(
 }
 
 async function loadToolchainAsset(path: string): Promise<Uint8Array> {
-  const url = contentAddressedToolchainAssetUrl(path, toolchainAssetBaseUrl);
+  const url = assetUrl(path);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Unable to load pinned toolchain asset '${path}' (${response.status}).`);
@@ -105,7 +120,7 @@ async function loadToolchainAsset(path: string): Promise<Uint8Array> {
 }
 
 async function loadToolchainFile(path: string): Promise<Uint8Array> {
-  const url = contentAddressedToolchainAssetUrl(path, toolchainAssetBaseUrl);
+  const url = assetUrl(path);
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Unable to load pinned toolchain file '${path}' (${response.status}).`);
   const bytes = new Uint8Array(await response.arrayBuffer());
@@ -114,34 +129,50 @@ async function loadToolchainFile(path: string): Promise<Uint8Array> {
 }
 
 async function verifyToolchainAsset(path: string, bytes: Uint8Array): Promise<void> {
-  const expected = expectedToolchainAssetSha256(path);
-  const actual = await sha256Hex(bytes);
-  if (actual !== expected) {
-    throw new Error(`Pinned toolchain asset '${path}' has digest ${actual}; expected ${expected}.`);
+  const { asset } = toolchainAssetSource(requiredToolchainSources(), path);
+  if (bytes.byteLength !== asset.bytes) {
+    throw new Error(`Pinned toolchain asset '${path}' has ${bytes.byteLength} bytes; expected ${asset.bytes}.`);
   }
+  const actual = await sha256Hex(bytes);
+  if (actual !== asset.sha256) {
+    throw new Error(`Pinned toolchain asset '${path}' has digest ${actual}; expected ${asset.sha256}.`);
+  }
+}
+
+function requiredToolchainSources(): readonly BrowserToolchainSource[] {
+  if (!toolchainSources) throw new Error("The compiler toolchain-source registry is not initialized.");
+  return toolchainSources;
+}
+
+function assetUrl(path: string): URL {
+  return browserToolchainAssetUrl(requiredToolchainSources(), path, workerBaseUrl);
+}
+
+function assetBaseUrl(path: string): string {
+  return browserToolchainAssetBaseUrl(requiredToolchainSources(), path, workerBaseUrl).toString();
 }
 
 function compileRust(request: RustCompileRequest): Promise<RustCompileResult> {
   rustStage ??= new PersistentIsolatedStage({
-    createWorker: () => createModuleWorker(RustcStageWorkerUrl, { name: "forge-rustc-stage" }),
+    createWorker: () => createModuleWorker(RustcStageWorkerUrl, { name: "wasm-oj-rustc-stage" }),
     timeoutMs: RUST_COMPILE_TIMEOUT_MS + 5_000,
     stageLabel: "rustc",
   });
   return rustStage.run({
     type: "compile",
     request,
-    assetBaseUrl: toolchainAssetBaseUrl.toString(),
+    assetBaseUrl: assetBaseUrl(RUST_PACKAGE_ASSET_PATH),
   });
 }
 
 function compilePython(request: PythonFrontendRequest): Promise<PythonFrontendResult> {
-  const worker = createModuleWorker(PythonStageWorkerUrl, { name: "forge-python-stage" });
+  const worker = createModuleWorker(PythonStageWorkerUrl, { name: "wasm-oj-python-stage" });
   return runIsolatedStage<PythonStageRequest, PythonFrontendResult>(
     worker,
     {
       type: "compile",
       request,
-      assetBaseUrl: toolchainAssetBaseUrl.toString(),
+      assetBaseUrl: assetBaseUrl(PYTHON_PACKAGE_ASSET_PATH),
     },
     PYTHON_COMPILE_TIMEOUT_MS + 5_000,
     "Python",
@@ -150,14 +181,14 @@ function compilePython(request: PythonFrontendRequest): Promise<PythonFrontendRe
 
 function compileGo(request: GoCompileRequest): Promise<GoCompileResult> {
   goStage ??= new PersistentIsolatedStage({
-    createWorker: () => createModuleWorker(GoStageWorkerUrl, { name: "forge-go-stage" }),
+    createWorker: () => createModuleWorker(GoStageWorkerUrl, { name: "wasm-oj-go-stage" }),
     timeoutMs: GO_COMPILE_TIMEOUT_MS + 5_000,
     stageLabel: "Go",
   });
   return goStage.run({
     type: "compile",
     request,
-    assetBaseUrl: toolchainAssetBaseUrl.toString(),
+    assetBaseUrl: assetBaseUrl(GO_PACKAGE_ASSET_PATH),
   });
 }
 
@@ -179,17 +210,14 @@ function configureCompilerHost(): void {
 
 async function initializeWorker(
   requestId: string,
-  assetBaseUrl?: string,
+  sources: readonly BrowserToolchainSource[],
 ): Promise<void> {
   if (!crossOriginIsolated) {
     throw new Error("Wasmer requires a cross-origin-isolated page. Serve this app with COOP and COEP headers.");
   }
   trace(requestId, "workerInitialize", "start");
   progress(requestId, "initializing", "Starting compiler worker", 0.2);
-  toolchainAssetBaseUrl = new URL(assetBaseUrl ?? "/toolchains/", workerBaseUrl);
-  if (!toolchainAssetBaseUrl.pathname.endsWith("/")) toolchainAssetBaseUrl.pathname += "/";
-  const persistedGraph = await loadClangBuildGraphArchive();
-  if (persistedGraph) await restoreSdkDirectClangBuildGraph(persistedGraph);
+  toolchainSources = snapshotBrowserToolchainSources(sources);
   configureCompilerHost();
   progress(requestId, "initializing", "Compiler worker ready", 1);
   trace(requestId, "workerInitialize", "end");
@@ -234,10 +262,13 @@ async function build(request: Extract<CompilerRequest, { type: "build" }>) {
   if (languageRequiresOuterRuntime(request.project.config.language)) {
     await ensureOuterRuntime(request.requestId);
   }
-  if (usesOutputReadyClang(request.project)) assertOutputReadyClangStageBudget(request.project);
+  if (usesOutputReadyClang(request.project)) {
+    await clangBuildGraphPersistence.ensureLoaded();
+    assertOutputReadyClangStageBudget(request.project);
+  }
   const result = await buildProject(request.project, request.cacheKey, request.requestId);
   if (usesOutputReadyClang(request.project)) {
-    await saveClangBuildGraphArchive(exportSdkDirectClangBuildGraph());
+    await clangBuildGraphPersistence.persistIfDirty();
   }
   return result;
 }
@@ -256,7 +287,7 @@ async function quiesce(): Promise<void> {
     ]);
   } finally {
     try {
-      await saveClangBuildGraphArchive(exportSdkDirectClangBuildGraph());
+      await clangBuildGraphPersistence.persistIfDirty();
       await disposeSdkDirectClangToolchain();
     } finally {
       clearCompilerHostCaches();
@@ -275,7 +306,7 @@ scope.addEventListener("message", (event: MessageEvent<CompilerRequest>) => {
     try {
       switch (request.type) {
         case "initialize":
-          await initializeWorker(request.requestId, request.assetBaseUrl);
+          await initializeWorker(request.requestId, request.toolchains);
           post({ type: "ready", requestId: request.requestId });
           break;
         case "build":

@@ -1,10 +1,10 @@
-import { FORGE_STORAGE } from "../core/contract.ts";
+import { WASM_OJ_STORAGE } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 
-const MAGIC = new TextEncoder().encode("FORGEFS1");
+const MAGIC = new TextEncoder().encode("WOJFS002");
 const HEADER_BYTES = 12;
 
-export const PYTHON_RUNTIME_FILES_CACHE_KEY = `${FORGE_STORAGE.runtimeFilesCache}:cpython-3.14.6-wasip1-stdlib-stored-zip`;
+export const PYTHON_RUNTIME_FILES_CACHE_KEY = `${WASM_OJ_STORAGE.runtimeFilesCache}:cpython-3.14.6-wasip1-stdlib-stored-zip`;
 
 export const PYTHON_RUNTIME_FILES_EXPORT_SCRIPT = String.raw`
 import io
@@ -15,7 +15,7 @@ import zipfile
 source_root = "/usr/local/lib/python3.14"
 guest_path = "/cpython/lib/python314.zip"
 output = sys.stdout.buffer
-output.write(b"FORGEFS1")
+output.write(b"WOJFS002")
 
 archive_buffer = io.BytesIO()
 with zipfile.ZipFile(archive_buffer, "w", compression=zipfile.ZIP_STORED) as archive:

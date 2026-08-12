@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { costProfileId } from "../core/cost-profile";
 import { toolchainPackageIdentities } from "../core/toolchains";
 import type { BuildArtifact, BuildResult, Project, WorkerProgress } from "../core/types";
-import type { ForgeCompiler } from "./compiler";
-import { CompileCoordinator, type ForgeArtifactStore } from "./coordinator";
+import type { Compiler } from "./compiler";
+import { CompileCoordinator, type ArtifactStore } from "./coordinator";
 
 function project(content: string): Project {
   return {
@@ -38,7 +38,7 @@ function project(content: string): Project {
 function artifact(projectValue: Project, cacheKey: string): BuildArtifact {
   return {
     kind: "wasm",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: crypto.randomUUID(),
     projectId: projectValue.id,
     cacheKey,
@@ -55,7 +55,7 @@ function artifact(projectValue: Project, cacheKey: string): BuildArtifact {
   };
 }
 
-class MemoryStore implements ForgeArtifactStore {
+class MemoryStore implements ArtifactStore {
   readonly values = new Map<string, BuildArtifact>();
   readonly saves: BuildArtifact[] = [];
   readonly deletes: string[] = [];
@@ -71,7 +71,7 @@ class MemoryStore implements ForgeArtifactStore {
   async clear() { this.values.clear(); }
 }
 
-class DeferredCompiler implements ForgeCompiler {
+class DeferredCompiler implements Compiler {
   builds: Array<{
     project: Project;
     cacheKey: string;
@@ -79,7 +79,7 @@ class DeferredCompiler implements ForgeCompiler {
     reject(error: Error): void;
   }> = [];
 
-  cacheIdentity() { return "forge-test-deferred-compiler-1"; }
+  cacheIdentity() { return "wasm-oj-test-deferred-compiler-1"; }
   ready() { return Promise.resolve(); }
   onProgress(listener: (progress: WorkerProgress) => void) {
     void listener;

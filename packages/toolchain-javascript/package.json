@@ -1,0 +1,32 @@
+{
+  "name": "@wasm-oj/toolchain-javascript",
+  "version": "0.1.0",
+  "description": "Digest-pinned JavaScript and TypeScript assets for the WASM-OJ SDK.",
+  "license": "SEE LICENSE IN THIRD_PARTY_NOTICES.md",
+  "author": "JacobLinCool",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wasm-oj/forge.git",
+    "directory": "packages/toolchain-javascript"
+  },
+  "homepage": "https://github.com/wasm-oj/forge#readme",
+  "bugs": { "url": "https://github.com/wasm-oj/forge/issues" },
+  "keywords": ["wasi", "wasm", "javascript", "typescript", "compiler"],
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./assets/quickjs-0.15.1.wasm.gz.bin": "./assets/quickjs-0.15.1.wasm.gz.bin",
+    "./assets/typescript-7.0.2.wasm.gz.bin": "./assets/typescript-7.0.2.wasm.gz.bin",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "assets", "licenses", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+  "engines": { "node": ">=24.18.0 <25" },
+  "scripts": {
+    "build": "node ../../scripts/build-library.mjs --package @wasm-oj/toolchain-javascript",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": { "@wasm-oj/contracts": "workspace:0.2.0" }
+}

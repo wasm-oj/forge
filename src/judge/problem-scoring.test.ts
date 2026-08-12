@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { LANGUAGES, type BuiltinLanguage, type RunResult } from "../core/types";
 import type { JudgeCaseResult } from "./engine";
-import { assertProblemCostProfile, scoreProblemResults } from "./problem-scoring";
+import {
+  assertProblemCostProfile,
+  scoreProblemResults,
+  summarizeProblemPolicies,
+} from "./problem-scoring";
 import type { JudgeProblem } from "./problems";
 
 const language: BuiltinLanguage = "c";
@@ -28,7 +32,7 @@ const problem: JudgeProblem = {
   scoring: {
     maximumPoints: 100,
     calibration: {
-      method: "forge-v1-compiled-average-optimal-rounded-v1",
+      method: "wasm-oj-v2/compiled-average-optimal-rounded/v1",
       profiles: { c: profile },
     },
     policies: [
@@ -59,7 +63,7 @@ const problem: JudgeProblem = {
   ],
 };
 
-function accepted(id: string, cost: number, memoryBytes = 900): JudgeCaseResult {
+function accepted(id: string, cost: number, memoryBytes = 900, logicalTimeNs = 0): JudgeCaseResult {
   return {
     id,
     verdict: "accepted",
@@ -92,7 +96,7 @@ function accepted(id: string, cost: number, memoryBytes = 900): JudgeCaseResult 
         costModel: "weighted",
         operations: {},
         memoryBytes,
-        logicalTimeNs: 0,
+        logicalTimeNs,
         filesystemBytes: 0,
         filesystemEntries: 0,
         stdoutBytes: 0,
@@ -161,6 +165,52 @@ describe("problem policy scoring", () => {
     expect(score.cases[0].points).toBe(0);
     expect(score.cases[0].policyEvaluations.every((policy) => policy.resourcePassed)).toBe(true);
     expect(score.cases[0].policyEvaluations.every((policy) => !policy.earned)).toBe(true);
+  });
+
+  it("produces a bounded anonymous policy aggregate with overlapping failures", () => {
+    const timedProblem: JudgeProblem = {
+      ...problem,
+      scoring: {
+        ...problem.scoring,
+        policies: problem.scoring.policies.map((policy) => ({
+          ...policy,
+          limits: { ...policy.limits, logicalTimeLimitMs: 1 },
+        })),
+      },
+    };
+    const wrongAnswer = accepted("sample-01", 100, 900, 2_000_000);
+    wrongAnswer.verdict = "wrong-answer";
+    const summary = summarizeProblemPolicies(scoreProblemResults(timedProblem, language, [
+      wrongAnswer,
+      accepted("adversarial-01", 800, 1_600, 2_000_000),
+    ]));
+    expect(summary).toEqual({
+      totalCases: 2,
+      outputAcceptedCases: 1,
+      policies: [
+        {
+          id: "baseline",
+          earnedCases: 0,
+          costExceededCases: 0,
+          memoryExceededCases: 0,
+          logicalTimeExceededCases: 1,
+        },
+        {
+          id: "efficient",
+          earnedCases: 0,
+          costExceededCases: 1,
+          memoryExceededCases: 1,
+          logicalTimeExceededCases: 1,
+        },
+        {
+          id: "optimal",
+          earnedCases: 0,
+          costExceededCases: 1,
+          memoryExceededCases: 1,
+          logicalTimeExceededCases: 1,
+        },
+      ],
+    });
   });
 
   it("scores only the contestant side of an interactive session", () => {

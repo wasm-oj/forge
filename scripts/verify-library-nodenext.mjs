@@ -1,27 +1,32 @@
 import { execFile } from "node:child_process";
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
 import { resolveTypeScriptCli } from "./typescript-cli.mjs";
-import { unpackPublishPackage } from "./packed-package.mjs";
+import { PUBLIC_PACKAGES, packagesRoot, repositoryRoot } from "./library-packages.mjs";
 
 const run = promisify(execFile);
-const repositoryRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const packed = await unpackPublishPackage(repositoryRoot, "forge-nodenext-consumer-");
+const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-nodenext-consumer-"));
 
 try {
-  const temporary = path.dirname(packed.packageRoot);
   const consumerRoot = path.join(temporary, "consumer");
-  const packageParent = path.join(consumerRoot, "node_modules/@wasm-oj");
-  const installedPackage = path.join(packageParent, "forge");
-  await mkdir(packageParent, { recursive: true });
-  await rename(packed.packageRoot, installedPackage);
+  const tarballs = new Map();
+  await mkdir(consumerRoot, { recursive: true });
+  for (const definition of PUBLIC_PACKAGES) {
+    tarballs.set(definition.name, await packPackage(path.join(packagesRoot, definition.directory), definition.name));
+  }
+  const externalTarballs = await packInstalledRuntimeDependencies();
+  const packageOverrides = new Map([...tarballs, ...externalTarballs]);
 
   await writeFile(path.join(consumerRoot, "package.json"), `${JSON.stringify({
-    name: "forge-nodenext-consumer",
+    name: "wasm-oj-nodenext-consumer",
     private: true,
     type: "module",
+    dependencies: Object.fromEntries([...tarballs].map(([name, tarball]) => [name, `file:${tarball}`])),
+    pnpm: {
+      overrides: Object.fromEntries([...packageOverrides].map(([name, tarball]) => [name, `file:${tarball}`])),
+    },
   }, null, 2)}\n`);
   await writeFile(path.join(consumerRoot, "tsconfig.json"), `${JSON.stringify({
     compilerOptions: {
@@ -39,286 +44,180 @@ try {
   }, null, 2)}\n`);
   await writeFile(path.join(consumerRoot, "consumer.ts"), `
 import {
-  FORGE_CONTRACT_ID,
-  FORGE_CONTRACT_VERSION,
-  FORGE_ERROR_CODES,
-  ForgeError,
-  ForgeDependencyManager,
-  ForgeCompilerRegistry,
-  ForgeEngine,
-  MemoryDependencyCache,
-  costProfileId,
-  createExtendedCostBaselineRegistry,
-  createSdkProject,
-  resolveArtifactCostBudget,
-  type BuildArtifact,
-  type BuildResult,
-  type CompileInput,
-  type CostBudget,
-  type DependencyManifest,
-  type ForgeCompiler,
-  type ForgeErrorRecord,
-  type ForgeOperationEvent,
-  type ForgeSubmissionOperation,
-  type ForgeSubmissionRequest,
-  type ForgeRunner,
-  type InteractiveRunConfig,
-  type InteractiveRunResult,
-  type JudgeExecutor,
-  type PackageFileSystemRequest,
-  type PreparedRunRequest,
-  type Project,
-  type RunConfig,
-  type RunResult,
-  type RuntimeDriver,
-  type RuntimeResolver,
-  type WasmArtifact,
-  type WorkerProgress,
-} from "@wasm-oj/forge";
+  WASM_OJ_CONTRACT_ID,
+  WASM_OJ_CONTRACT_VERSION,
+  type BrowserToolchainSource,
+  type ServerToolchainSource,
+  type ToolchainDescriptor,
+} from "@wasm-oj/contracts";
 import {
-  Forge,
-  BrowserForgeCompiler,
-  BrowserForgeRunner,
-  IndexedDbDependencyCache,
-  BROWSER_RUNTIME_PLUGIN_LIMITS,
-  registerToolchainCache,
-  type BrowserForgeCompilerOptions,
-  type BrowserForgeRunnerOptions,
-  type BrowserRuntimeDriverPlugin,
-  type ToolchainCacheRegistrationOptions,
-} from "@wasm-oj/forge/browser";
+  Engine,
+  WasmOjError,
+  CompilerRegistry,
+  DependencyManager,
+  createEngine,
+  type ArtifactStore,
+  type Compiler,
+  type Runner,
+} from "@wasm-oj/core";
 import {
-  ServerForgeCompiler,
-  ServerForgeRunner,
-  FileSystemDependencyCache,
-  FileSystemArtifactStore,
-  createServerForge,
-  resolveServerForgePaths,
-  type CreateServerForgeOptions,
-  type ServerForgeCompilerOptions,
-  type ServerForgeRunnerOptions,
-} from "@wasm-oj/forge/server";
+  BrowserCompiler,
+  BrowserRunner,
+  StorageCoordinator,
+  createBrowserEngine,
+} from "@wasm-oj/browser";
+import {
+  ServerCompiler,
+  ServerRunner,
+  createServerEngine,
+  createVerifiedServerDistribution,
+} from "@wasm-oj/server";
+import { runCollectionCli } from "@wasm-oj/organizer";
+import { Engine as UmbrellaEngine } from "@wasm-oj/sdk";
+import { createBrowserEngine as UmbrellaBrowser } from "@wasm-oj/sdk/browser";
+import { createServerEngine as UmbrellaServer } from "@wasm-oj/sdk/server";
+import { runCollectionCli as UmbrellaOrganizer } from "@wasm-oj/sdk/organizer";
+import { WASM_OJ_CONTRACT_ID as UmbrellaContract } from "@wasm-oj/sdk/contracts";
+import { browserSource as clangBrowser, serverSource as clangServer } from "@wasm-oj/toolchain-clang";
+import { browserSource as rustBrowser } from "@wasm-oj/toolchain-rust";
+import { browserSource as goBrowser } from "@wasm-oj/toolchain-go";
+import { browserSource as pythonBrowser } from "@wasm-oj/toolchain-python";
+import { browserSource as javascriptBrowser } from "@wasm-oj/toolchain-javascript";
 
-export interface VerifiedForgeSurface {
-  compiler: ForgeCompiler;
-  runner: ForgeRunner;
-  input: CompileInput;
-  customBudget: CostBudget;
-  dependencyManifest: DependencyManifest;
-  browserCompilerOptions: BrowserForgeCompilerOptions;
-  browserRunnerOptions: BrowserForgeRunnerOptions;
-  toolchainCacheOptions: ToolchainCacheRegistrationOptions;
-  serverCompilerOptions: ServerForgeCompilerOptions;
-  serverRunnerOptions: ServerForgeRunnerOptions;
-  serverFactoryOptions: CreateServerForgeOptions;
-  runtimeDriverPlugin: BrowserRuntimeDriverPlugin;
-  operation?: ForgeSubmissionOperation;
-  operationEvent?: ForgeOperationEvent;
-  error: ForgeErrorRecord;
+const browserSources: readonly BrowserToolchainSource[] = [
+  clangBrowser("/assets/wasm-oj/clang/"),
+  rustBrowser("/assets/wasm-oj/rust/"),
+  goBrowser("/assets/wasm-oj/go/"),
+  pythonBrowser("/assets/wasm-oj/python/"),
+  javascriptBrowser("/assets/wasm-oj/javascript/"),
+];
+const serverSources: readonly ServerToolchainSource[] = [clangServer()];
+const descriptor: ToolchainDescriptor = browserSources[0]!.descriptor;
+const browserEngine: Promise<Engine> = createBrowserEngine({ toolchains: browserSources });
+const serverEngine: Promise<Engine> = createServerEngine({
+  runtimeDirectory: "/opt/wasm-oj/bin",
+  toolchains: serverSources,
+});
+
+export interface PublicSurface {
+  artifactStore?: ArtifactStore;
+  compiler: Compiler;
+  runner: Runner;
+  engine: Engine;
 }
 
-export const forgeValues = [
-  FORGE_CONTRACT_ID,
-  FORGE_CONTRACT_VERSION,
-  FORGE_ERROR_CODES,
-  ForgeError,
-  ForgeCompilerRegistry,
-  ForgeEngine,
-  ForgeDependencyManager,
-  MemoryDependencyCache,
-  Forge,
-  BrowserForgeCompiler,
-  BrowserForgeRunner,
-  IndexedDbDependencyCache,
-  BROWSER_RUNTIME_PLUGIN_LIMITS,
-  registerToolchainCache,
-  ServerForgeCompiler,
-  ServerForgeRunner,
-  FileSystemDependencyCache,
-  FileSystemArtifactStore,
-  createServerForge,
-  resolveServerForgePaths,
-  costProfileId,
-  createExtendedCostBaselineRegistry,
-  resolveArtifactCostBudget,
+export const publicValues = [
+  WASM_OJ_CONTRACT_ID,
+  WASM_OJ_CONTRACT_VERSION,
+  Engine,
+  WasmOjError,
+  CompilerRegistry,
+  DependencyManager,
+  createEngine,
+  BrowserCompiler,
+  BrowserRunner,
+  StorageCoordinator,
+  createBrowserEngine,
+  ServerCompiler,
+  ServerRunner,
+  createServerEngine,
+  createVerifiedServerDistribution,
+  runCollectionCli,
+  UmbrellaEngine,
+  UmbrellaBrowser,
+  UmbrellaServer,
+  UmbrellaOrganizer,
+  UmbrellaContract,
+  descriptor,
+  browserEngine,
+  serverEngine,
+  serverSources,
 ] as const;
-
-class ConsumerCompiler implements ForgeCompiler {
-  cacheIdentity(project: Project): string {
-    return ["consumer-compiler-1", project.config.target, project.config.optimization].join(":");
-  }
-  ready(): Promise<void> { return Promise.resolve(); }
-  build(_project: Project, _cacheKey: string): Promise<BuildResult> {
-    return Promise.resolve({ success: false, diagnostics: [], stdout: "", stderr: "", cacheHit: false });
-  }
-  onProgress(_listener: (progress: WorkerProgress) => void): () => void { return () => undefined; }
-  clearToolchainCache(): Promise<void> { return Promise.resolve(); }
-  cancel(): void {}
-  restart(): void {}
-  dispose(): void {}
-}
-
-class ConsumerRunner implements ForgeRunner {
-  ready(): Promise<void> { return Promise.resolve(); }
-  run(_artifact: BuildArtifact, _config: RunConfig): Promise<RunResult> {
-    return Promise.reject(new Error("consumer stub"));
-  }
-  interact(
-    _contestant: BuildArtifact,
-    _interactor: BuildArtifact,
-    _config: InteractiveRunConfig,
-  ): Promise<InteractiveRunResult> {
-    return Promise.reject(new Error("consumer stub"));
-  }
-  onProgress(_listener: (progress: WorkerProgress) => void): () => void { return () => undefined; }
-  onStream(_listener: (stream: "stdout" | "stderr", chunk: string) => void): () => void { return () => undefined; }
-  clearRuntimeCache(): Promise<void> { return Promise.resolve(); }
-  cancel(): void {}
-  cancelAndWait(): Promise<void> { return Promise.resolve(); }
-  restart(): void {}
-  dispose(): void {}
-}
-
-const runtimeDriver: RuntimeDriver = {
-  id: "consumer-runtime",
-  supports: (_artifact: BuildArtifact): boolean => true,
-  async prepare(
-    _artifact: BuildArtifact,
-    config: RunConfig,
-    resolver: RuntimeResolver,
-  ): Promise<PreparedRunRequest> {
-    const fileSystemRequest: PackageFileSystemRequest = {
-      packageSpecifier: "consumer/runtime@1",
-      command: "run",
-      args: [],
-      cacheKey: "consumer-runtime-1",
-      expectedSha256: "0000000000000000000000000000000000000000000000000000000000000000",
-    };
-    await resolver.packageFileSystem(fileSystemRequest);
-    return {
-      wasm: await resolver.quickJs(),
-      args: [...config.args],
-      env: { ...config.env },
-      stdin: new Uint8Array(),
-      files: {},
-      outputPaths: [],
-      startupEntropyBytes: 0,
-      cost: {
-        rawInstructionBudget: config.resources.instructionBudget,
-        netInstructionBudget: config.resources.instructionBudget,
-        baselineCost: 0,
-        profile: "consumer",
-      },
-      determinism: { ...config.determinism },
-      resources: {
-        instructionBudget: config.resources.instructionBudget,
-        logicalTimeLimitMs: config.resources.logicalTimeLimitMs,
-        memoryLimitBytes: config.resources.memoryLimitBytes,
-        outputLimitBytes: config.resources.outputLimitBytes,
-        filesystemWriteLimitBytes: config.resources.filesystemWriteLimitBytes,
-        filesystemEntryLimit: config.resources.filesystemEntryLimit,
-      },
-    };
-  },
-};
-
-const judgeExecutor: JudgeExecutor = {
-  run: (_artifact, _caseSpec, _stdin) => Promise.reject(new Error("consumer stub")),
-  interact: (_contestant, _caseSpec, _input) => Promise.reject(new Error("consumer stub")),
-};
-
-const dependencyManifest: DependencyManifest = {
-  requirements: [{ ecosystem: "go", name: "example.com/module", requirement: "v1.0.0" }],
-};
-const dependencyManager = new ForgeDependencyManager(new MemoryDependencyCache());
-const runtimeDriverPlugin: BrowserRuntimeDriverPlugin = {
-  id: "consumer-runtime",
-  moduleUrl: "/runtime-driver.js",
-  sha256: "0000000000000000000000000000000000000000000000000000000000000000",
-};
-const browserRunnerOptions: BrowserForgeRunnerOptions = {
-  runtimeDriverPlugins: [runtimeDriverPlugin],
-};
-const stableError = new ForgeError("consumer failure", {
-  code: "invalid-input",
-  stage: "operation",
-});
-const submit = (engine: ForgeEngine, request: ForgeSubmissionRequest): ForgeSubmissionOperation =>
-  engine.submit(request);
-
-const customCompiler = new ConsumerCompiler();
-const compilerRegistry = new ForgeCompilerRegistry([{
-  languages: ["zig"],
-  compiler: customCompiler,
-}]);
-const customProject = createSdkProject({
-  language: "zig",
-  target: "wasip1",
-  optimization: "release",
-  entry: "src/main.zig",
-  files: { "src/main.zig": "pub fn main() void {}" },
-});
-const customProfile = costProfileId(
-  "zig",
-  "wasip1",
-  "release",
-  "zig-0.13.0-sha256-deadbeef",
-);
-const customBaselines = createExtendedCostBaselineRegistry({ [customProfile]: 42 });
-const customArtifact: WasmArtifact = {
-  kind: "wasm",
-  forgeContract: FORGE_CONTRACT_VERSION,
-  id: "zig-artifact",
-  projectId: customProject.id,
-  cacheKey: compilerRegistry.cacheIdentity(customProject),
-  name: "zig-program",
-  language: "zig",
-  target: "wasip1",
-  optimization: "release",
-  createdAt: 0,
-  durationMs: 0,
-  size: 8,
-  toolchains: ["zig-0.13.0-sha256-deadbeef"],
-  costProfile: customProfile,
-  bytes: new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]),
-};
-const customBudget = resolveArtifactCostBudget(customArtifact, 1_000, customBaselines);
-
-export const consumerImplementations = {
-  compiler: customCompiler,
-  compilerRegistry,
-  runner: new ConsumerRunner(),
-  runtimeDriver,
-  judgeExecutor,
-  dependencyManifest,
-  dependencyManager,
-  runtimeDriverPlugin,
-  browserRunnerOptions,
-  stableError: stableError.toJSON(),
-  submit,
-  customProject,
-  customArtifact,
-  customBudget,
-};
 `);
 
+  await writeFile(path.join(consumerRoot, "consumer-runtime.mjs"), `
+import * as contracts from "@wasm-oj/contracts";
+import * as core from "@wasm-oj/core";
+import * as browser from "@wasm-oj/browser";
+import * as server from "@wasm-oj/server";
+import * as organizer from "@wasm-oj/organizer";
+import * as sdk from "@wasm-oj/sdk";
+import * as sdkBrowser from "@wasm-oj/sdk/browser";
+import * as sdkContracts from "@wasm-oj/sdk/contracts";
+import * as sdkOrganizer from "@wasm-oj/sdk/organizer";
+import * as sdkServer from "@wasm-oj/sdk/server";
+
+if (contracts.WASM_OJ_CONTRACT_VERSION !== 2 || contracts.WASM_OJ_CONTRACT_ID !== "wasm-oj-v2") {
+  throw new Error("Packed contracts do not expose the contract 2 identity.");
+}
+if (
+  sdk.Engine !== core.Engine
+  || browser.Engine !== core.Engine
+  || browser.WasmOjError !== core.WasmOjError
+  || organizer.parseProblemCollectionIndex !== core.parseProblemCollectionIndex
+  || sdkContracts.WASM_OJ_CONTRACT_ID !== contracts.WASM_OJ_CONTRACT_ID
+  || core.WasmOjError !== contracts.WasmOjError
+  || core.LANGUAGES !== contracts.LANGUAGES
+  || sdkBrowser.createBrowserEngine !== browser.createBrowserEngine
+  || sdkServer.createServerEngine !== server.createServerEngine
+  || sdkOrganizer.runCollectionCli !== organizer.runCollectionCli
+) {
+  throw new Error("Umbrella entrypoints created a second core/contracts identity.");
+}
+`);
+
+  await run("pnpm", ["install", "--offline", "--ignore-scripts"], {
+    cwd: consumerRoot,
+    env: { ...process.env, NO_COLOR: "1" },
+    maxBuffer: 32 * 1024 * 1024,
+  });
+
   const typescript = await resolveTypeScriptCli();
-  try {
-    await run(process.execPath, [typescript, "--project", path.join(consumerRoot, "tsconfig.json"), "--pretty", "false"], {
-      cwd: consumerRoot,
-      env: { ...process.env, NO_COLOR: "1" },
-      maxBuffer: 10 * 1024 * 1024,
-    });
-  } catch (error) {
-    const stdout = typeof error?.stdout === "string" ? error.stdout.trim() : "";
-    const stderr = typeof error?.stderr === "string" ? error.stderr.trim() : "";
-    throw new Error(
-      `Strict NodeNext consumer compilation from the packed npm tarball failed.${stdout ? `\n${stdout}` : ""}${stderr ? `\n${stderr}` : ""}`,
-      { cause: error },
-    );
-  }
+  await run(process.execPath, [typescript, "--project", "tsconfig.json", "--pretty", "false"], {
+    cwd: consumerRoot,
+    env: { ...process.env, NO_COLOR: "1" },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  await run(process.execPath, ["consumer-runtime.mjs"], {
+    cwd: consumerRoot,
+    env: { ...process.env, NO_COLOR: "1" },
+    maxBuffer: 16 * 1024 * 1024,
+  });
+
+  process.stdout.write("Verified packed WASM-OJ packages in a clean NodeNext consumer.\n");
 } finally {
-  await packed.cleanup();
+  await rm(temporary, { recursive: true, force: true });
 }
 
-process.stdout.write("Strict NodeNext Forge consumer compilation from the packed npm tarball passed.\n");
+async function packInstalledRuntimeDependencies() {
+  const publicNames = new Set(PUBLIC_PACKAGES.map((definition) => definition.name));
+  const queue = PUBLIC_PACKAGES.flatMap((definition) => definition.runtimeDependencies ?? [])
+    .filter((name) => !publicNames.has(name));
+  const tarballs = new Map();
+  while (queue.length > 0) {
+    const name = queue.shift();
+    if (tarballs.has(name)) continue;
+    const packageRoot = path.join(repositoryRoot, "node_modules", name);
+    const manifest = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
+    if (manifest.name !== name) throw new Error(`Installed dependency '${name}' has package identity '${manifest.name}'.`);
+    tarballs.set(name, await packPackage(packageRoot, name));
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      if (!publicNames.has(dependency) && !tarballs.has(dependency)) queue.push(dependency);
+    }
+  }
+  return tarballs;
+}
+
+async function packPackage(packageRoot, packageName) {
+  const output = path.join(temporary, `pack-${packageName.replaceAll("/", "-").replaceAll("@", "")}`);
+  await mkdir(output);
+  const { stdout } = await run("pnpm", [
+    "--config.ignore-scripts=true",
+    "pack",
+    "--json",
+    "--pack-destination",
+    output,
+  ], { cwd: packageRoot, maxBuffer: 16 * 1024 * 1024 });
+  const result = JSON.parse(stdout);
+  return path.resolve(result.filename);
+}

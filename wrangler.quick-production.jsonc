@@ -30,8 +30,8 @@
   "vars": {
     "ENVIRONMENT": "production",
     "PUBLIC_ORIGIN": "https://wasm-oj-forge-production.jacob.workers.dev",
-    "FORGE_RELEASE_ID": "3dd39984-36df-43b2-b074-c0e174ebcd4a",
-    "FORGE_RELEASE_MANIFEST_SHA256": "4ace8f4c7bc1b99a83691e1034ef44f665307228f6362485a92e04cd8dba689a",
+    "WASM_OJ_RELEASE_ID": "__WASM_OJ_RELEASE_ID__",
+    "WASM_OJ_RELEASE_MANIFEST_SHA256": "__WASM_OJ_RELEASE_MANIFEST_SHA256__",
     "GITHUB_OAUTH_CLIENT_ID": "Ov23limRaIiQdRQ3xoyd",
     "GITHUB_APP_ID": "4536310",
     "GITHUB_APP_SLUG": "wasm-oj-forge-production-import",
@@ -41,26 +41,18 @@
   },
   "d1_databases": [
     {
-      "binding": "CORE_DB",
+      "binding": "DB",
       "database_name": "wasm-oj-core-production",
       "database_id": "68f58868-311b-4a5b-9337-c1a5af88e954",
       "migrations_dir": "migrations/core"
-    },
-    {
-      "binding": "SUBMISSIONS_DB",
-      "database_name": "wasm-oj-submissions-production-00",
-      "database_id": "514a6ae0-719b-4de0-ad8e-46db42421b64",
-      "migrations_dir": "migrations/submissions"
     }
   ],
   "r2_buckets": [
-    { "binding": "JUDGE_BUCKET", "bucket_name": "wasm-oj-judge-production" },
-    { "binding": "JUDGE_MIRROR_BUCKET", "bucket_name": "wasm-oj-judge-mirror-production" }
+    { "binding": "JUDGE_BUCKET", "bucket_name": "wasm-oj-judge-production" }
   ],
   "durable_objects": {
     "bindings": [
-      { "name": "SUBMISSION_CONTAINER", "class_name": "SubmissionJudgeContainer" },
-      { "name": "VALIDATION_CONTAINER", "class_name": "ValidationJudgeContainer" }
+      { "name": "SUBMISSION_CONTAINER", "class_name": "SubmissionJudgeContainer" }
     ]
   },
   "migrations": [
@@ -85,6 +77,10 @@
         "UserQuotaDO",
         "AdmissionControlDO"
       ]
+    },
+    {
+      "tag": "v3",
+      "deleted_classes": ["ValidationJudgeContainer"]
     }
   ],
   "workflows": [
@@ -94,26 +90,18 @@
       "class_name": "SubmissionWorkflow"
     },
     {
-      "name": "wasm-oj-validation-production",
-      "binding": "VALIDATION_WORKFLOW",
-      "class_name": "ValidationWorkflow"
+      "name": "wasm-oj-catalog-production",
+      "binding": "CATALOG_WORKFLOW",
+      "class_name": "CatalogWorkflow"
     }
   ],
   "containers": [
     {
       "name": "wasm-oj-submission-production",
       "class_name": "SubmissionJudgeContainer",
-      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/forge-judge-production:3dd39984-36df-43b2-b074-c0e174ebcd4a",
+      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-judge-production:__WASM_OJ_RELEASE_ID__",
       "instance_type": "standard-2",
       "max_instances": 50,
-      "ssh": { "enabled": false }
-    },
-    {
-      "name": "wasm-oj-validation-production",
-      "class_name": "ValidationJudgeContainer",
-      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/forge-judge-production:3dd39984-36df-43b2-b074-c0e174ebcd4a",
-      "instance_type": "standard-2",
-      "max_instances": 5,
       "ssh": { "enabled": false }
     }
   ],

@@ -13,7 +13,7 @@ await publishCargoLicenseInventory({
   stagedReportPath,
   reportPath,
   inventoryPath,
-  schema: "wasm-oj-forge-v1/runtime-core-licenses",
+  schema: "wasm-oj-v2/runtime-core-licenses",
   graph: {
     manifest: "crates/runtime-core/Cargo.toml",
     lockfile: "crates/runtime-core/Cargo.lock",

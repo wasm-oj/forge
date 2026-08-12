@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "./core/contract";
-import { FORGE_RUNTIME_IDENTITY_SHA256 } from "./core/runtime-identity";
+import { WASM_OJ_CONTRACT_VERSION } from "./core/contract";
+import { WASM_OJ_RUNTIME_IDENTITY_SHA256 } from "./core/runtime-identity";
 import {
-  forgeReleaseManifestBytes,
-  forgeReleaseManifestSha256,
-  FORGE_CONTAINER_PROTOCOL_VERSION,
-  FORGE_RELEASE_MANIFEST_SCHEMA,
-  parseForgeReleaseManifest,
-  verifyForgeReleaseManifestBytes,
-  type ForgeReleaseManifest,
+  releaseManifestBytes,
+  releaseManifestSha256,
+  WASM_OJ_CONTAINER_PROTOCOL_VERSION,
+  WASM_OJ_RELEASE_MANIFEST_SCHEMA,
+  parseReleaseManifest,
+  verifyReleaseManifestBytes,
+  type ReleaseManifest,
 } from "./release-manifest";
 
 const digest = (character: string) => character.repeat(64);
 
-function fixture(): ForgeReleaseManifest {
+function fixture(): ReleaseManifest {
   return {
-    schema: FORGE_RELEASE_MANIFEST_SCHEMA,
+    schema: WASM_OJ_RELEASE_MANIFEST_SCHEMA,
     releaseId: "018f0f2e-7b3c-7f51-8b36-df6ec12f8d31",
     version: "1.2.3-rc.1",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     createdAt: "2026-08-09T00:00:00.000Z",
     source: {
       repository: "https://github.com/wasm-oj/forge",
@@ -53,10 +53,10 @@ function fixture(): ForgeReleaseManifest {
       },
     },
     runtime: {
-      protocolVersion: FORGE_CONTAINER_PROTOCOL_VERSION,
+      protocolVersion: WASM_OJ_CONTAINER_PROTOCOL_VERSION,
       executionRootSha256: digest("9"),
       rootSha256: digest("a"),
-      runtimeIdentitySha256: FORGE_RUNTIME_IDENTITY_SHA256,
+      runtimeIdentitySha256: WASM_OJ_RUNTIME_IDENTITY_SHA256,
       runtimeCoreSha256: digest("b"),
       wasmerVersion: "7.2.1",
       wasmerSha256: digest("c"),
@@ -66,31 +66,38 @@ function fixture(): ForgeReleaseManifest {
     toolchains: { rootSha256: digest("f"), manifestSha256: digest("0") },
     cost: { model: "weighted", profileRootSha256: digest("1"), baselineSha256: digest("2") },
     evidence: { conformanceSha256: digest("3"), testsSha256: digest("4"), costCalibrationSha256: digest("5") },
-    migrations: { coreSha256: digest("6"), submissionsSha256: digest("7") },
+    migrations: { databaseSha256: digest("6") },
     provenance: { issuer: "https://token.actions.githubusercontent.com", subject: "repo:wasm-oj/forge" },
   };
 }
 
-describe("Forge release manifest", () => {
+describe("WASM-OJ release manifest", () => {
   it("produces one stable canonical byte sequence", async () => {
     const value = fixture();
     const reversed = Object.fromEntries(Object.entries(value).reverse());
-    expect(forgeReleaseManifestBytes(parseForgeReleaseManifest(reversed))).toEqual(forgeReleaseManifestBytes(value));
-    const bytes = forgeReleaseManifestBytes(value);
-    expect(await verifyForgeReleaseManifestBytes(bytes, await forgeReleaseManifestSha256(value))).toEqual(value);
-    await expect(verifyForgeReleaseManifestBytes(new TextEncoder().encode("not-json"), digest("0"))).rejects.toThrow("expected digest");
+    expect(releaseManifestBytes(parseReleaseManifest(reversed))).toEqual(releaseManifestBytes(value));
+    const bytes = releaseManifestBytes(value);
+    expect(await verifyReleaseManifestBytes(bytes, await releaseManifestSha256(value))).toEqual(value);
+    await expect(verifyReleaseManifestBytes(new TextEncoder().encode("not-json"), digest("0"))).rejects.toThrow("expected digest");
   });
 
   it("rejects non-canonical bytes and unknown fields", async () => {
     const value = fixture();
-    await expect(verifyForgeReleaseManifestBytes(new TextEncoder().encode(JSON.stringify(value)))).rejects.toThrow("canonical JSON");
-    expect(() => parseForgeReleaseManifest({ ...value, fallbackRelease: "old" })).toThrow("invalid shape");
+    await expect(verifyReleaseManifestBytes(new TextEncoder().encode(JSON.stringify(value)))).rejects.toThrow("canonical JSON");
+    expect(() => parseReleaseManifest({ ...value, fallbackRelease: "old" })).toThrow("invalid shape");
   });
 
   it("binds release and cost evidence to the exact runtime", () => {
-    expect(() => parseForgeReleaseManifest({
+    expect(() => parseReleaseManifest({
       ...fixture(),
       runtime: { ...fixture().runtime, runtimeIdentitySha256: digest("f") },
     })).toThrow("runtime identity");
+  });
+
+  it("accepts only the single authoritative database migration digest", () => {
+    expect(() => parseReleaseManifest({
+      ...fixture(),
+      migrations: { coreSha256: digest("6"), submissionsSha256: digest("7") },
+    })).toThrow("migrations has an invalid shape");
   });
 });

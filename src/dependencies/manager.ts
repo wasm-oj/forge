@@ -1,4 +1,4 @@
-import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 import {
   assertValidDependencyManifest,
@@ -25,8 +25,8 @@ import type {
   DependencyLock,
   DependencyManifest,
   DependencyOfflineBundle,
-  ForgeDependencyCache,
-  ForgeDependencyResolver,
+  DependencyCache,
+  DependencyResolver,
   ResolveDependencyOptions,
 } from "./types.ts";
 import {
@@ -36,7 +36,7 @@ import {
   type DependencyBuildBundle,
 } from "./build.ts";
 
-export class MemoryDependencyCache implements ForgeDependencyCache {
+export class MemoryDependencyCache implements DependencyCache {
   private readonly payloads = new Map<string, Uint8Array>();
 
   async load(integritySha256: string): Promise<Uint8Array | undefined> {
@@ -60,19 +60,19 @@ export class MemoryDependencyCache implements ForgeDependencyCache {
 }
 
 /** Host-neutral dependency resolution, locking, cache, and offline transport. */
-export class ForgeDependencyManager {
-  private readonly cache: ForgeDependencyCache;
-  private readonly resolvers = new Map<DependencyEcosystem, ForgeDependencyResolver>();
+export class DependencyManager {
+  private readonly cache: DependencyCache;
+  private readonly resolvers = new Map<DependencyEcosystem, DependencyResolver>();
 
   constructor(
-    cache: ForgeDependencyCache,
-    resolvers: readonly ForgeDependencyResolver[] = [],
+    cache: DependencyCache,
+    resolvers: readonly DependencyResolver[] = [],
   ) {
     this.cache = cache;
     for (const resolver of resolvers) this.registerResolver(resolver);
   }
 
-  registerResolver(resolver: ForgeDependencyResolver): void {
+  registerResolver(resolver: DependencyResolver): void {
     if (!resolver || typeof resolver !== "object" || typeof resolver.resolve !== "function") {
       throw new TypeError("Dependency resolvers must be objects implementing resolve().");
     }
@@ -128,7 +128,7 @@ export class ForgeDependencyManager {
       groups.set(requirement.ecosystem, group);
     }
     const roots: string[] = [];
-    const packages = new Map<string, Awaited<ReturnType<ForgeDependencyResolver["resolve"]>>["packages"][number]>();
+    const packages = new Map<string, Awaited<ReturnType<DependencyResolver["resolve"]>>["packages"][number]>();
     let payloadBytes = 0;
     for (const [ecosystem, requirements] of groups) {
       const resolver = this.resolvers.get(ecosystem);
@@ -240,17 +240,17 @@ export class ForgeDependencyManager {
       payloads[item.integritySha256] = payload;
     }
     return {
-      schema: FORGE_SCHEMAS.dependencyOfflineBundle,
-      forgeContract: FORGE_CONTRACT_VERSION,
+      schema: WASM_OJ_SCHEMAS.dependencyOfflineBundle,
+      wasmOjContract: WASM_OJ_CONTRACT_VERSION,
       lock: structuredClone(lock),
       payloads,
     };
   }
 
   async importOffline(bundle: DependencyOfflineBundle): Promise<DependencyLock> {
-    if (!bundle || typeof bundle !== "object" || bundle.schema !== FORGE_SCHEMAS.dependencyOfflineBundle
-      || bundle.forgeContract !== FORGE_CONTRACT_VERSION) {
-      throw new Error("Offline dependency bundle does not use the active Forge contract.");
+    if (!bundle || typeof bundle !== "object" || bundle.schema !== WASM_OJ_SCHEMAS.dependencyOfflineBundle
+      || bundle.wasmOjContract !== WASM_OJ_CONTRACT_VERSION) {
+      throw new Error("Offline dependency bundle does not use the active WASM-OJ contract.");
     }
     assertValidDependencyLock(bundle.lock);
     if (!bundle.payloads || typeof bundle.payloads !== "object" || Array.isArray(bundle.payloads)) {
@@ -278,10 +278,10 @@ export class ForgeDependencyManager {
 }
 
 export function createDefaultDependencyManager(
-  cache: ForgeDependencyCache,
+  cache: DependencyCache,
   options: DependencyResolverOptions = {},
-): ForgeDependencyManager {
-  return new ForgeDependencyManager(cache, createDefaultDependencyResolvers(options));
+): DependencyManager {
+  return new DependencyManager(cache, createDefaultDependencyResolvers(options));
 }
 
 function admitPayloadBytes(current: number, payload: Uint8Array, label: string): number {

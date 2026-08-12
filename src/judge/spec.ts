@@ -1,8 +1,8 @@
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
-import { assertValidBuildArtifact } from "../core/artifact-validation";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { resolveDeterminism } from "../core/determinism";
 import { resolveResourcePolicy } from "../core/resources";
-import type { BuildArtifact, DeterminismConfig, ResourcePolicy } from "../core/types";
+import type { DeterminismConfig, ResourcePolicy } from "../core/types";
+import { validateTrustedJudgeWasm, type TrustedJudgeProgram } from "../online-judge/trusted-judge-wasm";
 import type { OutputNormalization } from "./normalization";
 
 export type JudgeInputSpec =
@@ -47,7 +47,7 @@ export interface InteractiveJudgeCaseSpec extends JudgeCaseBase {
   /** Contestant execution policy. Secret case files are never mounted here. */
   contestant?: JudgeProgramSpec;
   interactor: JudgeProgramSpec & {
-    artifact: BuildArtifact;
+    program: TrustedJudgeProgram;
     /** Absolute guest path receiving the resolved primary case input. */
     inputPath: string;
   };
@@ -56,7 +56,7 @@ export interface InteractiveJudgeCaseSpec extends JudgeCaseBase {
 export type JudgeCaseSpec = BatchJudgeCaseSpec | InteractiveJudgeCaseSpec;
 
 export interface JudgeSpec {
-  version: typeof FORGE_CONTRACT_VERSION;
+  version: typeof WASM_OJ_CONTRACT_VERSION;
   cases: readonly JudgeCaseSpec[];
   /** Stop after the first non-accepted case. Defaults to true. */
   failFast?: boolean;
@@ -102,7 +102,7 @@ export function setMatcher(expected: string, multiplicity = false): JudgeMatcher
 }
 
 export function wasmCheckerMatcher(
-  checker: BuildArtifact,
+  checker: TrustedJudgeProgram,
   expected: string,
   args: readonly string[] = [],
   files: Readonly<Record<string, Uint8Array>> = {},
@@ -110,7 +110,7 @@ export function wasmCheckerMatcher(
   return {
     id: "wasm-checker",
     config: {
-      checker,
+      checker: { runtimeProfile: checker.runtimeProfile, wasm: checker.wasm.slice() },
       expected,
       args: [...args],
       files: Object.fromEntries(Object.entries(files).map(([path, contents]) => [path, contents.slice()])),
@@ -126,7 +126,7 @@ function assertTolerance(value: number, label: string): void {
 
 export function validateJudgeSpec(spec: JudgeSpec): void {
   if (!spec || typeof spec !== "object") throw new TypeError("Judge spec must be an object.");
-  if (spec.version !== FORGE_CONTRACT_VERSION) {
+  if (spec.version !== WASM_OJ_CONTRACT_VERSION) {
     throw new Error(`Unsupported judge spec version '${String(spec.version)}'.`);
   }
   if (!Array.isArray(spec.cases)) throw new TypeError("Judge spec cases must be an array.");
@@ -199,13 +199,14 @@ function validateInteractiveCase(item: InteractiveJudgeCaseSpec): void {
   }
   validateProgramSpec(item.interactor, item.id, "interactor");
   assertGuestFilePath(item.interactor.inputPath, `Judge case '${item.id}' interactor inputPath`);
-  if (!item.interactor.artifact || typeof item.interactor.artifact !== "object") {
-    throw new TypeError(`Judge case '${item.id}' interactor artifact must be a build artifact.`);
+  validateTrustedProgram(item.interactor.program, `Judge case '${item.id}' interactor`);
+}
+
+function validateTrustedProgram(value: TrustedJudgeProgram, label: string): void {
+  if (!value || typeof value !== "object" || !(value.wasm instanceof Uint8Array)) {
+    throw new TypeError(`${label} must be a trusted judge program.`);
   }
-  if (item.interactor.artifact.kind !== "wasm") {
-    throw new Error(`Judge case '${item.id}' interactor must be a standalone Wasm artifact.`);
-  }
-  assertValidBuildArtifact(item.interactor.artifact);
+  validateTrustedJudgeWasm(value.wasm);
 }
 
 function validateProgramSpec(value: JudgeProgramSpec, caseId: string, label: string): void {

@@ -1,0 +1,45 @@
+{
+  "name": "@wasm-oj/organizer",
+  "version": "0.2.0",
+  "description": "Problem collection and immutable judge-data publication tools for WASM-OJ.",
+  "license": "MIT",
+  "author": "JacobLinCool",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wasm-oj/forge.git",
+    "directory": "packages/organizer"
+  },
+  "homepage": "https://github.com/wasm-oj/forge#readme",
+  "bugs": {
+    "url": "https://github.com/wasm-oj/forge/issues"
+  },
+  "keywords": ["online-judge", "problems", "contest"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "wasm-oj-collection": "./bin/wasm-oj-collection.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["bin", "dist", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "licenses"],
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-library.mjs --package @wasm-oj/organizer",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@wasm-oj/core": "workspace:0.2.0"
+  }
+}

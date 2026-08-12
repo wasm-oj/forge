@@ -16,7 +16,7 @@ budget 非遞減，因此「能完整保留的 event 數」也不會減少。維
 
 ## 複雜度
 
-事件指標總共前進 `N` 次，每個查詢做 `O(1)` 額外工作，總時間 `O(N+Q)`。事件先於 budget 輸入，必須保留 stream 與 byte 數供後續掃描，所以核心輔助空間為 `O(N)`。C、C++、Go reference 串流讀寫；Rust、Python 保留完整輸入與輸出，JavaScript、TypeScript 保留單一 Forge 輸入字串並以固定 64 KiB 分塊輸出。每筆事件、budget 與答案皆只有常數個定長 token，故依實際 resident allocations 計算，七語言 reference 的共同最壞空間上界為 `O(N+Q)`；讀寫量亦給出 `Ω(N+Q)` 時間下界。
+事件指標總共前進 `N` 次，每個查詢做 `O(1)` 額外工作，總時間 `O(N+Q)`。事件先於 budget 輸入，必須保留 stream 與 byte 數供後續掃描，所以核心輔助空間為 `O(N)`。C、C++、Go reference 串流讀寫；Rust、Python 保留完整輸入與輸出，JavaScript、TypeScript 保留單一 WASM-OJ 輸入字串並以固定 64 KiB 分塊輸出。每筆事件、budget 與答案皆只有常數個定長 token，故依實際 resident allocations 計算，七語言 reference 的共同最壞空間上界為 `O(N+Q)`；讀寫量亦給出 `Ω(N+Q)` 時間下界。
 
 ## 常見錯誤
 

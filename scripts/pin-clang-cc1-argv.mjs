@@ -8,19 +8,19 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { FORGE_SCHEMAS } from "../src/core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../src/core/contract.ts";
 
 const VERSION = "22.0.0-git20542-10";
 const TOOLCHAIN_DIRECTORY = path.resolve(
-  process.env.FORGE_CLANG_TOOLCHAIN_DIRECTORY ?? "public/toolchains",
+  process.env.WASM_OJ_CLANG_TOOLCHAIN_DIRECTORY ?? "public/toolchains",
 );
 const WEBC_PATH = path.join(TOOLCHAIN_DIRECTORY, `clang-${VERSION}.webc`);
 const OUTPUT_PATH = path.join(TOOLCHAIN_DIRECTORY, `clang-${VERSION}.cc1-pins.json`);
-const COMPILER_BIN = path.resolve("crates/runtime-core/target/release/forge-compiler");
-const INPUT_PLACEHOLDER = "__FORGE_INPUT__";
-const OUTPUT_PLACEHOLDER = "__FORGE_OUTPUT__";
-const MAIN_FILE_NAME_PLACEHOLDER = "__FORGE_MAIN_FILE_NAME__";
-const OBJECTS_PLACEHOLDER = "__FORGE_OBJECTS__";
+const COMPILER_BIN = path.resolve("crates/runtime-core/target/release/wasm-oj-compiler");
+const INPUT_PLACEHOLDER = "__WASM_OJ_INPUT__";
+const OUTPUT_PLACEHOLDER = "__WASM_OJ_OUTPUT__";
+const MAIN_FILE_NAME_PLACEHOLDER = "__WASM_OJ_MAIN_FILE_NAME__";
+const OBJECTS_PLACEHOLDER = "__WASM_OJ_OBJECTS__";
 
 const CONFIGS = {
   "c-release": { language: "c", flags: ["-O2", "-DNDEBUG", "-std=c17"] },
@@ -37,14 +37,14 @@ const CONFIGS = {
 
 execFileSync("cargo", [
   "build", "--locked", "--manifest-path", path.resolve("crates/runtime-core/Cargo.toml"),
-  "--release", "--bin", "forge-compiler",
+  "--release", "--bin", "wasm-oj-compiler",
 ], { stdio: "inherit" });
 
 const webc = readFileSync(WEBC_PATH);
 const sourceSha256 = sha256(webc);
 const configKeys = Object.keys(CONFIGS).sort();
 const responses = runCompilerBatch({
-  schema: FORGE_SCHEMAS.compileBatch,
+  schema: WASM_OJ_SCHEMAS.compileBatch,
   packagePath: WEBC_PATH,
   memoryLimitBytes: 4_294_967_296,
   requests: configKeys.map((key) => pinRequest(CONFIGS[key])),
@@ -64,7 +64,7 @@ for (const [index, key] of configKeys.entries()) {
 }
 
 const manifest = {
-  schema: FORGE_SCHEMAS.clangPins,
+  schema: WASM_OJ_SCHEMAS.clangPins,
   version: VERSION,
   source: path.basename(WEBC_PATH),
   sourceSha256,
@@ -187,11 +187,11 @@ function runCompilerBatch(request) {
   });
   if (result.error) throw result.error;
   if (result.status !== 0 && !result.stdout) {
-    throw new Error(`forge-compiler failed (${result.status}):\n${result.stderr}`);
+    throw new Error(`wasm-oj-compiler failed (${result.status}):\n${result.stderr}`);
   }
   const parsed = JSON.parse(result.stdout);
   if (!Array.isArray(parsed.responses) || parsed.responses.length !== request.requests.length) {
-    throw new Error("forge-compiler returned a malformed batch response.");
+    throw new Error("wasm-oj-compiler returned a malformed batch response.");
   }
   return parsed.responses;
 }

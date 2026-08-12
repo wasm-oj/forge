@@ -107,7 +107,7 @@
         "caseSet": { "const": "all-manifest-tests" },
         "caseAggregation": { "const": "equal-weight-average" },
         "maximumPoints": { "const": 100 },
-        "costContract": { "const": "wasm-oj-forge-v1" },
+        "costContract": { "const": "wasm-oj-v2" },
         "costModel": { "const": "weighted" },
         "costMetric": { "const": "baseline-normalized-net" },
         "calibration": {
@@ -116,7 +116,7 @@
           "required": ["status", "method", "profiles"],
           "properties": {
             "status": { "const": "measured" },
-            "method": { "const": "forge-v1-compiled-average-optimal-rounded-v1" },
+            "method": { "const": "wasm-oj-v2/compiled-average-optimal-rounded/v1" },
             "profiles": {
               "type": "object",
               "additionalProperties": false,

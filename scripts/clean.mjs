@@ -23,7 +23,7 @@ for (const parent of ["crates", "tools", "vendor"]) {
   }
 }
 for (const entry of await readdir(root, { withFileTypes: true })) {
-  if (entry.isDirectory() && entry.name.startsWith(".forge-library-build-")) {
+  if (entry.isDirectory() && entry.name.startsWith(".wasm-oj-library-build-")) {
     generatedPaths.add(entry.name);
   }
 }

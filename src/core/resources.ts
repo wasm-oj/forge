@@ -1,6 +1,6 @@
 import type { ResourcePolicy } from "./types.ts";
 
-/** The weighted meter defined by the active Forge contract. */
+/** The weighted meter defined by the active WASM-OJ contract. */
 export const WEIGHTED_METER_MODEL = "weighted";
 export const MAX_LOGICAL_TIME_LIMIT_MS = Math.floor(Number.MAX_SAFE_INTEGER / 1_000_000);
 export const WASM_MEMORY_PAGE_BYTES = 65_536;

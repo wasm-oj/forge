@@ -3,7 +3,7 @@ import { canonicalFileEntries } from "./project-files.ts";
 import type { BuildArtifact } from "./types.ts";
 
 const encoder = new TextEncoder();
-const RUNTIME_BUNDLE_DOMAIN = encoder.encode("wasm-oj-forge/runtime-bundle-payload\0");
+const RUNTIME_BUNDLE_DOMAIN = encoder.encode("wasm-oj/runtime-bundle-payload\0");
 const TEXT_FILE = 1;
 const BINARY_FILE = 2;
 const U64_BYTES = 8;

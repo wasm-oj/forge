@@ -1770,17 +1770,17 @@
       "sha256": "4d77ff828df17aed4167a5aafd2b2e6d8c054e2b4772611724426a68582db150"
     }
   ],
-  "schema": "wasm-oj-forge-v1/go-toolchain",
+  "schema": "wasm-oj-v2/go-toolchain",
   "source": {
     "distributionSha256": "495be4bc87176ac567392e5b4116abd98466d33d7b49d41e764ccc6976b2dc42",
     "distributionUrl": "https://go.dev/dl/go1.26.5.src.tar.gz"
   },
   "standardLibrary": {
-    "compressedBytes": 29783008,
-    "compressedSha256": "78a4531121a78c3fca5b3ed0a24a0c1c4f9ac0b330d0d38730768cee7f174d68",
-    "format": "FORGEGO1",
+    "compressedBytes": 29300578,
+    "compressedSha256": "aeffc384fdc624544f174ba5fc3c22395717fdbc3c4387d677d20855b6be80d8",
+    "format": "WOJGO002",
     "path": "go-1.26.5-wasip1.stdlib.gz.bin",
-    "sha256": "0f52f7f37cc7bec08422c64607cf695e33a80852ce0b39d88a3bbe7d09a87b5a",
+    "sha256": "e1ec64b08efd02b35b7ffdaf3970875aaae98325fa4795eafca94ebae2d0d192",
     "uncompressedBytes": 129696615
   },
   "target": "wasip1/wasm",

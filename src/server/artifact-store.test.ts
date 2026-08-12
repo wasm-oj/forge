@@ -2,7 +2,7 @@ import { mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { costProfileId } from "../core/cost-profile";
 import type { WasmArtifact } from "../core/types";
 import { FileSystemArtifactStore } from "./artifact-store";
@@ -43,7 +43,7 @@ describe("FileSystemArtifactStore", () => {
 function testArtifact(cacheKey: string): WasmArtifact {
   return {
     kind: "wasm",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: "artifact",
     projectId: "project",
     cacheKey,
@@ -61,7 +61,7 @@ function testArtifact(cacheKey: string): WasmArtifact {
 }
 
 async function temporaryDirectory(): Promise<string> {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "forge-artifact-store-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-artifact-store-"));
   directories.push(directory);
   return directory;
 }

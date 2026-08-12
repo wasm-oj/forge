@@ -2,13 +2,13 @@ import { randomUUID, createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ForgeDependencyCache } from "./types.ts";
+import type { DependencyCache } from "./types.ts";
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const MAX_PAYLOAD_BYTES = 512 * 1024 * 1024;
 
 /** Atomic server-side content-addressed dependency cache. */
-export class FileSystemDependencyCache implements ForgeDependencyCache {
+export class FileSystemDependencyCache implements DependencyCache {
   private readonly directory: string;
   private initialized: Promise<void> | undefined;
 

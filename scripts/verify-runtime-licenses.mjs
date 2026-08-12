@@ -9,7 +9,7 @@ const run = promisify(execFile);
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const inventoryPath = path.join(root, "licenses/runtime-core-dependencies.json");
 const reportPath = path.join(root, "licenses/runtime-core-dependencies.html");
-const [inventoryBytes, reportBytes, tree] = await Promise.all([
+const [inventoryBytes, reportBytes, tree, metadataResult] = await Promise.all([
   readFile(inventoryPath),
   readFile(reportPath),
   run("cargo", [
@@ -23,9 +23,15 @@ const [inventoryBytes, reportBytes, tree] = await Promise.all([
     "--prefix", "none",
     "--format", "{p}",
   ], { cwd: root, maxBuffer: 16 * 1024 * 1024 }),
+  run("cargo", [
+    "metadata",
+    "--no-deps",
+    "--format-version", "1",
+    "--manifest-path", path.join(root, "crates/runtime-core/Cargo.toml"),
+  ], { cwd: root, maxBuffer: 4 * 1024 * 1024 }),
 ]);
 const inventory = JSON.parse(inventoryBytes.toString("utf8"));
-if (inventory.schema !== "wasm-oj-forge-v1/runtime-core-licenses") {
+if (inventory.schema !== "wasm-oj-v2/runtime-core-licenses") {
   throw new Error(`Unsupported runtime license inventory schema '${String(inventory.schema)}'.`);
 }
 if (inventory.generator?.name !== "cargo-about" || inventory.generator?.version !== "0.9.1") {
@@ -57,7 +63,11 @@ const actualPackages = new Set(
     .filter(Boolean)
     .map((match) => `${match[1]}@${match[2]}`),
 );
-actualPackages.delete("wasm-oj-forge-runtime-core@0.1.0");
+const metadata = JSON.parse(metadataResult.stdout);
+if (!Array.isArray(metadata.packages) || metadata.packages.length !== 1) {
+  throw new Error("Cargo metadata did not resolve exactly one runtime-core package.");
+}
+actualPackages.delete(`${metadata.packages[0].name}@${metadata.packages[0].version}`);
 const inventoryPackages = new Set();
 for (const item of inventory.packages ?? []) {
   if (

@@ -1,9 +1,9 @@
 import { assertLanguageIdentifier, type Language, type Project, type WorkerProgress } from "../core/types";
-import type { ForgeCompiler } from "./compiler";
+import type { Compiler } from "./compiler";
 
-export interface ForgeCompilerRegistration {
+export interface CompilerRegistration {
   readonly languages: readonly Language[];
-  readonly compiler: ForgeCompiler;
+  readonly compiler: Compiler;
 }
 
 /**
@@ -13,17 +13,17 @@ export interface ForgeCompilerRegistration {
  * deterministic for the lifetime of an engine and making each language owned
  * by exactly one compiler.
  */
-export class ForgeCompilerRegistry implements ForgeCompiler {
-  private readonly routes = new Map<Language, ForgeCompiler>();
-  private readonly compilers = new Set<ForgeCompiler>();
+export class CompilerRegistry implements Compiler {
+  private readonly routes = new Map<Language, Compiler>();
+  private readonly compilers = new Set<Compiler>();
   private readonly progressListeners = new Set<(progress: WorkerProgress) => void>();
-  private readonly removeCompilerListeners = new Map<ForgeCompiler, () => void>();
+  private readonly removeCompilerListeners = new Map<Compiler, () => void>();
   private initialization: Promise<void> | undefined;
   private sealed = false;
   private disposed = false;
   private generation = 0;
 
-  constructor(registrations: readonly ForgeCompilerRegistration[] = []) {
+  constructor(registrations: readonly CompilerRegistration[] = []) {
     try {
       for (const registration of registrations) {
         this.register(registration.languages, registration.compiler);
@@ -32,15 +32,15 @@ export class ForgeCompilerRegistry implements ForgeCompiler {
       try {
         this.dispose();
       } catch (disposeError) {
-        throw new AggregateError([error, disposeError], "ForgeCompilerRegistry construction and cleanup failed.");
+        throw new AggregateError([error, disposeError], "CompilerRegistry construction and cleanup failed.");
       }
       throw error;
     }
   }
 
-  register(languages: readonly Language[], compiler: ForgeCompiler): this {
+  register(languages: readonly Language[], compiler: Compiler): this {
     this.assertActive();
-    if (this.sealed) throw new Error("ForgeCompilerRegistry is sealed after its first lifecycle operation.");
+    if (this.sealed) throw new Error("CompilerRegistry is sealed after its first lifecycle operation.");
     if (!Array.isArray(languages) || languages.length === 0) {
       throw new Error("A compiler registration must own at least one language.");
     }
@@ -58,7 +58,7 @@ export class ForgeCompilerRegistry implements ForgeCompiler {
         for (const listener of this.progressListeners) listener(progress);
       });
       if (typeof removeProgressListener !== "function") {
-        throw new TypeError("ForgeCompiler.onProgress() must return an unsubscribe function.");
+        throw new TypeError("Compiler.onProgress() must return an unsubscribe function.");
       }
     }
     for (const language of unique) this.routes.set(language, compiler);
@@ -90,7 +90,7 @@ export class ForgeCompilerRegistry implements ForgeCompiler {
       ).then(() => {
         this.assertActive();
         if (generation !== this.generation) {
-          throw new Error("ForgeCompilerRegistry initialization was superseded by a lifecycle change.");
+          throw new Error("CompilerRegistry initialization was superseded by a lifecycle change.");
         }
       });
       this.initialization = initialization;
@@ -151,17 +151,17 @@ export class ForgeCompilerRegistry implements ForgeCompiler {
     }
     this.removeCompilerListeners.clear();
     this.progressListeners.clear();
-    if (errors.length > 0) throw new AggregateError(errors, "ForgeCompilerRegistry disposal failed.");
+    if (errors.length > 0) throw new AggregateError(errors, "CompilerRegistry disposal failed.");
   }
 
   private assertActive(): void {
-    if (this.disposed) throw new Error("ForgeCompilerRegistry is disposed.");
+    if (this.disposed) throw new Error("CompilerRegistry is disposed.");
   }
 
-  private compilerFor(language: Language): ForgeCompiler {
+  private compilerFor(language: Language): Compiler {
     this.assertActive();
     const compiler = this.routes.get(language);
-    if (!compiler) throw new Error(`No ForgeCompiler is registered for language '${language}'.`);
+    if (!compiler) throw new Error(`No Compiler is registered for language '${language}'.`);
     return compiler;
   }
 
@@ -180,13 +180,13 @@ export class ForgeCompilerRegistry implements ForgeCompiler {
       }
     }
     if (errors.length > 0) {
-      throw new AggregateError(errors, `ForgeCompilerRegistry ${operation} failed.`);
+      throw new AggregateError(errors, `CompilerRegistry ${operation} failed.`);
     }
   }
 }
 
-function assertCompilerContract(compiler: ForgeCompiler): void {
-  if (!compiler || typeof compiler !== "object") throw new TypeError("Forge compilers must be objects.");
+function assertCompilerContract(compiler: Compiler): void {
+  if (!compiler || typeof compiler !== "object") throw new TypeError("WASM-OJ compilers must be objects.");
   for (const method of [
     "cacheIdentity",
     "ready",
@@ -198,7 +198,7 @@ function assertCompilerContract(compiler: ForgeCompiler): void {
     "dispose",
   ] as const) {
     if (typeof compiler[method] !== "function") {
-      throw new TypeError(`ForgeCompiler must implement ${method}().`);
+      throw new TypeError(`Compiler must implement ${method}().`);
     }
   }
 }

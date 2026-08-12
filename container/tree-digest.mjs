@@ -43,7 +43,7 @@ async function hashFile(file) {
  * Hash a toolchain tree as canonical JSON over sorted relative paths, byte
  * lengths, and per-file SHA-256 digests. Symlinks and special files fail closed.
  */
-export async function computeFileTreeIdentity(root, options = {}) {
+export async function computeFileTreeInventory(root, options = {}) {
   const excluded = new Set(options.excludedRelativePaths ?? []);
   const allowInternalSymlinks = options.allowInternalSymlinks === true;
   for (const relative of excluded) {
@@ -95,10 +95,45 @@ export async function computeFileTreeIdentity(root, options = {}) {
   }
   await visit(root, "");
   if (entries.length === 0) throw new Error("Identity tree is empty.");
-  // This is the forge-file-tree-sha256-v1 algorithm used by qualification:
+  // This is the wasm-oj-file-tree-sha256-v1 algorithm used by qualification:
   // one JSON record per UTF-8-sorted file/internal-symlink and exactly one
   // trailing newline. Internal symlinks are opt-in for pnpm's deployed layout;
   // their normalized target and the target's physical tree are both bound.
-  const inventoryBytes = Buffer.from(`${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
-  return Object.freeze({ entries: entries.length, rootSha256: sha256(inventoryBytes) });
+  return freezeInventory(entries);
+}
+
+export async function computeFileTreeIdentity(root, options = {}) {
+  const inventory = await computeFileTreeInventory(root, options);
+  return Object.freeze({ entries: inventory.entries.length, rootSha256: inventory.rootSha256 });
+}
+
+export function deriveFileTreeInventory(inventory, relativeRoot, options = {}) {
+  if (!inventory || !Array.isArray(inventory.entries) || typeof relativeRoot !== "string"
+    || !relativeRoot || relativeRoot.startsWith("/") || relativeRoot.endsWith("/")
+    || relativeRoot.split("/").some((part) => !admittedName(part))) {
+    throw new Error("Identity subtree root is not canonical.");
+  }
+  const prefix = `${relativeRoot}/`;
+  const entries = inventory.entries.flatMap((entry) => {
+    if (!entry.path.startsWith(prefix)) return [];
+    const path = entry.path.slice(prefix.length);
+    if ("symlinkTarget" in entry) {
+      if (options.allowInternalSymlinks !== true) {
+        throw new Error("Identity subtree contains a symlink or special file.");
+      }
+      if (!entry.symlinkTarget.startsWith(prefix)) {
+        throw new Error("Identity subtree contains a symlink that escapes the subtree.");
+      }
+      return [{ path, symlinkTarget: entry.symlinkTarget.slice(prefix.length) }];
+    }
+    return [{ path, executable: entry.executable, bytes: entry.bytes, sha256: entry.sha256 }];
+  });
+  if (entries.length === 0) throw new Error("Identity subtree is empty.");
+  return freezeInventory(entries);
+}
+
+function freezeInventory(entries) {
+  const frozenEntries = Object.freeze(entries.map((entry) => Object.freeze(entry)));
+  const inventoryBytes = Buffer.from(`${frozenEntries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+  return Object.freeze({ entries: frozenEntries, rootSha256: sha256(inventoryBytes) });
 }

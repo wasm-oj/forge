@@ -4,7 +4,7 @@ import {
   Wasmer,
   type Command,
 } from "@wasmer/sdk";
-import { FORGE_CONTRACT_VERSION } from "../core/contract.ts";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract.ts";
 import {
   decodeClangPins,
   instantiateClangCc1,
@@ -30,7 +30,7 @@ import {
 } from "./libcxx-pch.ts";
 import { sha256Hex } from "../core/hash.ts";
 import type { BuildGraphInput } from "./incremental-build-graph.ts";
-import type { IncrementalBuildGraphArchive } from "./incremental-build-graph.ts";
+import type { IncrementalBuildGraphState } from "./incremental-build-graph.ts";
 import type {
   BuildResult,
   CompilerTraceEvent,
@@ -128,7 +128,7 @@ export async function buildClangWithSdkDirect(
   ));
   try {
     await ensureDirectory(directory, "/build");
-    await ensureDirectory(directory, "/.forge");
+    await ensureDirectory(directory, "/.wasm-oj");
     host.trace(requestId, "filesystemPrepare", "end");
 
   const isCpp = project.config.language === "cpp";
@@ -151,7 +151,7 @@ export async function buildClangWithSdkDirect(
   const structuredDiagnostics: Diagnostic[] = [];
 
   const pchHeader = isCpp ? findPrecompiledHeader(project) : undefined;
-  const pchPath = "/project/build/forge.pch";
+  const pchPath = "/project/build/wasm-oj.pch";
   let pchInput: BuildGraphInput | undefined;
   let admittedPch = false;
   if (pchHeader) {
@@ -159,9 +159,9 @@ export async function buildClangWithSdkDirect(
     let pch: Uint8Array;
     if (isToolchainLibcxxPchHeader(decoder.decode(headerBytes))) {
       admittedPch = true;
-      const reservedHeader = "forge.libcxx.hpp";
+      const reservedHeader = "wasm-oj.libcxx.hpp";
       if (projectFiles.has(reservedHeader)) {
-        throw new Error(`C++ projects using Forge's admitted libc++ PCH may not define reserved path '${reservedHeader}'.`);
+        throw new Error(`C++ projects using WASM-OJ's admitted libc++ PCH may not define reserved path '${reservedHeader}'.`);
       }
       projectFiles.set(reservedHeader, headerBytes);
       await directory.writeFile(`/${reservedHeader}`, headerBytes);
@@ -178,7 +178,7 @@ export async function buildClangWithSdkDirect(
         await directory.writeFile(pchPath.slice("/project".length), pch);
       } else {
         pchMisses += 1;
-        const dependencyPath = "/project/build/forge.pch.d";
+        const dependencyPath = "/project/build/wasm-oj.pch.d";
         const args = instantiateClangPch(config.cc1, pins.placeholders, pchHeader, pchPath);
         args.splice(args.length - 1, 0, ...dependencies.includeDirectories.flatMap((directory) => ["-I", directory]));
         args.push("-dependency-file", dependencyPath, "-MT", pchPath);
@@ -334,7 +334,7 @@ export async function buildClangWithSdkDirect(
   const diagnostics = structuredDiagnostics;
   const artifact: WasmArtifact = {
     kind: "wasm",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: crypto.randomUUID(),
     projectId: project.id,
     cacheKey,
@@ -375,12 +375,12 @@ export async function clearSdkDirectClangCaches(): Promise<void> {
   objectCache.clear();
 }
 
-export function exportSdkDirectClangBuildGraph(): IncrementalBuildGraphArchive {
-  return objectCache.exportArchive();
+export function exportSdkDirectClangBuildGraphState(): IncrementalBuildGraphState {
+  return objectCache.exportState();
 }
 
-export function restoreSdkDirectClangBuildGraph(archive: IncrementalBuildGraphArchive): Promise<void> {
-  return objectCache.restoreArchive(archive);
+export function restoreSdkDirectClangBuildGraphState(state: IncrementalBuildGraphState): Promise<void> {
+  return objectCache.restoreState(state);
 }
 
 /** Release all SDK resources tied to one Runtime while preserving object-cache bytes. */
@@ -471,9 +471,9 @@ async function loadLibcxxPch(
 function findPrecompiledHeader(project: Project): string | undefined {
   const headers = project.files
     .map((file) => file.path)
-    .filter((path) => path.split("/").at(-1) === "forge.pch.hpp");
+    .filter((path) => path.split("/").at(-1) === "wasm-oj.pch.hpp");
   if (headers.length > 1) {
-    throw new Error(`C++ projects may contain at most one forge.pch.hpp; received ${headers.join(", ")}.`);
+    throw new Error(`C++ projects may contain at most one wasm-oj.pch.hpp; received ${headers.join(", ")}.`);
   }
   return headers[0];
 }
@@ -625,7 +625,7 @@ async function runUntilOutputReady<T>(
       }
       await new Promise<void>((resolve) => setTimeout(resolve, 5));
     }
-    throw new Error(`ForgeCompiler stage did not produce a complete output within ${STAGE_OUTPUT_TIMEOUT_MS} ms.`);
+    throw new Error(`Compiler stage did not produce a complete output within ${STAGE_OUTPUT_TIMEOUT_MS} ms.`);
   } finally {
     host.trace(requestId, outputReadyOperation, "end");
     host.trace(requestId, waitOperation, "end");

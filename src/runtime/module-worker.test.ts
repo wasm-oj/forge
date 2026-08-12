@@ -21,11 +21,11 @@ class FakeWorker {
 beforeEach(() => {
   constructions.length = 0;
   vi.stubGlobal("location", {
-    href: "https://forge.example/judge",
-    origin: "https://forge.example",
+    href: "https://wasm-oj.example/judge",
+    origin: "https://wasm-oj.example",
   });
   vi.stubGlobal("Worker", FakeWorker);
-  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:https://forge.example/bootstrap");
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:https://wasm-oj.example/bootstrap");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
 });
 
@@ -36,12 +36,12 @@ afterEach(() => {
 
 describe("module Worker bootstrap", () => {
   it("loads a relative emitted module through an absolute static import", async () => {
-    const worker = createModuleWorker("/assets/compiler.worker.js", { name: "forge-compiler" });
+    const worker = createModuleWorker("/assets/compiler.worker.js", { name: "wasm-oj-compiler" });
 
     expect(worker).toBeInstanceOf(FakeWorker);
     expect(constructions).toEqual([{
-      url: "blob:https://forge.example/bootstrap",
-      options: { name: "forge-compiler", type: "module" },
+      url: "blob:https://wasm-oj.example/bootstrap",
+      options: { name: "wasm-oj-compiler", type: "module" },
     }]);
     const bootstrap = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0];
     expect(bootstrap).toBeInstanceOf(Blob);
@@ -49,12 +49,12 @@ describe("module Worker bootstrap", () => {
       "const pendingMessages = [];",
       "const queueMessage = (event) => { event.stopImmediatePropagation(); pendingMessages.push(event.data); };",
       'globalThis.addEventListener("message", queueMessage);',
-      'Object.defineProperty(globalThis, "__wasmOjForgeModuleWorkerBaseUrl", { value: "https://forge.example/judge" });',
-      'try { await import("https://forge.example/assets/compiler.worker.js"); } finally { globalThis.removeEventListener("message", queueMessage); }',
+      'Object.defineProperty(globalThis, "__wasmOjModuleWorkerBaseUrl", { value: "https://wasm-oj.example/judge" });',
+      'try { await import("https://wasm-oj.example/assets/compiler.worker.js"); } finally { globalThis.removeEventListener("message", queueMessage); }',
       'for (const data of pendingMessages) globalThis.dispatchEvent(new MessageEvent("message", { data }));',
       "",
     ].join("\n"));
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://forge.example/bootstrap");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://wasm-oj.example/bootstrap");
   });
 
   it("revokes the bootstrap URL when Worker construction throws", () => {
@@ -64,19 +64,19 @@ describe("module Worker bootstrap", () => {
       }
     });
 
-    expect(() => createModuleWorker("https://forge.example/runner.worker.js"))
+    expect(() => createModuleWorker("https://wasm-oj.example/runner.worker.js"))
       .toThrow("constructor failed");
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://forge.example/bootstrap");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://wasm-oj.example/bootstrap");
   });
 
   it("rejects cross-origin and decorated module URLs before creating a blob", () => {
     expect(() => createModuleWorker("https://cdn.example/runner.worker.js"))
       .toThrow("must be same-origin");
-    expect(() => createModuleWorker("https://forge.example/runner.worker.js?token=secret"))
+    expect(() => createModuleWorker("https://wasm-oj.example/runner.worker.js?token=secret"))
       .toThrow("no credentials, query, or fragment");
-    expect(() => createModuleWorker("https://forge.example/runner.worker.js#entry"))
+    expect(() => createModuleWorker("https://wasm-oj.example/runner.worker.js#entry"))
       .toThrow("no credentials, query, or fragment");
-    expect(() => createModuleWorker("https://user:secret@forge.example/runner.worker.js"))
+    expect(() => createModuleWorker("https://user:secret@wasm-oj.example/runner.worker.js"))
       .toThrow("no credentials, query, or fragment");
     expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
@@ -84,32 +84,32 @@ describe("module Worker bootstrap", () => {
   it("keeps a reusable bootstrap alive until its owner explicitly revokes it", async () => {
     const bootstrap = createModuleWorkerBootstrap("/assets/wasmer-thread.worker.js");
 
-    expect(bootstrap.url).toBe("blob:https://forge.example/bootstrap");
+    expect(bootstrap.url).toBe("blob:https://wasm-oj.example/bootstrap");
     expect(URL.revokeObjectURL).not.toHaveBeenCalled();
     const source = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0];
     expect(await (source as Blob).text()).toContain(
-      'await import("https://forge.example/assets/wasmer-thread.worker.js")',
+      'await import("https://wasm-oj.example/assets/wasmer-thread.worker.js")',
     );
 
     bootstrap.revoke();
     bootstrap.revoke();
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://forge.example/bootstrap");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:https://wasm-oj.example/bootstrap");
   });
 
   it("uses the injected browser base inside a blob Worker", () => {
     vi.stubGlobal("location", {
-      href: "blob:https://forge.example/bootstrap",
+      href: "blob:https://wasm-oj.example/bootstrap",
       origin: "null",
     });
-    vi.stubGlobal("__wasmOjForgeModuleWorkerBaseUrl", "https://forge.example/judge");
+    vi.stubGlobal("__wasmOjModuleWorkerBaseUrl", "https://wasm-oj.example/judge");
 
-    expect(moduleWorkerBaseUrl().href).toBe("https://forge.example/judge");
+    expect(moduleWorkerBaseUrl().href).toBe("https://wasm-oj.example/judge");
   });
 
   it("rejects a relative module URL when no trustworthy base exists", () => {
     vi.stubGlobal("location", {
-      href: "blob:https://forge.example/bootstrap",
+      href: "blob:https://wasm-oj.example/bootstrap",
       origin: "null",
     });
 

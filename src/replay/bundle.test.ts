@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract.ts";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract.ts";
 import { costProfileId } from "../core/cost-profile.ts";
 import { DEFAULT_DETERMINISM } from "../core/determinism.ts";
 import { DEFAULT_RESOURCE_POLICY, WEIGHTED_METER_MODEL } from "../core/resources.ts";
@@ -7,18 +7,18 @@ import { toolchainPackageIdentities } from "../core/toolchains.ts";
 import type { BuildArtifact, Project, RunConfig, RunResult } from "../core/types.ts";
 import { createSdkProject } from "../sdk/project.ts";
 import {
-  createForgeReplayBundle,
-  decodeForgeReplayBundle,
-  encodeForgeReplayBundle,
-  forgeReplayBundleSha256,
-  replayForgeBundle,
-  type ForgeReplayHost,
+  createReplayBundle,
+  decodeReplayBundle,
+  encodeReplayBundle,
+  replayBundleSha256,
+  replayBundle,
+  type ReplayHost,
 } from "./bundle.ts";
 
-describe("ForgeReplayBundle", () => {
+describe("ReplayBundle", () => {
   it("normalizes ephemeral metadata and round-trips one canonical binary transport", async () => {
     const input = fixture();
-    const bundle = await createForgeReplayBundle({
+    const bundle = await createReplayBundle({
       project: input.project,
       artifact: input.artifact,
       operation: { kind: "run", config: input.config, result: input.result },
@@ -26,28 +26,28 @@ describe("ForgeReplayBundle", () => {
     expect(bundle.project.updatedAt).toBe(0);
     expect(bundle.artifact).toMatchObject({ id: `replay:${bundle.artifactSha256}`, createdAt: 0, durationMs: 0 });
 
-    const first = await encodeForgeReplayBundle(bundle);
-    const second = await encodeForgeReplayBundle(bundle);
+    const first = await encodeReplayBundle(bundle);
+    const second = await encodeReplayBundle(bundle);
     expect(second).toEqual(first);
-    expect(await forgeReplayBundleSha256(bundle)).toMatch(/^[0-9a-f]{64}$/);
-    expect(await decodeForgeReplayBundle(first)).toEqual(bundle);
+    expect(await replayBundleSha256(bundle)).toMatch(/^[0-9a-f]{64}$/);
+    expect(await decodeReplayBundle(first)).toEqual(bundle);
   });
 
   it("rejects a byte-level payload mutation before replay", async () => {
     const input = fixture();
-    const bundle = await createForgeReplayBundle({
+    const bundle = await createReplayBundle({
       project: input.project,
       artifact: input.artifact,
       operation: { kind: "run", config: input.config, result: input.result },
     });
-    const encoded = await encodeForgeReplayBundle(bundle);
+    const encoded = await encodeReplayBundle(bundle);
     encoded[encoded.byteLength - 1] ^= 1;
-    await expect(decodeForgeReplayBundle(encoded)).rejects.toThrow("integrity verification");
+    await expect(decodeReplayBundle(encoded)).rejects.toThrow("integrity verification");
   });
 
   it("recompiles, compares stable artifact identity, and ignores wall duration", async () => {
     const input = fixture();
-    const bundle = await createForgeReplayBundle({
+    const bundle = await createReplayBundle({
       project: input.project,
       artifact: input.artifact,
       operation: { kind: "run", config: input.config, result: input.result },
@@ -61,13 +61,13 @@ describe("ForgeReplayBundle", () => {
       cacheHit: false,
     }));
     const run = vi.fn(async () => ({ ...input.result, durationMs: 999 }));
-    const host: ForgeReplayHost = {
+    const host: ReplayHost = {
       compileProject,
       run,
       judge: async () => { throw new Error("not used"); },
     };
 
-    const replayed = await replayForgeBundle(host, bundle);
+    const replayed = await replayBundle(host, bundle);
     expect(replayed).toMatchObject({ compatible: true, mismatches: [] });
     expect(compileProject).toHaveBeenCalledWith(expect.objectContaining({ updatedAt: 0 }), { cache: false });
     expect(run).toHaveBeenCalledOnce();
@@ -75,30 +75,30 @@ describe("ForgeReplayBundle", () => {
 
   it("reports precise deterministic transcript mismatch paths", async () => {
     const input = fixture();
-    const bundle = await createForgeReplayBundle({
+    const bundle = await createReplayBundle({
       project: input.project,
       artifact: input.artifact,
       operation: { kind: "run", config: input.config, result: input.result },
     });
-    const host: ForgeReplayHost = {
+    const host: ReplayHost = {
       compileProject: async () => { throw new Error("not used"); },
       run: async () => ({ ...input.result, stdout: "43\n" }),
       judge: async () => { throw new Error("not used"); },
     };
-    const replayed = await replayForgeBundle(host, bundle, { recompile: false });
+    const replayed = await replayBundle(host, bundle, { recompile: false });
     expect(replayed.compatible).toBe(false);
     expect(replayed.mismatches).toEqual(["run.stdout"]);
   });
 
   it("requires judge provider inputs to be materialized for offline replay", async () => {
     const input = fixture();
-    await expect(createForgeReplayBundle({
+    await expect(createReplayBundle({
       project: input.project,
       artifact: input.artifact,
       operation: {
         kind: "judge",
         spec: {
-          version: FORGE_CONTRACT_VERSION,
+          version: WASM_OJ_CONTRACT_VERSION,
           cases: [{
             id: "secret",
             kind: "batch",
@@ -130,7 +130,7 @@ describe("ForgeReplayBundle", () => {
   it("round-trips and replays a self-contained judge transcript", async () => {
     const input = fixture();
     const spec = {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         id: "sample",
         kind: "batch" as const,
@@ -155,13 +155,13 @@ describe("ForgeReplayBundle", () => {
         stderrBytes: 0,
       },
     };
-    const bundle = await createForgeReplayBundle({
+    const bundle = await createReplayBundle({
       project: input.project,
       artifact: input.artifact,
       operation: { kind: "judge", spec, result },
     });
-    const decoded = await decodeForgeReplayBundle(await encodeForgeReplayBundle(bundle));
-    const host: ForgeReplayHost = {
+    const decoded = await decodeReplayBundle(await encodeReplayBundle(bundle));
+    const host: ReplayHost = {
       compileProject: async () => { throw new Error("not used"); },
       run: async () => { throw new Error("not used"); },
       judge: async () => ({
@@ -169,7 +169,7 @@ describe("ForgeReplayBundle", () => {
         cases: [{ ...result.cases[0]!, run: { ...input.result, durationMs: 999 } }],
       }),
     };
-    await expect(replayForgeBundle(host, decoded, { recompile: false })).resolves.toMatchObject({
+    await expect(replayBundle(host, decoded, { recompile: false })).resolves.toMatchObject({
       compatible: true,
       mismatches: [],
     });
@@ -188,7 +188,7 @@ function fixture(): { project: Project; artifact: BuildArtifact; config: RunConf
   const costProfile = costProfileId("c", "wasip1", "release");
   const artifact: BuildArtifact = {
     kind: "wasm",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: "original-artifact",
     projectId: project.id,
     cacheKey: "replay-cache-key",

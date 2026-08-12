@@ -22,7 +22,7 @@ const goPlatform = `${process.platform}-${process.arch === "x64" ? "amd64" : pro
 const filename = `go${VERSION}.${goPlatform}.tar.gz`;
 const distributionUrl = `https://go.dev/dl/${filename}`;
 const outputDirectory = path.resolve("public/toolchains");
-const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-forge-go-"));
+const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-go-"));
 
 try {
   const archive = new Uint8Array(await download(distributionUrl));

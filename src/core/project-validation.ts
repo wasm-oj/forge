@@ -11,7 +11,7 @@ import {
   type ProjectFile,
   type ResourcePolicy,
 } from "./types.ts";
-import { assertValidDependencyBuildBundle } from "../dependencies/build.ts";
+import { assertValidDependencyBuildBundle } from "./dependencies.ts";
 
 const PROJECT_KEYS = Object.freeze(["id", "name", "files", "config", "activeFile", "updatedAt"] as const);
 const PROJECT_KEYS_WITH_DEPENDENCIES = Object.freeze([...PROJECT_KEYS, "dependencies"] as const);

@@ -1,13 +1,13 @@
 import { resolveDeterminism } from "../core/determinism.ts";
 import type { DeterminismConfig } from "../core/types.ts";
 
-export const DETERMINISTIC_NATIVE_SOURCE_PATH = ".forge/determinism.c";
-export const PYTHON_RUNNER_PATH = ".forge/deterministic_runner.py";
+export const DETERMINISTIC_NATIVE_SOURCE_PATH = ".wasm-oj/determinism.c";
+export const PYTHON_RUNNER_PATH = ".wasm-oj/deterministic_runner.py";
 
 const RESERVED_ENVIRONMENT = new Set([
-  "FORGE_RANDOM_SEED",
-  "FORGE_REALTIME_EPOCH_MS",
-  "FORGE_CLOCK_STEP_NS",
+  "WASM_OJ_RANDOM_SEED",
+  "WASM_OJ_REALTIME_EPOCH_MS",
+  "WASM_OJ_CLOCK_STEP_NS",
   "PYTHONHASHSEED",
   "TZ",
   "LC_ALL",
@@ -22,9 +22,9 @@ export function deterministicEnvironment(
   if (conflict) throw new Error(`Environment variable '${conflict}' is reserved by the deterministic runner.`);
   return {
     ...environment,
-    FORGE_RANDOM_SEED: String(determinism.randomSeed).padStart(10, "0"),
-    FORGE_REALTIME_EPOCH_MS: String(determinism.realtimeEpochMs).padStart(14, "0"),
-    FORGE_CLOCK_STEP_NS: String(determinism.clockStepNs).padStart(10, "0"),
+    WASM_OJ_RANDOM_SEED: String(determinism.randomSeed).padStart(10, "0"),
+    WASM_OJ_REALTIME_EPOCH_MS: String(determinism.realtimeEpochMs).padStart(14, "0"),
+    WASM_OJ_CLOCK_STEP_NS: String(determinism.clockStepNs).padStart(10, "0"),
     // Hash randomization affects interpreter bootstrap cost. Disable it so the
     // user entropy seed controls public random APIs without changing overhead.
     PYTHONHASHSEED: "0",
@@ -42,10 +42,10 @@ export const DETERMINISTIC_NATIVE_RUNTIME = String.raw`
 extern "C" {
 #endif
 
-static uint32_t forge_random_state;
-static int forge_initialized;
+static uint32_t wasm_oj_random_state;
+static int wasm_oj_initialized;
 
-static uint64_t forge_parse_u64(const char *value) {
+static uint64_t wasm_oj_parse_u64(const char *value) {
     if (!value || !*value) abort();
     uint64_t result = 0;
     for (const unsigned char *cursor = (const unsigned char *)value; *cursor; ++cursor) {
@@ -57,16 +57,16 @@ static uint64_t forge_parse_u64(const char *value) {
     return result;
 }
 
-static void forge_initialize(void) {
-    if (forge_initialized) return;
-    uint64_t seed = forge_parse_u64(getenv("FORGE_RANDOM_SEED"));
-    forge_random_state = (uint32_t)seed;
-    forge_initialized = 1;
+static void wasm_oj_initialize(void) {
+    if (wasm_oj_initialized) return;
+    uint64_t seed = wasm_oj_parse_u64(getenv("WASM_OJ_RANDOM_SEED"));
+    wasm_oj_random_state = (uint32_t)seed;
+    wasm_oj_initialized = 1;
 }
 
-static uint32_t forge_next_u32(void) {
-    forge_random_state += 0x9e3779b9u;
-    uint32_t value = forge_random_state;
+static uint32_t wasm_oj_next_u32(void) {
+    wasm_oj_random_state += 0x9e3779b9u;
+    uint32_t value = wasm_oj_random_state;
     value ^= value >> 16;
     value *= 0x21f0aaadu;
     value ^= value >> 15;
@@ -76,10 +76,10 @@ static uint32_t forge_next_u32(void) {
 }
 
 uint32_t __imported_wasi_snapshot_preview1_random_get(uint8_t *buffer, size_t length) {
-    forge_initialize();
+    wasm_oj_initialize();
     uint32_t word = 0;
     for (size_t index = 0; index < length; ++index) {
-        if ((index & 3u) == 0) word = forge_next_u32();
+        if ((index & 3u) == 0) word = wasm_oj_next_u32();
         buffer[index] = (uint8_t)(word >> ((index & 3u) * 8u));
     }
     return 0;
@@ -100,7 +100,7 @@ _random_state = None
 def _random_seed():
     global _random_state
     if _random_state is None:
-        _random_state = int(_os.environ["FORGE_RANDOM_SEED"]) & 0xffffffff
+        _random_state = int(_os.environ["WASM_OJ_RANDOM_SEED"]) & 0xffffffff
     return _random_state
 
 def _next_u32():
@@ -138,13 +138,13 @@ _runpy.run_path(_entry, run_name="__main__")
 export function quickJsDeterminismPrelude(config: DeterminismConfig): string {
   resolveDeterminism(config);
   return String.raw`
-const __forgeDeterminism = (() => {
-  const readSeed = globalThis.__forge_determinism_seed;
-  const readEpochMs = globalThis.__forge_determinism_epoch_ms;
-  const readStepNs = globalThis.__forge_determinism_step_ns;
-  delete globalThis.__forge_determinism_seed;
-  delete globalThis.__forge_determinism_epoch_ms;
-  delete globalThis.__forge_determinism_step_ns;
+const __wasmOjDeterminism = (() => {
+  const readSeed = globalThis.__wasm_oj_determinism_seed;
+  const readEpochMs = globalThis.__wasm_oj_determinism_epoch_ms;
+  const readStepNs = globalThis.__wasm_oj_determinism_step_ns;
+  delete globalThis.__wasm_oj_determinism_seed;
+  delete globalThis.__wasm_oj_determinism_epoch_ms;
+  delete globalThis.__wasm_oj_determinism_step_ns;
   let parsedConfig;
   const config = () => parsedConfig ??= Object.freeze({
     seed: readSeed(),

@@ -431,17 +431,28 @@ async function readRustAllocatorBitcode(
 }
 
 async function loadRustPackage(baseUrl: URL): Promise<Uint8Array> {
-  const compressed = await loadVerifiedAsset(
+  const compressed = await loadVerifiedAssetResponse(
     baseUrl,
     RUST_TOOLCHAIN.packageAsset,
     RUST_TOOLCHAIN.packageCompressedSha256,
   );
-  const body = new Response(compressed.slice().buffer).body;
+  const body = compressed.body;
   if (!body) throw new Error("Pinned Rust WebC response has no body.");
   const decompressed = body.pipeThrough(new DecompressionStream("gzip"));
   const bytes = new Uint8Array(await new Response(decompressed).arrayBuffer());
   await verifyDigest("decompressed Rust WebC", bytes, RUST_TOOLCHAIN.packageSha256);
   return bytes;
+}
+
+async function loadVerifiedAssetResponse(baseUrl: URL, assetPath: string, expectedSha256: string): Promise<Response> {
+  const filename = assetPath.slice(assetPath.lastIndexOf("/") + 1);
+  const response = await fetch(contentAddressedToolchainAssetUrl(assetPath, baseUrl));
+  if (!response.ok) {
+    throw new Error(`Unable to load pinned Rust toolchain asset '${filename}' (${response.status}).`);
+  }
+  const bytes = new Uint8Array(await response.clone().arrayBuffer());
+  await verifyDigest(filename, bytes, expectedSha256);
+  return response;
 }
 
 async function loadRustManifest(baseUrl: URL) {

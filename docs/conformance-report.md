@@ -1,30 +1,37 @@
-# Forge contract 1 conformance and efficiency report
+# Archived pre-v2 conformance and efficiency evidence
 
-Forge contract 1 is the first formal compatibility boundary and includes the
-complete compiler, runner, deterministic virtual-clock, metering, resource,
-judge, and library behavior. The current preregistered evidence is maintained
-under the single [contract 1 conformance experiment](../experiments/forge-contract-1-conformance/).
+> **Historical evidence only.** This snapshot was collected on 2026-07-20 for
+> the retired contract-1 implementation. It does not define the current
+> WASM-OJ v2 API, package compatibility, schemas, release status, or supported
+> toolchain set. Current behavior is defined by the
+> [library contract](library-contract.md), [architecture](architecture.md), and
+> [versioning policy](versioning.md).
 
-<!-- forge-conformance-summary:start -->
-This report records real local server and browser runs on 2026-07-20
-(Asia/Taipei). The canonical matrix is generated from independent append-only
-evidence records under `wasm-oj-forge-v1`; it is not a synthetic estimate.
-<!-- forge-conformance-summary:end -->
+The archived experiment covered the compiler, runner, deterministic virtual
+clock, metering, resources, judge behavior, and the former monolithic library.
+Its measurements remain useful as historical implementation evidence only; a
+WASM-OJ v2 conformance claim requires newly collected v2 evidence.
+
+<!-- wasm-oj-conformance-summary:start -->
+This archived snapshot records real local server and browser runs on 2026-07-20
+(Asia/Taipei). Its matrix was generated from independent append-only evidence
+records for the retired contract-1 implementation; it is not a synthetic estimate.
+<!-- wasm-oj-conformance-summary:end -->
 
 The canonical JSON matrix records the exact source-tree and specification
 digests for both raw inputs. Publication rejects records that do not match each
 other or the source and specification present at publication time.
 
-## Recorded contract
+## Archived scope
 
-- Forge contract 1 jointly versions compiler, runner, determinism, metering,
-  artifacts, judge specifications, caches, and conformance schemas. There are
-  no independent subsystem contract counters.
+- The retired contract jointly versioned compiler, runner, determinism,
+  metering, artifacts, judge specifications, caches, and conformance schemas.
+  It did not use independent subsystem contract counters.
 - Pinned content: Clang 22 for C17/C++20, Rust 1.91.1-dev, Go 1.26.5,
   CPython 3.14.6, TypeScript 7.0.2, and QuickJS-ng 0.15.1.
 - Runtime: the shared Rust runtime core uses Wasmer 7.2.1 and WASIX 0.702.1;
   browser compiler and package execution use `@wasmer/sdk` 0.10.0.
-- Weighted meter model `weighted` under Forge contract 1, with opcode weights
+- Weighted meter model `weighted`, with opcode weights
   adapted from Binaryen's optimizer cost model and preserved for WARK 0.3
   compatibility.
 - Every server case performs two uncached builds and three deterministic runs.
@@ -34,7 +41,7 @@ other or the source and specification present at publication time.
 
 ## Browser/server conformance
 
-<!-- forge-conformance-matrix:start -->
+<!-- wasm-oj-conformance-matrix:start -->
 All 21 declared language/target cases passed independently in
 `server-native` and `browser-wasmer-js`. The canonical comparison contains zero
 mismatches: every artifact digest and every deterministic transcript field is
@@ -64,19 +71,18 @@ compatibility.
 | JavaScript / wasip1 / virtual clock | `77fedb77…d488f` | 1,948 | 28,374,535 / 37,959,520 / 9,584,985 | 1,962 ms / 1,851 ms | 1,450 ms / 1,465 ms | 233 ms / 166 ms |
 | TypeScript / wasip1 / virtual clock | `3cd0cb23…bcab5` | 1,948 | 28,374,535 / 37,959,520 / 9,584,985 | 2,306 ms / 2,277 ms | 1,761 ms / 1,473 ms | 232 ms / 165 ms |
 | Go / wasip1 / virtual sleep | `8a7e09d7…3c07f` | 2,561,512 | 589,026 / 2,296,147 / 1,707,121 | 2,703 ms / 2,727 ms | 890 ms / 406 ms | 362 ms / 276 ms |
-<!-- forge-conformance-matrix:end -->
+<!-- wasm-oj-conformance-matrix:end -->
 
-The default panel contains all 21 execution cases shown above: the nine
+The archived default panel contained all 21 execution cases shown above: the nine
 language/target profiles plus deterministic filesystem, multi-file I/O,
 write-time VFS quota, denied capability, and language-level virtual-clock
-probes. The opt-in full panel adds the header-heavy C++ standard-library case.
-The new canonical header path now selects the toolchain-admitted release PCH;
-a real native Wasmer smoke on the current source compiled it in about 4.1
-seconds and executed successfully. That targeted attempt is retained as
-append-only raw evidence, but it is not merged into the 21-case browser/server
-matrix above until a new full two-host publication is collected.
+probes. The opt-in full panel added the header-heavy C++ standard-library case.
+A targeted native Wasmer attempt compiled that case in about 4.1 seconds and
+ran successfully. It was retained as separate raw evidence and was not merged
+into the 21-case browser/server matrix.
 
 Startup, parsing/loading, deterministic API use, input, allocation, I/O, and user code are all
 charged. Raw cost and the complete opcode map remain in every transcript.
 
-See the recorded [contract 1 conformance evidence](../experiments/forge-contract-1-conformance/).
+The raw experiment remains available in repository history. Do not use its
+identifiers or measurements as WASM-OJ v2 compatibility evidence.

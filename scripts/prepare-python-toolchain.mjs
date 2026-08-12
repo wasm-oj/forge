@@ -13,7 +13,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { FORGE_SCHEMAS } from "../src/core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../src/core/contract.ts";
 
 const run = promisify(execFile);
 const VERSION = "3.14.6";
@@ -24,17 +24,17 @@ const SPDX_SHA256 = "1f5d394856783fa77e1f1db280f84eabf693bffc1fb06a747f7116de9f9
 const WASI_SDK_ARCHIVE_SHA256 = "aeae999396d5f5caa5ce419f52e83c35869d5fd21d40af80acba2c80f51b0b3a";
 const EXPECTED_PYTHON_WASM_SHA256 = "f104b9da093f806451d7bba3f7eca41033842a5ec88ac256689e6e3cc1f1e2e1";
 const EXPECTED_RUNTIME_FILES = Object.freeze({
-  archiveSha256: "8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba",
-  archiveBytes: 10_652_546,
-  cacheKey: "wasm-oj-forge-v1:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip",
-  format: "FORGEFS1",
+  archiveSha256: "44d894f91487f20c2bb04fe496a9343db37d8720fb706472c2b4a7f3300db039",
+  archiveBytes: 10_652_540,
+  cacheKey: "wasm-oj-v2:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip",
+  format: "WOJFS002",
   guestPath: "/cpython/lib/python314.zip",
-  zipBytes: 10_652_488,
+  zipBytes: 10_652_482,
 });
 const EXPECTED_OUTPUT_SHA256 = Object.freeze({
-  [`python-${VERSION}-wasip1.webc`]: "67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86",
-  [`python-${VERSION}-wasip1.webc.gz.bin`]: "f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5",
-  [`python-${VERSION}-wasip1.manifest.json`]: "ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161",
+  [`python-${VERSION}-wasip1.webc`]: "454ffc53936aa13a0d7f4afbb5bd50ada339c8ebd04bbf27ea19e4104cf43207",
+  [`python-${VERSION}-wasip1.webc.gz.bin`]: "218cd20ac4abb443e0700816010a615a345a43eae623a0232da2227135a6c7a6",
+  [`python-${VERSION}-wasip1.manifest.json`]: "054eccad04a7cee7ba1661062142ef0d639976850981eab8fc785f48eb26129e",
 });
 const PUBLISHED_OUTPUTS = [
   `python-${VERSION}-wasip1.webc.gz.bin`,
@@ -55,10 +55,10 @@ if (process.argv.length !== 5) {
 }
 
 const [sourceArchivePath, spdxPath, wasiSdkArchivePath] = process.argv.slice(2).map((value) => path.resolve(value));
-const buildPython = process.env.FORGE_BUILD_PYTHON || "python3";
-const wasmer = process.env.FORGE_WASMER || "wasmer";
+const buildPython = process.env.WASM_OJ_BUILD_PYTHON || "python3";
+const wasmer = process.env.WASM_OJ_WASMER || "wasmer";
 const outputDirectory = path.resolve("public/toolchains");
-const temporary = await realpath(await mkdtemp(path.join(os.tmpdir(), "wasm-oj-forge-python-")));
+const temporary = await realpath(await mkdtemp(path.join(os.tmpdir(), "wasm-oj-python-")));
 const sourceExtractRoot = path.join(temporary, "source");
 const wasiSdkExtractRoot = path.join(temporary, "wasi-sdk");
 const stagedDirectory = path.join(temporary, "published");
@@ -165,7 +165,7 @@ try {
     ],
     environment,
   );
-  const inspectionPrefix = "FORGE_PYTHON_INSPECTION:";
+  const inspectionPrefix = "WASM_OJ_PYTHON_INSPECTION:";
   const inspectionLine = runtimeInspectionOutput.stdout
     .split("\n")
     .findLast((line) => line.startsWith(inspectionPrefix));
@@ -213,7 +213,7 @@ try {
 function deterministicEnvironment(tmpdir, wasmerPath) {
   const env = {
     ...process.env,
-    FORGE_WASMER: wasmerPath,
+    WASM_OJ_WASMER: wasmerPath,
     LANG: "C",
     LC_ALL: "C",
     PYTHONHASHSEED: "0",
@@ -257,7 +257,7 @@ async function requireBuildPrograms(python, wasmerPath, env) {
 async function validateManifest(filename) {
   const manifest = JSON.parse(await readFile(filename, "utf8"));
   if (
-    manifest.schema !== FORGE_SCHEMAS.pythonToolchain
+    manifest.schema !== WASM_OJ_SCHEMAS.pythonToolchain
     || manifest.version !== VERSION
     || manifest.target !== TARGET
     || manifest.source?.archiveSha256 !== SOURCE_ARCHIVE_SHA256
@@ -298,7 +298,7 @@ env_name=$2
 env_value=$3
 source=$4
 shift 4
-exec "$FORGE_WASMER" run --mapdir "/:$host_dir" --env "$env_name=$env_value" "$source" -- "$@"
+exec "$WASM_OJ_WASMER" run --mapdir "/:$host_dir" --env "$env_name=$env_value" "$source" -- "$@"
 `;
 }
 

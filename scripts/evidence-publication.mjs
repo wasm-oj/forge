@@ -24,7 +24,7 @@ export async function publishEvidenceFiles(entries) {
     for (const publication of publications) {
       await mkdir(path.dirname(publication.path), { recursive: true });
       const original = await readOptional(publication.path);
-      const stagedPath = `${publication.path}.forge-stage-${nonce}`;
+      const stagedPath = `${publication.path}.wasm-oj-stage-${nonce}`;
       await writeFile(stagedPath, publication.bytes, { flag: "wx" });
       const staged = await readFile(stagedPath);
       if (!staged.equals(publication.bytes)) {
@@ -45,7 +45,7 @@ export async function publishEvidenceFiles(entries) {
         if (state.original === undefined) {
           await rm(state.path, { force: true });
         } else {
-          const rollbackPath = `${state.path}.forge-rollback-${nonce}`;
+          const rollbackPath = `${state.path}.wasm-oj-rollback-${nonce}`;
           try {
             await writeFile(rollbackPath, state.original, { flag: "wx" });
             await rename(rollbackPath, state.path);

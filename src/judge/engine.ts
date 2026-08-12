@@ -9,6 +9,7 @@ import type {
   InteractiveRunResult,
   RunResult,
 } from "../core/types";
+import { validateTrustedJudgeWasm, type TrustedJudgeProgram } from "../online-judge/trusted-judge-wasm";
 import { normalizeOutput, type OutputNormalization } from "./normalization";
 import {
   validateJudgeSpec,
@@ -89,6 +90,7 @@ export interface JudgeResult {
 
 export interface JudgeExecutor {
   run(artifact: BuildArtifact, caseSpec: BatchJudgeCaseSpec, input: JudgeResolvedInput): Promise<RunResult>;
+  runTrusted(program: TrustedJudgeProgram, caseSpec: BatchJudgeCaseSpec, input: JudgeResolvedInput): Promise<RunResult>;
   interact(
     contestant: BuildArtifact,
     caseSpec: InteractiveJudgeCaseSpec,
@@ -357,6 +359,25 @@ export interface JudgeExecutionAdapter {
       determinism: DeterminismConfig;
     },
   ): Promise<InteractiveRunResult>;
+  runTrusted?(program: TrustedJudgeProgram, options: {
+    args: readonly string[];
+    stdin: string;
+    env: Readonly<Record<string, string>>;
+    files: Record<string, Uint8Array>;
+    outputPaths: string[];
+    cwd?: string;
+    determinism: ReturnType<typeof resolveDeterminism>;
+    resources: ReturnType<typeof resolveResourcePolicy>;
+  }): Promise<RunResult>;
+  interactTrusted?(
+    contestant: BuildArtifact,
+    interactor: TrustedJudgeProgram,
+    options: {
+      contestant: InteractiveProgramConfig;
+      interactor: InteractiveProgramConfig;
+      determinism: DeterminismConfig;
+    },
+  ): Promise<InteractiveRunResult>;
 }
 
 export function createJudgeExecutor(adapter: JudgeExecutionAdapter): JudgeExecutor {
@@ -371,12 +392,26 @@ export function createJudgeExecutor(adapter: JudgeExecutionAdapter): JudgeExecut
       determinism: resolveDeterminism(caseSpec.determinism),
       resources: resolveResourcePolicy(caseSpec.resources),
     }),
+    runTrusted: (program, caseSpec, input) => {
+      if (!adapter.runTrusted) throw new Error("This WASM-OJ host cannot execute trusted judge programs.");
+      return adapter.runTrusted(program, {
+        args: caseSpec.args ?? [],
+        stdin: input.stdin,
+        env: caseSpec.env ?? {},
+        files: cloneFiles(input.files),
+        outputPaths: [...(caseSpec.outputPaths ?? [])],
+        ...(caseSpec.cwd === undefined ? {} : { cwd: caseSpec.cwd }),
+        determinism: resolveDeterminism(caseSpec.determinism),
+        resources: resolveResourcePolicy(caseSpec.resources),
+      });
+    },
     interact: (contestant, caseSpec, input) => {
+      if (!adapter.interactTrusted) throw new Error("This WASM-OJ host cannot execute trusted interactors.");
       const interactorFiles: Record<string, Uint8Array> = {
         ...cloneFiles(input.files),
         [caseSpec.interactor.inputPath]: new TextEncoder().encode(input.stdin),
       };
-      return adapter.interact(contestant, caseSpec.interactor.artifact, {
+      return adapter.interactTrusted(contestant, caseSpec.interactor.program, {
         contestant: judgeProgramConfig(caseSpec.contestant),
         interactor: {
           ...judgeProgramConfig(caseSpec.interactor),
@@ -512,8 +547,16 @@ function wasmCheckerOutputMatcher(executor: JudgeExecutor): JudgeMatcher {
     id: "wasm-checker",
     async match(spec, context) {
       const checker = spec.config.checker;
-      assertValidBuildArtifact(checker);
-      if (checker.kind !== "wasm") throw new Error("Custom checker artifact must be a standalone Wasm module.");
+      if (!checker || typeof checker !== "object" || Array.isArray(checker)) {
+        throw new Error("wasm-checker matcher requires a trusted judge program.");
+      }
+      const runtimeProfile = (checker as { readonly runtimeProfile?: unknown }).runtimeProfile;
+      const wasm = (checker as { readonly wasm?: unknown }).wasm;
+      if (typeof runtimeProfile !== "string" || !(wasm instanceof Uint8Array)) {
+        throw new Error("wasm-checker matcher requires a trusted judge program.");
+      }
+      const program = { runtimeProfile, wasm } as TrustedJudgeProgram;
+      validateTrustedJudgeWasm(program.wasm);
       const expected = requiredString(spec, "expected");
       const configuredArgs = spec.config.args;
       if (!Array.isArray(configuredArgs) || configuredArgs.some((value) => typeof value !== "string")) {
@@ -553,7 +596,7 @@ function wasmCheckerOutputMatcher(executor: JudgeExecutor): JudgeMatcher {
         determinism: context.case.determinism,
         resources: context.case.resources,
       };
-      const result = await executor.run(checker, checkerCase, { stdin: "", files });
+      const result = await executor.runTrusted(program, checkerCase, { stdin: "", files });
       if (result.termination !== "exited" || (result.code !== 0 && result.code !== 1)) {
         throw new Error("Custom checker failed inside the judge sandbox.");
       }

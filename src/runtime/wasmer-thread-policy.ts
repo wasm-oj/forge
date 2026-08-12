@@ -9,7 +9,7 @@ export interface WasmerThreadInitMessage {
 // wasm-bindgen 0.2.101 defaults secondary instances to 2 MiB stacks. rustc
 // schedules enough blocking WASIX tasks for those concurrent allocations to
 // race memory growth in the SDK glue. One MiB is page-aligned and is the
-// verified bound for Forge's pinned compiler/runtime workloads.
+// verified bound for WASM-OJ's pinned compiler/runtime workloads.
 export const WASMER_THREAD_STACK_SIZE_BYTES = 1 << 20;
 
 export function isWasmerThreadInitMessage(value: unknown): value is WasmerThreadInitMessage {

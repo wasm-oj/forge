@@ -7,7 +7,7 @@ import type {
 import { assertBoundedCount, DEPENDENCY_RESOLUTION_LIMITS } from "./limits.ts";
 import { dependencyPublicHostname } from "./url-policy.ts";
 
-const STORAGE_PREFIX = "forge:dependency-network-consent:v1:";
+const STORAGE_PREFIX = "wasm-oj:dependency-network-consent:v2:";
 const DIGEST = /^[0-9a-f]{64}$/;
 
 export interface DependencyNetworkConsentPrompt {

@@ -1,8 +1,8 @@
 # Third-party notices
 
-This file covers third-party software distributed by the `@wasm-oj/forge`
-package, including the content-addressed compiler and runtime assets under
-`public/toolchains`. The Forge source code is licensed under the MIT License in
+This file covers third-party software distributed by the WASM-OJ code and
+toolchain packages, including the content-addressed compiler and runtime assets
+mirrored under `public/toolchains`. The WASM-OJ source code is licensed under the MIT License in
 `LICENSE`; that license does not replace the terms of any component listed
 below.
 
@@ -21,7 +21,7 @@ listed file to a SHA-256 digest and rejects unlisted toolchain or license files.
 - License: MIT
 - License material: `licenses/es-module-lexer-MIT.txt`
 
-Forge uses es-module-lexer inside the browser runner Worker to reject every
+WASM-OJ uses es-module-lexer inside the browser runner Worker to reject every
 static or dynamic transitive import before loading a content-pinned runtime
 driver plug-in.
 
@@ -33,7 +33,7 @@ driver plug-in.
 - License: MIT
 - License material: `licenses/fflate-MIT.txt`
 
-Forge uses fflate for bounded dependency archive extraction and to verify the
+WASM-OJ uses fflate for bounded dependency archive extraction and to verify the
 canonical Go module `h1:` hash over module ZIP entries.
 
 ### Wasmer JavaScript SDK
@@ -49,7 +49,7 @@ canonical Go module `h1:` hash over module ZIP entries.
   `licenses/wasmer-sdk-dependencies.html`, and
   `licenses/wasmer-sdk-dependencies.json`
 
-Forge consumes the official npm artifact without patching the installed
+WASM-OJ consumes the official npm artifact without patching the installed
 package. The generated dependency report covers every package in the pinned
 normal Cargo dependency graph selected for `wasm32-unknown-unknown`; its compact
 inventory binds all 332 package identities and the exact HTML report digest.
@@ -59,6 +59,8 @@ inventory binds all 332 package identities and the exact HTML report digest.
 ### TypeScript-Go
 
 - Distributed asset: `typescript-7.0.2.wasm.gz.bin`
+- Compressed SHA-256: `06e58ce887d95d1895055699b8dc96a1cde7d1f2baa48de40f9b790e3271dc16`
+- Expanded Wasm SHA-256: `27c931087b3b0cc48804f3749b07eb710538c4ab175969db8a8ff680e6ec4fde`
 - Source revision: `microsoft/typescript-go@2bd066d87f5bafd315be9f40889d0a60b9e58e0b`
 - Source: <https://github.com/microsoft/typescript-go/tree/2bd066d87f5bafd315be9f40889d0a60b9e58e0b>
 - Build runtime: Go 1.26.3 standard library (`GOOS=wasip1`, `GOARCH=wasm`)
@@ -82,15 +84,15 @@ the exact `go1.26.3` source tag used by the reproducible build script.
 - License: BSD-3-Clause
 - License material: `licenses/go-BSD-3-Clause.txt`
 
-Forge packages the standard Go `compile` and `link` commands plus the matching
+WASM-OJ packages the standard Go `compile` and `link` commands plus the matching
 349-package `GOOS=wasip1 GOARCH=wasm` standard library. The stored license is
 byte-identical to `go/LICENSE` in the exact Go 1.26.5 source distribution.
 
 ### QuickJS-ng
 
 - Distributed asset: `quickjs-0.15.1.wasm.gz.bin`
-- Compressed SHA-256: `5b1419b8d65d2b910b61954071e28d99ce1fd401b5dd9b47e2bf16552f9ff582`
-- Expanded Wasm SHA-256: `21fcf23a5fdf3e64b803344c9af86be01e95feabf4779d02aef325c852bc2c2e`
+- Compressed SHA-256: `8c7f0588210490e7d77f198fc91f72c1b94787ab4c359c4786ca59a363c4f5e8`
+- Expanded Wasm SHA-256: `956bf2b3700690e1817034eb8e063cfd9781c66b4bffa244ef4f9445656ccfa1`
 - Source revision: `quickjs-ng/quickjs@fd0a0210b7be00957751871e7e01b8291268fc29`
 - Source: <https://github.com/quickjs-ng/quickjs/tree/fd0a0210b7be00957751871e7e01b8291268fc29>
 - Build SDK: [WASI SDK 24.0 release archive for arm64 macOS](https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-arm64-macos.tar.gz),
@@ -101,7 +103,7 @@ byte-identical to `go/LICENSE` in the exact Go 1.26.5 source distribution.
 - Sources: <https://github.com/WebAssembly/wasi-sdk/tree/d2bea01edcc46f731156a817f710cdd9fc9c1c19>,
   <https://github.com/llvm/llvm-project/tree/26a1d6601d727a96f4301d0d8647b5a42760ae0c>, and
   <https://github.com/WebAssembly/wasi-libc/tree/b9ef79d7dbd47c6c5bafdae760823467c2f60b70>
-- Licenses: QuickJS-ng and the Forge adapter MIT; LLVM compiler-rt
+- Licenses: QuickJS-ng and the WASM-OJ adapter MIT; LLVM compiler-rt
   Apache-2.0 WITH LLVM-exception plus the third-party terms collected in its
   license; WASI libc Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT, with
   separately licensed dlmalloc, cloudlibc-derived, and musl-derived portions
@@ -120,7 +122,7 @@ The reproducible build links `crt1-command.o`, `libm.a`,
 `libwasi-emulated-signal.a`, `libc.a`, and
 `libclang_rt.builtins-wasm32.a` from that one digest-verified SDK archive.
 Linker tracing confirms that the selected allocator is dlmalloc, not emmalloc.
-Forge distributes the resulting stripped Wasm runtime, not the host Clang, LLD,
+WASM-OJ distributes the resulting stripped Wasm runtime, not the host Clang, LLD,
 or strip executables. The build script nevertheless verifies those executables
 and every linked archive by SHA-256 before compiling.
 
@@ -156,13 +158,13 @@ The pinned build repository contains its complete Rust/LLVM source revisions,
 the applied `rust.patch`, and the GitHub workflow used for the pinned artifact.
 That workflow builds libstdc++ from the pinned GCC submodule before building
 LLVM and rustc. The custom `rust.tar.br` omits Rust's generated binary-release
-notices, so Forge carries the complete `COPYRIGHT.html` and
+notices, so WASM-OJ carries the complete `COPYRIGHT.html` and
 `COPYRIGHT-library.html` from the official Rust 1.91.1 release for the exact
 `ed61e7d7e` source revision. The official release archive used to source those
 notices is `rustc-1.91.1-x86_64-unknown-linux-gnu.tar.xz`, SHA-256
 `4b4c596fc5268435c310a79c2e231a5a3567572c930ac0740ef9e147e83baf4e`.
 
-Forge copies the matching `wasm32-wasip1-threads` sysroot, replaces rustc's
+WASM-OJ copies the matching `wasm32-wasip1-threads` sysroot, replaces rustc's
 WASI `random_get` and `clock_time_get` imports with deterministic internal
 implementations, and packages the transformed atom and sysroot together with
 the verified YoWASP LLVM linker atom and resources into one WebC. The provenance
@@ -198,7 +200,7 @@ Rust COPYRIGHT reports and YoWASP source closure carried here.
 
 The published npm manifest incorrectly says `ISC` and omits a license file.
 The exact source revision's root `LICENSE.txt` and npm README both explicitly
-license the package under Apache-2.0. Forge does not redistribute the npm
+license the package under Apache-2.0. WASM-OJ does not redistribute the npm
 JavaScript wrapper: the packaging script digest-verifies and extracts only the
 LLVM core and LLVM/WASI resource payload, whose complete upstream license terms
 are carried above. The common Apache, MIT, cloudlibc, dlmalloc, emmalloc, and
@@ -216,13 +218,13 @@ WebC and pinned command manifests do not relicense those payloads.
 - Official SPDX document: <https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz.spdx.json>,
   SHA-256 `1f5d394856783fa77e1f1db280f84eabf693bffc1fb06a747f7116de9f99f3bd`
 - Expanded WebC SHA-256:
-  `67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86`
+  `454ffc53936aa13a0d7f4afbb5bd50ada339c8ebd04bbf27ea19e4104cf43207`
 - Distributed gzip SHA-256:
-  `f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5`
+  `218cd20ac4abb443e0700816010a615a345a43eae623a0232da2227135a6c7a6`
 - Provenance manifest SHA-256:
-  `ab6d91af39227ed8b0655b56f0b8340d67864d6397fa933df76e1b24a9134161`
-- Deterministically exported `FORGEFS1` runtime archive SHA-256:
-  `8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba`
+  `054eccad04a7cee7ba1661062142ef0d639976850981eab8fc785f48eb26129e`
+- Deterministically exported `WOJFS002` runtime archive SHA-256:
+  `44d894f91487f20c2bb04fe496a9343db37d8720fb706472c2b4a7f3300db039`
 - CPython license: Python Software Foundation License Version 2 and the
   historical notices reproduced with it
 - License text: `licenses/cpython-3.14.6-PSF-2.0.txt`
@@ -237,17 +239,17 @@ WebC and pinned command manifests do not relicense those payloads.
   `26a1d6601d727a96f4301d0d8647b5a42760ae0c`, and wasi-libc revision
   `b9ef79d7dbd47c6c5bafdae760823467c2f60b70`.
 
-Forge compiles this package from the pinned official sources, disables
+WASM-OJ compiles this package from the pinned official sources, disables
 `_socket`, removes test/development-only standard-library roots, canonicalizes
 build-only sysconfig paths, and packages the complete source SPDX document and
 applicable CPython, third-party, compiler-rt, WASI SDK, and wasi-libc notices
 inside the WebC. The build does not consume or redistribute the retired Wasmer
-Registry CPython/WASIX package, and Forge's MIT license does not apply to these
+Registry CPython/WASIX package, and WASM-OJ's MIT license does not apply to these
 third-party contents.
 
-## Forge runtime-core dependency closure
+## WASM-OJ runtime-core dependency closure
 
-The browser runner embeds `wasm-oj-forge-runtime-core` and its locked normal
+The browser runner embeds `wasm-oj-runtime-core` and its locked normal
 dependency graph for the `wasm32-unknown-unknown` target with the `web` feature.
 The complete generated license report, including the selected license text for
 every dependency, is `licenses/runtime-core-dependencies.html`. Its compact,
@@ -257,7 +259,7 @@ machine-verifiable package inventory and report digest are recorded in
 
 ## Vendored Rust crates
 
-Forge's source tree also contains patched source copies used to build the
+WASM-OJ's source tree also contains patched source copies used to build the
 runtime and packaging tools:
 
 - `vendor/shared-buffer`: MIT OR Apache-2.0; see

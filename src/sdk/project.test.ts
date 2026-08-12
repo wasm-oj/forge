@@ -66,7 +66,7 @@ describe("SDK project facade", () => {
     expect(() => createSdkProject({ ...source, optimization: "fast" as never })).toThrow("Unsupported optimization");
   });
 
-  it("preserves downstream language identities for custom ForgeCompiler implementations", () => {
+  it("preserves downstream language identities for custom Compiler implementations", () => {
     const project = createSdkProject({
       language: "zig",
       target: "wasip1",

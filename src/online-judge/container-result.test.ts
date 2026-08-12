@@ -1,18 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseContainerSubmissionResult, readContainerSubmissionResult } from "../../worker/container-result";
 
-const digest = "a".repeat(64);
-const identity = "b".repeat(64);
-const expected = {
-  submissionId: "submission-1",
-  attempt: 1,
-  expectedReleaseId: "12345678-1234-4123-8123-123456789abc",
-  expectedManifestSha256: digest,
-  expectedContainerIdentitySha256: identity,
-  expectedJudgeProjectionSha256: "c".repeat(64),
-  expectedProblemBundleDigest: "d".repeat(64),
-} as const;
-
 const result = {
   state: "completed",
   verdict: "accepted",
@@ -20,49 +8,72 @@ const result = {
   fullyPassedCases: 1,
   deterministicCost: 10,
   peakMemoryBytes: 65_536,
-  audit: {
-    schema: "forge-submission-audit-v1",
-    submissionId: expected.submissionId,
-    attempt: expected.attempt,
-    sourceDigest: "e".repeat(64),
-    forgeReleaseId: expected.expectedReleaseId,
-    expectedManifestSha256: expected.expectedManifestSha256,
-    expectedContainerIdentitySha256: expected.expectedContainerIdentitySha256,
-    actualContainerIdentitySha256: expected.expectedContainerIdentitySha256,
-    judgeProjectionSha256: expected.expectedJudgeProjectionSha256,
-    problemBundleDigest: expected.expectedProblemBundleDigest,
-    cases: [{ verdict: "accepted", termination: "exited", cost: 10, memoryBytes: 65_536 }],
+  policySummary: {
+    totalCases: 2,
+    outputAcceptedCases: 1,
+    policies: ["baseline", "efficient", "optimal"].map((id) => ({
+      id,
+      earnedCases: 0,
+      costExceededCases: 1,
+      memoryExceededCases: 1,
+      logicalTimeExceededCases: 1,
+    })),
   },
 } as const;
 
 describe("container result boundary", () => {
-  it("accepts only the exact hidden-safe result and immutable identities", () => {
-    expect(parseContainerSubmissionResult(result, expected)).toEqual(result);
-    expect(() => parseContainerSubmissionResult({ ...result, stdout: "hidden" }, expected)).toThrow("shape");
+  it("accepts only the aggregate, hidden-safe terminal result", () => {
+    expect(parseContainerSubmissionResult(result)).toEqual(result);
+    expect(() => parseContainerSubmissionResult({ ...result, stdout: "hidden" })).toThrow("shape");
+    expect(() => parseContainerSubmissionResult({ ...result, score: 101 })).toThrow("scoring contract");
+    expect(() => parseContainerSubmissionResult({ ...result, fullyPassedCases: -1 })).toThrow("non-negative");
     expect(() => parseContainerSubmissionResult({
       ...result,
-      audit: { ...result.audit, actualContainerIdentitySha256: digest },
-    }, expected)).toThrow("actual identity");
-    expect(() => parseContainerSubmissionResult({ ...result, score: 101 }, expected)).toThrow("scoring contract");
-    expect(() => parseContainerSubmissionResult({ ...result, fullyPassedCases: 2 }, expected)).toThrow("audit inventory");
+      policySummary: { ...result.policySummary, outputAcceptedCases: 2 },
+    })).toThrow("disagree");
+    expect(() => parseContainerSubmissionResult({
+      ...result,
+      policySummary: { ...result.policySummary, totalCases: 10_001 },
+    })).toThrow("total cases");
+    expect(() => parseContainerSubmissionResult({
+      ...result,
+      policySummary: {
+        ...result.policySummary,
+        policies: [...result.policySummary.policies].reverse(),
+      },
+    })).toThrow("order");
+    expect(() => parseContainerSubmissionResult({
+      ...result,
+      policySummary: {
+        ...result.policySummary,
+        policies: result.policySummary.policies.map((policy, index) => (
+          index === 0 ? { ...policy, earnedCases: 1, costExceededCases: 1 } : policy
+        )),
+      },
+    })).toThrow("contradicts");
   });
 
-  it("keeps judge errors out of a completed result", () => {
-    expect(() => parseContainerSubmissionResult({ ...result, verdict: "judge-error" }, expected)).toThrow("Completed state");
+  it("keeps judge errors and compile errors structurally explicit", () => {
+    expect(() => parseContainerSubmissionResult({ ...result, verdict: "judge-error" })).toThrow("Completed state");
     expect(parseContainerSubmissionResult({
-      ...result,
       state: "judge-error",
       verdict: "judge-error",
       score: 0,
       fullyPassedCases: 0,
-      audit: { ...result.audit, cases: [{ ...result.audit.cases[0], verdict: "judge-error" }] },
-    }, expected).state).toBe("judge-error");
+      deterministicCost: result.deterministicCost,
+      peakMemoryBytes: result.peakMemoryBytes,
+    }).state).toBe("judge-error");
+    expect(parseContainerSubmissionResult({ state: "compile-error", score: 0, fullyPassedCases: 0 })).toEqual({
+      state: "compile-error",
+      score: 0,
+      fullyPassedCases: 0,
+    });
   });
 
   it("bounds and parses the response before Workflow persistence", async () => {
     const response = new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
-    await expect(readContainerSubmissionResult(response, expected)).resolves.toEqual(result);
-    const oversized = new Response("x", { headers: { "content-length": String(2 * 1024 * 1024 + 1) } });
-    await expect(readContainerSubmissionResult(oversized, expected)).rejects.toThrow("bounded response");
+    await expect(readContainerSubmissionResult(response)).resolves.toEqual(result);
+    const oversized = new Response("x", { headers: { "content-length": String(64 * 1024 + 1) } });
+    await expect(readContainerSubmissionResult(oversized)).rejects.toThrow("bounded response");
   });
 });

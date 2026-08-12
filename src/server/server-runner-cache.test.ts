@@ -16,14 +16,15 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { PYTHON_PACKAGE } from "../core/toolchains";
 import type { PackageFileSystemRequest } from "../runner/artifact";
-import { ServerForgeRunner } from "./server-runner";
+import { ServerRunner } from "./server-runner";
+import { testToolchains } from "./test-toolchains.test-helper";
 
-describe("ServerForgeRunner runtime cache ownership", () => {
+describe("ServerRunner runtime cache ownership", () => {
   it("rejects a filesystem root, including a symlink alias", async () => {
     const filesystemRoot = path.parse(process.cwd()).root;
     expect(() => createRunner(filesystemRoot)).toThrow("must not be a filesystem root");
 
-    const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-cache-root-"));
+    const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-cache-root-"));
     const rootAlias = path.join(temporaryDirectory, "root-alias");
     await symlink(filesystemRoot, rootAlias, "dir");
     const runner = createRunner(rootAlias);
@@ -35,21 +36,21 @@ describe("ServerForgeRunner runtime cache ownership", () => {
     }
   });
 
-  it("removes only exact Forge-owned regular cache entries", async () => {
-    const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-cache-clear-"));
+  it("removes only exact WASM-OJ-owned regular cache entries", async () => {
+    const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-cache-clear-"));
     const cacheDirectory = path.join(temporaryDirectory, "shared-cache");
     const nestedDirectory = path.join(cacheDirectory, "nested");
     const sentinel = path.join(cacheDirectory, "caller-sentinel.txt");
     const nestedSentinel = path.join(nestedDirectory, "caller-data.txt");
-    const finalCache = path.join(cacheDirectory, `${"a".repeat(64)}.forgefs`);
+    const finalCache = path.join(cacheDirectory, `${"a".repeat(64)}.wasmojfs`);
     const temporaryCache = path.join(
       cacheDirectory,
-      `${"b".repeat(64)}.forgefs.00000000-0000-4000-8000-000000000000.tmp`,
+      `${"b".repeat(64)}.wasmojfs.00000000-0000-4000-8000-000000000000.tmp`,
     );
-    const nearMiss = path.join(cacheDirectory, `${"c".repeat(64)}.forgefs.tmp`);
-    const matchingDirectory = path.join(cacheDirectory, `${"d".repeat(64)}.forgefs`);
+    const nearMiss = path.join(cacheDirectory, `${"c".repeat(64)}.wasmojfs.tmp`);
+    const matchingDirectory = path.join(cacheDirectory, `${"d".repeat(64)}.wasmojfs`);
     const symlinkTarget = path.join(temporaryDirectory, "caller-target.txt");
-    const matchingSymlink = path.join(cacheDirectory, `${"e".repeat(64)}.forgefs`);
+    const matchingSymlink = path.join(cacheDirectory, `${"e".repeat(64)}.wasmojfs`);
     await mkdir(nestedDirectory, { recursive: true });
     await Promise.all([
       writeFile(sentinel, "sentinel"),
@@ -82,7 +83,7 @@ describe("ServerForgeRunner runtime cache ownership", () => {
   });
 
   it("re-exports an invalid archive and does not depend on cache persistence", async () => {
-    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-cache-persistence-"));
+    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-cache-persistence-"));
     const runner = createRunner(cacheDirectory);
     const canonicalArchive = emptyRuntimeArchive();
     const expectedSha256 = createHash("sha256").update(canonicalArchive).digest("hex");
@@ -135,7 +136,7 @@ describe("ServerForgeRunner runtime cache ownership", () => {
   });
 
   it("keeps cached runtime files immutable and clears both memory and disk ownership", async () => {
-    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-runtime-files-ownership-"));
+    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-runtime-files-ownership-"));
     const runner = createRunner(cacheDirectory);
     const canonicalArchive = runtimeArchive({ "/runtime.txt": new Uint8Array([1, 2, 3]) });
     const expectedSha256 = createHash("sha256").update(canonicalArchive).digest("hex");
@@ -164,7 +165,7 @@ describe("ServerForgeRunner runtime cache ownership", () => {
   });
 
   it("keeps cached package-command bytes private and clears their memory ownership", async () => {
-    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-command-ownership-"));
+    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-command-ownership-"));
     const runner = createRunner(cacheDirectory);
     const commandBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
     const runPackageStage = vi.fn(async () => ({
@@ -189,23 +190,23 @@ describe("ServerForgeRunner runtime cache ownership", () => {
   });
 });
 
-function createRunner(cacheDirectory: string): ServerForgeRunner {
-  return new ServerForgeRunner({
+function createRunner(cacheDirectory: string): ServerRunner {
+  return new ServerRunner({
     runtimeExecutable: process.execPath,
-    toolchainDirectory: path.resolve("public/toolchains"),
+    toolchains: testToolchains(),
     cacheDirectory,
   });
 }
 
 function emptyRuntimeArchive(): Uint8Array {
   const archive = new Uint8Array(20);
-  archive.set(new TextEncoder().encode("FORGEFS1"));
+  archive.set(new TextEncoder().encode("WOJFS002"));
   return archive;
 }
 
 function runtimeArchive(files: Record<string, Uint8Array>): Uint8Array {
   const encoder = new TextEncoder();
-  const chunks: Uint8Array[] = [encoder.encode("FORGEFS1")];
+  const chunks: Uint8Array[] = [encoder.encode("WOJFS002")];
   for (const [filePath, contents] of Object.entries(files)) {
     const encodedPath = encoder.encode(filePath);
     const header = new Uint8Array(12);
@@ -240,11 +241,11 @@ function runtimeFileIdentity(request: PackageFileSystemRequest): string {
 
 function runtimeFileCachePath(cacheDirectory: string, identity: string): string {
   const digest = createHash("sha256").update(identity).digest("hex");
-  return path.join(cacheDirectory, `${digest}.forgefs`);
+  return path.join(cacheDirectory, `${digest}.wasmojfs`);
 }
 
 function loadRuntimeFiles(
-  runner: ServerForgeRunner,
+  runner: ServerRunner,
   identity: string,
   request: PackageFileSystemRequest,
 ): Promise<Record<string, Uint8Array>> {
@@ -263,7 +264,7 @@ function loadRuntimeFiles(
 }
 
 function loadPackageRuntimeFiles(
-  runner: ServerForgeRunner,
+  runner: ServerRunner,
   request: PackageFileSystemRequest,
 ): Promise<Record<string, Uint8Array>> {
   const internal = runner as unknown as {
@@ -286,7 +287,7 @@ function loadPackageRuntimeFiles(
   );
 }
 
-function loadPackageCommand(runner: ServerForgeRunner): Promise<Uint8Array> {
+function loadPackageCommand(runner: ServerRunner): Promise<Uint8Array> {
   const internal = runner as unknown as {
     packageCommand(
       operation: {

@@ -2,81 +2,100 @@ import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { access, lstat, mkdir, open } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import type { JudgeEngineOptions } from "../judge/engine";
-import type { RuntimeDriverRegistry } from "../runner/artifact";
-import { createForgeEngine, type ForgeEngine } from "../sdk/engine";
-import { PINNED_TOOLCHAIN_ASSET_SHA256 } from "../core/toolchains";
-import { asForgeError } from "../core/errors";
+import type { ServerToolchainSource } from "@wasm-oj/contracts";
+import {
+  asWasmOjError,
+  createDefaultDependencyManager,
+  createEngine,
+  type Engine,
+  type JudgeEngineOptions,
+  type RuntimeDriverRegistry,
+} from "@wasm-oj/core";
 import { FileSystemArtifactStore } from "./artifact-store";
-import { ServerForgeCompiler } from "./server-compiler";
-import { ServerForgeRunner } from "./server-runner";
+import { ServerCompiler } from "./server-compiler";
+import { ServerRunner } from "./server-runner";
 import { FileSystemDependencyCache } from "../dependencies/filesystem-cache";
-import { createDefaultDependencyManager } from "../dependencies/manager";
+import {
+  assertVerifiedServerDistribution,
+  type VerifiedServerDistribution,
+} from "./verified-distribution";
+import {
+  serverToolchainAssetFile,
+  serverToolchainDirectories,
+  snapshotServerToolchainSources,
+} from "./toolchain-sources";
 
-export interface CreateServerForgeOptions {
-  /** Directory containing provisioned `forge-compiler` and `forge-runner` binaries. */
-  runtimeDirectory?: string;
-  /** Directory containing the exact package-exported toolchain files. */
-  toolchainDirectory?: string;
-  /** Writable Forge cache root. Defaults to `<cwd>/.forge`. */
+export interface ServerEngineOptions {
+  /** Directory containing provisioned `wasm-oj-compiler` and `wasm-oj-runner` binaries. */
+  runtimeDirectory: string;
+  /** Explicit package-owned toolchain sources. No toolchain is installed implicitly. */
+  toolchains: readonly ServerToolchainSource[];
+  /** Writable WASM-OJ cache root. Defaults to `<cwd>/.wasm-oj`. */
   cacheDirectory?: string;
   /** Set false to disable the server artifact cache. */
   artifactCache?: boolean;
   runtimeDrivers?: RuntimeDriverRegistry;
   additionalCostBaselines?: Readonly<Record<string, number>>;
   judge?: JudgeEngineOptions;
+  /** @internal Process-local capability emitted by container identity verification. */
+  verifiedDistribution?: VerifiedServerDistribution;
 }
 
-export interface ResolvedServerForgePaths {
-  packageRoot: string;
+export interface ResolvedServerPaths {
   compilerExecutable: string;
   runtimeExecutable: string;
-  toolchainDirectory: string;
+  toolchains: readonly ServerToolchainSource[];
   cacheDirectory: string;
 }
 
-/** Resolve the provisioned Forge distribution without performing I/O. */
-export function resolveServerForgePaths(options: CreateServerForgeOptions = {}): ResolvedServerForgePaths {
-  const packageRoot = path.dirname(fileURLToPath(import.meta.resolve("@wasm-oj/forge/package.json")));
-  const runtimeDirectory = path.resolve(options.runtimeDirectory
-    ?? path.join(packageRoot, "crates", "runtime-core", "target", "release"));
+/** Resolve an explicitly provisioned WASM-OJ distribution without performing I/O. */
+export function resolveServerPaths(options: ServerEngineOptions): ResolvedServerPaths {
+  if (typeof options?.runtimeDirectory !== "string" || !options.runtimeDirectory.trim()) {
+    throw new Error("ServerEngineOptions.runtimeDirectory is required.");
+  }
+  const runtimeDirectory = path.resolve(options.runtimeDirectory);
+  const toolchains = snapshotServerToolchainSources(options.toolchains);
   const suffix = process.platform === "win32" ? ".exe" : "";
   return Object.freeze({
-    packageRoot,
-    compilerExecutable: path.join(runtimeDirectory, `forge-compiler${suffix}`),
-    runtimeExecutable: path.join(runtimeDirectory, `forge-runner${suffix}`),
-    toolchainDirectory: path.resolve(options.toolchainDirectory ?? path.join(packageRoot, "public", "toolchains")),
-    cacheDirectory: path.resolve(options.cacheDirectory ?? path.join(process.cwd(), ".forge")),
+    compilerExecutable: path.join(runtimeDirectory, `wasm-oj-compiler${suffix}`),
+    runtimeExecutable: path.join(runtimeDirectory, `wasm-oj-runner${suffix}`),
+    toolchains,
+    cacheDirectory: path.resolve(options.cacheDirectory ?? path.join(process.cwd(), ".wasm-oj")),
   });
 }
 
-/** Verify the local distribution and construct one ready server Forge engine. */
-export async function createServerForge(options: CreateServerForgeOptions = {}): Promise<ForgeEngine> {
-  const paths = resolveServerForgePaths(options);
+/** Verify the explicit local distribution and construct one ready server engine. */
+export async function createServerEngine(options: ServerEngineOptions): Promise<Engine> {
+  const paths = resolveServerPaths(options);
   try {
     if (path.parse(paths.cacheDirectory).root === paths.cacheDirectory) {
-      throw new Error("Forge server cache directory cannot be a filesystem root.");
+      throw new Error("WASM-OJ server cache directory cannot be a filesystem root.");
     }
-    await Promise.all([
-      verifyExecutable(paths.compilerExecutable, "Forge compiler"),
-      verifyExecutable(paths.runtimeExecutable, "Forge runner"),
-    ]);
-    await verifyPinnedToolchainDirectory(paths.toolchainDirectory);
+    if (options.verifiedDistribution) {
+      assertVerifiedServerDistribution(options.verifiedDistribution, paths, paths.toolchains);
+    } else {
+      await Promise.all([
+        verifyExecutable(paths.compilerExecutable, "WASM-OJ compiler"),
+        verifyExecutable(paths.runtimeExecutable, "WASM-OJ runner"),
+      ]);
+      await verifyToolchainSources(paths.toolchains);
+    }
     await mkdir(paths.cacheDirectory, { recursive: true, mode: 0o700 });
 
-    const compiler = new ServerForgeCompiler({
+    const compiler = new ServerCompiler({
       compilerExecutable: paths.compilerExecutable,
-      toolchainDirectory: paths.toolchainDirectory,
+      toolchains: paths.toolchains,
+      verifiedDistribution: options.verifiedDistribution,
     });
-    const runner = new ServerForgeRunner({
+    const runner = new ServerRunner({
       runtimeExecutable: paths.runtimeExecutable,
-      toolchainDirectory: paths.toolchainDirectory,
+      toolchains: paths.toolchains,
       cacheDirectory: path.join(paths.cacheDirectory, "runtime"),
       runtimeDrivers: options.runtimeDrivers,
       additionalCostBaselines: options.additionalCostBaselines,
+      verifiedDistribution: options.verifiedDistribution,
     });
-    return await createForgeEngine({
+    return await createEngine({
       compiler,
       runner,
       artifactStore: options.artifactCache === false
@@ -88,7 +107,7 @@ export async function createServerForge(options: CreateServerForgeOptions = {}):
       ),
     });
   } catch (error) {
-    throw asForgeError(error, {
+    throw asWasmOjError(error, {
       code: "initialization-failure",
       stage: "initialize",
       retryable: false,
@@ -104,18 +123,29 @@ async function verifyExecutable(file: string, label: string): Promise<void> {
   await access(file, constants.X_OK);
 }
 
-async function verifyPinnedToolchainDirectory(directory: string): Promise<void> {
-  const metadata = await lstat(directory);
-  if (!metadata.isDirectory()) throw new Error(`Forge toolchain path is not a directory: '${directory}'.`);
-  for (const [assetPath, expected] of Object.entries(PINNED_TOOLCHAIN_ASSET_SHA256)) {
-    const file = path.join(directory, path.basename(assetPath));
-    const fileMetadata = await lstat(file);
-    if (!fileMetadata.isFile() || fileMetadata.isSymbolicLink()) {
-      throw new Error(`Pinned toolchain asset must be a real regular file: '${file}'.`);
+async function verifyToolchainSources(toolchains: readonly ServerToolchainSource[]): Promise<void> {
+  for (const directory of serverToolchainDirectories(toolchains)) {
+    const metadata = await lstat(directory);
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new Error(`Toolchain package path must be a real directory: '${directory}'.`);
     }
-    const actual = await digestFile(file);
-    if (actual !== expected) {
-      throw new Error(`Pinned toolchain asset '${file}' has digest ${actual}; expected ${expected}.`);
+  }
+  for (const source of toolchains) {
+    for (const asset of source.descriptor.assets) {
+      const file = serverToolchainAssetFile(toolchains, asset.path);
+      const fileMetadata = await lstat(file);
+      if (!fileMetadata.isFile() || fileMetadata.isSymbolicLink()) {
+        throw new Error(`Pinned toolchain asset must be a real regular file: '${file}'.`);
+      }
+      if (fileMetadata.size !== asset.bytes) {
+        throw new Error(
+          `Pinned toolchain asset '${file}' has ${fileMetadata.size} bytes; expected ${asset.bytes}.`,
+        );
+      }
+      const actual = await digestFile(file);
+      if (actual !== asset.sha256) {
+        throw new Error(`Pinned toolchain asset '${file}' has digest ${actual}; expected ${asset.sha256}.`);
+      }
     }
   }
 }

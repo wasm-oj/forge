@@ -1,10 +1,10 @@
 import { artifactPayloadSha256, canonicalArtifactPayloadBytes } from "../core/artifact-payload";
 import { sha256Hex } from "../core/hash";
 import { assertValidBuildArtifact } from "../core/artifact-validation";
-import { FORGE_STORAGE } from "../core/contract";
+import { WASM_OJ_STORAGE } from "../core/contract";
 import type { BuildArtifact, Project } from "../core/types";
 import { assertValidProject } from "../core/project-validation";
-import type { ForgeStorageEntry, ForgeStorageParticipant } from "./types";
+import type { StorageEntry, StorageParticipant } from "./types";
 
 const PROJECTS = "projects";
 const ARTIFACTS = "artifacts";
@@ -45,7 +45,7 @@ let databasePromise: Promise<IDBDatabase> | undefined;
 function openDatabase(): Promise<IDBDatabase> {
   if (databasePromise) return databasePromise;
   const pending = new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(FORGE_STORAGE.database, FORGE_STORAGE.databaseVersion);
+    const request = indexedDB.open(WASM_OJ_STORAGE.database, WASM_OJ_STORAGE.databaseVersion);
     let settled = false;
     const rejectOpen = (error: Error) => {
       if (settled) return;
@@ -83,10 +83,10 @@ function openDatabase(): Promise<IDBDatabase> {
       resolve(database);
     }, { once: true });
     request.addEventListener("error", () => {
-      rejectOpen(request.error ?? new Error("Unable to open Forge storage."));
+      rejectOpen(request.error ?? new Error("Unable to open WASM-OJ storage."));
     }, { once: true });
     request.addEventListener("blocked", () => {
-      rejectOpen(new Error("Forge storage upgrade is blocked by another open tab."));
+      rejectOpen(new Error("WASM-OJ storage upgrade is blocked by another open tab."));
     }, { once: true });
   });
   databasePromise = pending;
@@ -110,7 +110,7 @@ export async function loadLatestProject(): Promise<Project | undefined> {
 
 export async function listProjects(): Promise<Project[]> {
   const database = await openDatabase();
-  const transaction = database.transaction(PROJECTS, "readwrite");
+  const transaction = database.transaction(PROJECTS, "readonly");
   const projects = scanValidProjects(transaction.objectStore(PROJECTS));
   const [valid] = await Promise.all([projects, transactionDone(transaction)]);
   return valid.sort((left, right) => {
@@ -124,7 +124,7 @@ function scanValidProjects(store: IDBObjectStore): Promise<Project[]> {
     const projects: Project[] = [];
     const request = store.openCursor();
     request.addEventListener("error", () => {
-      reject(request.error ?? new Error("Unable to scan stored Forge projects."));
+      reject(request.error ?? new Error("Unable to scan stored WASM-OJ projects."));
     }, { once: true });
     request.addEventListener("success", () => {
       const cursor = request.result;
@@ -136,13 +136,11 @@ function scanValidProjects(store: IDBObjectStore): Promise<Project[]> {
       try {
         assertValidProject(candidate);
         projects.push(candidate);
-      } catch {
-        try {
-          cursor.delete();
-        } catch (error) {
-          reject(error);
-          return;
-        }
+      } catch (error) {
+        // Draft bytes are user data, not an evictable cache. A newer schema
+        // may no longer understand an older record, but it must never destroy
+        // that record during discovery or a database upgrade.
+        console.warn("WASM-OJ retained an unreadable project draft for manual recovery.", error);
       }
       try {
         cursor.continue();
@@ -225,7 +223,7 @@ export async function clearArtifactCache(): Promise<void> {
   await transactionDone(transaction);
 }
 
-export async function listArtifactStorageEntries(): Promise<ForgeStorageEntry[]> {
+export async function listArtifactStorageEntries(): Promise<StorageEntry[]> {
   const database = await openDatabase();
   const transaction = database.transaction(ARTIFACTS, "readonly");
   const stored = await requestResult(transaction.objectStore(ARTIFACTS).getAll() as IDBRequest<unknown[]>);
@@ -236,7 +234,7 @@ export async function listArtifactStorageEntries(): Promise<ForgeStorageEntry[]>
   });
 }
 
-export function artifactStorageParticipant(): ForgeStorageParticipant {
+export function artifactStorageParticipant(): StorageParticipant {
   return {
     id: "artifacts",
     retentionPriority: 20,

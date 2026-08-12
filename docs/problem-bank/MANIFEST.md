@@ -84,21 +84,19 @@ resolution，不需要模擬 host filesystem。
 `all-manifest-tests`。計分 case set 就是 `files.tests` 依 manifest 順序列出的所有 cases；
 所有 policy 使用完全相同的 case set，judge 不為不同分數層級準備不同測資。
 
-`scoring.costContract` 固定為 `wasm-oj-forge-v1`。這個 ID 綁定 Forge contract 1 的
+`scoring.costContract` 固定為 `wasm-oj-v2`。這個 ID 綁定 WASM-OJ contract 2 的
 compiler／runner、weighted opcode table、meter placement、artifact cost-profile validation
 與 empty-program baseline normalization；不能只看 `costModel=weighted` 後自行選另一套
-weights。權威契約固定引用校準證據所記錄的 Forge commit
-`baac61a2d3734b8689bc19e6871fef1c4f63ce8d` 的
-[verdict and metrics contract](https://github.com/wasm-oj/forge/blob/baac61a2d3734b8689bc19e6871fef1c4f63ce8d/docs/library-contract.md#verdict-and-metrics-contract)
-、[weighted instruction metering](https://github.com/wasm-oj/forge/blob/baac61a2d3734b8689bc19e6871fef1c4f63ce8d/docs/architecture.md#weighted-instruction-metering)
-及 [versioning policy](https://github.com/wasm-oj/forge/blob/baac61a2d3734b8689bc19e6871fef1c4f63ce8d/docs/versioning.md)。Judge
-遇到不同 Forge contract、artifact profile 不符、缺少 calibration 或 metric 不可用時必須
+weights。權威定義由目前 contract-2 的
+[library contract](../library-contract.md)、[architecture](../architecture.md)
+及 [versioning policy](../versioning.md) 共同約束。Judge
+遇到不同 WASM-OJ contract、artifact profile 不符、缺少 calibration 或 metric 不可用時必須
 fail closed，不得猜測或換算。
 
 每個 case 只需在最寬鬆 policy 的 hard limits 下執行一次。若答案正確且正常完成，judge
 把該次執行的 metrics 同時套用到每個 policy：
 
-- `instructionBudget` 比對 Forge `RunResult.metrics.cost` 回報的 baseline-normalized net
+- `instructionBudget` 比對 WASM-OJ `RunResult.metrics.cost` 回報的 baseline-normalized net
   weighted cost；
 - `memoryLimitBytes` 比對 guest peak linear memory，不是 browser／Node process RSS；
 - `logicalTimeLimitMs` 若存在，才比對 deterministic virtual elapsed time。
@@ -115,7 +113,7 @@ Policies 必須由寬到嚴排列，而且每一層至少收緊一個資源；�
 本 catalog 的有序 policy ID 固定為 `baseline`、`efficient`、`optimal`；缺少、重複或
 重新排序任何一層都不符合 calibration contract。
 
-Forge contract 1 會在所有函式及 start section 注入 weighted meter。Runner 依 submission
+WASM-OJ contract 2 會在所有函式及 start section 注入 weighted meter。Runner 依 submission
 artifact 的 exact contract、language、target、optimization、compiler/runtime content 與
 meter model 找到已校準的 empty-program baseline，並套用：
 
@@ -131,13 +129,13 @@ instruction metric。
 
 Reference scorer 會要求成功 execution 同時提供整數 `metrics.rawCost`、
 `metrics.baselineCost`、非空 `metrics.costProfile`，並重新驗證上式；只提供 `metrics.cost`
-不足以計分。缺少 manifest calibration、Forge cost profile 或任何必要 metric 是 judge
+不足以計分。缺少 manifest calibration、WASM-OJ cost profile 或任何必要 metric 是 judge
 configuration/error，整份 score 不成立；不得靜默把它當成 contestant 的 0 分 case。
 
 Execution identity 另須提供 submission `language`。Scorer 會要求
 `metrics.costProfile === scoring.calibration.profiles[language]`；只要 language 未校準、profile
 為空，或 toolchain/runtime profile 與本次校準不完全相同，就 fail closed。Profile 不是由
-contestant 自行宣告；judge 必須從 Forge 驗證過的 artifact 與 run result 傳入。
+contestant 自行宣告；judge 必須從 WASM-OJ 驗證過的 artifact 與 run result 傳入。
 
 假設共有 `C` 個 cases，policy `p` 的增量分數為 `points[p]`，在其中 `passed[p]` 個
 cases 通過，總分以精確有理數計算：
@@ -166,7 +164,7 @@ UI 如何顯示或四捨五入不屬於 judging contract，且不得回頭影響
 | `efficient` | 30 | C/C++/Rust/Go worst-case 的最大值 + 5% | declared-max review ceiling |
 | `optimal` | 50 | C/C++/Rust/Go worst-case 的算術平均 + 5% | declared-max review ceiling |
 
-校準固定 Forge binary、library、toolchain、`release/wasip1` target 與 deterministic
+校準固定 WASM-OJ binary、library、toolchain、`release/wasip1` target 與 deterministic
 configuration，逐一執行每題 `all-manifest-tests` 中的全部 case。對題目 `p` 與語言 `l`：
 
 ```text
@@ -199,10 +197,10 @@ Manifest 以
 ```json
 "calibration": {
   "status": "measured",
-  "method": "forge-v1-compiled-average-optimal-rounded-v1",
+  "method": "wasm-oj-v2/compiled-average-optimal-rounded/v1",
   "profiles": {
-    "c": "wasm-oj-forge-cost:contract-1:c:wasip1:release:content-...:weighted",
-    "cpp": "wasm-oj-forge-cost:contract-1:cpp:wasip1:release:content-...:weighted"
+    "c": "wasm-oj-cost:contract-2:c:wasip1:release:content-...:weighted",
+    "cpp": "wasm-oj-cost:contract-2:cpp:wasip1:release:content-...:weighted"
   }
 }
 ```
@@ -214,12 +212,13 @@ Manifest 以
 
 ## Validation
 
-- `tools/catalog.schema.json` 定義 localized root catalog v2。
-- `tools/problem.schema.json` 定義 localized problem manifest v3。
-- `tools/verify.py` 從 `catalog.json` discovery，並只依 manifest path 讀取內容、編譯
-  solutions、執行 validator／oracle／generator 與 stored tests。
-- `tools/scoring.py` 是 cumulative policy 計分的 executable specification；
-  `python3 -m unittest tools.test_scoring` 驗證 inclusive boundaries、partial points、
-  logical time、wall-safety 分離，以及缺少或不相容 metrics 時 fail closed。
-- Verifier 也檢查 path normalization、檔案存在性、test inventory、policy points、
-  64 KiB memory page alignment，以及 policy limits 的 relaxed-to-strict 單調性。
+- `schemas/problem-catalog.schema.json` 定義 localized root catalog v2。
+- `schemas/problem.schema.json` 定義 localized problem manifest v3。
+- `pnpm run problems:verify` 執行 schema regression tests，再以
+  `scripts/generate-judge-problems.mjs --check` 從 `catalog.json` discovery。它只依 manifest
+  路徑驗證 schema、normalized path、檔案存在與非空、test inventory、policy points、
+  64 KiB memory page alignment、cost profile，以及 relaxed-to-strict 單調性；不編譯或執行
+  solution、validator、oracle 或 generator。
+- `src/judge/problem-scoring.ts` 是 cumulative policy 計分的 executable specification；
+  `src/judge/problem-scoring.test.ts` 驗證 inclusive boundaries、partial points、logical time、
+  wall-safety 分離，以及缺少或不相容 metrics 時 fail closed。

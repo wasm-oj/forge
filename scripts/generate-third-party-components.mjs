@@ -118,7 +118,7 @@ const definitions = [
   },
   {
     id: "runtime-core-dependencies",
-    name: "Forge runtime-core locked normal dependency closure",
+    name: "WASM-OJ runtime-core locked normal dependency closure",
     version: `Cargo.lock-${runtimeLockSha256}`,
     source: { url: "https://crates.io/", revision: runtimeLockSha256 },
     files: [

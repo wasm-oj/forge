@@ -1,0 +1,143 @@
+{
+  "server": "http://127.0.0.1:8100",
+  "output_dir": "demo",
+  "final_name": "wasm-oj-forge-demo.mp4",
+  "ref_audio": "/Users/jacoblincool/Documents/GitHub/wasi-compiler-in-browser/submission/video/reference-21C4D7D1.wav",
+  "ref_text": "Introducing Video Studio MLX, an outstanding application that allows you and your AI agent to generate video footage and validate your video creations.",
+  "sentence_pause_ms": 180,
+  "language": "English",
+  "max_word_error_rate": 0.18,
+  "max_attempts": 5,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "app": { "x": 96, "y": 54, "w": 1728, "h": 972 },
+  "elements": "elements.json",
+  "focus_zoom": 1.55,
+  "xfade": 0.6,
+  "lead": 0.7,
+  "pad_step": 1.4,
+  "pad_hero": 2.6,
+  "grade": { "strength": 0.55, "tint": [-0.01, 0.02, -0.01], "grain": 2 },
+  "hero_zoom": 0.08,
+  "hero_backdrop": true,
+  "scenes": [
+    {
+      "name": "intro",
+      "narration": "Online judging has a resource problem. Every compilation and test consumes centralized server capacity. Moving that work into the browser solves scaling, but creates another problem. Wall-clock timing changes across devices. WASM OJ Forge asks: how can we distribute execution without changing what the result means? Our answer measures reproducible computational work instead of machine speed.",
+      "narration_parts": [
+        "Online judging has a resource problem.",
+        "Every compilation and test consumes centralized server capacity.",
+        "Moving that work into the browser solves scaling, but creates another problem.",
+        "Wall-clock timing changes across devices.",
+        "WASM OJ Forge asks: how can we distribute execution without changing what the result means?",
+        "Our answer measures reproducible computational work instead of machine speed."
+      ],
+      "hero": { "title": "WASM OJ Forge", "subtitle": "Forge code. Judge locally." },
+      "heroshot": "demo/footage/intro-still.png",
+      "tin": 0,
+      "transition": "fadeblack"
+    },
+    {
+      "name": "architecture",
+      "narration": "The design follows one clear boundary. The browser downloads and verifies problem bundles and pinned toolchains. Your source code, inputs, outputs, build artifacts, and verdicts stay on your device. Real language toolchains produce portable WebAssembly programs inside isolated workers. Wasmer then runs them under deterministic limits for instruction cost, logical time, memory, output, and the virtual file system.",
+      "narration_parts": [
+        "The design follows one clear boundary.",
+        "The browser downloads and verifies problem bundles and pinned toolchains.",
+        "Your source code, inputs, outputs, build artifacts, and verdicts stay on your device.",
+        "Real language toolchains produce portable WebAssembly programs inside isolated workers.",
+        "Wasmer then runs them under deterministic limits for instruction cost, logical time, memory, output, and the virtual file system."
+      ],
+      "caption": "Verified inputs · zero source uploads · deterministic limits",
+      "src": "demo/footage/session.mp4",
+      "tin": 3,
+      "transition": "dissolve"
+    },
+    {
+      "name": "compile",
+      "narration": "The interface keeps the familiar online judge workflow. Learners can browse forty-five bilingual systems problems and choose from seven languages. Progressive scoring rules explain how each solution earns points. Monaco supports multi-file editing. Here, this C solution compiles entirely inside the browser. No source file, and no compilation job, is uploaded.",
+      "narration_parts": [
+        "The interface keeps the familiar online judge workflow.",
+        "Learners can browse forty-five bilingual systems problems and choose from seven languages.",
+        "Progressive scoring rules explain how each solution earns points.",
+        "Monaco supports multi-file editing.",
+        "Here, this C solution compiles entirely inside the browser.",
+        "No source file, and no compilation job, is uploaded."
+      ],
+      "caption": "Seven languages · WASI and WASIX · entirely in-browser",
+      "src": "demo/footage/workspace.mp4",
+      "tin": 0,
+      "transition": "smoothleft",
+      "view": "workspace",
+      "focus": [
+        { "say": "fortyfive", "element": "challenge_list", "ring": false },
+        { "say": "seven languages", "element": "language_picker", "zoom": 1.8 },
+        { "say": "progressive scoring rules", "element": "scoring", "zoom": 1.55 },
+        { "say": "Monaco", "element": "editor", "ring": false, "zoom": 1.35 },
+        { "say": "compiles entirely", "element": "build_button", "zoom": 1.9 }
+      ]
+    },
+    {
+      "name": "self_test",
+      "narration": "Before submitting, the learner can run any custom input against the latest artifact. The result shows standard output, exit status, peak memory, and logical time. It also reports a normalized instruction cost. That budget is deterministic. A slow laptop and a fast desktop can apply the same policy.",
+      "narration_parts": [
+        "Before submitting, the learner can run any custom input against the latest artifact.",
+        "The result shows standard output, exit status, peak memory, and logical time.",
+        "It also reports a normalized instruction cost.",
+        "That budget is deterministic.",
+        "A slow laptop and a fast desktop can apply the same policy."
+      ],
+      "caption": "Custom input with reproducible resource evidence",
+      "src": "demo/footage/self-test.mp4",
+      "tin": 0,
+      "transition": "smoothup",
+      "view": "self_test",
+      "focus": [
+        { "say": "custom input", "element": "custom_input", "zoom": 1.45 },
+        { "say": "standard output", "element": "stdout", "zoom": 1.65 },
+        { "say": "peak memory", "element": "metrics", "zoom": 1.65 },
+        { "say": "normalized instruction cost", "element": "instruction_cost", "zoom": 1.75 }
+      ]
+    },
+    {
+      "name": "judge",
+      "narration": "Submit runs the complete test set locally. This solution passes all four cases and earns one hundred points. Each case keeps its own cost and memory evidence. That same evidence supports progressive scoring when a solution passes only a broader resource tier. The verdict is inspectable, educational, and reproducible.",
+      "narration_parts": [
+        "Submit runs the complete test set locally.",
+        "This solution passes all four cases and earns one hundred points.",
+        "Each case keeps its own cost and memory evidence.",
+        "That same evidence supports progressive scoring when a solution passes only a broader resource tier.",
+        "The verdict is inspectable, educational, and reproducible."
+      ],
+      "caption": "Four cases · 100 points · evidence per case",
+      "src": "demo/footage/accepted.mp4",
+      "tin": 0,
+      "transition": "smoothleft",
+      "view": "accepted",
+      "focus": [
+        { "say": "all four cases", "element": "case_cards", "zoom": 1.45 },
+        { "say": "one hundred points", "element": "accepted_banner", "zoom": 1.75 },
+        { "say": "cost and memory evidence", "element": "case_metrics", "zoom": 1.55 },
+        { "say": "resource tier", "element": "resource_chart", "zoom": 1.5 }
+      ]
+    },
+    {
+      "name": "codex",
+      "narration": "Codex with GPT five point six was our engineering partner throughout Build Week. It helped us recover invariants from earlier prototypes. We used it to design shared browser and server contracts, implement seven language toolchains, and debug isolation boundaries. It also helped create conformance and regression tests. We kept product decisions explicit. We accepted performance claims only when executable evidence supported them. WASM OJ Forge lets classrooms scale the judge without scaling the server.",
+      "narration_parts": [
+        "Codex with GPT five point six was our engineering partner throughout Build Week.",
+        "It helped us recover invariants from earlier prototypes.",
+        "We used it to design shared browser and server contracts, implement seven language toolchains, and debug isolation boundaries.",
+        "It also helped create conformance and regression tests.",
+        "We kept product decisions explicit.",
+        "We accepted performance claims only when executable evidence supported them.",
+        "WASM OJ Forge lets classrooms scale the judge without scaling the server."
+      ],
+      "hero": { "title": "Built with Codex + GPT-5.6", "subtitle": "Scale the judge, not the server." },
+      "heroshot": "demo/footage/accepted-still.png",
+      "tin": 0,
+      "pad": 3.0,
+      "transition": "fadeblack"
+    }
+  ]
+}

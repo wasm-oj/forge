@@ -1,8 +1,8 @@
-import { FORGE_CONTRACT_ID } from "../core/contract";
+import { WASM_OJ_CONTRACT_ID } from "../core/contract";
 
 export const MAX_SELF_TEST_CASES = 20;
-const SELF_TEST_SCHEMA = `${FORGE_CONTRACT_ID}/self-tests`;
-const SELF_TEST_KEY = `${FORGE_CONTRACT_ID}:self-tests`;
+const SELF_TEST_SCHEMA = `${WASM_OJ_CONTRACT_ID}/self-tests`;
+const SELF_TEST_KEY = `${WASM_OJ_CONTRACT_ID}:self-tests`;
 
 export interface SelfTestCase {
   readonly id: string;

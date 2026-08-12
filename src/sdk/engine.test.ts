@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
-import type { ForgeCompiler } from "../compiler/compiler";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
+import type { Compiler } from "../compiler/compiler";
 import type { BuildResult, WasmArtifact } from "../core/types";
 import { WEIGHTED_METER_MODEL } from "../core/resources";
 import { costProfileId } from "../core/cost-profile";
 import { toolchainPackageIdentities } from "../core/toolchains";
-import type { ForgeRunner } from "../runner/runner";
-import { ForgeEngine, type ForgeArtifactStore } from "./engine";
-import type { ForgeOperationEvent } from "../operations/operation";
+import type { Runner } from "../runner/runner";
+import { Engine, type ArtifactStore } from "./engine";
+import type { OperationEvent } from "../operations/operation";
 
 const artifact: WasmArtifact = {
   kind: "wasm",
-  forgeContract: FORGE_CONTRACT_VERSION,
+  wasmOjContract: WASM_OJ_CONTRACT_VERSION,
   id: "artifact",
   projectId: "project",
   cacheKey: "unused-outside-compile",
@@ -27,10 +27,10 @@ const artifact: WasmArtifact = {
   bytes: new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]),
 };
 
-describe("ForgeEngine", () => {
+describe("Engine", () => {
   it("composes environment-neutral compiler, runner, and artifact-store contracts", async () => {
     const compiler = {
-      cacheIdentity: vi.fn(() => "forge-test-c-compiler-1"),
+      cacheIdentity: vi.fn(() => "wasm-oj-test-c-compiler-1"),
       ready: vi.fn(async () => undefined),
       build: vi.fn(async (project, cacheKey) => ({
         success: true,
@@ -50,7 +50,7 @@ describe("ForgeEngine", () => {
       cancel: vi.fn(),
       restart: vi.fn(),
       dispose: vi.fn(),
-    } satisfies ForgeCompiler;
+    } satisfies Compiler;
     const runner = {
       ready: vi.fn(async () => undefined),
       run: vi.fn(async (_artifact, config) => ({
@@ -85,7 +85,7 @@ describe("ForgeEngine", () => {
       cancelAndWait: vi.fn(async () => undefined),
       restart: vi.fn(),
       dispose: vi.fn(),
-    } satisfies ForgeRunner;
+    } satisfies Runner;
     let cached: WasmArtifact | undefined;
     const store = {
       load: vi.fn(async () => cached),
@@ -98,8 +98,8 @@ describe("ForgeEngine", () => {
       clear: vi.fn(async () => {
         cached = undefined;
       }),
-    } satisfies ForgeArtifactStore;
-    const engine = new ForgeEngine({ compiler, runner, artifactStore: store });
+    } satisfies ArtifactStore;
+    const engine = new Engine({ compiler, runner, artifactStore: store });
     const input = { language: "c" as const, entry: "main.c", files: { "main.c": "int main(){}" } };
 
     await engine.ready();
@@ -134,13 +134,13 @@ describe("ForgeEngine", () => {
     engine.dispose();
     expect(compiler.dispose).toHaveBeenCalledOnce();
     expect(runner.dispose).toHaveBeenCalledOnce();
-    expect(() => engine.restart()).toThrow("ForgeEngine is disposed");
-    await expect(engine.compile(input)).rejects.toThrow("ForgeEngine is disposed");
+    expect(() => engine.restart()).toThrow("Engine is disposed");
+    await expect(engine.compile(input)).rejects.toThrow("Engine is disposed");
   });
 
   it("executes one observable submission and protects its operation boundary", async () => {
     const compiler = {
-      cacheIdentity: vi.fn(() => "forge-test-c-compiler-1"),
+      cacheIdentity: vi.fn(() => "wasm-oj-test-c-compiler-1"),
       ready: vi.fn(async () => undefined),
       build: vi.fn(async (project, cacheKey) => ({
         success: true,
@@ -155,7 +155,7 @@ describe("ForgeEngine", () => {
       cancel: vi.fn(),
       restart: vi.fn(),
       dispose: vi.fn(),
-    } satisfies ForgeCompiler;
+    } satisfies Compiler;
     const runner = {
       ready: vi.fn(async () => undefined),
       run: vi.fn(async (_artifact, config) => ({
@@ -190,17 +190,17 @@ describe("ForgeEngine", () => {
       cancelAndWait: vi.fn(async () => undefined),
       restart: vi.fn(),
       dispose: vi.fn(),
-    } satisfies ForgeRunner;
-    const engine = new ForgeEngine({ compiler, runner });
+    } satisfies Runner;
+    const engine = new Engine({ compiler, runner });
     const input = { language: "c" as const, entry: "main.c", files: { "main.c": "int main(){}" } };
-    const events: ForgeOperationEvent[] = [];
+    const events: OperationEvent[] = [];
     engine.onObservation((event) => events.push(event));
 
     const operation = engine.submit({
       id: "submission-1",
       input,
       spec: {
-        version: FORGE_CONTRACT_VERSION,
+        version: WASM_OJ_CONTRACT_VERSION,
         cases: [{
           id: "sample",
           kind: "batch",
@@ -231,12 +231,12 @@ describe("ForgeEngine", () => {
     async (action) => {
       const builds: Array<{
         cacheKey: string;
-        resolve(value: Awaited<ReturnType<ForgeCompiler["build"]>>): void;
+        resolve(value: Awaited<ReturnType<Compiler["build"]>>): void;
         reject(error: Error): void;
       }> = [];
       const rejectCurrent = (message: string) => builds.at(-1)?.reject(new Error(message));
       const compiler = {
-        cacheIdentity: vi.fn(() => "forge-test-c-compiler-1"),
+        cacheIdentity: vi.fn(() => "wasm-oj-test-c-compiler-1"),
         ready: vi.fn(async () => undefined),
         build: vi.fn((_project, cacheKey) => new Promise<BuildResult>((resolve, reject) => {
           builds.push({ cacheKey, resolve, reject });
@@ -246,7 +246,7 @@ describe("ForgeEngine", () => {
         cancel: vi.fn(() => rejectCurrent("Compilation cancelled.")),
         restart: vi.fn(() => rejectCurrent("Compiler restarted.")),
         dispose: vi.fn(() => rejectCurrent("Compiler disposed.")),
-      } satisfies ForgeCompiler;
+      } satisfies Compiler;
       const runner = {
         ready: vi.fn(async () => undefined),
         run: vi.fn(),
@@ -258,8 +258,8 @@ describe("ForgeEngine", () => {
         cancelAndWait: vi.fn(async () => undefined),
         restart: vi.fn(),
         dispose: vi.fn(),
-      } satisfies ForgeRunner;
-      const engine = new ForgeEngine({ compiler, runner });
+      } satisfies Runner;
+      const engine = new Engine({ compiler, runner });
       const input = { language: "c" as const, entry: "main.c", files: { "main.c": "int main(){}" } };
       const stale = engine.compile(input);
       await until(() => builds.length === 1);
@@ -288,7 +288,7 @@ describe("ForgeEngine", () => {
     let releaseSave!: () => void;
     const saveGate = new Promise<void>((resolve) => { releaseSave = resolve; });
     const compiler = {
-      cacheIdentity: vi.fn(() => "forge-test-c-compiler-1"),
+      cacheIdentity: vi.fn(() => "wasm-oj-test-c-compiler-1"),
       ready: vi.fn(async () => undefined),
       build: vi.fn(async (project, cacheKey) => ({
         success: true,
@@ -303,7 +303,7 @@ describe("ForgeEngine", () => {
       cancel: vi.fn(),
       restart: vi.fn(),
       dispose: vi.fn(),
-    } satisfies ForgeCompiler;
+    } satisfies Compiler;
     const runner = {
       ready: vi.fn(async () => undefined),
       run: vi.fn(),
@@ -315,7 +315,7 @@ describe("ForgeEngine", () => {
       cancelAndWait: vi.fn(async () => undefined),
       restart: vi.fn(),
       dispose: vi.fn(),
-    } satisfies ForgeRunner;
+    } satisfies Runner;
     const values = new Map<string, WasmArtifact>();
     const store = {
       load: vi.fn(async (cacheKey: string) => values.get(cacheKey)),
@@ -325,8 +325,8 @@ describe("ForgeEngine", () => {
       }),
       delete: vi.fn(async (cacheKey: string) => { values.delete(cacheKey); }),
       clear: vi.fn(async () => { values.clear(); }),
-    } satisfies ForgeArtifactStore;
-    const engine = new ForgeEngine({ compiler, runner, artifactStore: store });
+    } satisfies ArtifactStore;
+    const engine = new Engine({ compiler, runner, artifactStore: store });
     const input = { language: "c" as const, entry: "main.c", files: { "main.c": "int main(){}" } };
     const compile = engine.compile(input);
     await until(() => store.save.mock.calls.length === 1);
@@ -350,7 +350,7 @@ describe("ForgeEngine", () => {
     let rejectRun!: (error: Error) => void;
     let activeRun: Promise<never> | undefined;
     const compiler = {
-      cacheIdentity: vi.fn(() => "forge-test-c-compiler-1"),
+      cacheIdentity: vi.fn(() => "wasm-oj-test-c-compiler-1"),
       ready: vi.fn(async () => undefined),
       build: vi.fn(),
       onProgress: vi.fn(() => () => undefined),
@@ -358,7 +358,7 @@ describe("ForgeEngine", () => {
       cancel: vi.fn(),
       restart: vi.fn(),
       dispose: vi.fn(),
-    } satisfies ForgeCompiler;
+    } satisfies Compiler;
     const runner = {
       ready: vi.fn(async () => undefined),
       run: vi.fn(() => {
@@ -376,8 +376,8 @@ describe("ForgeEngine", () => {
       }),
       restart: vi.fn(),
       dispose: vi.fn(),
-    } satisfies ForgeRunner;
-    const engine = new ForgeEngine({ compiler, runner });
+    } satisfies Runner;
+    const engine = new Engine({ compiler, runner });
     const run = engine.run(artifact);
     const runAssertion = expect(run).rejects.toThrow("cancelled");
 

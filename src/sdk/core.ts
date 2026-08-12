@@ -1,17 +1,24 @@
 export { DEFAULT_DETERMINISM, resolveDeterminism } from "../core/determinism";
+export { canonicalJsonBytes, parseCanonicalJsonBytes } from "../core/canonical-json";
+export type { CanonicalJsonValue } from "../core/canonical-json";
 export {
-  asForgeError,
-  ForgeError,
-  FORGE_ERROR_CODES,
-  FORGE_ERROR_STAGES,
+  asWasmOjError,
+  WasmOjError,
+  WASM_OJ_ERROR_CODES,
+  WASM_OJ_ERROR_STAGES,
 } from "../core/errors";
 export type {
-  ForgeErrorCode,
-  ForgeErrorOptions,
-  ForgeErrorRecord,
-  ForgeErrorStage,
+  WasmOjErrorCode,
+  WasmOjErrorOptions,
+  WasmOjErrorRecord,
+  WasmOjErrorStage,
 } from "../core/errors";
-export { FORGE_CONTRACT_ID, FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "../core/contract";
+export {
+  WASM_OJ_CONTRACT_ID,
+  WASM_OJ_CONTRACT_VERSION,
+  WASM_OJ_SCHEMAS,
+  WASM_OJ_STORAGE,
+} from "../core/contract";
 export { DEFAULT_RESOURCE_POLICY, resolveResourcePolicy, WEIGHTED_METER_MODEL } from "../core/resources";
 export {
   CostBaselineRegistry,
@@ -20,25 +27,26 @@ export {
   normalizeExecutionMetrics,
   resolveArtifactCostBudget,
   resolveCostBudget,
+  unavailableExecutionMetrics,
 } from "../core/cost";
 export type { CostBudget, RawExecutionMetrics } from "../core/cost";
 export { costProfileId, isCostProfileFor } from "../core/cost-profile";
 export {
-  forgeRuntimeIdentityBytes,
-  FORGE_RUNTIME_COMPONENTS,
-  FORGE_RUNTIME_IDENTITY_SHA256,
-  verifyForgeRuntimeIdentity,
+  runtimeIdentityBytes,
+  WASM_OJ_RUNTIME_COMPONENTS,
+  WASM_OJ_RUNTIME_IDENTITY_SHA256,
+  verifyRuntimeIdentity,
 } from "../core/runtime-identity";
 export {
-  createForgeReleaseManifest,
-  forgeReleaseManifestBytes,
-  forgeReleaseManifestSha256,
-  FORGE_CONTAINER_PROTOCOL_VERSION,
-  FORGE_RELEASE_MANIFEST_SCHEMA,
-  parseForgeReleaseManifest,
-  verifyForgeReleaseManifestBytes,
+  createReleaseManifest,
+  releaseManifestBytes,
+  releaseManifestSha256,
+  WASM_OJ_CONTAINER_PROTOCOL_VERSION,
+  WASM_OJ_RELEASE_MANIFEST_SCHEMA,
+  parseReleaseManifest,
+  verifyReleaseManifestBytes,
 } from "../release-manifest";
-export type { ArtifactDigest, ForgeReleaseManifest } from "../release-manifest";
+export type { ArtifactDigest, ReleaseManifest } from "../release-manifest";
 export { assertLanguageIdentifier, isBuiltinLanguage, LANGUAGES } from "../core/types";
 export { assertValidProject } from "../core/project-validation";
 export { PROJECT_SOURCE_LIMITS } from "../core/project-files";
@@ -54,6 +62,9 @@ export type {
   BuildArtifact,
   BuildResult,
   BrowserRuntimeDriverPlugin,
+  CompilerRequest,
+  CompilerResponse,
+  CompilerTraceEvent,
   DeterminismConfig,
   Diagnostic,
   DiagnosticSeverity,
@@ -71,27 +82,46 @@ export type {
   InteractiveRunResult,
   RunConfig,
   RunResult,
+  RunnerRequest,
+  RunnerResponse,
   RuntimeBundleArtifact,
   TargetAbi,
   WasmArtifact,
   WorkerProgress,
+  BrowserToolchainSource,
+  ServerToolchainSource,
+  ToolchainAssetDescriptor,
+  ToolchainDescriptor,
+  ToolchainProfile,
 } from "../core/types";
-export { createForgeEngine, ForgeEngine } from "./engine";
-export type { JudgeProjectResult, ForgeEngineOptions } from "./engine";
+export {
+  browserToolchainAssetBaseUrl,
+  browserToolchainAssetUrl,
+  snapshotBrowserToolchainSources,
+  toolchainAssetSource,
+  toolchainProfileSource,
+  validateBrowserToolchainSources,
+  validateServerToolchainSources,
+  validateToolchainDescriptors,
+} from "../core/toolchain-sources";
+export { assertCompilerCacheKey } from "../core/hash";
+export { toolchainCacheIdentity } from "../core/toolchains";
+export { createEngine, Engine } from "./engine";
+export type { JudgeProjectResult, EngineOptions } from "./engine";
 export type {
-  ForgeOperation,
-  ForgeOperationEvent,
-  ForgeOperationEventPayload,
-  ForgeOperationKind,
-  ForgeOperationState,
-  ForgeSubmissionOperation,
-  ForgeSubmissionRequest,
+  Operation,
+  OperationEvent,
+  OperationEventPayload,
+  OperationKind,
+  OperationState,
+  SubmissionOperation,
+  SubmissionRequest,
 } from "../operations/operation";
-export type { ForgeArtifactStore, PrecompileOutcome, PrecompileStatus } from "../compiler/coordinator";
-export type { ForgeCompiler } from "../compiler/compiler";
+export type { ArtifactStore, PrecompileOutcome, PrecompileStatus } from "../compiler/coordinator";
+export type { Compiler } from "../compiler/compiler";
 export {
   decodeLibcxxPchManifest,
-  FORGE_LIBCXX_PCH_HEADER,
+  WASM_OJ_LIBCXX_PCH_HEADER,
   isToolchainLibcxxPchHeader,
 } from "../compiler/libcxx-pch";
 export type {
@@ -99,13 +129,14 @@ export type {
   LibcxxPchManifest,
   LibcxxPchProfile,
 } from "../compiler/libcxx-pch";
-export { ForgeCompilerRegistry } from "../compiler/compiler-registry";
-export type { ForgeCompilerRegistration } from "../compiler/compiler-registry";
-export type { ForgeRunner } from "../runner/runner";
+export { CompilerRegistry } from "../compiler/compiler-registry";
+export type { CompilerRegistration } from "../compiler/compiler-registry";
+export type { Runner } from "../runner/runner";
 export {
   createDefaultRuntimeDrivers,
   prepareArtifactInteraction,
   prepareArtifactRun,
+  prepareTrustedJudgeRun,
   RuntimeDriverRegistry,
 } from "../runner/artifact";
 export type {
@@ -173,55 +204,100 @@ export {
   verifyProblemBundleBytes,
   verifyProblemCollectionRevision,
 } from "../judge/problem-catalog-loader";
-export { assertProblemCostProfile, scoreProblemResults } from "../judge/problem-scoring";
-export { MANAGED_COLLECTION_SCHEMA, parseManagedCollectionContract } from "../online-judge/managed-collection";
+export {
+  assertJudgeDataCostProfile,
+  assertProblemCostProfile,
+  scoreJudgeDataResults,
+  scoreProblemResults,
+  summarizeProblemPolicies,
+} from "../judge/problem-scoring";
+export {
+  MANAGED_COLLECTION_SCHEMA,
+  parseManagedCollectionContract,
+  parseManagedCollectionV2,
+  parseManagedCollectionValueV2,
+} from "../online-judge/managed-collection";
 export type {
-  ManagedCollectionContract,
-  ManagedJudgeContract,
-  ManagedJudgeProgram,
-  ManagedProblemContract,
-  ManagedReferenceProgram,
-  ManagedRuntimeAsset,
-  ManagedSourceFile,
+  ManagedCollectionV2,
+  ManagedProblemPublication,
+  ManagedRepositoryObject,
 } from "../online-judge/managed-collection";
 export {
-  createForgeValidationSource,
-  forgeValidationSourceBytes,
-  forgeValidationSourceSha256,
-  parseForgeValidationSource,
-  VALIDATION_SOURCE_SCHEMA,
-  verifyForgeValidationSourceBytes,
-  verifyForgeValidationSourceObjects,
-} from "../online-judge/validation-source";
+  CONTEST_PUBLIC_PROJECTION_SCHEMA,
+  contestPublicProjectionBytes,
+  createContestPublicProjection,
+  deriveContestPublic,
+  derivePracticePublic,
+} from "../online-judge/contest-public";
+export type { ContestPublicProjection } from "../online-judge/contest-public";
+export { parseJudgeAllowedProfiles } from "../online-judge/compile-profiles";
+export type { JudgeAllowedProfile, JudgeAllowedProfiles } from "../online-judge/compile-profiles";
 export {
-  createManagedJudgeRuntimeProjection,
-  createTrustedWasmArtifactProjection,
-  decodeTrustedWasmArtifactProjection,
-  MANAGED_JUDGE_RUNTIME_SCHEMA,
-  managedJudgeSpec,
-  parseManagedJudgeRuntimeProjection,
-  parseTrustedWasmArtifactProjection,
-  redactJudgeCasesForAudit,
-  TRUSTED_WASM_ARTIFACT_SCHEMA,
-} from "../online-judge/managed-judge";
+  assertJudgeDataMatchesPracticePublic,
+  deriveJudgeData,
+  WASM_OJ_JUDGE_DATA_SCHEMA,
+  parseJudgeData,
+} from "../online-judge/judge-data";
+export type { JudgeDataCase, JudgeData, JudgePolicy } from "../online-judge/judge-data";
+export {
+  decodeJudgePackageForExecution,
+  encodeJudgePackage,
+  WASM_OJ_JUDGE_PACKAGE_MAGIC,
+  WASM_OJ_JUDGE_PACKAGE_MAX_BYTES,
+  WASM_OJ_JUDGE_PACKAGE_SCHEMA,
+  judgePackageSemanticDigest,
+  parseJudgePackageManifest,
+  readJudgePackageManifest,
+  validateJudgePackage,
+} from "../online-judge/judge-package";
 export type {
-  ManagedJudgeAssetProjection,
-  ManagedJudgeRuntimeProjection,
-  RedactedJudgeAuditCase,
-  TrustedWasmArtifactProjection,
-} from "../online-judge/managed-judge";
+  EncodedJudgePackage,
+  DecodedJudgePackageForExecution,
+  JudgePackageInput,
+  JudgePackageManifest,
+  JudgePackageAllowedProfile,
+  JudgePackageAssetInput,
+  JudgePackageAssetReference,
+  JudgePackageBlobReference,
+  JudgePackageByteSource,
+  JudgePackageInputJudge,
+  JudgePackageManifestJudge,
+  TrustedJudgeAsset,
+  TrustedJudgeExecutable,
+  ValidateJudgePackageOptions,
+  ValidatedJudgePackage,
+} from "../online-judge/judge-package";
+export {
+  MANAGED_COLLECTION_SOURCE_SCHEMA,
+  parseManagedCollectionSource,
+} from "../online-judge/managed-collection-source";
 export type {
-  CreatedValidationSource,
-  ForgeValidationSource,
-  ValidationSourceObjectReference,
-  ValidationSourceJudge,
-  ValidationSourceJudgeProgram,
-  ValidationSourceProvenance,
-  ValidationSourceProgram,
-  ValidationSourceRepositoryFile,
-  VerifiedValidationSource,
-} from "../online-judge/validation-source";
-export type { ProblemScore, ScoredProblemCase } from "../judge/problem-scoring";
+  ManagedCollectionSource,
+  ManagedCollectionSourceProblem,
+  ManagedSourceArtifact,
+  ManagedSourceAsset,
+  ManagedSourceJudge,
+  ManagedSourceObject,
+} from "../online-judge/managed-collection-source";
+export {
+  TRUSTED_JUDGE_RUNTIME_PROFILES,
+  TRUSTED_JUDGE_WASIP1_IMPORTS,
+  TRUSTED_JUDGE_WASM_MAX_BYTES,
+  validateTrustedJudgeWasm,
+} from "../online-judge/trusted-judge-wasm";
+export type {
+  TrustedJudgeRuntimeProfile,
+  TrustedJudgeProgram,
+  TrustedJudgeWasmInfo,
+  TrustedJudgeWasmValidationOptions,
+} from "../online-judge/trusted-judge-wasm";
+export { trustedJudgeSpec } from "../online-judge/trusted-judge";
+export type {
+  PolicyPerformanceAggregate,
+  ProblemScore,
+  ScoredProblemCase,
+  SubmissionPolicySummary,
+} from "../judge/problem-scoring";
 export type {
   ProblemBundleDescriptor,
   ProblemCollectionEntry,
@@ -247,7 +323,7 @@ export type {
 } from "../dependencies/build";
 export {
   createDefaultDependencyManager,
-  ForgeDependencyManager,
+  DependencyManager,
   MemoryDependencyCache,
 } from "../dependencies/manager";
 export {
@@ -291,33 +367,33 @@ export type {
   DependencyRequirement,
   DependencyResolutionContext,
   DependencySourceFile,
-  ForgeDependencyCache,
-  ForgeDependencyResolver,
+  DependencyCache,
+  DependencyResolver,
   LockedDependencyPackage,
   ResolveDependencyOptions,
   ResolvedDependencyGraph,
 } from "../dependencies/types";
 export {
-  assertValidForgeReplayBundle,
-  createForgeReplayBundle,
-  decodeForgeReplayBundle,
-  encodeForgeReplayBundle,
-  forgeReplayBundleSha256,
+  assertValidReplayBundle,
+  createReplayBundle,
+  decodeReplayBundle,
+  encodeReplayBundle,
+  replayBundleSha256,
   judgeTranscript,
-  replayForgeBundle,
+  replayBundle,
 } from "../replay/bundle";
 export type {
-  ForgeReplayBundle,
-  ForgeReplayBundleInput,
-  ForgeReplayDecodeOptions,
-  ForgeReplayHost,
-  ForgeReplayJudgeCaseTranscript,
-  ForgeReplayJudgeOperation,
-  ForgeReplayJudgeTranscript,
-  ForgeReplayOperation,
-  ForgeReplayOptions,
-  ForgeReplayResult,
-  ForgeReplayRunOperation,
+  ReplayBundle,
+  ReplayBundleInput,
+  ReplayDecodeOptions,
+  ReplayHost,
+  ReplayJudgeCaseTranscript,
+  ReplayJudgeOperation,
+  ReplayJudgeTranscript,
+  ReplayOperation,
+  ReplayOptions,
+  ReplayResult,
+  ReplayRunOperation,
 } from "../replay/bundle";
 export {
   compareConformanceSnapshots,

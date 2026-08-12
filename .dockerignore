@@ -5,17 +5,28 @@
 
 !package.json
 !pnpm-lock.yaml
+!pnpm-workspace.yaml
 !tsconfig.json
 !tsconfig.lib.json
 !vite-env.d.ts
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!rust-toolchain.toml
 
-!lib/
-!lib/**
+!packages/
+!packages/**
+
+!licenses/
+!licenses/**
+
+!testdata/
+!testdata/wojjdg02-v2-text.hex
 
 !src/
 !src/**
 !scripts/
 !scripts/build-library.mjs
+!scripts/library-packages.mjs
 !scripts/typescript-cli.mjs
 
 !container/
@@ -24,6 +35,7 @@
 !container/generate-identity.mjs
 !container/tree-digest.mjs
 !container/submission-result.mjs
+!container/progress.mjs
 !container/output-budget.mjs
 !container/validation-budget.mjs
 

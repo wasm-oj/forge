@@ -22,7 +22,7 @@ Induct on the number of processed events. Initially the expected offset is 0, me
 
 ## Complexity
 
-Let `S` be the total length of all names and `T` the complete textual input size. Time is `O(N+S)`. C, C++, Rust, Go, and Python read line by line, so solver auxiliary space is `O(S_max)`, where `S_max≤200`. Forge's JavaScript/TypeScript API supplies only an immutable full input string through `readAsString()`, so those languages necessarily retain `O(T)` host-provided input; their parser uses a cursor and no all-token array, leaving its additional state at `O(S_max)`. The 256 MiB memory limit includes this runtime/input-contract cost.
+Let `S` be the total length of all names and `T` the complete textual input size. Time is `O(N+S)`. C, C++, Rust, Go, and Python read line by line, so solver auxiliary space is `O(S_max)`, where `S_max≤200`. WASM-OJ's JavaScript/TypeScript API supplies only an immutable full input string through `readAsString()`, so those languages necessarily retain `O(T)` host-provided input; their parser uses a cursor and no all-token array, leaving its additional state at `O(S_max)`. The 256 MiB memory limit includes this runtime/input-contract cost.
 
 ## Common Mistakes
 

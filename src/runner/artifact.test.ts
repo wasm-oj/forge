@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { runInNewContext } from "node:vm";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { costProfileId } from "../core/cost-profile";
 import { CostBaselineRegistry, createExtendedCostBaselineRegistry } from "../core/cost";
@@ -25,7 +25,7 @@ import {
 } from "./artifact";
 
 const base = {
-  forgeContract: FORGE_CONTRACT_VERSION,
+  wasmOjContract: WASM_OJ_CONTRACT_VERSION,
   id: "artifact",
   projectId: "project",
   cacheKey: "cache",
@@ -153,9 +153,9 @@ describe("artifact runner preparation", () => {
     };
     const manifest = createRuntimeBundleManifest(project, PYTHON_PACKAGE, "python", "build/main.pyc");
     const files = {
-      ".forge/deterministic_runner.py": "runner",
+      ".wasm-oj/deterministic_runner.py": "runner",
       "build/main.pyc": new Uint8Array([7]),
-      "forge.manifest.json": manifest,
+      "wasm-oj.manifest.json": manifest,
     };
     const artifact: RuntimeBundleArtifact = {
       ...base,
@@ -178,7 +178,7 @@ describe("artifact runner preparation", () => {
     const request = await prepareArtifactRun(artifact, config, resolver, builtInDrivers);
     expect(request.cwd).toBe("/project");
     expect(request.args.slice(0, 2)).toEqual([
-      "/project/.forge/deterministic_runner.py",
+      "/project/.wasm-oj/deterministic_runner.py",
       "/project/build/main.pyc",
     ]);
     expect(request.files["/project/build/main.pyc"]).toEqual(new Uint8Array([7]));
@@ -270,7 +270,7 @@ describe("artifact runner preparation", () => {
       },
     };
     const manifest = createRuntimeBundleManifest(project, QUICKJS_PACKAGE, "qjs", "main.js");
-    const files = { "main.js": "", "forge.manifest.json": manifest };
+    const files = { "main.js": "", "wasm-oj.manifest.json": manifest };
     const artifact: RuntimeBundleArtifact = {
       ...base,
       kind: "runtime-bundle",
@@ -299,15 +299,15 @@ describe("artifact runner preparation", () => {
     )).rejects.toThrow("does not support streaming interactive execution");
   });
 
-  it("rejects artifacts from another or missing Forge contract", async () => {
+  it("rejects artifacts from another or missing WASM-OJ contract", async () => {
     const artifact = {
       ...base,
-      forgeContract: FORGE_CONTRACT_VERSION + 1,
+      wasmOjContract: WASM_OJ_CONTRACT_VERSION + 1,
       kind: "wasm",
       bytes: new Uint8Array([1]),
     } as unknown as WasmArtifact;
     await expect(prepareArtifactRun(artifact, config, resolver)).rejects.toThrow(
-      `Artifact Forge contract '${FORGE_CONTRACT_VERSION + 1}' is unsupported; expected '${FORGE_CONTRACT_VERSION}'.`,
+      `Artifact WASM-OJ contract '${WASM_OJ_CONTRACT_VERSION + 1}' is unsupported; expected '${WASM_OJ_CONTRACT_VERSION}'.`,
     );
   });
 
@@ -321,11 +321,11 @@ describe("artifact runner preparation", () => {
     } as unknown as RuntimeBundleArtifact;
     const source = quickJsBundle(artifact, "", config);
     const context = {
-      __forge_determinism_seed: () => 0,
-      __forge_determinism_epoch_ms: () => 0,
-      __forge_determinism_step_ns: () => 1,
-      __forge_write_stdout: vi.fn(),
-      __forge_write_stderr: vi.fn(),
+      __wasm_oj_determinism_seed: () => 0,
+      __wasm_oj_determinism_epoch_ms: () => 0,
+      __wasm_oj_determinism_step_ns: () => 1,
+      __wasm_oj_write_stdout: vi.fn(),
+      __wasm_oj_write_stderr: vi.fn(),
     };
 
     expect(() => runInNewContext(source, context)).toThrow("escapes the project root");
@@ -344,11 +344,11 @@ describe("artifact runner preparation", () => {
     const stdout = vi.fn();
 
     runInNewContext(source, {
-      __forge_determinism_seed: () => 0,
-      __forge_determinism_epoch_ms: () => 0,
-      __forge_determinism_step_ns: () => 1,
-      __forge_write_stdout: stdout,
-      __forge_write_stderr: vi.fn(),
+      __wasm_oj_determinism_seed: () => 0,
+      __wasm_oj_determinism_epoch_ms: () => 0,
+      __wasm_oj_determinism_step_ns: () => 1,
+      __wasm_oj_write_stdout: stdout,
+      __wasm_oj_write_stderr: vi.fn(),
     });
 
     expect(stdout).toHaveBeenCalledWith("42");
@@ -361,11 +361,11 @@ describe("artifact runner preparation", () => {
     } as unknown as RuntimeBundleArtifact;
     const source = quickJsBundle(artifact, "", config);
     const context = {
-      __forge_determinism_seed: () => 0,
-      __forge_determinism_epoch_ms: () => 0,
-      __forge_determinism_step_ns: () => 1,
-      __forge_write_stdout: vi.fn(),
-      __forge_write_stderr: vi.fn(),
+      __wasm_oj_determinism_seed: () => 0,
+      __wasm_oj_determinism_epoch_ms: () => 0,
+      __wasm_oj_determinism_step_ns: () => 1,
+      __wasm_oj_write_stdout: vi.fn(),
+      __wasm_oj_write_stderr: vi.fn(),
     };
 
     expect(() => runInNewContext(source, context)).toThrow("canonical forward slashes");

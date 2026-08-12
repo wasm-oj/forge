@@ -1,6 +1,6 @@
 import { canonicalJsonBytes, parseCanonicalJsonBytes } from "./core/canonical-json.ts";
-import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "./core/contract.ts";
-import { FORGE_RUNTIME_IDENTITY_SHA256 } from "./core/runtime-identity.ts";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "./core/contract.ts";
+import { WASM_OJ_RUNTIME_IDENTITY_SHA256 } from "./core/runtime-identity.ts";
 import { WEIGHTED_METER_MODEL } from "./core/resources.ts";
 import { sha256Hex } from "./core/sha256.ts";
 
@@ -11,14 +11,14 @@ const SEMVER = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?
 const VERSION = /^[0-9A-Za-z][0-9A-Za-z._+-]{0,127}$/;
 const IDENTITY = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,511}$/;
 
-export const FORGE_RELEASE_MANIFEST_SCHEMA = FORGE_SCHEMAS.releaseManifest;
-export const FORGE_CONTAINER_PROTOCOL_VERSION = "forge-container-v1";
+export const WASM_OJ_RELEASE_MANIFEST_SCHEMA = WASM_OJ_SCHEMAS.releaseManifest;
+export const WASM_OJ_CONTAINER_PROTOCOL_VERSION = "wasm-oj-container-v2";
 
-export interface ForgeReleaseManifest {
-  readonly schema: typeof FORGE_RELEASE_MANIFEST_SCHEMA;
+export interface ReleaseManifest {
+  readonly schema: typeof WASM_OJ_RELEASE_MANIFEST_SCHEMA;
   readonly releaseId: string;
   readonly version: string;
-  readonly forgeContract: typeof FORGE_CONTRACT_VERSION;
+  readonly wasmOjContract: typeof WASM_OJ_CONTRACT_VERSION;
   readonly createdAt: string;
   readonly source: {
     readonly repository: string;
@@ -53,7 +53,7 @@ export interface ForgeReleaseManifest {
     };
   };
   readonly runtime: {
-    readonly protocolVersion: typeof FORGE_CONTAINER_PROTOCOL_VERSION;
+    readonly protocolVersion: typeof WASM_OJ_CONTAINER_PROTOCOL_VERSION;
     readonly executionRootSha256: string;
     readonly rootSha256: string;
     readonly runtimeIdentitySha256: string;
@@ -78,8 +78,7 @@ export interface ForgeReleaseManifest {
     readonly costCalibrationSha256: string;
   };
   readonly migrations: {
-    readonly coreSha256: string;
-    readonly submissionsSha256: string;
+    readonly databaseSha256: string;
   };
   readonly provenance: {
     readonly issuer: string;
@@ -140,14 +139,14 @@ function sourceRepository(value: unknown): string {
   return url.toString().replace(/\/$/, "");
 }
 
-export function parseForgeReleaseManifest(value: unknown): ForgeReleaseManifest {
+export function parseReleaseManifest(value: unknown): ReleaseManifest {
   const manifest = record(value, "release manifest");
   exact(manifest, [
-    "artifacts", "build", "cost", "createdAt", "evidence", "forgeContract", "migrations",
+    "artifacts", "build", "cost", "createdAt", "evidence", "wasmOjContract", "migrations",
     "provenance", "releaseId", "runtime", "schema", "source", "toolchains", "version",
   ], [], "release manifest");
-  if (manifest.schema !== FORGE_RELEASE_MANIFEST_SCHEMA) throw new TypeError("Release manifest schema is unsupported.");
-  if (manifest.forgeContract !== FORGE_CONTRACT_VERSION) throw new TypeError("Release manifest uses another Forge contract.");
+  if (manifest.schema !== WASM_OJ_RELEASE_MANIFEST_SCHEMA) throw new TypeError("Release manifest schema is unsupported.");
+  if (manifest.wasmOjContract !== WASM_OJ_CONTRACT_VERSION) throw new TypeError("Release manifest uses another WASM-OJ contract.");
   if (typeof manifest.releaseId !== "string" || !UUID.test(manifest.releaseId)) throw new TypeError("releaseId must be a UUID.");
   if (typeof manifest.version !== "string" || !SEMVER.test(manifest.version)) throw new TypeError("version must be semantic versioning.");
 
@@ -175,13 +174,13 @@ export function parseForgeReleaseManifest(value: unknown): ForgeReleaseManifest 
     if (base.stage !== expectedStages[index] || typeof base.image !== "string" || !IDENTITY.test(base.image) || typeof base.digest !== "string" || !OCI_DIGEST.test(base.digest)) {
       throw new TypeError("Container base image inventory is invalid.");
     }
-    return { stage: base.stage, image: base.image, digest: base.digest } as ForgeReleaseManifest["artifacts"]["containerImage"]["baseImages"][number];
+    return { stage: base.stage, image: base.image, digest: base.digest } as ReleaseManifest["artifacts"]["containerImage"]["baseImages"][number];
   });
 
   const runtime = record(manifest.runtime, "runtime");
   exact(runtime, ["compilerSha256", "executionRootSha256", "protocolVersion", "rootSha256", "runnerSha256", "runtimeCoreSha256", "runtimeIdentitySha256", "wasmerSha256", "wasmerVersion"], [], "runtime");
-  if (runtime.protocolVersion !== FORGE_CONTAINER_PROTOCOL_VERSION) throw new TypeError("Container protocol is unsupported.");
-  if (runtime.runtimeIdentitySha256 !== FORGE_RUNTIME_IDENTITY_SHA256) throw new TypeError("Release runtime identity does not match this Forge build.");
+  if (runtime.protocolVersion !== WASM_OJ_CONTAINER_PROTOCOL_VERSION) throw new TypeError("Container protocol is unsupported.");
+  if (runtime.runtimeIdentitySha256 !== WASM_OJ_RUNTIME_IDENTITY_SHA256) throw new TypeError("Release runtime identity does not match this WASM-OJ build.");
 
   const toolchains = record(manifest.toolchains, "toolchains");
   exact(toolchains, ["manifestSha256", "rootSha256"], [], "toolchains");
@@ -191,7 +190,7 @@ export function parseForgeReleaseManifest(value: unknown): ForgeReleaseManifest 
   const evidence = record(manifest.evidence, "evidence");
   exact(evidence, ["conformanceSha256", "costCalibrationSha256", "testsSha256"], [], "evidence");
   const migrations = record(manifest.migrations, "migrations");
-  exact(migrations, ["coreSha256", "submissionsSha256"], [], "migrations");
+  exact(migrations, ["databaseSha256"], [], "migrations");
   const provenance = record(manifest.provenance, "provenance");
   exact(provenance, ["issuer", "subject"], [], "provenance");
   if (typeof provenance.issuer !== "string" || !IDENTITY.test(provenance.issuer) || typeof provenance.subject !== "string" || !IDENTITY.test(provenance.subject)) {
@@ -199,10 +198,10 @@ export function parseForgeReleaseManifest(value: unknown): ForgeReleaseManifest 
   }
 
   return {
-    schema: FORGE_RELEASE_MANIFEST_SCHEMA,
+    schema: WASM_OJ_RELEASE_MANIFEST_SCHEMA,
     releaseId: manifest.releaseId,
     version: manifest.version,
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     createdAt: timestamp(manifest.createdAt),
     source: {
       repository: sourceRepository(source.repository),
@@ -233,10 +232,10 @@ export function parseForgeReleaseManifest(value: unknown): ForgeReleaseManifest 
       },
     },
     runtime: {
-      protocolVersion: FORGE_CONTAINER_PROTOCOL_VERSION,
+      protocolVersion: WASM_OJ_CONTAINER_PROTOCOL_VERSION,
       executionRootSha256: digest(runtime.executionRootSha256, "runtime.executionRootSha256"),
       rootSha256: digest(runtime.rootSha256, "runtime.rootSha256"),
-      runtimeIdentitySha256: FORGE_RUNTIME_IDENTITY_SHA256,
+      runtimeIdentitySha256: WASM_OJ_RUNTIME_IDENTITY_SHA256,
       runtimeCoreSha256: digest(runtime.runtimeCoreSha256, "runtime.runtimeCoreSha256"),
       wasmerVersion: version(runtime.wasmerVersion, "runtime.wasmerVersion"),
       wasmerSha256: digest(runtime.wasmerSha256, "runtime.wasmerSha256"),
@@ -258,32 +257,31 @@ export function parseForgeReleaseManifest(value: unknown): ForgeReleaseManifest 
       costCalibrationSha256: digest(evidence.costCalibrationSha256, "evidence.costCalibrationSha256"),
     },
     migrations: {
-      coreSha256: digest(migrations.coreSha256, "migrations.coreSha256"),
-      submissionsSha256: digest(migrations.submissionsSha256, "migrations.submissionsSha256"),
+      databaseSha256: digest(migrations.databaseSha256, "migrations.databaseSha256"),
     },
-    provenance: { issuer: provenance.issuer, subject: provenance.subject } as ForgeReleaseManifest["provenance"],
+    provenance: { issuer: provenance.issuer, subject: provenance.subject } as ReleaseManifest["provenance"],
   };
 }
 
-export function createForgeReleaseManifest(value: ForgeReleaseManifest): ForgeReleaseManifest {
-  return parseForgeReleaseManifest(value);
+export function createReleaseManifest(value: ReleaseManifest): ReleaseManifest {
+  return parseReleaseManifest(value);
 }
 
-export function forgeReleaseManifestBytes(value: ForgeReleaseManifest): Uint8Array {
-  return canonicalJsonBytes(parseForgeReleaseManifest(value));
+export function releaseManifestBytes(value: ReleaseManifest): Uint8Array {
+  return canonicalJsonBytes(parseReleaseManifest(value));
 }
 
-export async function forgeReleaseManifestSha256(value: ForgeReleaseManifest): Promise<string> {
-  return sha256Hex(forgeReleaseManifestBytes(value));
+export async function releaseManifestSha256(value: ReleaseManifest): Promise<string> {
+  return sha256Hex(releaseManifestBytes(value));
 }
 
-export async function verifyForgeReleaseManifestBytes(
+export async function verifyReleaseManifestBytes(
   bytes: Uint8Array,
   expectedSha256?: string,
-): Promise<ForgeReleaseManifest> {
+): Promise<ReleaseManifest> {
   if (expectedSha256 !== undefined) {
     const expected = digest(expectedSha256, "expected release manifest digest");
     if (expected !== await sha256Hex(bytes)) throw new TypeError("Release manifest bytes do not match the expected digest.");
   }
-  return parseForgeReleaseManifest(parseCanonicalJsonBytes(bytes, "release manifest"));
+  return parseReleaseManifest(parseCanonicalJsonBytes(bytes, "release manifest"));
 }

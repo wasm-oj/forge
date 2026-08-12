@@ -35,8 +35,14 @@ try {
   await init({ log: "warn" });
   runtime = new Runtime({ registry: null });
   const [packageBytes, manifest] = await Promise.all([
-    loadRustPackage(encoded.toolchainDirectory),
-    loadRustManifest(encoded.toolchainDirectory),
+    loadRustPackage(
+      requiredToolchainAsset(encoded, RUST_TOOLCHAIN.packageAsset),
+      encoded.verifiedToolchain === true,
+    ),
+    loadRustManifest(
+      requiredToolchainAsset(encoded, RUST_TOOLCHAIN.manifestAsset),
+      encoded.verifiedToolchain === true,
+    ),
   ]);
   pkg = await Wasmer.fromFile(packageBytes, runtime);
   rustc = pkg.commands.rustc;
@@ -279,20 +285,26 @@ async function readRustAllocatorBitcode(work) {
   }
 }
 
-async function loadRustPackage(toolchainDirectory) {
-  const filename = path.basename(RUST_TOOLCHAIN.packageAsset);
-  const compressed = await readFile(path.join(toolchainDirectory, filename));
-  verifyDigest(filename, compressed, RUST_TOOLCHAIN.packageCompressedSha256);
-  const bytes = new Uint8Array(gunzipSync(compressed));
-  verifyDigest("decompressed Rust WebC", bytes, RUST_TOOLCHAIN.packageSha256);
+async function loadRustPackage(file, verifiedToolchain) {
+  const compressed = await readFile(file);
+  if (!verifiedToolchain) verifyDigest(file, compressed, RUST_TOOLCHAIN.packageCompressedSha256);
+  const bytes = uint8View(gunzipSync(compressed));
+  if (!verifiedToolchain) verifyDigest("decompressed Rust WebC", bytes, RUST_TOOLCHAIN.packageSha256);
   return bytes;
 }
 
-async function loadRustManifest(toolchainDirectory) {
-  const filename = path.basename(RUST_TOOLCHAIN.manifestAsset);
-  const bytes = new Uint8Array(await readFile(path.join(toolchainDirectory, filename)));
-  verifyDigest(filename, bytes, RUST_TOOLCHAIN.manifestSha256);
+async function loadRustManifest(file, verifiedToolchain) {
+  const bytes = new Uint8Array(await readFile(file));
+  if (!verifiedToolchain) verifyDigest(file, bytes, RUST_TOOLCHAIN.manifestSha256);
   return decodeRustToolchainManifest(bytes);
+}
+
+function requiredToolchainAsset(encoded, assetPath) {
+  const file = encoded?.toolchainAssets?.[assetPath];
+  if (typeof file !== "string" || !path.isAbsolute(file)) {
+    throw new Error(`The Rust compiler stage did not receive absolute asset '${assetPath}'.`);
+  }
+  return file;
 }
 
 function verifyDigest(filename, bytes, expected) {
@@ -300,6 +312,10 @@ function verifyDigest(filename, bytes, expected) {
   if (actual !== expected) {
     throw new Error(`Pinned Rust toolchain asset '${filename}' has digest ${actual}; expected ${expected}.`);
   }
+}
+
+function uint8View(bytes) {
+  return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
 async function readStdin() {

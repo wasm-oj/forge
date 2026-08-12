@@ -1,0 +1,43 @@
+import { describe, expect, it } from "vitest";
+import {
+  executionTerminationLabel,
+  judgeUiText,
+  localizedWorkerProgress,
+  verdictLabel,
+} from "./judge-ui-i18n";
+
+describe("judge UI localization", () => {
+  it("provides complete locale-specific copy for primary workspace surfaces", () => {
+    const zh = judgeUiText("zh-TW");
+    const en = judgeUiText("en");
+
+    expect(zh.topbar.judgeLocally).toBe("本機判題");
+    expect(en.topbar.judgeLocally).toBe("Judge Locally");
+    expect(zh.panel.diagnostics).toBe("編譯診斷");
+    expect(en.panel.diagnostics).toBe("Diagnostics");
+    expect(zh.settings.localDataTitle).toBe("本機資料與隱私");
+    expect(en.settings.localDataTitle).toBe("Local data and privacy");
+    expect(en.judge.casesAndPoints(2, 3, 4, 5)).toBe("2 / 3 cases · 4.00 / 5 points");
+    expect(zh.judge.casesAndPoints(2, 3, 4, 5)).toBe("2 / 3 筆測資 · 4.00 / 5 分");
+    expect(en.official.cursor(7)).toBe("Event cursor: 7");
+    expect(zh.official.resources(1234, "1 MiB")).toContain("1 MiB");
+    expect(en.official.reconnecting(2, 7)).toContain("cursor 7");
+  });
+
+  it("keeps all static English copy free of Chinese characters", () => {
+    expect(JSON.stringify(judgeUiText("en"))).not.toMatch(/[\p{Script=Han}]/u);
+  });
+
+  it("localizes verdicts, termination states, and worker progress", () => {
+    expect(verdictLabel("zh-TW", "wrong-answer")).toBe("答案錯誤");
+    expect(verdictLabel("en", "wrong-answer")).toBe("Wrong Answer");
+    expect(executionTerminationLabel("zh-TW", "memory-limit")).toBe("超過記憶體限制");
+    expect(executionTerminationLabel("en", "memory-limit")).toBe("memory limit");
+
+    const progress = { phase: "running" as const, label: "Local cases 2 / 5", progress: 0.4 };
+    expect(localizedWorkerProgress(progress, "zh-TW")).toBe("本機測資 2 / 5");
+    expect(localizedWorkerProgress(progress, "en")).toBe("Local cases 2 / 5");
+    expect(localizedWorkerProgress({ phase: "linking", label: "Linking SDK-direct Clang objects" }, "zh-TW"))
+      .toBe("正在連結");
+  });
+});

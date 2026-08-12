@@ -1,5 +1,5 @@
 {
-  "schema": "wasm-oj-forge-v1/runtime-core-licenses",
+  "schema": "wasm-oj-v2/runtime-core-licenses",
   "generator": {
     "name": "cargo-about",
     "version": "0.9.1"
@@ -18,7 +18,7 @@
   },
   "report": {
     "path": "licenses/runtime-core-dependencies.html",
-    "sha256": "d093fdf7b7d3db40e3392f92f5c1773fb3a9c7001a30041ddceb08df0fa16aad"
+    "sha256": "b5c72c34e4d413d783af7559a86cfb95d2f4dfc20c2f5e966d86668fe681edec"
   },
   "packages": [
     {

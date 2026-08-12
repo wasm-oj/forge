@@ -13,9 +13,9 @@
 第一階段只讀 `catalog.json`、五份 `problem.json` 中的 identity／statement／validator／
 test paths、雙語 statements、validators 與 stored tests；刻意略過 complexities、scoring、
 editorials、官方 solutions、oracles 與 generators。Reviewer 從題意自行推導直覺、進階與
-最佳解，並在 repository 外的
-`/tmp/forge-blind-review-041-045.VkVSWE/` 寫五份 C++20 solver 及一份獨立 Python brute
-cross-checker。五份 solver 先通過四個 stored cases，再各跑 1,000 組固定 seed 的隨機
+最佳解，並在 repository 外的隔離 reviewer workspace 寫五份 C++20 solver 及一份獨立
+Python brute cross-checker；workspace 在記錄下方 digest 後即刪除，不是可重現性契約的一部分。
+五份 solver 先通過四個 stored cases，再各跑 1,000 組固定 seed 的隨機
 小 case；expected output 由直接定義計算，不使用 repo oracle 或 reference consensus。
 
 第二階段才讀 `AGENTS.md`、完整 `docs/CONTRACT.md`、雙語 editorials、35 份官方

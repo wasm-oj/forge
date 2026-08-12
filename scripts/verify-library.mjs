@@ -1,904 +1,445 @@
 import { execFile } from "node:child_process";
-import { constants as fsConstants } from "node:fs";
-import { createServer } from "node:http";
-import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { chromium } from "playwright";
-import { unpackPublishPackage } from "./packed-package.mjs";
 import {
-  COMPONENT_MANIFEST_PATH,
-  readThirdPartyComponents,
-} from "./third-party-components.mjs";
+  CODE_PACKAGES,
+  CODE_VERSION,
+  PUBLIC_PACKAGE_BY_NAME,
+  PUBLIC_PACKAGES,
+  TOOLCHAIN_DESCRIPTOR_SCHEMA,
+  TOOLCHAIN_PACKAGES,
+  WASM_OJ_CONTRACT_VERSION,
+  packagesRoot,
+  repositoryRoot,
+} from "./library-packages.mjs";
 
-const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const run = promisify(execFile);
-const serviceWorkerFile = "public/toolchain-cache-sw.js";
-const browserWasmSources = new Map([
-  ["wasmer_js_bg", await readFile(fileURLToPath(import.meta.resolve("@wasmer/sdk/wasm")))],
-  ["runtime-core_bg", await readFile(path.join(root, "src/runner/generated/runtime-core_bg.wasm"))],
-]);
+const selectedName = parseSelection(process.argv.slice(2));
+const selected = selectedName ? [requiredPackage(selectedName)] : PUBLIC_PACKAGES;
 
-const canonicalToolchainFiles = [
-  "public/toolchains/README.md",
-  "public/toolchains/clang-22.0.0-git20542-10.cc1-pins.json",
-  "public/toolchains/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin",
-  "public/toolchains/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin",
-  "public/toolchains/clang-22.0.0-git20542-10.libcxx-pch.json",
-  "public/toolchains/clang-22.0.0-git20542-10.manifest.json",
-  "public/toolchains/clang-22.0.0-git20542-10.webc.gz.bin",
-  "public/toolchains/go-1.26.5-wasip1.manifest.json",
-  "public/toolchains/go-1.26.5-wasip1.stdlib.gz.bin",
-  "public/toolchains/go-1.26.5-wasip1.webc.gz.bin",
-  "public/toolchains/python-3.14.6-wasip1.manifest.json",
-  "public/toolchains/python-3.14.6-wasip1.webc.gz.bin",
-  "public/toolchains/quickjs-0.15.1.wasm.gz.bin",
-  "public/toolchains/rust-1.91.1-dev.manifest.json",
-  "public/toolchains/rust-1.91.1-dev.webc.gz.bin",
-  "public/toolchains/typescript-7.0.2.wasm.gz.bin",
-];
-const exactToolchainExports = Object.fromEntries(
-  canonicalToolchainFiles
-    .filter((relative) => relative !== "public/toolchains/README.md")
-    .map((relative) => [
-      `./toolchains/${path.posix.basename(relative)}`,
-      `./${relative}`,
-    ]),
-);
-const publicDeclarations = [
-  "lib/core.d.ts",
-  "lib/browser.d.ts",
-  "lib/server.d.ts",
-];
-const publicJavaScript = [
-  "lib/core.js",
-  "lib/browser.js",
-  "lib/server.js",
-  "lib/collection-cli.js",
-];
-const serverCompilerStages = [
-  "lib/server-build-stage.mjs",
-  "lib/python-stage.mjs",
-  "lib/rustc-stage.mjs",
-  "lib/go-stage.mjs",
-];
-const serverRunnerStages = [
-  "lib/server-runner-stage.mjs",
-];
-const serverStages = [...serverCompilerStages, ...serverRunnerStages];
-const expectedWorkerRoles = [
-  "compiler.worker",
-  "runner.worker",
-  "python-stage.worker",
-  "rustc-stage.worker",
-  "go-stage.worker",
-  "wasmer-thread.worker",
-];
+await verifyWorkspaceGraph();
+await verifyReleaseWorkflows();
+for (const definition of selected) await verifyPackage(definition);
 
-async function filesBelow(directory, prefix) {
-  const files = [];
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const relative = `${prefix}/${entry.name}`;
-    if (entry.isDirectory()) {
-      files.push(...await filesBelow(path.join(directory, entry.name), relative));
-    } else if (entry.isFile()) {
-      files.push(relative);
-    } else {
-      throw new Error(`Package source boundary contains unsupported entry '${relative}'.`);
-    }
+process.stdout.write(`Verified ${selected.length} packed WASM-OJ package${selected.length === 1 ? "" : "s"}.\n`);
+
+function parseSelection(arguments_) {
+  if (arguments_.length === 0) return undefined;
+  if (arguments_.length !== 2 || arguments_[0] !== "--package" || !arguments_[1]) {
+    throw new Error("Usage: node scripts/verify-library.mjs [--package @wasm-oj/<name>]");
   }
-  return files;
+  return arguments_[1];
 }
 
-async function packageDocumentationFiles() {
+function requiredPackage(name) {
+  const definition = PUBLIC_PACKAGE_BY_NAME.get(name);
+  if (!definition) throw new Error(`Unknown public package '${name}'.`);
+  return definition;
+}
+
+async function verifyWorkspaceGraph() {
+  const rootManifest = await readJson(path.join(repositoryRoot, "package.json"));
+  if (rootManifest.name !== "wasm-oj-platform" || rootManifest.version !== CODE_VERSION || rootManifest.private !== true) {
+    throw new Error(`Root package must be private wasm-oj-platform@${CODE_VERSION}.`);
+  }
+  if (rootManifest.repository?.url !== "git+https://github.com/wasm-oj/forge.git"
+    || rootManifest.homepage !== "https://github.com/wasm-oj/forge#readme"
+    || rootManifest.bugs?.url !== "https://github.com/wasm-oj/forge/issues") {
+    throw new Error("Root package must retain wasm-oj/forge repository metadata.");
+  }
+  for (const legacy of ["exports", "files", "bin", "publishConfig", "types"]) {
+    if (Object.hasOwn(rootManifest, legacy)) throw new Error(`Root app manifest must not expose publish field '${legacy}'.`);
+  }
+  if (rootManifest.scripts?.["packages:bootstrap"] !== "node scripts/build-library.mjs"
+    || rootManifest.scripts?.predev !== "pnpm run packages:bootstrap"
+    || rootManifest.scripts?.prebuild !== "pnpm run packages:bootstrap"
+    || rootManifest.scripts?.pretypecheck !== "pnpm run packages:bootstrap") {
+    throw new Error("Root dev/build/typecheck commands must bootstrap workspace packages without recursion.");
+  }
+  if (Object.values(rootManifest.scripts ?? {}).some((command) => command.includes("FORGE_RUN_"))) {
+    throw new Error("Root scripts contain a retired Forge integration environment variable.");
+  }
+
+  const manifests = new Map();
+  for (const definition of PUBLIC_PACKAGES) {
+    const manifest = await readJson(path.join(packagesRoot, definition.directory, "package.json"));
+    manifests.set(definition.name, manifest);
+    if (manifest.name !== definition.name || manifest.private === true) {
+      throw new Error(`${definition.directory} must be publishable as ${definition.name}.`);
+    }
+    if (!isSafeSemver(manifest.version)) throw new Error(`${definition.name} must use a safe semantic version.`);
+    if (manifest.repository?.url !== "git+https://github.com/wasm-oj/forge.git"
+      || manifest.repository?.directory !== `packages/${definition.directory}`
+      || manifest.homepage !== "https://github.com/wasm-oj/forge#readme"
+      || manifest.bugs?.url !== "https://github.com/wasm-oj/forge/issues") {
+      throw new Error(`${definition.name} must retain wasm-oj/forge repository metadata.`);
+    }
+    if (manifest.publishConfig?.access !== "public" || manifest.publishConfig?.registry !== "https://registry.npmjs.org/") {
+      throw new Error(`${definition.name} must publish publicly to npmjs.org.`);
+    }
+    const expectedLicense = definition.kind === "toolchain" ? "SEE LICENSE IN THIRD_PARTY_NOTICES.md" : "MIT";
+    if (manifest.license !== expectedLicense || manifest.type !== "module" || manifest.sideEffects !== false) {
+      throw new Error(`${definition.name} must declare its exact package license, use ESM, and be side-effect free.`);
+    }
+    if (manifest.engines?.node !== ">=24.18.0 <25") {
+      throw new Error(`${definition.name} must use the workspace's exact supported Node.js line.`);
+    }
+  }
+
+  for (const definition of PUBLIC_PACKAGES) {
+    const version = manifests.get(definition.name).version;
+    const expected = `workspace:${version}`;
+    if (rootManifest.dependencies?.[definition.name] !== expected) {
+      throw new Error(`Root application dependency ${definition.name} must be exact ${expected}.`);
+    }
+  }
+
+  for (const definition of CODE_PACKAGES) {
+    const manifest = manifests.get(definition.name);
+    if (manifest.version !== CODE_VERSION) throw new Error(`${definition.name} must use synchronized version ${CODE_VERSION}.`);
+    setEqual(
+      `${definition.name} dependencies`,
+      new Set(definition.runtimeDependencies),
+      new Set(Object.keys(manifest.dependencies ?? {})),
+    );
+    for (const [name, version] of Object.entries(manifest.dependencies ?? {})) {
+      if (name.startsWith("@wasm-oj/") && !name.startsWith("@wasm-oj/toolchain-") && version !== `workspace:${CODE_VERSION}`) {
+        throw new Error(`${definition.name} dependency ${name} must be exact workspace:${CODE_VERSION}.`);
+      }
+      if (!name.startsWith("@wasm-oj/") && version !== rootManifest.dependencies?.[name]) {
+        throw new Error(`${definition.name} dependency ${name} must match the root's exact runtime pin.`);
+      }
+    }
+  }
+  const umbrella = manifests.get("@wasm-oj/sdk");
+  if (Object.keys(umbrella.dependencies ?? {}).some((name) => name.startsWith("@wasm-oj/toolchain-"))) {
+    throw new Error("@wasm-oj/sdk must not depend on toolchain packages.");
+  }
+  if (Object.keys(manifests.get("@wasm-oj/contracts").dependencies ?? {}).length !== 0) {
+    throw new Error("@wasm-oj/contracts must have zero runtime dependencies.");
+  }
+  for (const definition of TOOLCHAIN_PACKAGES) {
+    const manifest = manifests.get(definition.name);
+    setEqual(
+      `${definition.name} dependencies`,
+      new Set(["@wasm-oj/contracts"]),
+      new Set(Object.keys(manifest.dependencies ?? {})),
+    );
+    if (manifest.dependencies?.["@wasm-oj/contracts"] !== `workspace:${CODE_VERSION}`) {
+      throw new Error(`${definition.name} must type its source through exact contracts ${CODE_VERSION}.`);
+    }
+  }
+}
+
+async function verifyReleaseWorkflows() {
+  const codeRelease = await readFile(path.join(repositoryRoot, ".github/workflows/release.yml"), "utf8");
+  const toolchainRelease = await readFile(path.join(repositoryRoot, ".github/workflows/release-toolchain.yml"), "utf8");
+  for (const [label, source] of [["code", codeRelease], ["toolchain", toolchainRelease]]) {
+    for (const required of [
+      "id-token: write",
+      "node-version: 24.18.0",
+      "package-manager-cache: false",
+      "npm publish",
+    ]) {
+      if (!source.includes(required)) throw new Error(`${label} release workflow is missing '${required}'.`);
+    }
+    if (source.includes("pnpm publish")) throw new Error(`${label} release workflow must publish through npm's OIDC-aware CLI.`);
+  }
+  const publishOrder = ["contracts", "core", "browser", "server", "organizer", "sdk"]
+    .map((name) => codeRelease.indexOf(`npm publish release-tarballs/wasm-oj-${name}-`));
+  if (publishOrder.some((position) => position < 0)
+    || publishOrder.some((position, index) => index > 0 && position <= publishOrder[index - 1])) {
+    throw new Error("Synchronized packages must publish in dependency-topological order.");
+  }
+  for (const required of [
+    "workflow_dispatch:",
+    "pnpm run toolchain:verify",
+    "scripts/pack-library.mjs --package",
+    'npm publish "release-tarballs/wasm-oj-${PACKAGE_NAME}-${RELEASE_VERSION}.tgz"',
+  ]) {
+    if (!toolchainRelease.includes(required)) throw new Error(`Toolchain release workflow is missing '${required}'.`);
+  }
+  for (const definition of TOOLCHAIN_PACKAGES) {
+    if (!toolchainRelease.includes(`- ${definition.directory}`)) {
+      throw new Error(`Toolchain release workflow omits ${definition.name}.`);
+    }
+  }
+}
+
+async function verifyPackage(definition) {
+  const packageRoot = path.join(packagesRoot, definition.directory);
+  const manifest = await readJson(path.join(packageRoot, "package.json"));
+  const packed = await packAndExtract(packageRoot, definition.directory);
+  try {
+    const packedManifest = await readJson(path.join(packed.root, "package.json"));
+    if (packedManifest.name !== definition.name || packedManifest.version !== manifest.version) {
+      throw new Error(`${definition.name} packed a different identity.`);
+    }
+    if (JSON.stringify(packedManifest.dependencies ?? {}) !== JSON.stringify(publishedDependencies(manifest.dependencies ?? {}))) {
+      throw new Error(`${definition.name} packed dependencies are not exact published workspace versions.`);
+    }
+    for (const required of ["package.json", "README.md", "LICENSE"]) requireFile(packed.files, definition.name, required);
+    verifyPackagedLicenses(definition, packed.files);
+    verifyExportTargets(definition.name, packedManifest.exports, packed.files);
+    await verifyNoSourceLeaks(definition, packed.root, packed.files);
+    if (definition.kind === "toolchain") await verifyToolchain(definition, packed.root, packed.files, packedManifest);
+    else await verifyCode(definition, packed.root, packed.files, packedManifest);
+  } finally {
+    await packed.cleanup();
+  }
+}
+
+function publishedDependencies(dependencies) {
+  return Object.fromEntries(Object.entries(dependencies).map(([name, version]) => [
+    name,
+    typeof version === "string" && version.startsWith("workspace:") ? version.slice("workspace:".length) : version,
+  ]));
+}
+
+function verifyExportTargets(packageName, exports, files) {
+  if (!exports || typeof exports !== "object" || Array.isArray(exports)) {
+    throw new Error(`${packageName} must declare explicit exports.`);
+  }
+  for (const [subpath, target] of Object.entries(exports)) {
+    const targets = typeof target === "string" ? [target] : Object.values(target ?? {});
+    for (const value of targets) {
+      if (typeof value !== "string" || !value.startsWith("./") || value.includes("..")) {
+        throw new Error(`${packageName} export '${subpath}' has unsafe target '${String(value)}'.`);
+      }
+      requireFile(files, packageName, value.slice(2));
+    }
+  }
+}
+
+async function verifyCode(definition, packedRoot, packedFiles, manifest) {
+  requireFile(packedFiles, definition.name, "dist/index.js");
+  requireFile(packedFiles, definition.name, "dist/index.d.ts");
+  const entryJavaScript = await readFile(path.join(packedRoot, "dist/index.js"), "utf8");
+  const requiredSharedPackages = definition.name === "@wasm-oj/core"
+    ? ["@wasm-oj/contracts"]
+    : definition.browser || definition.server
+      ? ["@wasm-oj/contracts", "@wasm-oj/core"]
+      : definition.organizer
+        ? ["@wasm-oj/core"]
+      : [];
+  for (const dependency of requiredSharedPackages) {
+    if (!hasTopLevelModuleImport(entryJavaScript, dependency)) {
+      throw new Error(`${definition.name} top-level bundle must externalize ${dependency}.`);
+    }
+  }
+  const toolchainAssets = [...packedFiles].filter((file) => file.startsWith("assets/") || file.includes("toolchains/"));
+  if (toolchainAssets.length > 0) {
+    throw new Error(`${definition.name} code package contains toolchain assets: ${toolchainAssets.join(", ")}.`);
+  }
+  if (definition.organizer) {
+    requireFile(packedFiles, definition.name, "bin/wasm-oj-collection.js");
+    requireFile(packedFiles, definition.name, "dist/collection-cli.js");
+    if (manifest.bin?.["wasm-oj-collection"] !== "./bin/wasm-oj-collection.js" || Object.keys(manifest.bin ?? {}).length !== 1) {
+      throw new Error("@wasm-oj/organizer must expose only the wasm-oj-collection CLI.");
+    }
+    const bin = await readFile(path.join(packedRoot, "bin/wasm-oj-collection.js"), "utf8");
+    if (!bin.startsWith("#!/usr/bin/env node\n")
+      || !bin.includes('from "../dist/index.js"')
+      || !bin.includes("runCollectionCli(process.argv.slice(2))")) {
+      throw new Error("Organizer CLI does not call the public runCollectionCli entrypoint.");
+    }
+  } else if (Object.hasOwn(manifest, "bin")) {
+    throw new Error(`${definition.name} must not expose a CLI.`);
+  }
+  if (definition.server) {
+    for (const required of [
+      "crates/runtime-core/Cargo.lock",
+      "crates/runtime-core/Cargo.toml",
+      "crates/runtime-core/src/bin/wasm-oj-compiler.rs",
+      "crates/runtime-core/src/bin/wasm-oj-runner.rs",
+      "rust-toolchain.toml",
+      "testdata/wojjdg02-v2-text.hex",
+      "vendor/shared-buffer/Cargo.toml",
+      "vendor/virtual-fs/Cargo.toml",
+    ]) requireFile(packedFiles, definition.name, required);
+  }
+  if (definition.sdk) {
+    const expected = new Set([".", "./contracts", "./browser", "./server", "./organizer", "./package.json"]);
+    setEqual("@wasm-oj/sdk exports", expected, new Set(Object.keys(manifest.exports ?? {})));
+    for (const file of ["contracts", "browser", "server", "organizer"]) {
+      const source = await readFile(path.join(packedRoot, `dist/${file}.js`), "utf8");
+      if (!source.includes(`@wasm-oj/${file}`)) throw new Error(`SDK ${file} facade does not re-export its direct package.`);
+    }
+  }
+  const declarations = [...packedFiles].filter((file) => /\.d\.(?:c|m)?ts$/u.test(file));
+  for (const file of declarations) {
+    const source = await readFile(path.join(packedRoot, file), "utf8");
+    if (source.includes("@/") || /(?:^|["'])\.\.?\/.*(?:src|packages)\//mu.test(source)) {
+      throw new Error(`${definition.name} declaration '${file}' leaks a workspace/source path.`);
+    }
+  }
+}
+
+async function verifyToolchain(definition, packedRoot, packedFiles, manifest) {
+  const expectedAssets = new Set(definition.assets.map((file) => `assets/${file}`));
+  const actualAssets = new Set([...packedFiles].filter((file) => file.startsWith("assets/")));
+  setEqual(`${definition.name} assets`, expectedAssets, actualAssets);
+  const expectedAssetExports = new Set(definition.assets.map((file) => `./assets/${file}`));
+  const actualAssetExports = new Set(Object.keys(manifest.exports ?? {}).filter((subpath) => subpath.startsWith("./assets/")));
+  setEqual(`${definition.name} asset exports`, expectedAssetExports, actualAssetExports);
+
+  const moduleUrl = pathToFileURL(path.join(packedRoot, "dist/index.js"));
+  moduleUrl.searchParams.set("verify", String(Date.now()));
+  const importedModule = await import(moduleUrl.href);
+  const { descriptor } = importedModule;
+  if (descriptor?.schema !== TOOLCHAIN_DESCRIPTOR_SCHEMA
+    || descriptor?.id !== definition.id
+    || descriptor?.version !== definition.toolchainVersion
+    || descriptor?.wasmOjContract !== WASM_OJ_CONTRACT_VERSION) {
+    throw new Error(`${definition.name} has an invalid descriptor identity.`);
+  }
+  if (!Object.isFrozen(descriptor)
+    || !Object.isFrozen(descriptor.assets)
+    || !Object.isFrozen(descriptor.languages)
+    || !Object.isFrozen(descriptor.profiles)
+    || descriptor.assets.some((asset) => !Object.isFrozen(asset))
+    || descriptor.profiles.some((profile) => !Object.isFrozen(profile))) {
+    throw new Error(`${definition.name} descriptor must be deeply immutable.`);
+  }
+  if (JSON.stringify(descriptor.languages) !== JSON.stringify(definition.languages)
+    || JSON.stringify(descriptor.profiles) !== JSON.stringify(definition.profiles)) {
+    throw new Error(`${definition.name} descriptor languages/profiles differ from the package contract.`);
+  }
+  if (descriptor.assets.length !== definition.assets.length
+    || new Set(descriptor.assets.map((asset) => asset.path)).size !== descriptor.assets.length) {
+    throw new Error(`${definition.name} descriptor assets must be complete and unique.`);
+  }
+  for (const asset of descriptor.assets) {
+    const filename = path.posix.basename(asset.path);
+    if (asset.path !== `/toolchains/${filename}` || asset.exportPath !== `./assets/${filename}`) {
+      throw new Error(`${definition.name} descriptor has a non-canonical asset path.`);
+    }
+    const bytes = await readFile(path.join(packedRoot, "assets", filename));
+    if (asset.bytes !== bytes.byteLength || asset.sha256 !== createHash("sha256").update(bytes).digest("hex")) {
+      throw new Error(`${definition.name} descriptor does not bind '${filename}' exactly.`);
+    }
+  }
+  assertThrows(() => importedModule.browserSource(undefined), "browser source must require baseUrl");
+  assertThrows(() => importedModule.browserSource("relative/assets"), "browser source must reject relative URL");
+  assertThrows(() => importedModule.browserSource("//cdn.example/assets"), "browser source must reject protocol-relative URL");
+  assertThrows(() => importedModule.browserSource("file:///tmp/assets"), "browser source must reject non-HTTP URL");
+  assertThrows(() => importedModule.browserSource("https://user:pass@cdn.example/assets"), "browser source must reject credentials");
+  const rootRelative = importedModule.browserSource("/assets/wasm-oj");
+  if (!Object.isFrozen(rootRelative)
+    || rootRelative.kind !== "browser"
+    || rootRelative.baseUrl !== "/assets/wasm-oj/"
+    || rootRelative.descriptor !== descriptor) {
+    throw new Error(`${definition.name} returned an invalid root-relative browser source.`);
+  }
+  const absolute = importedModule.browserSource("https://cdn.example/sdk?release=1");
+  if (absolute.baseUrl !== "https://cdn.example/sdk/?release=1") {
+    throw new Error(`${definition.name} did not normalize its absolute browser source.`);
+  }
+  const server = importedModule.serverSource();
+  if (!Object.isFrozen(server) || server.kind !== "server" || !(server.directory instanceof URL)
+    || server.directory.protocol !== "file:" || server.descriptor !== descriptor) {
+    throw new Error(`${definition.name} returned an invalid explicit server source.`);
+  }
+}
+
+async function verifyNoSourceLeaks(definition, packedRoot, files) {
+  const textExtensions = /\.(?:js|mjs|cjs|ts|mts|cts|json|md)$/u;
+  const forbiddenTokens = ["wasm-oj-forge-v1", "FORGEFS1", "forgeContract", "__FORGE_"];
+  for (const file of files) {
+    const bytes = await readFile(path.join(packedRoot, file));
+    for (const forbidden of forbiddenTokens) {
+      if (bytes.includes(forbidden)) throw new Error(`${definition.name} packed '${file}' with retired token '${forbidden}'.`);
+    }
+    if (textExtensions.test(file)) {
+      const source = bytes.toString("utf8");
+      if (source.includes(repositoryRoot) || source.includes("@/")) {
+        throw new Error(`${definition.name} packed '${file}' with a private source path.`);
+      }
+    }
+  }
+}
+
+function hasTopLevelModuleImport(source, packageName) {
+  const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`(?:from\\s*|import\\s*\\()(["'])${escaped}(?:/[^"']+)?\\1`, "u").test(source);
+}
+
+function isSafeSemver(value) {
+  return typeof value === "string"
+    && /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u.test(value);
+}
+
+function verifyPackagedLicenses(definition, files) {
+  const expected = new Set(definition.licenses.map((file) => `licenses/${file}`));
+  const actual = new Set([...files].filter((file) => file.startsWith("licenses/")));
+  setEqual(`${definition.name} license files`, expected, actual);
+  if (definition.licenses.length > 0) requireFile(files, definition.name, "THIRD_PARTY_NOTICES.md");
+  else if (files.has("THIRD_PARTY_NOTICES.md")) {
+    throw new Error(`${definition.name} packed an undeclared third-party notice.`);
+  }
+}
+
+async function packAndExtract(packageRoot, prefix) {
+  const temporary = await mkdtemp(path.join(os.tmpdir(), `wasm-oj-${prefix}-`));
+  const extractRoot = path.join(temporary, "package");
+  try {
+    await run("pnpm", ["--config.ignore-scripts=true", "pack", "--pack-destination", temporary], {
+      cwd: packageRoot,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    const tarballs = (await readdir(temporary)).filter((file) => file.endsWith(".tgz"));
+    if (tarballs.length !== 1) throw new Error(`Expected one tarball for ${packageRoot}.`);
+    const actualTarball = path.join(temporary, tarballs[0]);
+    await access(actualTarball);
+    await mkdir(extractRoot);
+    await run("tar", ["-xzf", actualTarball, "-C", extractRoot, "--strip-components=1"]);
+    return {
+      root: extractRoot,
+      files: new Set(await filesBelow(extractRoot)),
+      cleanup: () => rm(temporary, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    await rm(temporary, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function filesBelow(directory, prefix = "") {
   const files = [];
-  for (const directory of ["docs", "experiments"]) {
-    files.push(...await filesBelow(path.join(root, directory), directory));
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) files.push(...await filesBelow(path.join(directory, entry.name), relative));
+    else if (entry.isFile()) files.push(relative);
+    else throw new Error(`Packed package contains unsupported entry '${relative}'.`);
   }
   return files.sort();
 }
 
-async function packageRuntimeSourceFiles() {
-  const rustSources = [
-    ...await filesBelow(
-      path.join(root, "crates/runtime-core/src"),
-      "crates/runtime-core/src",
-    ),
-    ...await filesBelow(
-      path.join(root, "vendor/shared-buffer/src"),
-      "vendor/shared-buffer/src",
-    ),
-    ...await filesBelow(
-      path.join(root, "vendor/virtual-fs/src"),
-      "vendor/virtual-fs/src",
-    ),
-  ].sort();
-  const nonRustSources = rustSources.filter((relative) => !relative.endsWith(".rs"));
-  if (nonRustSources.length > 0) {
-    throw new Error(
-      `The native runtime source boundary contains non-Rust files: ${nonRustSources.join(", ")}.`,
-    );
-  }
-  return [
-    "rust-toolchain.toml",
-    "crates/runtime-core/Cargo.lock",
-    "crates/runtime-core/Cargo.toml",
-    "crates/runtime-core/README.md",
-    "vendor/shared-buffer/Cargo.toml",
-    "vendor/shared-buffer/LICENSE_APACHE.md",
-    "vendor/shared-buffer/LICENSE_MIT.md",
-    "vendor/shared-buffer/README.md",
-    "vendor/virtual-fs/Cargo.toml",
-    "vendor/virtual-fs/LICENSE",
-    ...rustSources,
-  ].sort();
+function requireFile(files, packageName, file) {
+  if (!files.has(file)) throw new Error(`${packageName} packed tarball is missing '${file}'.`);
 }
 
-async function verifyLocalMarkdownLinks(packageRoot, packedFiles, markdownFiles) {
-  for (const relative of markdownFiles) {
-    const source = await readFile(path.join(packageRoot, relative), "utf8");
-    for (const match of source.matchAll(/(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+['\"][^'\"]*['\"])?\)/g)) {
-      const reference = match[1];
-      if (
-        reference.startsWith("#")
-        || reference.startsWith("/")
-        || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(reference)
-      ) continue;
-      const pathname = reference.split("#", 1)[0].split("?", 1)[0];
-      if (!pathname) continue;
-      const target = path.posix.normalize(path.posix.join(path.posix.dirname(relative), decodeURIComponent(pathname)));
-      if (target === ".." || target.startsWith("../")) {
-        throw new Error(`Packed Markdown '${relative}' escapes the package through '${reference}'.`);
-      }
-      const directoryPrefix = target.endsWith("/") ? target : `${target}/`;
-      if (!packedFiles.has(target) && ![...packedFiles].some((file) => file.startsWith(directoryPrefix))) {
-        throw new Error(`Packed Markdown '${relative}' references missing local target '${reference}'.`);
-      }
-    }
+function setEqual(label, expected, actual) {
+  const missing = [...expected].filter((value) => !actual.has(value));
+  const unexpected = [...actual].filter((value) => !expected.has(value));
+  if (missing.length || unexpected.length) {
+    throw new Error(`${label} differs.${missing.length ? ` Missing: ${missing.join(", ")}.` : ""}${unexpected.length ? ` Unexpected: ${unexpected.join(", ")}.` : ""}`);
   }
 }
 
-function failSetDifference(label, expected, actual) {
-  const missing = [...expected].filter((value) => !actual.has(value)).sort();
-  const unexpected = [...actual].filter((value) => !expected.has(value)).sort();
-  if (missing.length > 0 || unexpected.length > 0) {
-    throw new Error(
-      `${label} differs from the canonical package surface.`
-      + `${missing.length > 0 ? ` Missing: ${missing.join(", ")}.` : ""}`
-      + `${unexpected.length > 0 ? ` Unexpected: ${unexpected.join(", ")}.` : ""}`,
-    );
-  }
-}
-
-function localExecutableReferences(source, from, stageBasenames) {
-  const references = new Set();
-  for (const match of source.matchAll(/\bnew URL\(\s*["'`]([^"'`]+)["'`]\s*,\s*import\.meta\.url\s*\)/g)) {
-    const specifier = match[1];
-    if (specifier.startsWith("/")) {
-      throw new Error(`Packed executable '${from}' contains site-root asset URL '${specifier}'.`);
-    }
-    // The SDK facade is emitted only as the protocol's sdkUrl value. Forge's
-    // custom secondary worker validates but deliberately does not import that
-    // URL; every executable SDK instance receives the verified hashed module
-    // explicitly. Do not turn wasm-bindgen's unreachable default literal into
-    // a second, unhashed copy of the same 6.6 MB binary.
-    if (
-      (specifier === "wasmer_js_bg.wasm" || specifier === "index.mjs")
-      && /^lib\/assets\/index-[A-Za-z0-9_-]+\.mjs$/.test(from)
-      && ["ThreadPoolWorker", "initSync", "setSDKUrl"].every((symbol) => source.includes(symbol))
-    ) {
-      continue;
-    }
-    if (/\.(?:m?js|wasm)$/.test(specifier)) {
-      references.add(path.posix.normalize(path.posix.join(path.posix.dirname(from), specifier)));
-    }
-  }
-  const specifierPatterns = [
-    /(?:^|\n)\s*(?:import|export)\s+(?:[^"'\n]*?\sfrom\s*)?["']([^"']+)["']/g,
-    /\bimport\(\s*["']([^"']+)["']\s*\)/g,
-    /["'`](\/?assets\/[A-Za-z0-9._-]+\.(?:m?js|wasm))["'`]/g,
-  ];
-  for (const pattern of specifierPatterns) {
-    for (const match of source.matchAll(pattern)) {
-      const specifier = match[1];
-      if (specifier.startsWith("/assets/")) {
-        throw new Error(`Packed executable '${from}' contains site-root asset URL '${specifier}'.`);
-      } else if (specifier.startsWith("assets/")) {
-        references.add(`lib/${specifier.replace(/^\//, "")}`);
-      } else if (specifier.startsWith("./") || specifier.startsWith("../")) {
-        references.add(path.posix.normalize(path.posix.join(path.posix.dirname(from), specifier)));
-      }
-    }
-  }
-  for (const basename of stageBasenames) {
-    if (
-      source.includes(`"${basename}"`)
-      || source.includes(`'${basename}'`)
-      || source.includes(`\`${basename}\``)
-    ) {
-      references.add(`lib/${basename}`);
-    }
-  }
-  return references;
-}
-
-async function executableReachability(packageRoot, executableFiles, binaryFiles) {
-  const reachable = new Set();
-  const edges = new Map();
-  const pending = [...publicJavaScript];
-  const runtimeFiles = new Set([...executableFiles, ...binaryFiles]);
-  const stageBasenames = serverStages.map((file) => path.posix.basename(file));
-  while (pending.length > 0) {
-    const relative = pending.pop();
-    if (reachable.has(relative)) continue;
-    if (!executableFiles.has(relative)) {
-      throw new Error(`Packed JavaScript graph references missing executable '${relative}'.`);
-    }
-    reachable.add(relative);
-    const source = await readFile(path.join(packageRoot, relative), "utf8");
-    const references = localExecutableReferences(source, relative, stageBasenames);
-    edges.set(relative, references);
-    for (const reference of references) {
-      if (!runtimeFiles.has(reference)) {
-        throw new Error(`Packed runtime '${relative}' references missing local file '${reference}'.`);
-      }
-      if (executableFiles.has(reference)) pending.push(reference);
-      else reachable.add(reference);
-    }
-  }
-  return { reachable, edges };
-}
-
-function workerRole(relative) {
-  const match = /^lib\/assets\/(.+\.worker)-[A-Za-z0-9_-]+\.js$/.exec(relative);
-  return match?.[1];
-}
-
-function browserWasmRole(relative) {
-  const match = /^lib\/assets\/(wasmer_js_bg|runtime-core_bg)-[A-Za-z0-9_-]+\.wasm$/.exec(relative);
-  return match?.[1];
-}
-
-function requireEdge(edges, from, to, description) {
-  if (!edges.get(from)?.has(to)) {
-    throw new Error(`${description}: '${from}' must directly reference '${to}'.`);
-  }
-}
-
-const sourceComponents = await readThirdPartyComponents(root);
-const documentationFiles = await packageDocumentationFiles();
-const runtimeSourceFiles = await packageRuntimeSourceFiles();
-const sourceServiceWorker = await readFile(path.join(root, serviceWorkerFile));
-const packed = await unpackPublishPackage(root, "forge-package-verification-");
-try {
-  const { packageRoot, packedFiles } = packed;
-  const packageJson = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
-  const packedComponents = await readThirdPartyComponents(packageRoot);
-  if (!packedComponents.manifestBytes.equals(sourceComponents.manifestBytes)) {
-    throw new Error(`Packed '${COMPONENT_MANIFEST_PATH}' differs from the verified source manifest.`);
-  }
-  const packedLicenseFiles = [...sourceComponents.expectedLicenseFiles].sort();
-
-  const required = [
-    ...publicJavaScript,
-    ...publicDeclarations,
-    ...serverStages,
-    serviceWorkerFile,
-    ...runtimeSourceFiles,
-    "LICENSE",
-    "README.md",
-    "CHANGELOG.md",
-    "SECURITY.md",
-    "THIRD_PARTY_NOTICES.md",
-    "pnpm-lock.yaml",
-    ...documentationFiles,
-    ...packedLicenseFiles,
-    ...canonicalToolchainFiles,
-  ];
-  for (const relative of required) {
-    if (!packedFiles.has(relative)) throw new Error(`Packed library is missing required file '${relative}'.`);
-    await access(path.join(packageRoot, relative));
-  }
-  for (const relative of packedLicenseFiles) {
-    const bytes = await readFile(path.join(packageRoot, relative));
-    if (bytes.byteLength === 0) throw new Error(`Packed license material '${relative}' is empty.`);
-  }
-  const packedServiceWorker = await readFile(path.join(packageRoot, serviceWorkerFile));
-  if (!packedServiceWorker.equals(sourceServiceWorker)) {
-    throw new Error("The packed toolchain-cache service worker differs from its verified source asset.");
-  }
-  for (const relative of runtimeSourceFiles) {
-    const [sourceBytes, packedBytes] = await Promise.all([
-      readFile(path.join(root, relative)),
-      readFile(path.join(packageRoot, relative)),
-    ]);
-    if (!packedBytes.equals(sourceBytes)) {
-      throw new Error(`Packed native runtime source '${relative}' differs from the repository source.`);
-    }
-  }
-
-  const forbiddenPaths = [...packedFiles].filter((relative) => (
-    /(?:^|\/)sdk\/index(?:\.|\/)/.test(relative)
-    || /(?:^|\/)templates(?:\.|\/)/.test(relative)
-    || /rust-link-stage/.test(relative)
-    || relative.startsWith("lib/types/")
-  ));
-  if (forbiddenPaths.length > 0) {
-    throw new Error(`Packed library contains removed or private files: ${forbiddenPaths.sort().join(", ")}.`);
-  }
-
-  const declarations = new Set([...packedFiles].filter((relative) => relative.endsWith(".d.ts")));
-  failSetDifference("Packed declaration entrypoints", new Set(publicDeclarations), declarations);
-
-  const toolchainFiles = new Set([...packedFiles].filter((relative) => relative.startsWith("public/toolchains/")));
-  failSetDifference("Packed toolchain assets", new Set(canonicalToolchainFiles), toolchainFiles);
-
-  const executableFiles = new Set([...packedFiles].filter((relative) => (
-    relative.startsWith("lib/") && (relative.endsWith(".js") || relative.endsWith(".mjs"))
-  )));
-  const browserWasmFiles = new Set([...packedFiles].filter((relative) => (
-    relative.startsWith("lib/assets/") && relative.endsWith(".wasm")
-  )));
-  const browserRuntimeFiles = new Set([...executableFiles, ...browserWasmFiles]);
-  const { reachable, edges } = await executableReachability(
-    packageRoot,
-    executableFiles,
-    browserWasmFiles,
-  );
-  failSetDifference("Packed browser runtime graph", browserRuntimeFiles, reachable);
-
-  const workersByRole = new Map();
-  for (const relative of executableFiles) {
-    if (!relative.startsWith("lib/assets/")) continue;
-    const role = workerRole(relative);
-    if (!role) {
-      if (relative.includes(".worker-")) {
-        throw new Error(`Packed browser Worker '${relative}' has no canonical role.`);
-      }
-      continue;
-    }
-    if (workersByRole.has(role)) throw new Error(`Packed browser Worker role '${role}' is emitted more than once.`);
-    workersByRole.set(role, relative);
-  }
-  failSetDifference("Packed browser Worker roles", new Set(expectedWorkerRoles), new Set(workersByRole.keys()));
-
-  const browserWasmByRole = new Map();
-  for (const relative of browserWasmFiles) {
-    const role = browserWasmRole(relative);
-    if (!role) throw new Error(`Packed browser Wasm asset '${relative}' has no canonical role.`);
-    if (browserWasmByRole.has(role)) throw new Error(`Packed browser Wasm role '${role}' is emitted more than once.`);
-    const expected = browserWasmSources.get(role);
-    const actual = await readFile(path.join(packageRoot, relative));
-    if (!expected?.equals(actual)) {
-      throw new Error(`Packed browser Wasm role '${role}' differs from its verified source module.`);
-    }
-    browserWasmByRole.set(role, relative);
-  }
-  failSetDifference(
-    "Packed browser Wasm roles",
-    new Set(browserWasmSources.keys()),
-    new Set(browserWasmByRole.keys()),
-  );
-  const wasmerWasm = browserWasmByRole.get("wasmer_js_bg");
-  const runtimeCoreWasm = browserWasmByRole.get("runtime-core_bg");
-  requireEdge(edges, "lib/browser.js", workersByRole.get("compiler.worker"), "Compiler Worker reachability");
-  requireEdge(edges, "lib/browser.js", workersByRole.get("runner.worker"), "Runner Worker reachability");
-  const compilerWorker = workersByRole.get("compiler.worker");
-  const runnerWorker = workersByRole.get("runner.worker");
-  const pythonWorker = workersByRole.get("python-stage.worker");
-  const rustWorker = workersByRole.get("rustc-stage.worker");
-  const goWorker = workersByRole.get("go-stage.worker");
-  const wasmerThreadWorker = workersByRole.get("wasmer-thread.worker");
-  requireEdge(edges, compilerWorker, pythonWorker, "Python stage Worker reachability");
-  requireEdge(edges, compilerWorker, rustWorker, "Rust stage Worker reachability");
-  requireEdge(edges, compilerWorker, goWorker, "Go stage Worker reachability");
-  for (const [parent, description] of [
-    [compilerWorker, "Compiler Wasmer thread Worker reachability"],
-    [runnerWorker, "Runner Wasmer thread Worker reachability"],
-    [pythonWorker, "Python Wasmer thread Worker reachability"],
-    [rustWorker, "Rust Wasmer thread Worker reachability"],
-  ]) {
-    requireEdge(edges, parent, wasmerThreadWorker, description);
-    requireEdge(edges, parent, wasmerWasm, `${description} SDK module`);
-  }
-  requireEdge(edges, runnerWorker, runtimeCoreWasm, "Runner runtime-core module reachability");
-  requireEdge(edges, goWorker, runtimeCoreWasm, "Go stage runtime-core module reachability");
-
-  const serverCompilerChunk = "lib/chunks/server-compiler.js";
-  if (!reachable.has(serverCompilerChunk)) {
-    throw new Error(`Canonical server compiler chunk '${serverCompilerChunk}' is not reachable from the server entrypoint.`);
-  }
-  for (const stage of serverCompilerStages) {
-    requireEdge(edges, serverCompilerChunk, stage, "Server compiler stage reachability");
-  }
-  for (const stage of serverRunnerStages) {
-    const parents = [...edges]
-      .filter(([, references]) => references.has(stage))
-      .map(([relative]) => relative)
-      .sort();
-    if (parents.length !== 1 || !reachable.has(parents[0])) {
-      throw new Error(
-        `Server runner stage '${stage}' must have exactly one reachable executable parent; `
-        + `received ${parents.join(", ") || "none"}.`,
-      );
-    }
-  }
-
-  const exactSurface = new Set([
-    "package.json",
-    "README.md",
-    "CHANGELOG.md",
-    "SECURITY.md",
-    "LICENSE",
-    "THIRD_PARTY_NOTICES.md",
-    "pnpm-lock.yaml",
-    ...documentationFiles,
-    ...packedLicenseFiles,
-    ...canonicalToolchainFiles,
-    serviceWorkerFile,
-    ...runtimeSourceFiles,
-    ...publicDeclarations,
-    ...executableFiles,
-    ...browserWasmFiles,
-  ]);
-  failSetDifference("Packed npm files", exactSurface, packedFiles);
-  await verifyLocalMarkdownLinks(
-    packageRoot,
-    packedFiles,
-    [
-      "README.md",
-      "CHANGELOG.md",
-      "SECURITY.md",
-      "THIRD_PARTY_NOTICES.md",
-      "crates/runtime-core/README.md",
-      "public/toolchains/README.md",
-      ...documentationFiles,
-    ].filter((relative) => relative.endsWith(".md")),
-  );
-
-  const thirdPartyNotices = await readFile(path.join(packageRoot, "THIRD_PARTY_NOTICES.md"), "utf8");
-  if (/distribution blocker/i.test(thirdPartyNotices)) {
-    throw new Error("THIRD_PARTY_NOTICES.md contains an unresolved distribution blocker.");
-  }
-  const referencedLicenseFiles = new Set(
-    [...thirdPartyNotices.matchAll(/`(licenses\/[A-Za-z0-9._-]+)`/g)]
-      .map((match) => match[1]),
-  );
-  failSetDifference(
-    "THIRD_PARTY_NOTICES.md license references",
-    sourceComponents.expectedLicenseFiles,
-    referencedLicenseFiles,
-  );
-
-  if (packageJson.private === true) throw new Error("The Forge library package must be publishable.");
-  if (packageJson.license !== "MIT" || typeof packageJson.description !== "string") {
-    throw new Error("The Forge library package must declare its MIT license and description.");
-  }
-  if (
-    packageJson.publishConfig?.access !== "public"
-    || packageJson.publishConfig?.registry !== "https://registry.npmjs.org/"
-    || packageJson.repository?.url !== "git+https://github.com/wasm-oj/forge.git"
-    || packageJson.homepage !== "https://github.com/wasm-oj/forge#readme"
-    || packageJson.bugs?.url !== "https://github.com/wasm-oj/forge/issues"
-  ) {
-    throw new Error("The scoped Forge library package must bind its public registry and wasm-oj/forge provenance metadata.");
-  }
-  if (packageJson.dependencies?.["@wasmer/sdk"] !== "0.10.0") {
-    throw new Error("The Forge library package must pin the verified @wasmer/sdk 0.10.0 release.");
-  }
-  for (const lifecycle of ["preinstall", "install", "postinstall"]) {
-    if (Object.hasOwn(packageJson.scripts ?? {}, lifecycle)) {
-      throw new Error(`The Forge library must not mutate consumer installs through '${lifecycle}'.`);
-    }
-  }
-
-  const expectedExports = {
-    ".": { import: "./lib/core.js", types: "./lib/core.d.ts" },
-    "./browser": { import: "./lib/browser.js", types: "./lib/browser.d.ts" },
-    "./server": { import: "./lib/server.js", types: "./lib/server.d.ts" },
-    "./toolchain-cache-sw.js": `./${serviceWorkerFile}`,
-    ...exactToolchainExports,
-    "./package.json": "./package.json",
-  };
-  failSetDifference("Package export keys", new Set(Object.keys(expectedExports)), new Set(Object.keys(packageJson.exports ?? {})));
-  if (packageJson.types !== "./lib/core.d.ts") {
-    throw new Error("Package-level types must resolve to './lib/core.d.ts'.");
-  }
-  if (packageJson.bin?.["forge-collection"] !== "./lib/collection-cli.js") {
-    throw new Error("The Forge package must expose the forge-collection CLI entrypoint.");
-  }
-  if (
-    packageJson.scripts?.["runtime:build-native"]
-    !== "cargo build --locked --manifest-path crates/runtime-core/Cargo.toml --release --bins"
-  ) {
-    throw new Error("The packed native compiler/runner build command must use the locked runtime-core source contract.");
-  }
-  for (const [key, expected] of Object.entries(expectedExports)) {
-    const actual = packageJson.exports[key];
-    if (typeof expected === "string") {
-      if (actual !== expected) throw new Error(`Package export '${key}' must resolve to '${expected}'.`);
-      if (expected.startsWith("./") && !packedFiles.has(expected.slice(2))) {
-        throw new Error(`Package export '${key}' targets unpacked file '${expected}'.`);
-      }
-      continue;
-    }
-    if (actual?.import !== expected.import || actual?.types !== expected.types) {
-      throw new Error(
-        `Package export '${key}' must resolve import/types to '${expected.import}' and '${expected.types}'.`,
-      );
-    }
-    failSetDifference(
-      `Package export '${key}' conditions`,
-      new Set(["import", "types"]),
-      new Set(Object.keys(actual)),
-    );
-    for (const target of Object.values(expected)) {
-      if (!packedFiles.has(target.slice(2))) {
-        throw new Error(`Package export '${key}' targets unpacked file '${target}'.`);
-      }
-    }
-  }
-
-  for (const relative of [...publicJavaScript, ...publicDeclarations]) {
-    const source = await readFile(path.join(packageRoot, relative), "utf8");
-    if (source.includes("@/src/") || source.includes("lib/types/") || source.includes("src/sdk/index")) {
-      throw new Error(`Built library '${relative}' contains a private source reference.`);
-    }
-  }
-
-  const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-  await run(pnpm, [
-    "install",
-    "--prod",
-    "--ignore-scripts",
-    "--lockfile=false",
-    "--prefer-offline",
-  ], {
-    cwd: packageRoot,
-    env: { ...process.env, NO_COLOR: "1" },
-    maxBuffer: 16 * 1024 * 1024,
-  });
-
-  await verifyPackedBrowserRuntime(packageRoot, workersByRole, browserWasmByRole);
-
-  const core = await import(pathToFileURL(path.join(packageRoot, "lib/core.js")).href);
-  const browser = await import(pathToFileURL(path.join(packageRoot, "lib/browser.js")).href);
-  const server = await import(pathToFileURL(path.join(packageRoot, "lib/server.js")).href);
-  for (const name of [
-    "createForgeEngine",
-    "ForgeEngine",
-    "ForgeCompilerRegistry",
-    "createExtendedCostBaselineRegistry",
-    "costProfileId",
-    "resolveArtifactCostBudget",
-  ]) {
-    if (typeof core[name] !== "function") throw new Error(`The core package entry is missing '${name}'.`);
-  }
-  if (
-    "Forge" in core
-    || "BrowserForgeCompiler" in core
-    || "ServerForgeCompiler" in core
-    || "LanguageDriverRegistry" in core
-  ) {
-    throw new Error("The environment-neutral package entry leaks a host or removed implementation.");
-  }
-  if (
-    typeof browser.Forge !== "function"
-    || typeof browser.BrowserForgeCompiler !== "function"
-    || typeof browser.registerToolchainCache !== "function"
-  ) {
-    throw new Error("The browser package entry is missing its host implementations.");
-  }
-  if (typeof server.ServerForgeCompiler !== "function" || typeof server.ServerForgeRunner !== "function") {
-    throw new Error("The server package entry is missing its host implementations.");
-  }
-
-  const { compilerExecutable, runtimeExecutable } = await buildPackedNativeRuntime(packageRoot);
-  const compiler = new server.ServerForgeCompiler({
-    compilerExecutable,
-    toolchainDirectory: path.join(packageRoot, "public/toolchains"),
-  });
-  let runner;
-  const runtimeCacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-packed-runner-cache-"));
+function assertThrows(operation, label) {
   try {
-    await compiler.ready();
-    const project = core.createSdkProject({
-      language: "typescript",
-      target: "wasip1",
-      optimization: "release",
-      entry: "src/main.ts",
-      files: {
-        "src/main.ts": 'import * as std from "std";\nconst answer: number = 40 + 2;\nstd.out.puts(`${answer}\\n`);\n',
-      },
-      name: "package-verification",
-      projectId: "forge:package-verification",
-    });
-    const result = await compiler.build(project, "forge:package-verification:typescript");
-    if (!result.success || result.artifact?.kind !== "runtime-bundle") {
-      throw new Error(
-        `The packaged server compiler failed its TypeScript integration check:\n${result.stderr}\n${JSON.stringify(result.diagnostics)}`,
-      );
-    }
-    const emitted = result.artifact.files["src/main.js"];
-    if (typeof emitted !== "string" || !emitted.includes("answer")) {
-      throw new Error("The packaged server compiler did not emit the expected TypeScript output.");
-    }
-    const artifact = result.artifact;
-    const runtimeDrivers = core.createDefaultRuntimeDrivers(
-      new core.CostBaselineRegistry({ [artifact.costProfile]: 0 }),
-    );
-    runner = new server.ServerForgeRunner({
-      runtimeExecutable,
-      toolchainDirectory: path.join(packageRoot, "public/toolchains"),
-      cacheDirectory: runtimeCacheDirectory,
-      runtimeDrivers,
-    });
-    await runner.ready();
-    const execution = await runner.run(artifact, {
-      args: [],
-      stdin: "",
-      env: {},
-      determinism: {
-        randomSeed: 0x5eed_1234,
-        realtimeEpochMs: 946_684_800_000,
-        clockStepNs: 1_000_000,
-      },
-      resources: {
-        instructionBudget: 100_000_000,
-        logicalTimeLimitMs: 60_000,
-        memoryLimitBytes: 256 * 1024 * 1024,
-        outputLimitBytes: 1024 * 1024,
-        filesystemWriteLimitBytes: 64 * 1024 * 1024,
-        filesystemEntryLimit: 4_096,
-        wallTimeLimitMs: 60_000,
-      },
-    });
-    if (execution.code !== 0 || execution.termination !== "exited" || execution.stdout !== "42\n") {
-      throw new Error(
-        "The packed ServerForgeRunner failed its compiled TypeScript execution check: "
-        + JSON.stringify({
-          code: execution.code,
-          termination: execution.termination,
-          stdout: execution.stdout,
-          stderr: execution.stderr,
-          trapMessage: execution.trapMessage,
-        }),
-      );
-    }
-  } finally {
-    try {
-      runner?.dispose();
-    } finally {
-      try {
-        compiler.dispose();
-      } finally {
-        await rm(runtimeCacheDirectory, { recursive: true, force: true });
-      }
-    }
+    operation();
+  } catch {
+    return;
   }
-} finally {
-  await packed.cleanup();
+  throw new Error(`Expected ${label}.`);
 }
 
-process.stdout.write("Forge packed library package verified.\n");
-
-async function verifyPackedBrowserRuntime(packageRoot, workersByRole, browserWasmByRole) {
-  const requests = [];
-  const server = createServer(async (request, response) => {
-    const headers = {
-      "Cross-Origin-Embedder-Policy": "require-corp",
-      "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Resource-Policy": "same-origin",
-      "Cache-Control": "no-store",
-    };
-    try {
-      const url = new URL(request.url ?? "/", "http://127.0.0.1");
-      requests.push(url.pathname);
-      if (url.pathname === "/smoke.html") {
-        response.writeHead(200, { ...headers, "Content-Type": "text/html; charset=utf-8" });
-        response.end("<!doctype html><meta charset=utf-8><title>Forge packed browser smoke</title>");
-        return;
-      }
-      const decoded = url.pathname === "/toolchain-cache-sw.js"
-        ? serviceWorkerFile
-        : decodeURIComponent(url.pathname).replace(/^\/+/, "");
-      const absolute = path.resolve(packageRoot, decoded);
-      const relative = path.relative(packageRoot, absolute);
-      if (!decoded || relative.startsWith("..") || path.isAbsolute(relative)) {
-        response.writeHead(404, headers);
-        response.end();
-        return;
-      }
-      const bytes = await readFile(absolute);
-      const contentType = absolute.endsWith(".js") || absolute.endsWith(".mjs")
-        ? "text/javascript; charset=utf-8"
-        : absolute.endsWith(".wasm")
-          ? "application/wasm"
-          : "application/octet-stream";
-      response.writeHead(200, {
-        ...headers,
-        "Content-Type": contentType,
-        "Content-Length": bytes.byteLength,
-        ...(url.pathname === "/toolchain-cache-sw.js" ? { "Service-Worker-Allowed": "/" } : {}),
-      });
-      response.end(bytes);
-    } catch (error) {
-      response.writeHead(500, { ...headers, "Content-Type": "text/plain; charset=utf-8" });
-      response.end(error instanceof Error ? error.message : String(error));
-    }
-  });
-  let browser;
-  try {
-    await new Promise((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", resolve);
-    });
-    const address = server.address();
-    if (!address || typeof address === "string") throw new Error("Packed browser smoke server has no TCP address.");
-    const origin = `http://127.0.0.1:${address.port}`;
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ serviceWorkers: "allow" });
-    const page = await context.newPage();
-    const pageErrors = [];
-    const consoleErrors = [];
-    const consoleMessages = [];
-    const requestFailures = [];
-    page.on("pageerror", (error) => pageErrors.push(error.message));
-    page.on("console", (message) => {
-      consoleMessages.push(`${message.type()}: ${message.text()}`);
-      if (consoleMessages.length > 100) consoleMessages.shift();
-      if (message.type() === "error") consoleErrors.push(message.text());
-    });
-    page.on("requestfailed", (request) => {
-      requestFailures.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "unknown"}`);
-    });
-    await page.goto(`${origin}/smoke.html`, { waitUntil: "domcontentloaded", timeout: 120_000 });
-    let verification;
-    try {
-      verification = await withDeadline(page.evaluate(async () => {
-      const browserModule = await import("/lib/browser.js");
-      const forge = await browserModule.Forge.create({
-        artifactCache: false,
-        assetBaseUrl: "/public/toolchains/",
-      });
-      const compileDurationsMs = [];
-      const progress = [];
-      const removeProgress = forge.onProgress((event) => {
-        progress.push(`${event.phase}: ${event.label}`);
-        if (progress.length > 100) progress.shift();
-      });
-      let artifact;
-      try {
-        for (let index = 0; index < 6; index += 1) {
-          const startedAt = performance.now();
-          const build = await forge.compile({
-            language: "rust",
-            target: "wasip1",
-            optimization: "release",
-            entry: "src/main.rs",
-            files: { "src/main.rs": "fn main() { println!(\"42\"); }\n" },
-          }, { cache: false });
-          compileDurationsMs.push(performance.now() - startedAt);
-          if (!build.success || build.artifact?.kind !== "wasm") {
-            throw new Error(
-              `Packed Rust build ${index + 1} failed: ${build.stderr || JSON.stringify(build.diagnostics)}`,
-            );
-          }
-          artifact = build.artifact;
-        }
-        const execution = await forge.run(artifact);
-        if (execution.code !== 0 || execution.termination !== "exited" || execution.stdout !== "42\n") {
-          throw new Error(`Packed Rust execution failed: ${JSON.stringify(execution)}`);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`${message}\nProgress:\n${progress.join("\n")}`);
-      } finally {
-        removeProgress();
-        forge.dispose();
-      }
-      const registration = await browserModule.registerToolchainCache({
-        scriptUrl: "/toolchain-cache-sw.js",
-        scope: "/",
-      });
-      const active = registration?.active?.state === "activated";
-      await registration?.unregister();
-      return { active, compileDurationsMs };
-      }), 300_000, "Packed browser Rust lifecycle, execution, and service-worker registration");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`${message}\nBrowser console:\n${consoleMessages.join("\n")}`);
-    }
-    if (
-      verification?.active !== true
-      || verification.compileDurationsMs?.length !== 6
-      || pageErrors.length > 0
-      || consoleErrors.length > 0
-      || requestFailures.length > 0
-    ) {
-      throw new Error(
-        "Packed browser runtime failed: "
-        + [
-          ...pageErrors,
-          ...consoleErrors,
-          ...requestFailures,
-          ...(verification?.active === true ? [] : ["service-worker activation returned false"]),
-        ].join("; "),
-      );
-    }
-    for (const role of ["compiler.worker", "runner.worker", "rustc-stage.worker", "wasmer-thread.worker"]) {
-      const expected = `/${workersByRole.get(role)}`;
-      if (!requests.includes(expected)) {
-        throw new Error(`Packed browser smoke did not load '${expected}'.`);
-      }
-    }
-    for (const relative of browserWasmByRole.values()) {
-      const expected = `/${relative}`;
-      if (!requests.includes(expected)) {
-        throw new Error(`Packed browser smoke did not load '${expected}'.`);
-      }
-    }
-    for (const inactiveDefault of ["wasmer_js_bg.wasm", "index.mjs"]) {
-      if (requests.includes(`/lib/assets/${inactiveDefault}`)) {
-        throw new Error(`Packed browser runtime requested inactive SDK default '${inactiveDefault}'.`);
-      }
-    }
-    if (!requests.includes("/toolchain-cache-sw.js")) {
-      throw new Error("Packed browser smoke did not register the exported toolchain-cache service worker.");
-    }
-  } finally {
-    try {
-      await browser?.close();
-    } finally {
-      if (server.listening) {
-        await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-      }
-    }
-  }
-}
-
-async function buildPackedNativeRuntime(packageRoot) {
-  const targetDirectory = path.join(root, "crates/runtime-core/target");
-  const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-  await run(pnpm, [
-    "run",
-    "runtime:build-native",
-    "--target-dir", targetDirectory,
-  ], {
-    cwd: packageRoot,
-    env: {
-      ...process.env,
-      NO_COLOR: "1",
-    },
-    timeout: 20 * 60 * 1_000,
-    killSignal: "SIGKILL",
-    maxBuffer: 32 * 1024 * 1024,
-  });
-  const suffix = process.platform === "win32" ? ".exe" : "";
-  const compilerExecutable = path.join(targetDirectory, "release", `forge-compiler${suffix}`);
-  const runtimeExecutable = path.join(targetDirectory, "release", `forge-runner${suffix}`);
-  await Promise.all([
-    access(compilerExecutable, fsConstants.X_OK),
-    access(runtimeExecutable, fsConstants.X_OK),
-  ]);
-  return { compilerExecutable, runtimeExecutable };
-}
-
-async function withDeadline(operation, timeoutMs, label) {
-  let timer;
-  try {
-    return await Promise.race([
-      operation,
-      new Promise((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`${label} exceeded ${timeoutMs} ms.`)),
-          timeoutMs,
-        );
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
+async function readJson(file) {
+  return JSON.parse(await readFile(file, "utf8"));
 }

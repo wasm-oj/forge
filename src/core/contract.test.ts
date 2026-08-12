@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
-  FORGE_CONTRACT_ID,
-  FORGE_CONTRACT_VERSION,
-  FORGE_SCHEMAS,
-  FORGE_STORAGE,
+  WASM_OJ_CONTRACT_ID,
+  WASM_OJ_CONTRACT_VERSION,
+  WASM_OJ_SCHEMAS,
+  WASM_OJ_STORAGE,
 } from "./contract";
 
-describe("Forge contract identity", () => {
+describe("WASM-OJ contract identity", () => {
   it("derives every production schema from the single contract", () => {
-    expect(FORGE_CONTRACT_VERSION).toBe(1);
-    expect(FORGE_CONTRACT_ID).toBe("wasm-oj-forge-v1");
-    const schemas = Object.values(FORGE_SCHEMAS);
+    expect(WASM_OJ_CONTRACT_VERSION).toBe(2);
+    expect(WASM_OJ_CONTRACT_ID).toBe("wasm-oj-v2");
+    const schemas = Object.values(WASM_OJ_SCHEMAS);
     expect(new Set(schemas).size).toBe(schemas.length);
-    expect(schemas.every((schema) => schema.startsWith(`${FORGE_CONTRACT_ID}/`))).toBe(true);
+    expect(schemas.every((schema) => schema.startsWith(`${WASM_OJ_CONTRACT_ID}/`))).toBe(true);
   });
 
   it("starts browser storage from the same contract boundary", () => {
-    expect(FORGE_STORAGE.databaseVersion).toBe(FORGE_CONTRACT_VERSION);
-    expect(FORGE_STORAGE.database.startsWith(`${FORGE_CONTRACT_ID}:`)).toBe(true);
-    expect(FORGE_STORAGE.runtimeFilesCache.startsWith(`${FORGE_CONTRACT_ID}:`)).toBe(true);
-    expect(FORGE_STORAGE.toolchainCache.startsWith(`${FORGE_CONTRACT_ID}:`)).toBe(true);
+    expect(WASM_OJ_STORAGE.databaseVersion).toBe(WASM_OJ_CONTRACT_VERSION);
+    expect(WASM_OJ_STORAGE.database.startsWith(`${WASM_OJ_CONTRACT_ID}:`)).toBe(true);
+    expect(WASM_OJ_STORAGE.runtimeFilesCache.startsWith(`${WASM_OJ_CONTRACT_ID}:`)).toBe(true);
+    expect(WASM_OJ_STORAGE.toolchainCache.startsWith(`${WASM_OJ_CONTRACT_ID}:`)).toBe(true);
   });
 });

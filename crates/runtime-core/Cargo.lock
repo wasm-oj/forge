@@ -4201,7 +4201,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wasm-oj-forge-runtime-core"
+name = "wasm-oj-runtime-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
@@ -4214,6 +4214,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_bytes",
  "serde_json",
+ "sha2 0.11.0",
  "thiserror",
  "tokio",
  "virtual-fs",

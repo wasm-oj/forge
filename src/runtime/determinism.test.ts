@@ -30,9 +30,9 @@ function observeScript(seed: number): ScriptObservations {
   });
   const context = createContext({
     Date: hostDate,
-    __forge_determinism_seed: () => seed,
-    __forge_determinism_epoch_ms: () => DEFAULT_DETERMINISM.realtimeEpochMs,
-    __forge_determinism_step_ns: () => DEFAULT_DETERMINISM.clockStepNs,
+    __wasm_oj_determinism_seed: () => seed,
+    __wasm_oj_determinism_epoch_ms: () => DEFAULT_DETERMINISM.realtimeEpochMs,
+    __wasm_oj_determinism_step_ns: () => DEFAULT_DETERMINISM.clockStepNs,
   });
   const script = new Script(`${quickJsDeterminismPrelude({ ...DEFAULT_DETERMINISM, randomSeed: seed })}
 globalThis.__result = {
@@ -63,9 +63,9 @@ describe("runtime determinism adapters", () => {
   it("pins locale, timezone, Python hashing, clock, and entropy environment", () => {
     expect(deterministicEnvironment({ USER_VALUE: "kept" }, { ...DEFAULT_DETERMINISM, randomSeed: 7 })).toEqual({
       USER_VALUE: "kept",
-      FORGE_RANDOM_SEED: "0000000007",
-      FORGE_REALTIME_EPOCH_MS: String(DEFAULT_DETERMINISM.realtimeEpochMs).padStart(14, "0"),
-      FORGE_CLOCK_STEP_NS: String(DEFAULT_DETERMINISM.clockStepNs).padStart(10, "0"),
+      WASM_OJ_RANDOM_SEED: "0000000007",
+      WASM_OJ_REALTIME_EPOCH_MS: String(DEFAULT_DETERMINISM.realtimeEpochMs).padStart(14, "0"),
+      WASM_OJ_CLOCK_STEP_NS: String(DEFAULT_DETERMINISM.clockStepNs).padStart(10, "0"),
       PYTHONHASHSEED: "0",
       TZ: "UTC",
       LC_ALL: "C",

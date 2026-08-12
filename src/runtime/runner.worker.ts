@@ -2,10 +2,9 @@
 
 import { Runtime, Wasmer, init } from "@wasmer/sdk";
 import wasmerWasmUrl from "@wasmer/sdk/wasm?url";
-import { FORGE_STORAGE } from "@/src/core/contract";
+import { WASM_OJ_STORAGE } from "@/src/core/contract";
 import { sha256Hex } from "@/src/core/hash";
 import {
-  contentAddressedToolchainAssetUrl,
   PYTHON_COMPRESSED_PACKAGE_SHA256,
   PYTHON_PACKAGE,
   PYTHON_PACKAGE_ASSET_PATH,
@@ -14,7 +13,13 @@ import {
   QUICKJS_ASSET_SHA256,
   QUICKJS_VERSION,
 } from "@/src/core/toolchains";
+import {
+  browserToolchainAssetUrl,
+  snapshotBrowserToolchainSources,
+  toolchainAssetSource,
+} from "@/src/core/toolchain-sources";
 import type {
+  BrowserToolchainSource,
   ExecutionTermination,
   InteractiveProcessResult,
   InteractiveRunConfig,
@@ -48,8 +53,8 @@ import {
   withWasmerCommand,
 } from "@/src/runner/package-handle-cache";
 import initRuntimeCore, {
-  interact_forge as interactForgeCore,
-  run_forge as runForgeCore,
+  interact_wasm_oj as interactWasmOjCore,
+  run_wasm_oj as runWasmOjCore,
 } from "@/src/runner/generated/runtime-core.js";
 import runtimeCoreWasmUrl from "@/src/runner/generated/runtime-core_bg.wasm?url";
 import {
@@ -67,10 +72,11 @@ const decoder = new TextDecoder();
 const packages = new PackageHandleCache<string, WasmerPackageHandle>();
 const packageFileSystems = new Map<string, Promise<Record<string, Uint8Array>>>();
 let sdkRuntime: Runtime | undefined;
+let sdkRuntimeInitialization: Promise<Runtime> | undefined;
 let wasmerThreadWorkerBootstrap: ModuleWorkerBootstrap | undefined;
 let runtimeDrivers: RuntimeDriverRegistry | undefined;
 let quickJsBytes: Promise<Uint8Array> | undefined;
-let toolchainAssetBaseUrl = new URL("/toolchains/", workerBaseUrl);
+let toolchainSources: readonly BrowserToolchainSource[] | undefined;
 
 interface CoreRunResult {
   code: number;
@@ -134,33 +140,17 @@ function progress(requestId: string, phase: WorkerPhase, label: string, value?: 
 
 async function initializeRuntime(
   requestId: string,
-  assetBaseUrl?: string,
+  sources: readonly BrowserToolchainSource[],
   additionalCostBaselines?: Readonly<Record<string, number>>,
   runtimeDriverPlugins: readonly BrowserRuntimeDriverPlugin[] = [],
 ): Promise<void> {
   if (!crossOriginIsolated) {
     throw new Error("The deterministic runner requires a cross-origin-isolated page with COOP and COEP headers.");
   }
-  toolchainAssetBaseUrl = new URL(assetBaseUrl ?? "/toolchains/", workerBaseUrl);
-  if (!toolchainAssetBaseUrl.pathname.endsWith("/")) toolchainAssetBaseUrl.pathname += "/";
+  toolchainSources = snapshotBrowserToolchainSources(sources);
 
   progress(requestId, "initializing", "Starting deterministic Wasmer runner", 0.1);
   await initRuntimeCore({ module_or_path: new URL(runtimeCoreWasmUrl, workerBaseUrl) });
-  progress(requestId, "initializing", "Starting Wasmer package resolver", 0.55);
-  const bootstrap = createModuleWorkerBootstrap(new URL(wasmerThreadWorkerUrl, workerBaseUrl));
-  wasmerThreadWorkerBootstrap = bootstrap;
-  try {
-      await init({
-        log: "warn",
-        module: new URL(wasmerWasmUrl, workerBaseUrl),
-        workerUrl: bootstrap.url,
-      });
-      sdkRuntime = new Runtime({ registry: null });
-    } catch (error) {
-      if (wasmerThreadWorkerBootstrap === bootstrap) wasmerThreadWorkerBootstrap = undefined;
-      bootstrap.revoke();
-      throw error;
-    }
   runtimeDrivers = createDefaultRuntimeDrivers(
     createExtendedCostBaselineRegistry(additionalCostBaselines),
   );
@@ -173,13 +163,37 @@ async function initializeRuntime(
   progress(requestId, "initializing", "Deterministic Wasmer runner ready", 1);
 }
 
-function requireRuntime(): Runtime {
-  if (!sdkRuntime) throw new Error("The Wasmer package resolver is not initialized.");
-  return sdkRuntime;
+async function ensurePackageRuntime(): Promise<Runtime> {
+  if (sdkRuntime) return sdkRuntime;
+  sdkRuntimeInitialization ??= (async () => {
+    const bootstrap = createModuleWorkerBootstrap(new URL(wasmerThreadWorkerUrl, workerBaseUrl));
+    wasmerThreadWorkerBootstrap = bootstrap;
+    try {
+      await init({
+        log: "warn",
+        module: new URL(wasmerWasmUrl, workerBaseUrl),
+        workerUrl: bootstrap.url,
+      });
+      const initialized = new Runtime({ registry: null });
+      sdkRuntime = initialized;
+      return initialized;
+    } catch (error) {
+      if (wasmerThreadWorkerBootstrap === bootstrap) wasmerThreadWorkerBootstrap = undefined;
+      bootstrap.revoke();
+      throw error;
+    }
+  })();
+  try {
+    return await sdkRuntimeInitialization;
+  } catch (error) {
+    sdkRuntimeInitialization = undefined;
+    throw error;
+  }
 }
 
 function toolchainAssetUrl(path: string): URL {
-  return contentAddressedToolchainAssetUrl(path, toolchainAssetBaseUrl);
+  if (!toolchainSources) throw new Error("The runner toolchain-source registry is not initialized.");
+  return browserToolchainAssetUrl(toolchainSources, path, workerBaseUrl);
 }
 
 async function loadCompressedAsset(
@@ -193,6 +207,14 @@ async function loadCompressedAsset(
     throw new Error(`Unable to load ${label} (${response.status}).`);
   }
   const compressed = new Uint8Array(await response.arrayBuffer());
+  if (!toolchainSources) throw new Error("The runner toolchain-source registry is not initialized.");
+  const { asset } = toolchainAssetSource(toolchainSources, path);
+  if (compressed.byteLength !== asset.bytes) {
+    throw new Error(`Pinned ${label} asset has ${compressed.byteLength} bytes; expected ${asset.bytes}.`);
+  }
+  if (asset.sha256 !== compressedSha256) {
+    throw new Error(`Pinned ${label} descriptor digest ${asset.sha256} does not match runtime pin ${compressedSha256}.`);
+  }
   const actual = await sha256Hex(compressed);
   if (actual !== compressedSha256) {
     throw new Error(`Pinned ${label} asset has digest ${actual}; expected ${compressedSha256}.`);
@@ -212,23 +234,26 @@ async function loadCompressedAsset(
 
 function acquirePackage(specifier: string) {
   if (specifier !== PYTHON_PACKAGE) {
-    throw new Error(`No pinned Forge runtime package is declared for '${specifier}'.`);
+    throw new Error(`No pinned WASM-OJ runtime package is declared for '${specifier}'.`);
   }
   return packages.acquire(specifier, async () => {
-    const bytes = await loadCompressedAsset(
-      PYTHON_PACKAGE_ASSET_PATH,
-      "Python/WASI package",
-      PYTHON_COMPRESSED_PACKAGE_SHA256,
-      PYTHON_PACKAGE_SHA256,
-    );
-    return new WasmerPackageHandle(await Wasmer.fromFile(bytes, requireRuntime()));
+    const [bytes, runtime] = await Promise.all([
+      loadCompressedAsset(
+        PYTHON_PACKAGE_ASSET_PATH,
+        "Python/WASI package",
+        PYTHON_COMPRESSED_PACKAGE_SHA256,
+        PYTHON_PACKAGE_SHA256,
+      ),
+      ensurePackageRuntime(),
+    ]);
+    return new WasmerPackageHandle(await Wasmer.fromFile(bytes, runtime));
   });
 }
 
 function runtimeFilesCacheRequest(request: PackageFileSystemRequest): Request {
   const identity = `${request.packageSpecifier}\n${request.command}\n${request.cacheKey}\n${request.expectedSha256}`;
   const encoded = encodeURIComponent(identity);
-  return new Request(new URL(`/__wasm_oj_forge_runtime_files__/${encoded}`, workerBaseUrl));
+  return new Request(new URL(`/__wasm_oj_runtime_files__/${encoded}`, workerBaseUrl));
 }
 
 async function exportPackageFileSystem(
@@ -239,7 +264,7 @@ async function exportPackageFileSystem(
   if (pending) return pending;
 
   pending = (async () => {
-    const cache = await openOptionalRuntimeFilesCache(caches, FORGE_STORAGE.runtimeFilesCache);
+    const cache = await openOptionalRuntimeFilesCache(caches, WASM_OJ_STORAGE.runtimeFilesCache);
     const cacheRequest = runtimeFilesCacheRequest(request);
     return restoreOrExportRuntimeFiles(
       cache,
@@ -316,13 +341,13 @@ async function clearRuntimeCaches(): Promise<void> {
   packageFileSystems.clear();
   quickJsBytes = undefined;
   await packageRetirement.wait();
-  await caches.delete(FORGE_STORAGE.runtimeFilesCache);
+  await caches.delete(WASM_OJ_STORAGE.runtimeFilesCache);
 }
 
 function number(value: number | bigint): number {
   const converted = Number(value);
   if (!Number.isSafeInteger(converted) || converted < 0) {
-    throw new Error(`ForgeRunner returned an invalid numeric metric: ${String(value)}.`);
+    throw new Error(`Runner returned an invalid numeric metric: ${String(value)}.`);
   }
   return converted;
 }
@@ -346,10 +371,10 @@ function rawMetrics(value: CoreRunResult["metrics"]): RawExecutionMetrics {
 async function runArtifact(request: Extract<RunnerRequest, { type: "run" }>): Promise<RunResult> {
   const started = performance.now();
   progress(request.requestId, "loading-toolchain", `Resolving runtime for ${request.artifact.name}`, 0.1);
-  if (!runtimeDrivers) throw new Error("The Forge runtime-driver registry is not initialized.");
+  if (!runtimeDrivers) throw new Error("The WASM-OJ runtime-driver registry is not initialized.");
   const prepared = await prepareArtifactRun(request.artifact, request.config, resolver, runtimeDrivers);
   progress(request.requestId, "running", `Running ${request.artifact.name} with deterministic Wasmer`, 0.25);
-  const response = runForgeCore(prepared) as CoreRunResponse;
+  const response = runWasmOjCore(prepared) as CoreRunResponse;
   if (!response.ok || !response.result) {
     const error = response.error ?? { code: "RUNTIME_ERROR", message: "The runtime core returned no result." };
     throw Object.assign(new Error(error.message), { code: error.code });
@@ -376,7 +401,7 @@ async function interactArtifacts(
   request: Extract<RunnerRequest, { type: "interact" }>,
 ): Promise<InteractiveRunResult> {
   const started = performance.now();
-  if (!runtimeDrivers) throw new Error("The Forge runtime-driver registry is not initialized.");
+  if (!runtimeDrivers) throw new Error("The WASM-OJ runtime-driver registry is not initialized.");
   if (request.interactor.kind !== "wasm") {
     throw new Error("Interactive judge artifacts must be standalone Wasm modules.");
   }
@@ -396,7 +421,7 @@ async function interactArtifacts(
     ),
   ]);
   progress(request.requestId, "running", "Running interactive session with deterministic Wasmer", 0.25);
-  const response = await interactForgeCore({
+  const response = await interactWasmOjCore({
     contestant: interactiveCoreProgram(contestant),
     interactor: interactiveCoreProgram(interactor),
     determinism: request.config.determinism,
@@ -475,7 +500,7 @@ scope.addEventListener("message", (event: MessageEvent<RunnerRequest>) => {
         case "initialize":
           await initializeRuntime(
             request.requestId,
-            request.assetBaseUrl,
+            request.toolchains,
             request.additionalCostBaselines,
             request.runtimeDriverPlugins,
           );

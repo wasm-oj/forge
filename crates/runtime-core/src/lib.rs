@@ -7,7 +7,9 @@ mod deterministic;
 mod error;
 mod filesystem;
 mod filesystem_quota;
+mod go_compiler_session;
 mod interactive;
+mod judge_package;
 mod memory;
 mod meter;
 mod module_imports;
@@ -18,46 +20,29 @@ mod types;
 
 pub use compiler::CompilerToolchain;
 pub use contract::{
-    FORGE_COMPILE_BATCH_SCHEMA, FORGE_CONTRACT_VERSION, FORGE_INTERACTIVE_REQUEST_SCHEMA,
-    FORGE_RUN_REQUEST_SCHEMA,
+    WASM_OJ_COMPILE_BATCH_SCHEMA, WASM_OJ_CONTRACT_ID, WASM_OJ_CONTRACT_VERSION,
+    WASM_OJ_INTERACTIVE_REQUEST_SCHEMA, WASM_OJ_RUN_REQUEST_SCHEMA,
 };
 pub use error::{RunError, RunErrorCode};
+pub use go_compiler_session::GoCompilerSession;
 pub use interactive::interact;
+pub use judge_package::{
+    JudgePackageError, JudgePackageManifest, JudgePackageValidationOptions,
+    TRUSTED_JUDGE_WASM_MAX_BYTES, TrustedJudgeWasmInfo, ValidatedJudgePackage,
+    WASM_OJ_JUDGE_PACKAGE_MAGIC, WASM_OJ_JUDGE_PACKAGE_MAX_BYTES, WASM_OJ_JUDGE_PACKAGE_SCHEMA,
+    validate_judge_package, validate_judge_package_with_options, validate_trusted_judge_wasm,
+};
 pub use meter::{METER_MODEL, instrument_wasm};
 pub use module_policy::enforce_memory_limit;
 pub use run::run;
 pub use types::{
-    CompilePipelineRequest, CompilePipelineResponse, CompilePipelineResult, CompileRequest,
-    CompileResponse, CompileResult, CompilerToolchainConfig, DeterminismConfig, ExecutionMetrics,
-    ExecutionTermination, InteractiveMetrics, InteractiveProcessResult, InteractiveProgram,
+    CompilePipelineResponse, CompilePipelineResult, CompileRequest, CompileResponse, CompileResult,
+    CompilerToolchainConfig, DeterminismConfig, ExecutionMetrics, ExecutionTermination,
+    GoCompilerSessionConfig, GoCompilerSessionRequest, GoCompilerSessionResponse,
+    GoCompilerSourceDelta, InteractiveMetrics, InteractiveProcessResult, InteractiveProgram,
     InteractiveRequest, InteractiveResponse, InteractiveResult, ResourcePolicy, RunFailure,
     RunRequest, RunResponse, RunResult,
 };
-
-pub async fn compile_pipeline_response(request: CompilePipelineRequest) -> CompilePipelineResponse {
-    let result = async {
-        let toolchain = CompilerToolchain::new(request.toolchain)?;
-        toolchain
-            .compile_pipeline(request.files, request.stages)
-            .await
-    }
-    .await;
-    match result {
-        Ok(result) => CompilePipelineResponse {
-            ok: true,
-            result: Some(result),
-            error: None,
-        },
-        Err(error) => CompilePipelineResponse {
-            ok: false,
-            result: None,
-            error: Some(RunFailure {
-                code: error.code(),
-                message: error.to_string(),
-            }),
-        },
-    }
-}
 
 pub fn run_response(request: RunRequest) -> RunResponse {
     match run(request) {

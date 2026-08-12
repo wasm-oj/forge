@@ -20,14 +20,14 @@ const LINKER_RESOURCES_SHA256 = "79eef0c336fe55cf03ff8f5b42b784c8168f929a3603138
 const EXPECTED_OUTPUT_SHA256 = Object.freeze({
   [`rust-${VERSION}.webc`]: "765de8d68d03078e79f69f49dec0dcab1ff96fe3bbe5e9eafebb2ce61a39d3ee",
   [`rust-${VERSION}.webc.gz.bin`]: "cfbdadc67be1315e735aa55bdf8a5a0d00171982a023fefcf7ba586127753887",
-  [`rust-${VERSION}.manifest.json`]: "14715bd4eeb7dfe9dc806e7f28f404a87f590728f4c622f5de5b71857ceacc21",
+  [`rust-${VERSION}.manifest.json`]: "d5bbdca994e61888679c5738cb9420649c0854ed0eb5d65468bc67d5d550bce1",
 });
 const PUBLISHED_OUTPUTS = [
   `rust-${VERSION}.webc.gz.bin`,
   `rust-${VERSION}.manifest.json`,
 ];
 
-const archiveArgument = process.argv[2] || process.env.FORGE_RUST_TOOLCHAIN_ARCHIVE;
+const archiveArgument = process.argv[2] || process.env.WASM_OJ_RUST_TOOLCHAIN_ARCHIVE;
 if (!archiveArgument) {
   throw new Error([
     "A verified rust.tar.br from the pinned upstream build is required.",
@@ -38,7 +38,7 @@ if (!archiveArgument) {
 
 const archivePath = path.resolve(archiveArgument);
 const outputDirectory = path.resolve("public/toolchains");
-const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-forge-rust-"));
+const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-rust-"));
 const extractedRoot = path.join(temporary, "rust");
 const stagedDirectory = path.join(temporary, "published");
 

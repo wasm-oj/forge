@@ -27,9 +27,9 @@ const SOURCE_REVISION: &str = "ae62cab6adf0665377d19ffa39daeaf758290431";
 const LINKER_VERSION: &str = "22.0.0-git20542-10";
 const LINKER_SOURCE_SHA256: &str =
     "6230ea1afa9691fa065935cf68c01642ff9b31c183fe8ac64cdfda025df06009";
-const LINK_OBJECT_PLACEHOLDER: &str = "__FORGE_RUST_OBJECT__";
-const LINK_ALLOCATOR_PLACEHOLDER: &str = "__FORGE_RUST_ALLOCATOR_BITCODE__";
-const LINK_OUTPUT_PLACEHOLDER: &str = "__FORGE_RUST_OUTPUT__";
+const LINK_OBJECT_PLACEHOLDER: &str = "__WASM_OJ_RUST_OBJECT__";
+const LINK_ALLOCATOR_PLACEHOLDER: &str = "__WASM_OJ_RUST_ALLOCATOR_BITCODE__";
+const LINK_OUTPUT_PLACEHOLDER: &str = "__WASM_OJ_RUST_OUTPUT__";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments: Vec<String> = std::env::args().collect();
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let compressed = fs::read(&compressed_path)?;
     let manifest = serde_json::json!({
-        "schema": "wasm-oj-forge-v1/rust-toolchain",
+        "schema": "wasm-oj-v2/rust-toolchain",
         "version": VERSION,
         "target": TARGET,
         "source": {

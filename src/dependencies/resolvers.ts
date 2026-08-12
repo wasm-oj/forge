@@ -1,5 +1,5 @@
 import { unzipSync } from "fflate";
-import { FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 import type {
   DependencyEcosystem,
@@ -8,7 +8,7 @@ import type {
   DependencyRequirement,
   DependencyResolutionContext,
   DependencySourceFile,
-  ForgeDependencyResolver,
+  DependencyResolver,
   LockedDependencyPackage,
   ResolvedDependencyGraph,
 } from "./types.ts";
@@ -71,12 +71,12 @@ interface DownloadedPackage {
 }
 
 /**
- * Creates Forge's native-lockfile adapters. They consume exact versions and
+ * Creates WASM-OJ's native-lockfile adapters. They consume exact versions and
  * ecosystem integrity data; they deliberately do not act as a second package solver.
  */
 export function createDefaultDependencyResolvers(
   options: DependencyResolverOptions = {},
-): readonly ForgeDependencyResolver[] {
+): readonly DependencyResolver[] {
   const resolved = resolveOptions(options);
   return [
     new CargoLockDependencyResolver(resolved),
@@ -87,7 +87,7 @@ export function createDefaultDependencyResolvers(
   ];
 }
 
-export class CargoLockDependencyResolver implements ForgeDependencyResolver {
+export class CargoLockDependencyResolver implements DependencyResolver {
   readonly ecosystem = "cargo" as const;
   private readonly options: ResolvedOptions;
 
@@ -150,7 +150,7 @@ export class CargoLockDependencyResolver implements ForgeDependencyResolver {
   }
 }
 
-export class NpmLockDependencyResolver implements ForgeDependencyResolver {
+export class NpmLockDependencyResolver implements DependencyResolver {
   readonly ecosystem = "npm" as const;
   private readonly options: ResolvedOptions;
 
@@ -212,7 +212,7 @@ export class NpmLockDependencyResolver implements ForgeDependencyResolver {
   }
 }
 
-export class PyPiLockDependencyResolver implements ForgeDependencyResolver {
+export class PyPiLockDependencyResolver implements DependencyResolver {
   readonly ecosystem = "pypi" as const;
   private readonly options: ResolvedOptions;
 
@@ -266,7 +266,7 @@ export class PyPiLockDependencyResolver implements ForgeDependencyResolver {
   }
 }
 
-export class GoLockDependencyResolver implements ForgeDependencyResolver {
+export class GoLockDependencyResolver implements DependencyResolver {
   readonly ecosystem = "go" as const;
   private readonly options: ResolvedOptions;
 
@@ -319,7 +319,7 @@ export class GoLockDependencyResolver implements ForgeDependencyResolver {
 }
 
 export interface CppDependencyLockSource {
-  schema: typeof FORGE_SCHEMAS.cppDependencyLock;
+  schema: typeof WASM_OJ_SCHEMAS.cppDependencyLock;
   roots: readonly string[];
   packages: readonly {
     name: string;
@@ -331,7 +331,7 @@ export interface CppDependencyLockSource {
 }
 
 interface NormalizedCppDependencyLock {
-  schema: typeof FORGE_SCHEMAS.cppDependencyLock;
+  schema: typeof WASM_OJ_SCHEMAS.cppDependencyLock;
   roots: string[];
   packages: Array<{
     name: string;
@@ -342,7 +342,7 @@ interface NormalizedCppDependencyLock {
   }>;
 }
 
-export class CppLockDependencyResolver implements ForgeDependencyResolver {
+export class CppLockDependencyResolver implements DependencyResolver {
   readonly ecosystem = "cpp" as const;
   private readonly options: ResolvedOptions;
 
@@ -351,18 +351,18 @@ export class CppLockDependencyResolver implements ForgeDependencyResolver {
   }
 
   async resolve(manifest: DependencyManifest, context: DependencyResolutionContext): Promise<ResolvedDependencyGraph> {
-    const source = requireSource(manifest, "cpp", "lockfile", "forge-cpp.lock.json");
-    const lock = parseCppLock(parseJson(source.contents, "forge-cpp.lock.json"));
+    const source = requireSource(manifest, "cpp", "lockfile", "wasm-oj-cpp.lock.json");
+    const lock = parseCppLock(parseJson(source.contents, "wasm-oj-cpp.lock.json"));
     const records = new Map(lock.packages.map((item) => [`${item.name}@${item.version}`, item]));
     for (const requirement of manifest.requirements) {
       const version = exactVersion(requirement, false);
       if (!records.has(`${requirement.name}@${version}`)) {
-        throw new Error(`forge-cpp.lock.json must contain '${requirement.name}@${version}'.`);
+        throw new Error(`wasm-oj-cpp.lock.json must contain '${requirement.name}@${version}'.`);
       }
     }
     const requiredRoots = sortedUnique(manifest.requirements.map((item) => `${item.name}@${exactVersion(item, false)}`));
     if (JSON.stringify(requiredRoots) !== JSON.stringify(lock.roots)) {
-      throw new Error("forge-cpp.lock.json roots do not exactly match the C/C++ dependency manifest.");
+      throw new Error("wasm-oj-cpp.lock.json roots do not exactly match the C/C++ dependency manifest.");
     }
     const network = await authorizeDependencyNetwork(this.options, context);
     const downloadBudget = resolutionDownloadBudget(context);
@@ -879,9 +879,9 @@ function escapeGoPath(value: string): string {
 }
 
 function parseCppLock(value: unknown): NormalizedCppDependencyLock {
-  if (!isRecord(value) || value.schema !== FORGE_SCHEMAS.cppDependencyLock
+  if (!isRecord(value) || value.schema !== WASM_OJ_SCHEMAS.cppDependencyLock
     || !Array.isArray(value.roots) || !Array.isArray(value.packages)) {
-    throw new Error("forge-cpp.lock.json does not use the active Forge C/C++ dependency schema.");
+    throw new Error("wasm-oj-cpp.lock.json does not use the active WASM-OJ C/C++ dependency schema.");
   }
   assertBoundedCount(value.roots.length, DEPENDENCY_RESOLUTION_LIMITS.roots, "C/C++ dependency roots");
   assertBoundedCount(value.packages.length, DEPENDENCY_RESOLUTION_LIMITS.packages, "C/C++ locked packages");
@@ -898,9 +898,9 @@ function parseCppLock(value: unknown): NormalizedCppDependencyLock {
     return { name, version, url, sha256, dependencies };
   }).sort((left, right) => `${left.name}@${left.version}`.localeCompare(`${right.name}@${right.version}`));
   const ids = packages.map((item) => `${item.name}@${item.version}`);
-  if (new Set(ids).size !== ids.length) throw new Error("forge-cpp.lock.json contains duplicate packages.");
-  if (roots.some((root) => !ids.includes(root))) throw new Error("forge-cpp.lock.json contains an unknown root package.");
-  return { schema: FORGE_SCHEMAS.cppDependencyLock, roots, packages };
+  if (new Set(ids).size !== ids.length) throw new Error("wasm-oj-cpp.lock.json contains duplicate packages.");
+  if (roots.some((root) => !ids.includes(root))) throw new Error("wasm-oj-cpp.lock.json contains an unknown root package.");
+  return { schema: WASM_OJ_SCHEMAS.cppDependencyLock, roots, packages };
 }
 
 function graph(roots: readonly string[], packages: readonly DownloadedPackage[]): ResolvedDependencyGraph {

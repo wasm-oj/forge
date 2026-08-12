@@ -12,11 +12,11 @@ const CORE_SHA256 = "24fbed474c7b5b4968fd73fc4827440b93fb351c1b6264516130300eff3
 const RESOURCES_SHA256 = "79eef0c336fe55cf03ff8f5b42b784c8168f929a3603138b2c6301f4601e4c86";
 const OUTPUT_SHA256 = Object.freeze({
   [`clang-${VERSION}.webc.gz.bin`]: "7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a",
-  [`clang-${VERSION}.manifest.json`]: "681dc3a98aa98c8902cd17bb5d155b8771d650f2ac64f9552f45d524a2b955fd",
-  [`clang-${VERSION}.cc1-pins.json`]: "4583b167dcac4bc1766c8378e0761b32e747ea614f24a1dcf2d8e8b0dc116029",
-  [`clang-${VERSION}.libcxx-pch.json`]: "37c9b502fe6e3afa8f9aafb5d94dabb892b9f98a240f43093e8d7e36a58993e7",
-  [`clang-${VERSION}.cpp-debug.pch.gz.bin`]: "b41560aef9e8573b850fc3406e44d12365e3e4b58dc19eefba863d3b98f9ef1e",
-  [`clang-${VERSION}.cpp-release.pch.gz.bin`]: "93adf037d41cf0dc5d7367946462f5eb00363206b5566fc2b3a71214b1261e63",
+  [`clang-${VERSION}.manifest.json`]: "6382dcdfb6a2da49032a0e08da3b1fb490eb24432be85c3c12e3e871a5065273",
+  [`clang-${VERSION}.cc1-pins.json`]: "66c4604dccd3f89d8e1472bf4432367d7396cce4a01279b1a1db445f229dba72",
+  [`clang-${VERSION}.libcxx-pch.json`]: "d126c99e951a7302d4ea2b66da4ed64d3d74e9d319d562518867c8d8c97a06b8",
+  [`clang-${VERSION}.cpp-debug.pch.gz.bin`]: "a4152027d248412eca8aec3e7e23f6f7c81f95170cae9fd385bcf02e57e91fc9",
+  [`clang-${VERSION}.cpp-release.pch.gz.bin`]: "18f4ca8ab8ca7888db572ba34146fc1acb213a7e7305000ea6285188f52f99f4",
 });
 const OUTPUT_DIRECTORY = path.resolve("public/toolchains");
 const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-clang-"));
@@ -46,11 +46,11 @@ try {
   await run("node", [
     "--experimental-strip-types", "--disable-warning=ExperimentalWarning",
     path.resolve("scripts/pin-clang-cc1-argv.mjs"),
-  ], { FORGE_CLANG_TOOLCHAIN_DIRECTORY: stagedDirectory });
+  ], { WASM_OJ_CLANG_TOOLCHAIN_DIRECTORY: stagedDirectory });
   await run("node", [
     "--experimental-strip-types", "--disable-warning=ExperimentalWarning",
     path.resolve("scripts/build-clang-libcxx-pch.ts"),
-  ], { FORGE_CLANG_TOOLCHAIN_DIRECTORY: stagedDirectory });
+  ], { WASM_OJ_CLANG_TOOLCHAIN_DIRECTORY: stagedDirectory });
 
   for (const [filename, expected] of Object.entries(OUTPUT_SHA256)) {
     requireDigest(filename, await readFile(path.join(stagedDirectory, filename)), expected);

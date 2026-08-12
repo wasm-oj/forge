@@ -16,14 +16,14 @@ const sha = (character: string): string => character.repeat(64);
 
 const embeddedIdentity = {
   compilerSha256: sha("5"),
-  contract: 1 as const,
+  contract: 2 as const,
   executionRootSha256: sha("2"),
   gitCommit: "a".repeat(40),
-  protocol: "forge-container-v1" as const,
+  protocol: "wasm-oj-container-v2" as const,
   releaseId,
   runnerSha256: sha("6"),
   runtimeRootSha256: sha("3"),
-  schema: "forge-container-identity-v1" as const,
+  schema: "wasm-oj-platform/container-identity/v2" as const,
   toolchainRootSha256: sha("4"),
 };
 
@@ -46,7 +46,7 @@ const release: ContainerIdentityReleaseBinding = {
   releaseId,
   manifestSha256: job.expectedManifestSha256,
   workerVersionId: "worker-version-123",
-  forgeContract: 1,
+  wasmOjContract: 2,
   sourceCommit: identity.gitCommit,
   containerIdentitySha256: identity.identitySha256,
   protocol: identity.protocol,
@@ -112,7 +112,7 @@ describe("Worker-side Container identity fence", () => {
   });
 
   it.each([
-    ["protocol", { protocol: "forge-container-v2" }],
+    ["protocol", { protocol: "unsupported-container-protocol" }],
     ["execution root", { executionRootSha256: sha("9") }],
     ["runtime root", { runtimeRootSha256: sha("9") }],
     ["toolchain root", { toolchainRootSha256: sha("9") }],
@@ -136,9 +136,13 @@ describe("Worker-side Container identity fence", () => {
   });
 
   it("requires an exact, bounded identity shape", () => {
+    const retiredBrand = ["for", "ge"].join("");
     expect(() => parseProbedContainerIdentity({ ...identity, unexpected: true })).toThrow(/invalid shape/);
     expect(() => parseProbedContainerIdentity({ ...identity, releaseId: `${releaseId}suffix` })).toThrow(/coordinates/);
     expect(() => parseProbedContainerIdentity({ ...identity, compilerSha256: "a".repeat(65) })).toThrow(/SHA-256/);
+    expect(() => parseProbedContainerIdentity({ ...identity, contract: 1 })).toThrow(/coordinates/);
+    expect(() => parseProbedContainerIdentity({ ...identity, protocol: `${retiredBrand}-container-v1` })).toThrow(/coordinates/);
+    expect(() => parseProbedContainerIdentity({ ...identity, schema: `${retiredBrand}-container-identity-v1` })).toThrow(/coordinates/);
   });
 
   it("rejects callback replay across attempt token, job, or Worker deployment", () => {

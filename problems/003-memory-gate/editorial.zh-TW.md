@@ -16,7 +16,7 @@
 
 ## 複雜度
 
-前處理 `O(N)`，每個查詢 `O(1)`，總時間 `O(N+Q)`，核心前綴和與 `nextBad` 的輔助空間為 `O(N)`。C、C++、Go reference 串流讀寫；Rust、Python 會保留完整輸入與輸出，JavaScript、TypeScript 保留單一 Forge 輸入字串並以固定 64 KiB 分塊輸出。每筆宣告、查詢與答案的文字長度皆為常數，因此依實際 resident allocations 計算，七語言 reference 的共同最壞空間上界為 `O(N+Q)`。讀取輸入與輸出答案已有 `Ω(N+Q)` 下界，故時間漸進最佳。
+前處理 `O(N)`，每個查詢 `O(1)`，總時間 `O(N+Q)`，核心前綴和與 `nextBad` 的輔助空間為 `O(N)`。C、C++、Go reference 串流讀寫；Rust、Python 會保留完整輸入與輸出，JavaScript、TypeScript 保留單一 WASM-OJ 輸入字串並以固定 64 KiB 分塊輸出。每筆宣告、查詢與答案的文字長度皆為常數，因此依實際 resident allocations 計算，七語言 reference 的共同最壞空間上界為 `O(N+Q)`。讀取輸入與輸出答案已有 `Ω(N+Q)` 下界，故時間漸進最佳。
 
 ## 常見錯誤
 

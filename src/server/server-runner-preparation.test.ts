@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { costProfileId } from "../core/cost-profile";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { DEFAULT_RESOURCE_POLICY } from "../core/resources";
 import { PYTHON_PACKAGE } from "../core/toolchains";
 import type { BuildArtifact, RunConfig } from "../core/types";
-import { RuntimeDriverRegistry } from "../runner/artifact";
+import { RuntimeDriverRegistry } from "@wasm-oj/core";
 
 const spawnState = vi.hoisted(() => ({ spawn: vi.fn() }));
 
@@ -19,7 +19,8 @@ vi.mock("node:child_process", async (importOriginal) => {
   return { ...original, spawn: spawnState.spawn };
 });
 
-import { ServerForgeRunner } from "./server-runner";
+import { ServerRunner } from "./server-runner";
+import { testToolchains } from "./test-toolchains.test-helper";
 
 const TEST_COST_PROFILE = costProfileId("zig", "wasip1", "release", "runner-stage-test");
 const temporaryDirectories = new Set<string>();
@@ -36,7 +37,7 @@ afterEach(async () => {
   temporaryDirectories.clear();
 });
 
-describe("ServerForgeRunner isolated preparation lifecycle", () => {
+describe("ServerRunner isolated preparation lifecycle", () => {
   it.each(["cancel", "restart", "dispose"] as const)(
     "%s terminates and releases a stage that never closes",
     async (action) => {
@@ -119,8 +120,8 @@ describe("ServerForgeRunner isolated preparation lifecycle", () => {
   );
 });
 
-async function createRunner(): Promise<ServerForgeRunner> {
-  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-stalled-runner-stage-"));
+async function createRunner(): Promise<ServerRunner> {
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-stalled-runner-stage-"));
   temporaryDirectories.add(cacheDirectory);
   const runtimeDrivers = new RuntimeDriverRegistry();
   runtimeDrivers.register({
@@ -131,9 +132,9 @@ async function createRunner(): Promise<ServerForgeRunner> {
       throw new Error("The stalled package stage unexpectedly completed.");
     },
   });
-  const runner = new ServerForgeRunner({
+  const runner = new ServerRunner({
     runtimeExecutable: process.execPath,
-    toolchainDirectory: path.resolve("public/toolchains"),
+    toolchains: testToolchains(),
     cacheDirectory,
     runtimeDrivers,
   });
@@ -141,12 +142,12 @@ async function createRunner(): Promise<ServerForgeRunner> {
   return runner;
 }
 
-async function createNativeRunner(): Promise<ServerForgeRunner> {
-  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-native-transport-"));
+async function createNativeRunner(): Promise<ServerRunner> {
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-native-transport-"));
   temporaryDirectories.add(cacheDirectory);
-  const runner = new ServerForgeRunner({
+  const runner = new ServerRunner({
     runtimeExecutable: process.execPath,
-    toolchainDirectory: path.resolve("public/toolchains"),
+    toolchains: testToolchains(),
     cacheDirectory,
     additionalCostBaselines: { [TEST_COST_PROFILE]: 0 },
   });
@@ -173,7 +174,7 @@ function stalledChild() {
 function wasmArtifact(): BuildArtifact {
   return {
     kind: "wasm",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: "artifact",
     projectId: "project",
     cacheKey: "cache",

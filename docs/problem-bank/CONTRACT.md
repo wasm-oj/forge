@@ -61,7 +61,7 @@ normalized POSIX relative path。
 - Rust：edition 2024，可使用標準函式庫。
 - Go：Go 1.26。
 - Python：Python 3.14。
-- JavaScript／TypeScript：Forge `std` 輸入輸出介面；整數超過
+- JavaScript／TypeScript：WASM-OJ `std` 輸入輸出介面；整數超過
   `Number.MAX_SAFE_INTEGER` 時必須使用 `bigint`。
 - 七份 solution 必須實作同一個最佳演算法，不得以較寬鬆的語言 timeout
   偷渡次佳解法。
@@ -69,7 +69,7 @@ normalized POSIX relative path。
 
 ## Author-owned quality review (not a publish gate)
 
-The following checks are optional authoring guidance for the official repository. Forge does not
+The following checks are optional authoring guidance for the official repository. WASM-OJ does not
 run them during Organizer import or publication and does not decide whether a reference solution
 is correct, optimal, or deserving of a particular score.
 
@@ -86,12 +86,12 @@ is correct, optimal, or deserving of a particular score.
 
 ## Resource policies and scoring
 
-- 計算量的主要限制是 Forge baseline-normalized weighted `instructionBudget`，不是
+- 計算量的主要限制是 WASM-OJ baseline-normalized weighted `instructionBudget`，不是
   host wall time。
-- `scoring.costContract` 固定為 `wasm-oj-forge-v1`；judge 必須使用該 contract 驗證過的
+- `scoring.costContract` 固定為 `wasm-oj-v2`；judge 必須使用該 contract 驗證過的
   artifact cost profile 與 `RunResult.metrics.cost`，遇到 contract/profile/calibration
   mismatch 時 fail closed。
-- `scoring.calibration.profiles` 明列七語言的 exact Forge cost profile；execution 必須帶
+- `scoring.calibration.profiles` 明列七語言的 exact WASM-OJ cost profile；execution 必須帶
   submission language，且 metrics profile 必須與該語言校準值 byte-identical。
 - 本 catalog 固定使用依 relaxed-to-strict 排列的 `baseline`、`efficient`、`optimal`
   三個 cumulative policies；每層至少收緊 instruction cost、memory 或 deterministic
@@ -105,14 +105,14 @@ is correct, optimal, or deserving of a particular score.
   deterministic policy metric。
 - `safetyLimits.wallTimeLimitMs` 只負責終止失控 host execution，不參與計分，也不得
   作為跨 host 的演算法效率指標。
-- `calibration.profiles` 在 v1 是 manifest 內的固定 language/profile mapping；部署不要求
+- `calibration.profiles` 在目前 manifest 是固定的 language/profile mapping；部署不要求
   額外 calibration evidence。
 
 ## Metadata
 
-`catalog.json` 必須符合 `tools/catalog.schema.json`，並宣告唯一 default locale 與有序的
+`catalog.json` 必須符合 `schemas/problem-catalog.schema.json`，並宣告唯一 default locale 與有序的
 supported locale 清單；目前固定為 `zh-TW`、`en`。`problem.json` 必須符合
-`tools/problem.schema.json`，所有 localized title/name 與 statement/editorial map 必須完整
+`schemas/problem.schema.json`，所有 localized title/name 與 statement/editorial map 必須完整
 覆蓋 catalog locales。`complexities` 記錄 editorial 所分析的主要路徑，最後一筆必須是
 reference solutions 使用的最佳解。完整 API discovery、path resolution 與計分公式見
-`docs/MANIFEST.md`。
+`MANIFEST.md`。

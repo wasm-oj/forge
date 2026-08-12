@@ -3,15 +3,17 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { deserialize, serialize } from "node:v8";
-import type { ForgeArtifactStore } from "../compiler/coordinator";
-import { assertCompilerCacheKey } from "../core/hash";
-import { assertValidBuildArtifact } from "../core/artifact-validation";
-import type { BuildArtifact } from "../core/types";
+import {
+  assertCompilerCacheKey,
+  assertValidBuildArtifact,
+  type ArtifactStore,
+} from "@wasm-oj/core";
+import type { BuildArtifact } from "@wasm-oj/contracts";
 
 const MAX_SERIALIZED_ARTIFACT_BYTES = 512 * 1024 * 1024;
 
 /** Atomic, content-addressed artifact storage for the Node/server host. */
-export class FileSystemArtifactStore implements ForgeArtifactStore {
+export class FileSystemArtifactStore implements ArtifactStore {
   private initialized: Promise<void> | undefined;
 
   constructor(private readonly directory: string) {
@@ -91,7 +93,7 @@ export class FileSystemArtifactStore implements ForgeArtifactStore {
   }
 
   private pathFor(cacheKey: string): string {
-    return path.join(this.directory, `${cacheFileName(cacheKey)}.forge-artifact`);
+    return path.join(this.directory, `${cacheFileName(cacheKey)}.wasm-oj-artifact`);
   }
 }
 

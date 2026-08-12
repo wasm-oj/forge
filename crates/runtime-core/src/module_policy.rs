@@ -2,12 +2,14 @@ use std::fmt;
 use wasm_encoder::reencode::{Error, Reencode, RoundtripReencoder};
 
 pub(crate) const INTERACTIVE_WASIP1_DETERMINISTIC_NAMESPACE: &str =
-    "forge_interactive_wasi_snapshot_preview1";
-pub(crate) const INTERACTIVE_WASIX32_DETERMINISTIC_NAMESPACE: &str = "forge_interactive_wasix_32v1";
-pub(crate) const INTERACTIVE_WASIX64_DETERMINISTIC_NAMESPACE: &str = "forge_interactive_wasix_64v1";
+    "wasm_oj_interactive_wasi_snapshot_preview1";
+pub(crate) const INTERACTIVE_WASIX32_DETERMINISTIC_NAMESPACE: &str =
+    "wasm_oj_interactive_wasix_32v1";
+pub(crate) const INTERACTIVE_WASIX64_DETERMINISTIC_NAMESPACE: &str =
+    "wasm_oj_interactive_wasix_64v1";
 
 const WASM_PAGE_BYTES: u64 = 65_536;
-pub(crate) const DEFERRED_START_EXPORT: &str = "__wasm_oj_forge_deferred_start";
+pub(crate) const DEFERRED_START_EXPORT: &str = "__wasm_oj_deferred_start";
 const WASIP1_FUNCTIONS: &[&str] = &[
     "args_get",
     "args_sizes_get",
@@ -288,7 +290,7 @@ impl Reencode for MemoryLimiter {
     ) -> Result<wasm_encoder::MemoryType, Error<Self::Error>> {
         if memory.memory64 {
             return Err(Error::UserError(MemoryPolicyError(
-                "memory64 modules are unsupported by the pinned Forge runtime".to_string(),
+                "memory64 modules are unsupported by the pinned WASM-OJ runtime".to_string(),
             )));
         }
         if memory.initial > self.limit_pages {
@@ -351,7 +353,7 @@ fn validate_runtime_import(
             Ok(())
         }
         "env" => Err(format!(
-            "unsupported runtime import env.{name}; Forge admits only env.memory"
+            "unsupported runtime import env.{name}; WASM-OJ admits only env.memory"
         )),
         "wasi" if name == "thread-spawn" && is_function => Ok(()),
         "wasi" => Err(format!(
@@ -369,14 +371,14 @@ fn validate_runtime_import(
             "unsupported non-function WASIX import {namespace}.{name}"
         )),
         _ => Err(format!(
-            "unsupported runtime import namespace '{namespace}'; Forge accepts only wasip1 and WASIX modules"
+            "unsupported runtime import namespace '{namespace}'; WASM-OJ accepts only wasip1 and WASIX modules"
         )),
     }
 }
 
 /// Converts the WebAssembly start section into a private host-invoked export.
 ///
-/// A native start section runs inside `Instance::new`, before Forge can attach
+/// A native start section runs inside `Instance::new`, before WASM-OJ can attach
 /// guest memory to deterministic clock/random functions or initialize WASI
 /// instance handles. Deferring it keeps the same instrumented function body
 /// and function index while allowing the runner to invoke it immediately after
@@ -392,7 +394,7 @@ pub(crate) fn defer_start_section(wasm: &[u8]) -> Result<DeferredStartModule, St
                         .map_err(|error| format!("failed to inspect module export: {error}"))?;
                     if export.name == DEFERRED_START_EXPORT {
                         return Err(format!(
-                            "module export name {DEFERRED_START_EXPORT} is reserved by Forge"
+                            "module export name {DEFERRED_START_EXPORT} is reserved by WASM-OJ"
                         ));
                     }
                 }
@@ -507,7 +509,7 @@ pub fn validate_memory_limit(wasm: &[u8], memory_limit_bytes: u64) -> Result<(),
 
 fn validate_memory_type(memory: wasmparser::MemoryType, limit_pages: u64) -> Result<(), String> {
     if memory.memory64 {
-        return Err("memory64 modules are unsupported by the pinned Forge runtime".to_string());
+        return Err("memory64 modules are unsupported by the pinned WASM-OJ runtime".to_string());
     }
     if memory.initial > limit_pages || memory.maximum.is_none_or(|maximum| maximum > limit_pages) {
         return Err(format!(
@@ -603,7 +605,7 @@ mod tests {
         )
         .unwrap();
         let error = enforce_memory_limit(&wasm, 2 * 65_536).unwrap_err();
-        assert!(error.contains("Forge admits only env.memory"));
+        assert!(error.contains("WASM-OJ admits only env.memory"));
     }
 
     #[test]
@@ -707,6 +709,6 @@ mod tests {
         ))
         .unwrap();
         let error = defer_start_section(&wasm).unwrap_err();
-        assert!(error.contains("reserved by Forge"));
+        assert!(error.contains("reserved by WASM-OJ"));
     }
 }

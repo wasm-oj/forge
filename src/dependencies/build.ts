@@ -1,31 +1,28 @@
 import { Gunzip, unzipSync } from "fflate";
 import { sha256Hex } from "../core/sha256.ts";
-import { assertSafeRelativePath } from "../core/project-files.ts";
-import { assertValidDependencyLock, dependencyLockSha256 } from "./lock.ts";
-import { DEPENDENCY_RESOLUTION_LIMITS } from "./limits.ts";
-import type { DependencyEcosystem, DependencyLock, LockedDependencyPackage } from "./types.ts";
+import {
+  canonicalDependencyFiles,
+  DEPENDENCY_BUILD_LIMITS,
+  assertValidDependencyLock,
+  dependencyFileTreeSha256,
+  dependencyLockSha256,
+  verifyDependencyBuildBundle,
+} from "../core/dependencies.ts";
+import type {
+  DependencyBuildBundle,
+  DependencyEcosystem,
+  DependencyLock,
+  LockedDependencyPackage,
+  MaterializedDependencyPackage,
+} from "../core/types.ts";
 
-export const DEPENDENCY_BUILD_LIMITS = Object.freeze({
-  packages: DEPENDENCY_RESOLUTION_LIMITS.packages,
-  filesPerPackage: DEPENDENCY_RESOLUTION_LIMITS.archiveFiles,
-  bytesPerFile: 64 * 1024 * 1024,
-  totalBytes: DEPENDENCY_RESOLUTION_LIMITS.unpackedBytes,
-});
-
-export interface MaterializedDependencyPackage {
-  package: LockedDependencyPackage;
-  /** SHA-256 of the canonical path-and-content file tree. */
-  filesSha256: string;
-  /** Canonical package-root-relative files after verified archive extraction. */
-  files: Readonly<Record<string, Uint8Array>>;
-}
-
-/** Archive-independent dependency input admitted by Forge compilers. */
-export interface DependencyBuildBundle {
-  lock: DependencyLock;
-  lockSha256: string;
-  packages: readonly MaterializedDependencyPackage[];
-}
+export type { DependencyBuildBundle, MaterializedDependencyPackage } from "../core/types.ts";
+export {
+  DEPENDENCY_BUILD_LIMITS,
+  assertValidDependencyBuildBundle,
+  dependencyFileTreeSha256,
+  verifyDependencyBuildBundle,
+} from "../core/dependencies.ts";
 
 export interface DependencyBuildAdapter {
   readonly ecosystem: DependencyEcosystem;
@@ -98,51 +95,6 @@ export async function createDependencyBuildBundle(
   });
   await verifyDependencyBuildBundle(bundle);
   return bundle;
-}
-
-/** Re-verify a caller-provided build bundle before it enters a compiler cache key. */
-export async function verifyDependencyBuildBundle(bundle: DependencyBuildBundle): Promise<void> {
-  assertValidDependencyBuildBundle(bundle);
-  if (await dependencyLockSha256(bundle.lock) !== bundle.lockSha256) {
-    throw new Error("Dependency build lock digest does not match its canonical lock.");
-  }
-  for (const item of bundle.packages) {
-    if (await dependencyFileTreeSha256(item.files) !== item.filesSha256) {
-      throw new Error(`Dependency package '${item.package.id}' file-tree digest mismatch.`);
-    }
-  }
-}
-
-export function assertValidDependencyBuildBundle(value: unknown): asserts value is DependencyBuildBundle {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new TypeError("Dependency build bundle must be an object.");
-  }
-  const bundle = value as DependencyBuildBundle;
-  assertValidDependencyLock(bundle.lock);
-  requireSha256(bundle.lockSha256, "Dependency build lock");
-  if (!Array.isArray(bundle.packages) || bundle.packages.length !== bundle.lock.packages.length) {
-    throw new Error("Dependency build packages must exactly match the dependency lock.");
-  }
-  let totalBytes = 0;
-  for (const [index, item] of bundle.packages.entries()) {
-    if (!item || typeof item !== "object" || item.package.id !== bundle.lock.packages[index]?.id) {
-      throw new Error("Dependency build packages must use canonical lock order.");
-    }
-    requireSha256(item.filesSha256, `Dependency package '${item.package.id}' file tree`);
-    const files = canonicalDependencyFiles(item.files, item.package.id, false);
-    totalBytes += Object.values(files).reduce((sum, bytes) => sum + bytes.byteLength, 0);
-  }
-  if (totalBytes > DEPENDENCY_BUILD_LIMITS.totalBytes) {
-    throw new RangeError(`Dependency build exceeds ${DEPENDENCY_BUILD_LIMITS.totalBytes} extracted bytes.`);
-  }
-}
-
-export async function dependencyFileTreeSha256(files: Readonly<Record<string, Uint8Array>>): Promise<string> {
-  const entries: Array<{ path: string; bytes: number; sha256: string }> = [];
-  for (const [path, bytes] of Object.entries(files).sort(([left], [right]) => left.localeCompare(right))) {
-    entries.push({ path, bytes: bytes.byteLength, sha256: await sha256Hex(bytes) });
-  }
-  return sha256Hex(JSON.stringify(entries));
 }
 
 function archiveAdapter(
@@ -359,29 +311,6 @@ function stripSingleCommonRoot(files: Record<string, Uint8Array>): Record<string
     : files;
 }
 
-function canonicalDependencyFiles(
-  value: Readonly<Record<string, Uint8Array>>,
-  id: string,
-  clone = true,
-): Record<string, Uint8Array> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new TypeError(`Dependency '${id}' materializer must return a file record.`);
-  }
-  const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right));
-  if (entries.length === 0 || entries.length > DEPENDENCY_BUILD_LIMITS.filesPerPackage) {
-    throw new RangeError(`Dependency '${id}' must contain 1-${DEPENDENCY_BUILD_LIMITS.filesPerPackage} files.`);
-  }
-  const result: Record<string, Uint8Array> = {};
-  for (const [path, bytes] of entries) {
-    assertSafeRelativePath(path, `Dependency '${id}' file path`);
-    if (!(bytes instanceof Uint8Array) || bytes.byteLength > DEPENDENCY_BUILD_LIMITS.bytesPerFile) {
-      throw new RangeError(`Dependency '${id}' file '${path}' exceeds its byte limit.`);
-    }
-    result[path] = clone ? bytes.slice() : bytes;
-  }
-  return result;
-}
-
 function requiredUtf8(files: Record<string, Uint8Array>, path: string, id: string): string {
   const bytes = files[path];
   if (!bytes) throw new Error(`Dependency '${id}' omits required '${path}'.`);
@@ -395,12 +324,6 @@ function rejectExtensions(files: Record<string, Uint8Array>, record: LockedDepen
 
 function unsupported(record: LockedDependencyPackage, feature: string): never {
   throw new Error(`Dependency '${record.id}' requires unsupported ${feature}.`);
-}
-
-function requireSha256(value: unknown, label: string): asserts value is string {
-  if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
-    throw new Error(`${label} SHA-256 must be lowercase hexadecimal.`);
-  }
 }
 
 function isZip(payload: Uint8Array): boolean {

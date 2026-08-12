@@ -4,12 +4,12 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promise
 import os from "node:os";
 import path from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
-import { FORGE_SCHEMAS } from "../src/core/contract.ts";
-import { FORGE_LIBCXX_PCH_HEADER } from "../src/compiler/libcxx-pch.ts";
+import { WASM_OJ_SCHEMAS } from "../src/core/contract.ts";
+import { WASM_OJ_LIBCXX_PCH_HEADER } from "../src/compiler/libcxx-pch.ts";
 
 const VERSION = "22.0.0-git20542-10";
-const DIRECTORY = path.resolve(process.env.FORGE_CLANG_TOOLCHAIN_DIRECTORY ?? "public/toolchains");
-const COMPILER = path.resolve("crates/runtime-core/target/release/forge-compiler");
+const DIRECTORY = path.resolve(process.env.WASM_OJ_CLANG_TOOLCHAIN_DIRECTORY ?? "public/toolchains");
+const COMPILER = path.resolve("crates/runtime-core/target/release/wasm-oj-compiler");
 const packageCompressed = await readFile(path.join(DIRECTORY, `clang-${VERSION}.webc.gz.bin`));
 const packageBytes = gunzipSync(packageCompressed);
 const pinsBytes = await readFile(path.join(DIRECTORY, `clang-${VERSION}.cc1-pins.json`));
@@ -17,15 +17,15 @@ const pins = JSON.parse(pinsBytes.toString()) as {
   placeholders: { input: string; output: string; mainFileName: string };
   configs: Record<string, { cc1: string[] }>;
 };
-const temporary = await mkdtemp(path.join(os.tmpdir(), "forge-libcxx-pch-"));
+const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-libcxx-pch-"));
 
 try {
   const packagePath = path.join(temporary, `clang-${VERSION}.webc`);
   await writeFile(packagePath, packageBytes, { flag: "wx" });
   const profiles = ["cpp-debug", "cpp-release"] as const;
-  const headerPath = "/project/forge.libcxx.hpp";
+  const headerPath = "/project/wasm-oj.libcxx.hpp";
   const responses = runBatch({
-    schema: FORGE_SCHEMAS.compileBatch,
+    schema: WASM_OJ_SCHEMAS.compileBatch,
     packagePath,
     memoryLimitBytes: 4_294_967_296,
     requests: profiles.map((profile) => {
@@ -35,7 +35,7 @@ try {
         args: instantiatePch(pins.configs[profile]?.cc1, pins.placeholders, headerPath, outputPath),
         env: { PATH: "/bin", SOURCE_DATE_EPOCH: "946684800", TZ: "UTC", LC_ALL: "C" },
         stdinBase64: "",
-        filesBase64: { [headerPath]: Buffer.from(FORGE_LIBCXX_PCH_HEADER).toString("base64") },
+        filesBase64: { [headerPath]: Buffer.from(WASM_OJ_LIBCXX_PCH_HEADER).toString("base64") },
         cwd: "/project",
         outputPaths: [outputPath],
         outputLimitBytes: 16 * 1024 * 1024,
@@ -67,12 +67,12 @@ try {
     };
   }
   const manifest = {
-    schema: FORGE_SCHEMAS.clangLibcxxPch,
+    schema: WASM_OJ_SCHEMAS.clangLibcxxPch,
     version: VERSION,
     clangPackageSha256: sha256(packageBytes),
     clangPinsSha256: sha256(pinsBytes),
-    header: FORGE_LIBCXX_PCH_HEADER,
-    headerSha256: sha256(FORGE_LIBCXX_PCH_HEADER),
+    header: WASM_OJ_LIBCXX_PCH_HEADER,
+    headerSha256: sha256(WASM_OJ_LIBCXX_PCH_HEADER),
     profiles: assets,
   };
   const encodedManifest = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
@@ -99,7 +99,7 @@ function instantiatePch(
     if (token === "c++") return "c++-header";
     if (token === placeholders.input) return inputPath;
     if (token === placeholders.output) return outputPath;
-    if (token === placeholders.mainFileName) return "forge.libcxx.hpp";
+    if (token === placeholders.mainFileName) return "wasm-oj.libcxx.hpp";
     return token;
   });
 }
@@ -115,9 +115,9 @@ function runBatch(request: unknown): Array<{
     encoding: "utf8",
   });
   if (result.error) throw result.error;
-  if (!result.stdout) throw new Error(`forge-compiler emitted no response: ${result.stderr}`);
+  if (!result.stdout) throw new Error(`wasm-oj-compiler emitted no response: ${result.stderr}`);
   const parsed = JSON.parse(result.stdout) as { responses?: unknown };
-  if (!Array.isArray(parsed.responses)) throw new Error("forge-compiler emitted a malformed response.");
+  if (!Array.isArray(parsed.responses)) throw new Error("wasm-oj-compiler emitted a malformed response.");
   return parsed.responses as ReturnType<typeof runBatch>;
 }
 

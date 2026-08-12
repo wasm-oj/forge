@@ -1,10 +1,10 @@
-import type { AuthenticatedSession, ForgeWorkerEnv } from "./env";
+import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { constantTimeEqual, randomToken, sha256Hex } from "./crypto";
 import { ApiError, assertSameOrigin, cookieHeader, jsonResponse, parseCookies, readBoundedResponseJson } from "./http";
 
-const SESSION_COOKIE = "forge_session";
-const CSRF_COOKIE = "forge_csrf";
-const OAUTH_VERIFIER_COOKIE = "forge_oauth_verifier";
+const SESSION_COOKIE = "wasm_oj_session";
+const CSRF_COOKIE = "wasm_oj_csrf";
+const OAUTH_VERIFIER_COOKIE = "wasm_oj_oauth_verifier";
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
 const OAUTH_STATE_SECONDS = 10 * 60;
 const MAX_GITHUB_AUTH_RESPONSE_BYTES = 1024 * 1024;
@@ -23,11 +23,11 @@ function safeReturnPath(value: string | null): string {
   return value;
 }
 
-function oauthRedirectUri(env: ForgeWorkerEnv): string {
+function oauthRedirectUri(env: WasmOjWorkerEnv): string {
   return new URL("/api/auth/github/callback", env.PUBLIC_ORIGIN).toString();
 }
 
-export async function beginGithubLogin(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function beginGithubLogin(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const requestUrl = new URL(request.url);
   const state = randomToken();
   const verifier = randomToken(48);
@@ -35,7 +35,7 @@ export async function beginGithubLogin(request: Request, env: ForgeWorkerEnv): P
   const challenge = btoa(String.fromCharCode(...challengeBytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
   const now = new Date();
   const expiresAt = new Date(now.getTime() + OAUTH_STATE_SECONDS * 1_000).toISOString();
-  await env.CORE_DB.prepare(
+  await env.DB.prepare(
     "INSERT INTO oauth_states (state_hash, verifier_hash, return_path, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
   ).bind(
     await sha256Hex(state),
@@ -60,23 +60,23 @@ export async function beginGithubLogin(request: Request, env: ForgeWorkerEnv): P
   return new Response(null, { status: 302, headers });
 }
 
-export async function completeGithubLogin(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function completeGithubLogin(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const url = new URL(request.url);
   const state = url.searchParams.get("state");
   const code = url.searchParams.get("code");
   const verifier = parseCookies(request).get(OAUTH_VERIFIER_COOKIE);
   if (!state || !code || !verifier) throw new ApiError(400, "oauth-invalid", "GitHub login callback is incomplete.");
   const stateHash = await sha256Hex(state);
-  const oauthState = await env.CORE_DB.prepare(
+  const oauthState = await env.DB.prepare(
     "SELECT verifier_hash, return_path, expires_at FROM oauth_states WHERE state_hash = ?",
   ).bind(stateHash).first<{ verifier_hash: string; return_path: string; expires_at: string }>();
-  await env.CORE_DB.prepare("DELETE FROM oauth_states WHERE state_hash = ?").bind(stateHash).run();
+  await env.DB.prepare("DELETE FROM oauth_states WHERE state_hash = ?").bind(stateHash).run();
   if (!oauthState || oauthState.expires_at <= new Date().toISOString() || !constantTimeEqual(oauthState.verifier_hash, await sha256Hex(verifier))) {
     throw new ApiError(400, "oauth-state-invalid", "GitHub login state is invalid or expired.");
   }
   const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
-    headers: { accept: "application/json", "content-type": "application/json", "user-agent": "wasm-oj-forge" },
+    headers: { accept: "application/json", "content-type": "application/json", "user-agent": "wasm-oj" },
     body: JSON.stringify({
       client_id: env.GITHUB_OAUTH_CLIENT_ID,
       client_secret: env.GITHUB_OAUTH_CLIENT_SECRET,
@@ -98,7 +98,7 @@ export async function completeGithubLogin(request: Request, env: ForgeWorkerEnv)
     headers: {
       accept: "application/vnd.github+json",
       authorization: `Bearer ${tokenBody.access_token}`,
-      "user-agent": "wasm-oj-forge",
+      "user-agent": "wasm-oj",
       "x-github-api-version": "2022-11-28",
     },
     redirect: "manual",
@@ -114,20 +114,20 @@ export async function completeGithubLogin(request: Request, env: ForgeWorkerEnv)
     throw new ApiError(502, "github-identity-error", "GitHub returned an invalid identity.");
   }
   const now = new Date().toISOString();
-  const existing = await env.CORE_DB.prepare("SELECT user_id FROM github_identities WHERE github_user_id = ?")
+  const existing = await env.DB.prepare("SELECT user_id FROM github_identities WHERE github_user_id = ?")
     .bind(github.id).first<{ user_id: string }>();
   const userId = existing?.user_id ?? crypto.randomUUID();
   const sessionToken = randomToken();
   const csrfToken = randomToken();
   const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1_000).toISOString();
-  await env.CORE_DB.batch([
-    env.CORE_DB.prepare("INSERT INTO users (id, created_at, updated_at, status) VALUES (?, ?, ?, 'active') ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at")
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO users (id, created_at, updated_at, status) VALUES (?, ?, ?, 'active') ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at")
       .bind(userId, now, now),
-    env.CORE_DB.prepare("INSERT INTO github_identities (github_user_id, user_id, login, avatar_url, profile_url, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(github_user_id) DO UPDATE SET login = excluded.login, avatar_url = excluded.avatar_url, profile_url = excluded.profile_url, updated_at = excluded.updated_at")
+    env.DB.prepare("INSERT INTO github_identities (github_user_id, user_id, login, avatar_url, profile_url, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(github_user_id) DO UPDATE SET login = excluded.login, avatar_url = excluded.avatar_url, profile_url = excluded.profile_url, updated_at = excluded.updated_at")
       .bind(github.id, userId, github.login, github.avatar_url, github.html_url, now),
-    env.CORE_DB.prepare("INSERT INTO profiles (user_id, display_name, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO NOTHING")
+    env.DB.prepare("INSERT INTO profiles (user_id, display_name, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO NOTHING")
       .bind(userId, github.login, now),
-    env.CORE_DB.prepare("INSERT INTO sessions (token_hash, user_id, csrf_hash, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)")
+    env.DB.prepare("INSERT INTO sessions (token_hash, user_id, csrf_hash, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)")
       .bind(await sha256Hex(sessionToken), userId, await sha256Hex(csrfToken), now, expiresAt, now),
   ]);
   const headers = new Headers({ location: oauthState.return_path, "cache-control": "no-store" });
@@ -137,14 +137,14 @@ export async function completeGithubLogin(request: Request, env: ForgeWorkerEnv)
   return new Response(null, { status: 302, headers });
 }
 
-export async function authenticatedSession(request: Request, env: ForgeWorkerEnv): Promise<AuthenticatedSession | undefined> {
+export async function authenticatedSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession | undefined> {
   const token = parseCookies(request).get(SESSION_COOKIE);
   if (!token) return undefined;
-  const row = await env.CORE_DB.prepare(
+  const row = await env.DB.prepare(
     "SELECT sessions.user_id, sessions.expires_at, sessions.csrf_hash, github_identities.login, github_identities.avatar_url FROM sessions JOIN users ON users.id = sessions.user_id JOIN github_identities ON github_identities.user_id = users.id WHERE sessions.token_hash = ? AND users.status = 'active'",
   ).bind(await sha256Hex(token)).first<SessionRow>();
   if (!row || row.expires_at <= new Date().toISOString()) return undefined;
-  const roles = await env.CORE_DB.prepare("SELECT role FROM user_roles WHERE user_id = ? ORDER BY role")
+  const roles = await env.DB.prepare("SELECT role FROM user_roles WHERE user_id = ? ORDER BY role")
     .bind(row.user_id).all<{ role: "admin" | "organizer" }>();
   return {
     userId: row.user_id,
@@ -155,23 +155,23 @@ export async function authenticatedSession(request: Request, env: ForgeWorkerEnv
   };
 }
 
-export async function requireSession(request: Request, env: ForgeWorkerEnv): Promise<AuthenticatedSession> {
+export async function requireSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession> {
   const session = await authenticatedSession(request, env);
   if (!session) throw new ApiError(401, "authentication-required", "Sign in with GitHub to continue.");
   return session;
 }
 
-export async function requireMutationSession(request: Request, env: ForgeWorkerEnv): Promise<AuthenticatedSession> {
+export async function requireMutationSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession> {
   assertSameOrigin(request, env.PUBLIC_ORIGIN);
   const session = await requireSession(request, env);
   const cookies = parseCookies(request);
   const csrfCookie = cookies.get(CSRF_COOKIE);
-  const csrfHeader = request.headers.get("x-forge-csrf");
+  const csrfHeader = request.headers.get("x-wasm-oj-csrf");
   const sessionToken = cookies.get(SESSION_COOKIE);
   if (!csrfCookie || !csrfHeader || !sessionToken || !constantTimeEqual(csrfCookie, csrfHeader)) {
     throw new ApiError(403, "csrf-rejected", "CSRF verification failed.");
   }
-  const row = await env.CORE_DB.prepare("SELECT csrf_hash FROM sessions WHERE token_hash = ?")
+  const row = await env.DB.prepare("SELECT csrf_hash FROM sessions WHERE token_hash = ?")
     .bind(await sha256Hex(sessionToken)).first<{ csrf_hash: string }>();
   if (!row || !constantTimeEqual(row.csrf_hash, await sha256Hex(csrfCookie))) {
     throw new ApiError(403, "csrf-rejected", "CSRF verification failed.");
@@ -179,15 +179,15 @@ export async function requireMutationSession(request: Request, env: ForgeWorkerE
   return session;
 }
 
-export async function sessionResponse(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function sessionResponse(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await authenticatedSession(request, env);
   return jsonResponse({ authenticated: Boolean(session), ...(session ? { user: session } : {}) });
 }
 
-export async function logout(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function logout(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   await requireMutationSession(request, env);
   const sessionToken = parseCookies(request).get(SESSION_COOKIE);
-  if (sessionToken) await env.CORE_DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Hex(sessionToken)).run();
+  if (sessionToken) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Hex(sessionToken)).run();
   const headers = new Headers();
   headers.append("set-cookie", cookieHeader(SESSION_COOKIE, "", { httpOnly: true, maxAge: 0, sameSite: "Lax" }));
   headers.append("set-cookie", cookieHeader(CSRF_COOKIE, "", { maxAge: 0, sameSite: "Strict" }));

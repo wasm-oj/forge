@@ -9,7 +9,7 @@ import {
   type SubmissionState,
 } from "../src/online-judge/contracts";
 import { sha256Hex } from "./crypto";
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 import { ApiError } from "./http";
 
 const TERMINAL_SQL = "'completed','compile-error','judge-error','infrastructure-error','cancelled'";
@@ -55,20 +55,20 @@ function validateEventKey(value: string): void {
 }
 
 async function existingEvent(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   submissionId: string,
   eventKey: string,
 ): Promise<SubmissionEventRow | null> {
-  return env.SUBMISSIONS_DB.prepare(
+  return env.DB.prepare(
     "SELECT id, payload_json, created_at FROM submission_events WHERE submission_id=? AND event_key=?",
   ).bind(submissionId, eventKey).first<SubmissionEventRow>();
 }
 
 async function currentSubmissionState(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   submissionId: string,
 ): Promise<SubmissionState> {
-  const row = await env.SUBMISSIONS_DB.prepare("SELECT state FROM submissions WHERE id=?")
+  const row = await env.DB.prepare("SELECT state FROM submissions WHERE id=?")
     .bind(submissionId).first<{ readonly state: unknown }>();
   if (!row) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   return parseSubmissionState(row.state);
@@ -82,7 +82,7 @@ export async function containerSubmissionEventKey(
 }
 
 export async function appendAuthorizedSubmissionEvent(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   input: AppendSubmissionEventInput,
 ): Promise<AppendedSubmissionEvent> {
   if (!Number.isSafeInteger(input.attempt) || input.attempt < 1 || !/^[0-9a-f]{64}$/.test(input.attemptTokenHash)) {
@@ -104,7 +104,7 @@ export async function appendAuthorizedSubmissionEvent(
       }
       assertSubmissionTransition(before, payload.state);
     }
-    stateUpdate = env.SUBMISSIONS_DB.prepare(`UPDATE submissions
+    stateUpdate = env.DB.prepare(`UPDATE submissions
        SET state=?, updated_at=?
      WHERE id=? AND state=?
        AND EXISTS (
@@ -116,7 +116,7 @@ export async function appendAuthorizedSubmissionEvent(
     throw new ApiError(409, "submission-terminal", "No event may be appended after a terminal state.");
   }
 
-  const insertion = env.SUBMISSIONS_DB.prepare(`INSERT INTO submission_events
+  const insertion = env.DB.prepare(`INSERT INTO submission_events
       (submission_id, event_key, payload_json, created_at)
     SELECT ?, ?, ?, ?
      WHERE EXISTS (
@@ -141,7 +141,7 @@ export async function appendAuthorizedSubmissionEvent(
       input.attemptTokenHash,
     );
 
-  const results = await env.SUBMISSIONS_DB.batch(stateUpdate ? [stateUpdate, insertion] : [insertion]);
+  const results = await env.DB.batch(stateUpdate ? [stateUpdate, insertion] : [insertion]);
   const inserted = results.at(-1)?.meta.changes === 1;
   const stored = await existingEvent(env, input.submissionId, input.eventKey);
   if (!stored) {
@@ -196,12 +196,12 @@ export function prepareSubmissionEventInsert(
 }
 
 export async function replaySubmissionEvents(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   submissionId: string,
   after: number,
   limit = 100,
 ): Promise<readonly SequencedSubmissionEvent[]> {
-  const rows = await env.SUBMISSIONS_DB.prepare(`SELECT id, payload_json, created_at
+  const rows = await env.DB.prepare(`SELECT id, payload_json, created_at
       FROM submission_events
      WHERE submission_id=? AND id>?
      ORDER BY id ASC
@@ -211,17 +211,17 @@ export async function replaySubmissionEvents(
 }
 
 export async function latestSubmissionEventCursor(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   submissionId: string,
 ): Promise<number> {
-  const row = await env.SUBMISSIONS_DB.prepare(
+  const row = await env.DB.prepare(
     "SELECT COALESCE(MAX(id), 0) AS cursor FROM submission_events WHERE submission_id=?",
   ).bind(submissionId).first<{ readonly cursor: number }>();
   return row?.cursor ?? 0;
 }
 
 export async function terminalizeSubmissionWithEvent(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   input: {
     readonly submissionId: string;
     readonly state: SubmissionState;
@@ -234,12 +234,12 @@ export async function terminalizeSubmissionWithEvent(
   validateEventKey(input.eventKey);
   const timestamp = (input.now ?? new Date()).toISOString();
   const ownerFence = input.ownerUserId === undefined ? "" : " AND user_id=?";
-  const update = env.SUBMISSIONS_DB.prepare(`UPDATE submissions
+  const update = env.DB.prepare(`UPDATE submissions
       SET state=?, updated_at=?, completed_at=COALESCE(completed_at, ?)
     WHERE id=?${ownerFence}
       AND state NOT IN (${TERMINAL_SQL})`)
     .bind(input.state, timestamp, timestamp, input.submissionId, ...(input.ownerUserId === undefined ? [] : [input.ownerUserId]));
-  const insertion = prepareSubmissionEventInsert(env.SUBMISSIONS_DB, {
+  const insertion = prepareSubmissionEventInsert(env.DB, {
     submissionId: input.submissionId,
     eventKey: input.eventKey,
     event: { kind: "state", state: input.state },
@@ -247,8 +247,8 @@ export async function terminalizeSubmissionWithEvent(
     requiredState: input.state,
     requiredOwnerUserId: input.ownerUserId,
   });
-  const [updated] = await env.SUBMISSIONS_DB.batch([update, insertion]);
-  const row = await env.SUBMISSIONS_DB.prepare("SELECT state, user_id FROM submissions WHERE id=?")
+  const [updated] = await env.DB.batch([update, insertion]);
+  const row = await env.DB.prepare("SELECT state, user_id FROM submissions WHERE id=?")
     .bind(input.submissionId).first<{ readonly state: string; readonly user_id: string }>();
   if (!row) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   if (input.ownerUserId !== undefined && row.user_id !== input.ownerUserId) {

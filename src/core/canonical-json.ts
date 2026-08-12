@@ -39,7 +39,7 @@ function canonicalValue(
   ]));
 }
 
-/** Forge canonical JSON: sorted object keys, safe integers, UTF-8, and one trailing newline. */
+/** WASM-OJ canonical JSON: sorted object keys, safe integers, UTF-8, and one trailing newline. */
 export function canonicalJsonBytes(value: unknown): Uint8Array {
   return encoder.encode(`${JSON.stringify(canonicalValue(value, "$", new Set()))}\n`);
 }
@@ -53,7 +53,7 @@ export function parseCanonicalJsonBytes(bytes: Uint8Array, label = "value"): Can
   }
   const canonical = canonicalJsonBytes(value);
   if (canonical.byteLength !== bytes.byteLength || canonical.some((byte, index) => byte !== bytes[index])) {
-    throw new TypeError(`${label} is not encoded as Forge canonical JSON.`);
+    throw new TypeError(`${label} is not encoded as WASM-OJ canonical JSON.`);
   }
   return value as CanonicalJsonValue;
 }

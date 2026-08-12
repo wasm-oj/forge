@@ -1,398 +1,273 @@
-# WASM OJ Forge
+# WASM-OJ
 
 [![CI](https://github.com/wasm-oj/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/wasm-oj/forge/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/%40wasm-oj%2Fforge)](https://www.npmjs.com/package/@wasm-oj/forge)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/%40wasm-oj%2Fsdk)](https://www.npmjs.com/package/@wasm-oj/sdk)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-WASM OJ Forge is a local-first compiler, deterministic runner, and online-judge library. It is the experimental successor to WASM-OJ's `compilet` and `wark`. In the browser deployment, source compilation, linking, execution, diagnostics, and all 45 original problems stay on the device. Compiler and language-runtime packages execute under the Wasmer JavaScript SDK; submitted programs execute under a portable Rust/Wasmer runtime core compiled for both WebAssembly and native server hosts.
+WASM-OJ is a local-first compiler, deterministic runner, and online-judge SDK. C, C++, Rust,
+Go, Python, JavaScript, and TypeScript compile and run through digest-pinned WebAssembly
+toolchains. The browser host keeps source, artifacts, local tests, and practice progress on the
+device. Official Submit sends source to a one-shot server Container, which recompiles it against
+immutable judge data and returns only the authorized result.
 
-**[Open the live judge](https://wasm-oj-forge.jacoblincool.chatgpt.site/)** — no account, server build, or test data is required.
+The product and public SDK are named **WASM-OJ**. The GitHub repository remains
+[`wasm-oj/forge`](https://github.com/wasm-oj/forge) until a separate repository migration is
+approved; repository URLs in package metadata intentionally keep that path.
 
-## OpenAI Build Week: Codex and GPT-5.6
+## Package architecture
 
-Codex with GPT-5.6 was used as an engineering collaborator throughout the Build Week rebuild. It helped recover behavioral invariants from earlier prototypes, turn them into one explicit browser/server contract, implement and debug the compiler and runtime boundaries, and create the experiments, conformance matrices, and regression tests used to validate the result.
+The code packages share one release version and form a one-way dependency graph:
 
-The product decisions remained deliberate and human-owned: ordinary compilation and practice runs should move to learner devices; browser and server hosts must preserve the same observable semantics; and portable computational work must be measured independently of wall-clock speed. We accepted implementation and performance claims only when executable evidence supported them. The resulting Build Week work includes the integrated seven-language browser toolchains, the deterministic Rust/Wasmer runtime core, shared browser/server judging semantics, the 45-problem learner experience, and the evidence pipeline documented in [`experiments/`](experiments/) and [the conformance report](docs/conformance-report.md).
-
-## Judge quick test
-
-The fastest evaluation path is the public browser deployment:
-
-1. Open the [live judge](https://wasm-oj-forge.jacoblincool.chatgpt.site/) in a current desktop Chromium browser.
-2. Keep problem 01 and C/WASIP1 selected, then replace the starter with the verified solution below.
-3. Choose **Build** to compile the source locally, **Self Test** to run the sample input, and **Submit** to execute all four judge cases.
-4. Inspect the Accepted result, per-case instruction cost, normalized baseline, peak memory, logical time, and cumulative scoring tiers.
-
-The public demo is verified on Chromium and requires WebAssembly, Web Workers, `SharedArrayBuffer`, and cross-origin isolation. The package requires Node.js 24.18; the native server build is continuously verified on Ubuntu 24.04. See [Run locally](#run-locally) for installation and [the integration guide](docs/integration-guide.md) for browser and server library use.
-
-<details>
-<summary>Verified problem 01 solution</summary>
-
-```c
-#include <stdio.h>
-
-int main(void) {
-    int n, q;
-    if (scanf("%d %d", &n, &q) != 2) return 0;
-    static long long prefix[200001];
-    for (int i = 1; i <= n; ++i) {
-        long long cost;
-        scanf("%lld", &cost);
-        prefix[i] = prefix[i - 1] + cost;
-    }
-    for (int i = 0; i < q; ++i) {
-        long long budget;
-        scanf("%lld", &budget);
-        int lo = 0, hi = n;
-        while (lo < hi) {
-            int mid = lo + (hi - lo + 1) / 2;
-            if (prefix[mid] <= budget) lo = mid;
-            else hi = mid - 1;
-        }
-        printf("%d\n", lo);
-    }
-    return 0;
-}
+```text
+@wasm-oj/contracts
+        │
+        ▼
+  @wasm-oj/core
+   ┌────┼──────────┐
+   ▼    ▼          ▼
+browser server  organizer
+   └────┴────┬─────┘
+             ▼
+       @wasm-oj/sdk
 ```
 
-</details>
-
-All production compatibility is governed by one `wasm-oj-forge-v1` contract. It
-jointly versions compilation, execution, determinism, metering, artifacts,
-judge specifications, caches, and conformance schemas; there are no separate
-compiler/determinism/resource/judge counters. See [versioning policy](docs/versioning.md).
-
-## Judge experience
-
-- Browse 45 systems-algorithm problems in a topic-grouped, prerequisite-aware learning path; search by number, title, track, or tag in Traditional Chinese or English.
-- Work in C, C++, Rust, Go, Python, JavaScript, or TypeScript with Monaco and multi-file projects.
-- Build once, run the sample, then execute each judge case locally through Wasmer.
-- Compare normalized stdout, surface compile/runtime/time-limit/wrong-answer verdicts, and retain solved progress in browser storage.
-- Stop a running build or submission by terminating and recreating its isolated Worker.
-
-Because the judge is completely local, its test data can be inspected by a determined user. This is an explicit privacy and learning tradeoff: the product is for practice and self-verification, not cheat-resistant competition.
-
-## The 45-problem systems track
-
-The canonical collection is published independently at
-[`wasm-oj/problems`](https://github.com/wasm-oj/problems). Its small browser index
-lists localized titles and integrity-addressed per-problem bundles. Forge loads
-that index by default, downloads a full bundle only when the learner opens a
-problem, verifies its exact byte length and SHA-256 digest, then caches it by
-content hash. The GitHub owner, repository, ref, and index path are user
-configurable. The local generated TypeScript catalog remains a deterministic
-development/test fixture; it is not the browser's runtime data source.
-See the [problem catalog contract](docs/problem-catalog.md) for discovery,
-localization, generation, and cumulative scoring behavior.
-
-The learner-facing order starts with five foundations problems, then progresses through metering
-and resource limits, filesystems and packaging, build scheduling and caching, graph algorithms,
-and knapsack variants. Stable source manifest IDs remain unchanged so GitHub API paths do not
-drift when the pedagogical sequence changes. No original 20-problem
-fixture or compatibility catalog remains.
-
-## Language support
-
-| Language | Build path | Output |
-| --- | --- | --- |
-| C | Pinned Clang 22 WebC; direct cc1 plus LLD with frozen WASI P1 arguments | Standalone WASI P1 `.wasm`; `wasix` changes Forge profile identity |
-| C++ | The same Clang 22 module in C++20 mode plus the same LLD | Standalone WASI P1 `.wasm`; `wasix` changes Forge profile identity |
-| Rust | Pinned `rustc` 1.91.1-dev WebC with its matching standard library under Wasmer | Standalone WASI P1 `.wasm` |
-| Go | Pinned standard Go 1.26.5 compiler, linker, and `GOOS=wasip1 GOARCH=wasm` standard library under Wasmer | Standalone WASI P1 `.wasm` |
-| Python | Source-built CPython 3.14.6/WASI P1 byte-compilation | Runtime bundle containing bytecode, project modules, and the pinned WASI P1 runtime contract |
-| JavaScript | TypeScript 7.0.2/WASI checking and emit | CommonJS runtime bundle executed by QuickJS-ng 0.15.1 plus the pinned Forge adapter |
-| TypeScript | Native TypeScript 7.0.2 compiler built for WASI | CommonJS runtime bundle executed by QuickJS-ng 0.15.1 plus the pinned Forge adapter |
-
-For C and C++, `target: "wasip1"` and `target: "wasix"` do not select different compiler ABIs. Both use the same `wasm32-unknown-wasip1` cc1 configurations and LLD command from one verified manifest. Given the same language, optimization, and sources, the emitted module bytes are the same; `wasix` changes the artifact, cache, and runtime-profile identity. The current Forge runner uses the same runtime implementation for both labels and validates the module's actual imports.
-
-The Rust path uses a source-traceable browser-runnable `rustc` 1.91.1-dev build, its matching `wasm32-wasip1-threads` standard library, and a digest-pinned `wasm-ld` 22 stage. Forge restricts rustc to one codegen thread, emits the crate object plus rustc's allocator-shim bitcode, then links them in a fresh Wasmer command instance. In the browser, builds are serialized through one persistent Rust stage per compiler Worker generation. That stage keeps its verified Runtime, WebC package, `rustc`/`wasm-ld` command handles, and Wasmer SDK thread pool warm while giving every build a fresh project `Directory` and fresh command instances. The server still uses a fresh isolated child per build; no host compiler or linker participates on either host. The resulting shared-memory module is admitted as Forge `wasip1`; submitted programs do not receive thread-spawn capability. Collections, traits, structs, enums, macros, iterators, and normal `std` I/O compile normally.
-
-The Go path runs the standard Go 1.26.5 `compile` and `link` commands as verified WebC commands under Wasmer. Its deterministic archive contains all 349 packages from the matching `GOOS=wasip1 GOARCH=wasm` standard library. The published package is reproducibly traced to the official Go source tarball and contains no host compiler binary. Go currently supports `wasip1`; Forge does not relabel it as WASIX.
-
-C++ projects may opt into a real precompiled header by adding exactly one file named `forge.pch.hpp`. If its contents exactly equal the exported `FORGE_LIBCXX_PCH_HEADER`, Forge loads the matching debug/release PCH generated by the pinned Clang WebC, cc1 arguments, and WASI sysroot; both compressed and expanded bytes are manifest-pinned. Other header contents keep the custom local-PCH path. Forge records compiler dependencies and keys source, header, package, PCH, object, and link-result nodes by content. The browser persists a digest-verified graph archive in IndexedDB, so Worker recycling does not discard clean objects and link results. Units that emitted diagnostics are deliberately rebuilt because a cache hit could not faithfully reconstruct those diagnostics.
-
-Python, JavaScript, and TypeScript use a runtime-bundle artifact because these languages require their language runtime. The executable WebAssembly runtime is pinned in the bundle manifest and is always launched by Wasmer. C, C++, Rust, and Go produce raw standalone modules.
-
-The default conformance suite contains every declared language/target profile,
-deterministic filesystem metadata, multi-file I/O, and write-time VFS quota probes,
-plus one C/WASIX denied-capability probe. Browser and server compile
-measurements use this Forge contract suite rather than a parallel benchmark
-protocol. See the [conformance specification](experiments/forge-contract-1-conformance/SPEC.md)
-and the latest recorded [conformance report](docs/conformance-report.md).
-
-## Enforced execution policy
-
-Every submitted module passes through the same `wasm-oj-forge-runtime-core` before Wasmer instantiates it:
-
-| Control | Enforcement |
+| Package | Boundary |
 | --- | --- |
-| Weighted metering | The opcode weights are adapted from [Binaryen's optimizer cost model](https://github.com/WebAssembly/binaryen/blob/7f8e4cbf6273c9b13b3a1a42f5e2833ea0d0f686/src/ir/cost.h). Forge preserves WARK 0.3 compatibility, including its verified 1000-point penalty rule, and injects the meter into every function and the start section; judging uses a versioned empty-program-normalized net score. |
-| Linear memory | Every defined or imported memory receives a hard maximum; the native engine also applies limiting Wasmer tunables. |
-| Captured output | stdout, stderr, and explicitly collected output files share one byte budget. The result reports each stream's retained byte count. |
-| Writable VFS | File growth and inode creation are reserved transactionally against separate live-occupancy limits. Mounted inputs form the baseline; truncation and deletion release headroom. |
-| Logical time | Clock reads advance by a configured deterministic step. WASI clock polls and WASIX sleep fast-forward the same virtual clock without waiting for the host; `logicalTimeLimitMs` terminates as `logical-time-limit`. |
-| Emergency wall deadline | Browser Workers and native child processes are forcibly replaced or killed if the engine itself stops making progress. |
-| Determinism | WASI/WASIX clock and random imports, language-level time/random APIs, locale, timezone, and Python hash seed are controlled by an explicit run contract. |
+| `@wasm-oj/contracts` | Contract-2 constants, wire models, errors, toolchain descriptors, and source types; no host dependencies |
+| `@wasm-oj/core` | Host-neutral `Engine`, compiler and runner contracts, judge, dependency, replay, and conformance logic |
+| `@wasm-oj/browser` | Browser Workers, IndexedDB/Cache Storage adapters, and `createBrowserEngine()` |
+| `@wasm-oj/server` | Node.js/Wasmer adapters, filesystem storage, native runtime processes, and `createServerEngine()` |
+| `@wasm-oj/organizer` | Static collection and immutable judge-package validation/publication; never compiles or runs reference solutions |
+| `@wasm-oj/sdk` | Convenience entrypoints that re-export the packages above without embedding duplicate copies |
 
-`RunResult` reports `termination`, weighted instruction `cost`, `rawCost`, `baselineCost`, `logicalTimeNs`, profile identity, meter model, peak linear-memory/VFS occupancy, and output byte counts. The runner applies the requested instruction budget directly; `baselineCost` is zero. The profile still binds language, target, optimization, and runtime shape so a mismatched artifact is rejected. Logical time, memory, captured output, writable VFS occupancy, and the emergency wall boundary remain hard limits.
+Compiler and runtime assets are independently versioned packages:
 
-## Library API
+- `@wasm-oj/toolchain-clang`
+- `@wasm-oj/toolchain-rust`
+- `@wasm-oj/toolchain-go`
+- `@wasm-oj/toolchain-python`
+- `@wasm-oj/toolchain-javascript`
 
-```bash
-pnpm add @wasm-oj/forge
+Neither `@wasm-oj/sdk` nor a host package installs or selects toolchains implicitly. Every host
+receives an explicit source array. Source registration rejects a missing source, stale contract,
+undeclared language/profile, or duplicate asset ownership. The browser checks each asset's byte
+length and SHA-256 digest when that asset is first fetched; server startup verifies every declared
+asset before accepting work.
+
+## Install
+
+Install only the host and toolchains the application uses:
+
+```sh
+pnpm add @wasm-oj/browser \
+  @wasm-oj/toolchain-clang \
+  @wasm-oj/toolchain-rust \
+  @wasm-oj/toolchain-go \
+  @wasm-oj/toolchain-python \
+  @wasm-oj/toolchain-javascript
 ```
 
-The package root, `@wasm-oj/forge`, is the supported environment-neutral
-boundary. `@wasm-oj/forge/browser` adds the Worker-based browser host and
-`@wasm-oj/forge/server` adds the Node/Wasmer host. `ForgeEngine` composes a
-`ForgeCompiler`, `ForgeRunner`, and optional `ForgeArtifactStore` into compile,
-run, judge, and execute operations. For a downstream-OJ walkthrough covering
-browser/server setup, submission lifecycle, stable errors and observations,
-dependencies, and browser runtime plug-ins, see the
-[Forge integration guide](docs/integration-guide.md).
-Maintainers should follow the [release contract](docs/releasing.md); a tag is
-accepted only when it matches `package.json`, all CI gates pass, and the exact
-npm tarball is attached to the GitHub Release with its SHA-256 digest.
+Applications that prefer one namespace can install `@wasm-oj/sdk` and import
+`@wasm-oj/sdk/browser`, `@wasm-oj/sdk/server`, or `@wasm-oj/sdk/organizer`. Toolchains remain
+separate and explicit in either form.
 
-A downstream language implements `ForgeCompiler`, including a stable
-`cacheIdentity(project)` bound to every compiler and toolchain input that can
-change output, then registers its language with `ForgeCompilerRegistry`. The
-registry routes both cache identity and builds, owns shared compiler lifecycle
-once, and seals registration on first use. Standalone modules use the existing
-runtime path; a new runtime-bundle format also needs a `RuntimeDriver`. The
-browser `Forge` convenience class contains only built-in compilers, so custom
-compiler composition uses `ForgeEngine`. Browser runtime-driver injection has
-an additional Worker boundary: `runtimeDriverPlugins` accepts only trusted,
-same-origin, SHA-256-pinned, self-contained ESM modules, which are verified and
-constructed inside the runner Worker. It never transfers arbitrary functions
-through `postMessage`. The full deployment and authority contract is described in the
-[library contract](docs/library-contract.md#extension-rules).
+## Browser host
 
-`Forge` is the browser host. It computes content-addressed build keys and optionally persists artifacts in IndexedDB. Both C/C++ target labels use the same compiler-stage-bounded WASI P1 Worker pipeline: immutable toolchain state and verified translation-unit objects remain warm until the next build could exceed the eight-stage Clang 22 safety budget. Rust uses a persistent serialized stage; Forge conservatively charges two output-ready stages per Rust build (`rustc` plus `wasm-ld`), caps a Worker generation at four, and recycles the complete Worker tree before the third build. Go uses a separate persistent serialized stage that retains its verified toolchain and standard-library bytes while runtime-core creates and drops each two-step compile/link pipeline. A graceful boundary asks every active language stage to release its resources, waits for its shutdown acknowledgement, then waits for the outer compiler Worker to acknowledge quiescence before starting the next generation. Python's compiler stage is disposable, and the outer Wasmer Runtime is initialized lazily only for C, C++, JavaScript, or TypeScript. Cancellation, restart, timeout, cache clearing, disposal, and infrastructure failure remain hard-termination boundaries. `precompile()` provides safe compile-ahead for edit–test loops: a matching foreground compile joins the exact in-flight request or loads its content-addressed artifact, while `supersedePrecompile()` cancels stale speculative work without cancelling a foreground build.
+Deploy each installed toolchain package's exported `assets/` directory to an HTTP directory. A
+single directory may contain all five packages when filenames remain unchanged.
 
 ```ts
-import { Forge } from "@wasm-oj/forge/browser";
+import { createBrowserEngine } from "@wasm-oj/browser";
+import { browserSource as clangSource } from "@wasm-oj/toolchain-clang";
+import { browserSource as rustSource } from "@wasm-oj/toolchain-rust";
+import { browserSource as goSource } from "@wasm-oj/toolchain-go";
+import { browserSource as pythonSource } from "@wasm-oj/toolchain-python";
+import { browserSource as javascriptSource } from "@wasm-oj/toolchain-javascript";
 
-const forge = await Forge.create({
-  assetBaseUrl: "/toolchains/",
+const toolchainBase = "/toolchains/";
+const engine = await createBrowserEngine({
+  toolchains: [
+    clangSource(toolchainBase),
+    rustSource(toolchainBase),
+    goSource(toolchainBase),
+    pythonSource(toolchainBase),
+    javascriptSource(toolchainBase),
+  ],
   artifactCache: true,
 });
 
-try {
-  const input = {
-    language: "typescript" as const,
-    entry: "src/main.ts",
-    files: {
-      "src/main.ts": 'import * as std from "std";\nstd.out.puts("42\\n");\n',
-    },
-  };
-  // Optional: call after an editor idle debounce.
-  void forge.precompile(input);
+const build = await engine.compile({
+  language: "rust",
+  target: "wasip1",
+  optimization: "release",
+  entry: "main.rs",
+  files: { "main.rs": 'fn main() { println!("42"); }' },
+});
 
-  const build = await forge.compile(input);
-
-  if (!build.success || !build.artifact) {
-    console.table(build.diagnostics);
-    throw new Error("Compilation failed.");
-  }
-
-  const result = await forge.run(build.artifact, {
-    stdin: "7 35\n",
-    determinism: {
-      randomSeed: 42,
-      realtimeEpochMs: Date.UTC(2000, 0, 1),
-      clockStepNs: 1_000_000,
-    },
-  });
-
+if (build.artifact) {
+  const result = await engine.run(build.artifact, { stdin: "" });
   console.log(result.stdout);
-} finally {
-  forge.dispose();
 }
+
+engine.dispose();
 ```
 
-`submit()` is the production OJ boundary: each FIFO submission owns its ID,
-state, abort signal, result, cancellation, and structured event stream;
-`onObservation()` provides the same sequence-correlated events at engine scope.
-`execute()` remains available for one-shot use. `onProgress()` and `onStream()`
-are lower-level direct-operation signals; `precompile()`,
-`supersedePrecompile()`, `cancel()`, `restart()`, `clearCache()`, and `dispose()`
-manage scheduling and lifecycle. Public asynchronous infrastructure failures
-are `ForgeError` records; compiler diagnostics, guest termination, and judge
-verdicts remain result data. A production browser host must provide
-`Cross-Origin-Opener-Policy: same-origin`,
-`Cross-Origin-Embedder-Policy: require-corp`, and
-`Cross-Origin-Resource-Policy: same-origin`. Forge uses same-origin `blob:`
-bootstraps for its module Workers, so a Content Security Policy must include
-`worker-src 'self' blob:`. The packed compiler, runner, Python-stage,
-Rust-stage, Go-stage, and Wasmer secondary-worker assets must all remain
-deployed at their emitted reachable URLs. Toolchains may use another base URL
-only when that host provides CORS and Cross-Origin-Resource-Policy headers
-compatible with the page's COEP policy.
+The page must be cross-origin isolated. Serve documents with COOP `same-origin`, COEP
+`require-corp`, and CORP `same-origin`; CSP must permit `worker-src 'self' blob:`. Toolchain
+requests address the immutable asset filename and append its digest query to any query parameters
+configured on the source base URL. They never contain source, stdin, diagnostics, or artifacts.
 
-The package exposes a strict public export map for npm, workspace, and packed-
-tarball consumers. `pnpm run library:build` emits the three entries,
-declarations, browser Worker assets, and isolated server stages;
-`pnpm run library:verify` validates the official Wasmer SDK integrity, package
-boundary, licenses, packed contents, and NodeNext consumer types. A browser
-host must serve the files in `public/toolchains/` at its configured
-`assetBaseUrl` (the default is `/toolchains/`). The package also exports
-`@wasm-oj/forge/toolchain-cache-sw.js`; copy that file unchanged to a
-same-origin public URL whose service-worker scope covers `assetBaseUrl`, then
-register that exact URL through the browser entrypoint:
+## Server host
+
+The server package ships the native runtime source, not opaque prebuilt host executables. Build
+`wasm-oj-compiler` and `wasm-oj-runner` while constructing the deployment image:
+
+```sh
+pnpm --dir node_modules/@wasm-oj/server run runtime:build-native
+```
+
+Then pass the runtime directory and installed package-owned toolchain directories explicitly:
 
 ```ts
-import { registerToolchainCache } from "@wasm-oj/forge/browser";
+import { createServerEngine } from "@wasm-oj/server";
+import { serverSource as clangSource } from "@wasm-oj/toolchain-clang";
+import { serverSource as rustSource } from "@wasm-oj/toolchain-rust";
+import { serverSource as goSource } from "@wasm-oj/toolchain-go";
+import { serverSource as pythonSource } from "@wasm-oj/toolchain-python";
+import { serverSource as javascriptSource } from "@wasm-oj/toolchain-javascript";
 
-await registerToolchainCache({
-  scriptUrl: "/toolchain-cache-sw.js",
-  scope: "/",
+const engine = await createServerEngine({
+  runtimeDirectory: "/srv/wasm-oj/runtime/release",
+  cacheDirectory: "/var/cache/wasm-oj",
+  toolchains: [
+    clangSource(),
+    rustSource(),
+    goSource(),
+    pythonSource(),
+    javascriptSource(),
+  ],
 });
 ```
 
-The default options match a host that places the exported file at
-`/toolchain-cache-sw.js`. The registration helper waits for that registration's
-own worker to activate; it does not wait on an unrelated global scope.
-Size-limited static deployments may additionally pass
-`chunkManifestUrl: "/toolchains/forge-sites-chunks.json"` after generating that
-canonical manifest and its content-addressed parts. This mode is explicit: npm
-consumers serving the canonical monolithic assets do not probe for, or silently
-fall back through, a second transport. The service worker verifies each chunk's
-declared length and SHA-256 before streaming it, and the compiler worker verifies
-the reconstructed compressed asset against its pinned SHA-256 before
-decompression or use.
-`prepack` performs both build and verification, including real registration of
-the service-worker asset from the packed tarball.
+Startup verifies both executables and every declared asset. It does not search the filesystem,
+download missing files, invoke a host compiler for user code, or fall back to another distribution.
 
-`judgeProject()` compiles once and evaluates a versioned, data-oriented `JudgeSpec`. Named input providers and matchers are registries, so downstream applications can add remote-data adapters, digest-verified fixtures, token/float/property checkers, or domain-specific verdict logic without changing the engine. Custom matcher configuration must remain serialization-safe when a host persists or transfers the specification. See [Library contract](docs/library-contract.md).
+## Organizer and collection CLI
 
-Batch cases may mount multiple input files and collect explicit output paths. Built-in matchers cover text, SHA-256, tokens, floating-point tolerance, sets/multisets, and exact output-file sets. `wasmCheckerMatcher()` executes a compiled standalone Wasm checker through the same `ForgeRunner` sandbox. Interactive cases run contestant and interactor concurrently with full-duplex pipes, independent resource budgets, deterministic clocks/randomness, and secret files mounted only on the interactor side.
+Install `@wasm-oj/organizer` in a problem repository and use its single executable:
 
-`createDefaultDependencyManager()` installs real native-lockfile adapters for
-Cargo crates, npm packages, PyPI distributions, Go modules, and C/C++
-libraries. They consume Cargo.lock v3/v4 checksums, package-lock v2/v3 SRI,
-exact hash-locked requirements, go.mod plus Go's official `h1` ZIP hash, or an
-explicit Forge C/C++ lock. `resolveDependencies()` produces the canonical lock;
-`prepareDependencies()` verifies and extracts it into an archive-independent
-`DependencyBuildBundle`. Passing that bundle as `CompileInput.dependencies`
-really mounts and compiles the admitted source/package tree, and binds the lock
-and every file-tree digest into object/link/artifact cache identity and replay
-provenance. Forge does not pretend to be a second semver solver: roots must be
-exact, and build scripts, proc macros, native extensions, npm ESM/lifecycle
-packages, Python sdists, cgo/assembly, and prebuilt C/C++ objects fail closed.
-Browser IndexedDB, server filesystem, and offline bundle transports implement
-the same integrity contract.
+```sh
+pnpm exec wasm-oj-collection build .
+pnpm exec wasm-oj-collection validate .
+pnpm exec wasm-oj-collection verify .
+```
 
-`ForgeReplayBundle` is the portable replay boundary. `createForgeReplayBundle()` normalizes ephemeral project/artifact timestamps, embeds source, artifact, optional offline dependencies, the exact run or self-contained judge contract, and its deterministic transcript. `encodeForgeReplayBundle()` emits a canonical `FORGRPL1` binary envelope with sorted, deduplicated SHA-256 blobs; decode rejects corruption, non-canonical JSON, missing or unused blobs, trailing bytes, and contract drift. `forge.replay()` recompiles by default, compares the stable artifact digest, reruns or re-judges, and reports field-level deterministic mismatches. Provider-backed judge inputs must be materialized inline; built-in matchers, Wasm checkers, and interactors remain portable because their artifacts are embedded.
+The Organizer boundary validates canonical schema, normalized paths, bounded byte lengths,
+digests, and deployable `WOJJDG02` judge packages. Reference solutions remain author-owned input;
+Organizer does not compile, execute, score, benchmark, or decide whether they are correct.
 
-The server host resolves and verifies the provisioned package distribution,
-constructs compiler, runner, artifact/dependency stores, and returns the same
-ready high-level engine in one call:
+Official Submit is the execution boundary. It compiles a user's source inside a one-shot Container
+and judges it against the already published immutable package with no public dependency network.
+
+## Compatibility contract
+
+All active wire and storage identities use contract 2:
 
 ```ts
-import { createServerForge } from "@wasm-oj/forge/server";
-
-const forge = await createServerForge();
-
-const { build, run } = await forge.execute({
-  language: "typescript",
-  entry: "src/main.ts",
-  files: { "src/main.ts": 'import * as std from "std";\nstd.out.puts("42\\n");' },
-});
+WASM_OJ_CONTRACT_VERSION = 2
+WASM_OJ_CONTRACT_ID = "wasm-oj-v2"
 ```
 
-`createServerForge({ runtimeDirectory, toolchainDirectory, cacheDirectory })`
-accepts explicit immutable deployment paths. Startup verifies real executable
-files and every pinned toolchain SHA-256, and never downloads or builds a
-fallback. The lower-level `ServerForgeCompiler`, `ServerForgeRunner`,
-`FileSystemArtifactStore`, and `FileSystemDependencyCache` remain exported for
-hosts that need custom composition.
+Contract 2 covers compiler/runner requests, artifacts, judge specifications, deterministic inputs,
+metering, replay, caches, package descriptors, and conformance evidence. Older shapes are rejected;
+there is no compatibility shim or silent migration path.
 
-`ServerForgeCompiler` starts a fresh isolated Node/Wasmer child for each
-uncached build, so independent library instances do not share scheduler state
-and cancellation can kill the compiler. Server runtime-package preparation is
-also a one-shot Node/Wasmer child; the parent keeps only verified bytes and can
-kill a stalled preparation at its 120-second control deadline. After
-preparation, `ServerForgeRunner` starts a fresh native runtime-core process for
-each run, which supplies the separate guest wall boundary. Call
-`cancelAndWait()` before manually clearing runtime storage; `ForgeEngine`
-already enforces that ordering.
+Host and infrastructure failures use the stable `WasmOjError` envelope. Compiler diagnostics and
+guest verdicts remain typed domain results rather than exceptions.
 
-Forge intentionally does not ship an opaque platform binary and does not run a
-compiler during package installation. The publish tarball instead contains the
-exact `runtime-core` Rust source, `Cargo.lock`, the pinned `rust-toolchain.toml`,
-and the two audited local Cargo patches needed by that lockfile. Provision one
-native compiler/runner pair explicitly before starting a server:
+Binary envelopes are also versioned and fail closed:
 
-```bash
-# Forge source checkout; outputs forge-compiler and forge-runner under target/release.
-pnpm run runtime:build-native
+| Format | Magic |
+| --- | --- |
+| Replay bundle | `WOJRPL02` |
+| Immutable judge package | `WOJJDG02` |
+| Runtime filesystem archive | `WOJFS002` |
+| Go shared-file archive | `WOJGO002` |
 
-# Installed package; keep generated artifacts outside node_modules.
-pnpm --dir node_modules/@wasm-oj/forge run runtime:build-native \
-  --target-dir /srv/wasm-oj-forge-runtime
-```
+See [versioning](docs/versioning.md), the [library contract](docs/library-contract.md), and the
+[host integration guide](docs/integration-guide.md).
 
-The second command produces both executables under
-`/srv/wasm-oj-forge-runtime/release`, which can be passed as
-`createServerForge({ runtimeDirectory })`. Both commands use the package-root
-toolchain pin and `cargo build
---locked`; registry dependencies are fetched only during this explicit server
-provisioning step. The packed-package verifier builds this source contract and
-then runs a TypeScript program through the packed `ServerForgeCompiler` and
-`ServerForgeRunner`, so a missing source, patch, stage, or executable boundary
-fails publication.
+## Supported languages
 
-## Deterministic execution contract
+| Language | Compiler path | Artifact/runtime |
+| --- | --- | --- |
+| C | Clang 22 cc1 + LLD with pinned WASI P1 arguments | Standalone Wasm |
+| C++ | Clang 22, libc++ and optional pinned PCH + LLD | Standalone Wasm |
+| Rust | rustc 1.91.1-dev + matching standard library + wasm-ld | Standalone Wasm |
+| Go | Go 1.26.5 `compile` + `link` + pinned `wasip1` standard library | Standalone Wasm |
+| Python | CPython 3.14.6 bytecode preparation | Runtime bundle executed by CPython/WASI |
+| JavaScript | TypeScript-Go checking/emit | Runtime bundle executed by QuickJS-ng 0.15.1 |
+| TypeScript | TypeScript-Go checking/emit | Runtime bundle executed by QuickJS-ng 0.15.1 |
 
-Every run requires a validated random seed, realtime epoch, and virtual-clock step. Defaults are seed `0x5eed1234`, `2000-01-01T00:00:00Z`, and one millisecond per observation. Given the same artifact, stdin, args, environment, and determinism configuration, the supported single-threaded language surface produces the same exit code, stdout, and stderr.
+`wasix` is a profile identity for the admitted C/C++ output; it does not silently select a second
+compiler ABI. Unsupported language/target/profile combinations fail before compilation.
 
-- The runtime core replaces WASI and WASIX `random_get`, `clock_time_get`, `clock_res_get`, and `poll_oneoff` imports before instantiation, and virtualizes WASIX `thread_sleep`. C and C++ link only an entropy adapter; their wasi-libc clock and sleep calls, plus the unchanged Rust and Go standard-library calls, reach this shared host clock directly.
-- Python starts through a bundled bootstrap that controls `random`, `Random()`, `os.urandom`, `secrets`, UUID entropy, timezone, and locale. CPython's native `time`, `datetime`, and sleep implementations reach the shared host clock; interpreter hash randomization is fixed independently.
-- JavaScript and TypeScript install deterministic `Math.random`, `performance`, `crypto.getRandomValues`, and `crypto.randomUUID` before loading user modules. Native QuickJS `Date` reaches the shared host clock, and `performance.now()` derives from it relative to the configured epoch.
-- Each run receives a fresh Wasmer instance and seekable ephemeral filesystem. Supported socket, network, process-spawn, and thread-spawn imports are replaced with signature-preserving traps before instantiation; unknown import namespaces or functions are rejected. Deterministic WASIX helpers such as thread identity, reported parallelism, and logical sleep remain available but cannot create guest concurrency.
+## Determinism and judging
 
-`durationMs`, build duration, artifact IDs, and creation timestamps are host observations and are outside the deterministic transcript. The clock is logical: every supported clock observation advances it by `clockStepNs`; language sleep and relative or absolute clock polling advance it by the requested virtual duration without waiting. `logicalTimeLimitMs` bounds this deterministic elapsed time independently of the emergency wall deadline.
+The Rust runtime core is built for browser Wasm and native server hosts. It validates imports,
+instruments weighted instructions, enforces deterministic random/clock inputs, bounds memory,
+output and filesystem growth, and records normalized metrics. Browser and server hosts use the
+same artifact and judge contracts.
 
-## Run locally
+Batch judging supports text, SHA-256, token, float, set/multiset, file-set, and sandboxed Wasm
+checker matchers. Interactive judging connects contestant and interactor through bounded
+full-duplex pipes with separate resource policies. `instructionBudget` is the portable scoring
+boundary; wall time is only a host safety deadline.
 
-Requirements: Node.js 24.18 and a modern browser with
-`SharedArrayBuffer` support. Building the optional native server runner also
-requires rustup/Cargo; the package pins Rust 1.97.1.
+Dependencies enter compilation only as a verified, archive-independent `DependencyBuildBundle`.
+Online resolution requires a host-supplied `DependencyNetworkAuthorizer` plus an explicit immutable
+repository/bundle/host scope. See [dependency network consent](docs/dependency-network-consent.md).
 
-```bash
+## Online Judge product boundary
+
+Local Build, Run, and Judge remain browser-only. Official Submit accepts canonical source files,
+rebuilds them in a one-shot Container, and scores them against immutable judge data. The server
+ignores client artifacts, limits, verdicts, and hidden-data claims.
+
+Catalog import and publication are static Organizer operations. They validate exact-commit schema,
+paths, sizes, digests, canonical encoding, redaction, and judge-package deployability. They do not
+start a Container or evaluate reference solutions. See the [Cloudflare Online Judge](docs/cloudflare-online-judge.md)
+and [production deployment](docs/cloudflare-deployment-plan.md) guides.
+
+## Development
+
+The repository uses Node 24 and pnpm 10:
+
+```sh
 corepack enable
 pnpm install --frozen-lockfile
-pnpm run dev
+pnpm dev
 ```
 
-Open the printed local URL. The development and production servers send COOP, COEP, and CORP headers because the Wasmer SDK uses `SharedArrayBuffer` and host-side Workers. Forge supplies the SDK's official `workerUrl` protocol with a custom secondary worker: it validates the SDK initialization envelope, disables registry access, calls `initSync` with a page-aligned 1 MiB secondary stack, then installs the validated `sdkUrl` in the same order as the official SDK worker. The packed browser build emits the SDK facade and Wasm modules as external content-hashed assets rather than data URLs. These secondary workers belong to the host compiler/runtime implementation and do not expose guest thread-spawn capability. The production launcher serves emitted `.wasm` assets as `application/wasm`, preserving streaming WebAssembly compilation.
+Useful verification commands:
 
-Useful checks:
-
-```bash
+```sh
 pnpm run typecheck
+pnpm run lint
 pnpm test
-pnpm run contract:verify
 pnpm run library:build
 pnpm run library:verify
-pnpm run runtime:test
-pnpm run runtime:check-web
+pnpm run docs:verify
+pnpm run licenses:verify
 pnpm run build
 ```
 
-## Local-first storage and network policy
+Package release instructions are in [docs/releasing.md](docs/releasing.md). Toolchain provenance,
+asset digests, and rebuild commands are in [public/toolchains/README.md](public/toolchains/README.md).
 
-- Per-problem language drafts and build artifacts are stored in IndexedDB. `ForgeStorageCoordinator` applies one cross-tab Web Locks admission policy across artifacts, dependency payloads, the incremental build graph, runtime files, and toolchains. It enforces logical and browser-quota headroom, then evicts by retention class and LRU; toolchains have the highest retention priority.
-- Solved-problem progress is stored in localStorage.
-- Browser compiler packages, runtime modules, and standard libraries are fetched as digest-pinned static files from the configured `assetBaseUrl` (same-origin `/toolchains/` by default). Each same-origin request carries the expected SHA-256 as its cache key; the bundled service worker verifies both cache hits and network responses, removes stale same-path content, and treats persistence failure as an optimization failure rather than a failed verified fetch. A cross-origin asset host controls its own HTTP caching. Generated runtime filesystem archives use a caller-selected cache directory on the server.
-- The versioned TypeScript and QuickJS-ng WASI assets are built reproducibly from pinned upstream revisions. Their `.wasm.gz.bin` suffix keeps artifact compression distinct from HTTP `Content-Encoding`.
-- Rust verifies one source-traceable WebC and its provenance manifest by SHA-256, then runs the package's `rustc` and `wasm-ld` commands under Wasmer. The compiler, matching standard library, pinned linker, and linker resources stay inside that package; there is no host compiler, linker, or registry resolution.
-- C/C++ verifies the decompressed Clang WebC, WASI P1 sysroot, single pinned cc1/`wasm-ld` manifest, and two reproducible toolchain-admitted libc++ PCH profiles by SHA-256. Within a bounded Worker generation, unchanged translation units reuse dependency-validated objects; compressed PCH/toolchain responses remain in Cache Storage across generations. The real C++ PCH conformance case compiles and executes below the ten-second target on the native Wasmer host.
-- Compile and run paths perform no runtime registry resolution. Asset fetches are static GET requests and contain no source, stdin, environment, diagnostics, or artifact data. Guest network imports are denied by the runtime policy rather than routed to a host network implementation.
-- Clearing caches is available under Build settings.
+## Security and licenses
 
-See [Architecture](docs/architecture.md) for the worker protocol, compilation pipelines, artifact model, and trust boundaries.
-The latest recorded browser/server parity and efficiency measurements are in [the conformance report](docs/conformance-report.md).
-The open Git repository contract is documented in [Problem collection loading](docs/problem-catalog.md),
-and the managed service is covered by [Cloudflare Online Judge deployment](docs/cloudflare-online-judge.md).
+WASM-OJ executes hostile guest programs by design; review [SECURITY.md](SECURITY.md) before a
+production deployment. Project source is MIT licensed. Distributed toolchains and runtime
+dependencies retain their upstream licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+and the machine-verifiable [`licenses/components.json`](licenses/components.json) inventory.

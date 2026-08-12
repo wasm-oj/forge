@@ -7,8 +7,7 @@ import {
 } from "./contracts";
 
 const SUBMISSION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const POLL_INTERVAL_MS = 1_000;
-const FAILURE_BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 10_000] as const;
+const POLL_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000] as const;
 
 function exactObject(value: unknown, keys: readonly string[], label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError(`${label} must be an object.`);
@@ -174,7 +173,10 @@ export class SubmissionEventPollingClient {
   private readonly focusTarget: FocusEventTarget | null;
   private readonly onEvent: (event: SequencedSubmissionEvent) => void;
   private readonly onStatus?: (status: SubmissionPollingStatus) => void;
-  private readonly onFocus = (): void => this.wake();
+  private readonly onFocus = (): void => {
+    this.idleBackoffIndex = 0;
+    this.wake();
+  };
   private cursorValue: number;
   private terminalState?: SubmissionState;
   private stoppedReason?: string;
@@ -182,6 +184,7 @@ export class SubmissionEventPollingClient {
   private delayTimer?: ReturnType<typeof setTimeout>;
   private delayResolve?: () => void;
   private started = false;
+  private idleBackoffIndex = 0;
 
   constructor(options: SubmissionEventPollingOptions) {
     if (!Number.isSafeInteger(options.initialCursor ?? 0) || (options.initialCursor ?? 0) < 0) {
@@ -237,7 +240,8 @@ export class SubmissionEventPollingClient {
     this.cursorValue = event.sequence;
   }
 
-  private async poll(): Promise<{ readonly fullPage: boolean }> {
+  private async poll(): Promise<{ readonly advanced: boolean; readonly fullPage: boolean }> {
+    const cursorBeforePoll = this.cursorValue;
     this.activeAbort = new AbortController();
     let response: Response;
     try {
@@ -248,7 +252,7 @@ export class SubmissionEventPollingClient {
         signal: this.activeAbort.signal,
       });
     } catch (error) {
-      if (this.stoppedReason) return { fullPage: false };
+      if (this.stoppedReason) return { advanced: false, fullPage: false };
       throw new SubmissionEventTransportError(error instanceof Error ? `Submission event poll failed: ${error.message}` : "Submission event poll failed.");
     } finally {
       this.activeAbort = undefined;
@@ -273,8 +277,8 @@ export class SubmissionEventPollingClient {
     }
     this.cursorValue = replay.nextCursor;
     const fullPage = replay.events.length === 100;
-    if (!fullPage && isTerminalSubmissionState(replay.state)) this.terminalState = replay.state;
-    return { fullPage };
+    if (!fullPage && isTerminalSubmissionState(replay.summary.state)) this.terminalState = replay.summary.state;
+    return { advanced: this.cursorValue > cursorBeforePoll, fullPage };
   }
 
   async run(): Promise<SubmissionEventPollingResult> {
@@ -287,7 +291,7 @@ export class SubmissionEventPollingClient {
       while (!this.stoppedReason) {
         this.status(firstPoll ? "replaying" : "connected", failureCount);
         try {
-          const { fullPage } = await this.poll();
+          const { advanced, fullPage } = await this.poll();
           if (this.stoppedReason) break;
           failureCount = 0;
           firstPoll = false;
@@ -296,7 +300,12 @@ export class SubmissionEventPollingClient {
             this.status("completed", 0);
             return { kind: "terminal", state: this.terminalState, cursor: this.cursorValue };
           }
-          if (!fullPage) await this.wait(POLL_INTERVAL_MS);
+          if (!fullPage) {
+            if (advanced) this.idleBackoffIndex = 0;
+            const delay = POLL_BACKOFF_MS[this.idleBackoffIndex]!;
+            if (!advanced) this.idleBackoffIndex = Math.min(this.idleBackoffIndex + 1, POLL_BACKOFF_MS.length - 1);
+            await this.wait(delay);
+          }
         } catch (error) {
           if (this.stoppedReason) break;
           if (error instanceof SubmissionEventProtocolError) throw error;
@@ -304,7 +313,7 @@ export class SubmissionEventPollingClient {
           const reason = error instanceof Error ? error.message : "event polling transport failed";
           this.status("disconnected", failureCount - 1, reason);
           this.status("reconnecting", failureCount);
-          await this.wait(FAILURE_BACKOFF_MS[Math.min(failureCount - 1, FAILURE_BACKOFF_MS.length - 1)]!);
+          await this.wait(POLL_BACKOFF_MS[Math.min(failureCount - 1, POLL_BACKOFF_MS.length - 1)]!);
           firstPoll = false;
         }
       }

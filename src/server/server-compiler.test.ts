@@ -4,16 +4,17 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createForgeEngine } from "../sdk/engine";
+import { createEngine } from "../sdk/engine";
 import { createSdkProject } from "../sdk/project";
-import { ServerForgeCompiler } from "./server-compiler";
-import { ServerForgeRunner } from "./server-runner";
+import { ServerCompiler } from "./server-compiler";
+import { ServerRunner } from "./server-runner";
+import { testToolchains } from "./test-toolchains.test-helper";
 
 describe("server compiler and runner", () => {
   it("rejects malformed direct compiler inputs before starting an isolated stage", async () => {
-    const compiler = new ServerForgeCompiler({
+    const compiler = new ServerCompiler({
       compilerExecutable: process.execPath,
-      toolchainDirectory: path.resolve("public/toolchains"),
+      toolchains: testToolchains(),
     });
     const malformed = createSdkProject({
       language: "javascript",
@@ -34,9 +35,9 @@ describe("server compiler and runner", () => {
   });
 
   it("captures complete Rust warning and error diagnostics", { timeout: 300_000 }, async () => {
-    const compiler = new ServerForgeCompiler({
+    const compiler = new ServerCompiler({
       compilerExecutable: process.execPath,
-      toolchainDirectory: path.resolve("public/toolchains"),
+      toolchains: testToolchains(),
     });
     await compiler.ready();
     try {
@@ -90,19 +91,19 @@ describe("server compiler and runner", () => {
       "--manifest-path",
       "crates/runtime-core/Cargo.toml",
       "--bin",
-      "forge-runner",
+      "wasm-oj-runner",
     ], { stdio: "pipe" });
-    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-server-test-"));
-    const compiler = new ServerForgeCompiler({
+    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-server-test-"));
+    const compiler = new ServerCompiler({
       compilerExecutable: process.execPath,
-      toolchainDirectory: path.resolve("public/toolchains"),
+      toolchains: testToolchains(),
     });
-    const runner = new ServerForgeRunner({
-      runtimeExecutable: path.resolve("crates/runtime-core/target/debug/forge-runner"),
-      toolchainDirectory: path.resolve("public/toolchains"),
+    const runner = new ServerRunner({
+      runtimeExecutable: path.resolve("crates/runtime-core/target/debug/wasm-oj-runner"),
+      toolchains: testToolchains(),
       cacheDirectory,
     });
-    const engine = await createForgeEngine({ compiler, runner });
+    const engine = await createEngine({ compiler, runner });
     try {
       const execution = await engine.execute({
         language: "typescript",
@@ -163,19 +164,19 @@ describe("server compiler and runner", () => {
       "--manifest-path",
       "crates/runtime-core/Cargo.toml",
       "--bin",
-      "forge-runner",
+      "wasm-oj-runner",
     ], { stdio: "pipe" });
-    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-rust-server-test-"));
-    const compiler = new ServerForgeCompiler({
+    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-rust-server-test-"));
+    const compiler = new ServerCompiler({
       compilerExecutable: process.execPath,
-      toolchainDirectory: path.resolve("public/toolchains"),
+      toolchains: testToolchains(),
     });
-    const runner = new ServerForgeRunner({
-      runtimeExecutable: path.resolve("crates/runtime-core/target/debug/forge-runner"),
-      toolchainDirectory: path.resolve("public/toolchains"),
+    const runner = new ServerRunner({
+      runtimeExecutable: path.resolve("crates/runtime-core/target/debug/wasm-oj-runner"),
+      toolchains: testToolchains(),
       cacheDirectory,
     });
-    const engine = await createForgeEngine({ compiler, runner });
+    const engine = await createEngine({ compiler, runner });
     try {
       const execution = await engine.execute({
         language: "rust",

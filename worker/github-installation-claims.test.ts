@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { hmacSha256Hex, sha256Hex } from "./crypto";
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 import { MAX_GITHUB_INSTALLATION_REPOSITORY_CHANGES } from "./github";
 import {
   activateGithubInstallationClaim,
@@ -163,7 +163,7 @@ describe("GitHub installation ownership claims", () => {
       installation: { id: INSTALLATION, app_id: 12_345, account: { id: ACCOUNT, login: "managed-account" } },
       sender: { id: GITHUB_A, login: "organizer-a" },
     });
-    const signedRequest = async (signature: string) => new Request("https://forge.example.test/api/github/webhook", {
+    const signedRequest = async (signature: string) => new Request("https://wasm-oj.example.test/api/github/webhook", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -173,7 +173,7 @@ describe("GitHub installation ownership claims", () => {
       },
       body,
     });
-    const env = { CORE_DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv;
+    const env = { DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as WasmOjWorkerEnv;
 
     await expect(githubWebhook(await signedRequest("0".repeat(64)), env)).rejects.toMatchObject({
       code: "github-webhook-signature",
@@ -208,7 +208,7 @@ describe("GitHub installation ownership claims", () => {
         repositories_removed: removed,
       });
       const bytes = new TextEncoder().encode(body);
-      return githubWebhook(new Request("https://forge.example.test/api/github/webhook", {
+      return githubWebhook(new Request("https://wasm-oj.example.test/api/github/webhook", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -217,7 +217,7 @@ describe("GitHub installation ownership claims", () => {
           "x-hub-signature-256": `sha256=${await hmacSha256Hex(secret, bytes)}`,
         },
         body,
-      }), { CORE_DB: forbiddenD1, GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
+      }), { DB: forbiddenD1, GITHUB_WEBHOOK_SECRET: secret } as WasmOjWorkerEnv);
     };
     const boundary = Array.from({ length: MAX_GITHUB_INSTALLATION_REPOSITORY_CHANGES }, (_, id) => ({ id: id + 1 }));
 
@@ -269,7 +269,7 @@ describe("GitHub installation ownership claims", () => {
         },
         sender: { id: GITHUB_A, login: "organizer-a" },
       });
-      return githubWebhook(new Request("https://forge.example.test/api/github/webhook", {
+      return githubWebhook(new Request("https://wasm-oj.example.test/api/github/webhook", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -278,7 +278,7 @@ describe("GitHub installation ownership claims", () => {
           "x-hub-signature-256": `sha256=${await hmacSha256Hex(secret, new TextEncoder().encode(body))}`,
         },
         body,
-      }), { CORE_DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
+      }), { DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as WasmOjWorkerEnv);
     };
 
     expect((await deliver("delivery-permission-write", { contents: "write", metadata: "read" }, "selected")).status).toBe(200);
@@ -318,7 +318,7 @@ describe("GitHub installation ownership claims", () => {
       sender: { id: GITHUB_A, login: "organizer-a" },
     });
     const signature = await hmacSha256Hex(secret, new TextEncoder().encode(body));
-    const response = await githubWebhook(new Request("https://forge.example.test/api/github/webhook", {
+    const response = await githubWebhook(new Request("https://wasm-oj.example.test/api/github/webhook", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -327,7 +327,7 @@ describe("GitHub installation ownership claims", () => {
         "x-hub-signature-256": `sha256=${signature}`,
       },
       body,
-    }), { CORE_DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv);
+    }), { DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as WasmOjWorkerEnv);
 
     expect(response.status).toBe(200);
     expect(database.prepare("SELECT COUNT(*) AS count FROM github_installation_claim_proofs WHERE installer_github_user_id=?").get(GITHUB_A)).toEqual({ count: 0 });
@@ -349,7 +349,7 @@ describe("GitHub installation ownership claims", () => {
     const bytes = new TextEncoder().encode(body);
     database.prepare("INSERT INTO github_webhook_deliveries (delivery_id, event_name, body_sha256, received_at, updated_at, attempts, outcome) VALUES (?, 'installation', ?, ?, ?, 1, 'failed')")
       .run(deliveryId, await sha256Hex(bytes), NOW, NOW);
-    const request = async (value: string) => new Request("https://forge.example.test/api/github/webhook", {
+    const request = async (value: string) => new Request("https://wasm-oj.example.test/api/github/webhook", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -359,7 +359,7 @@ describe("GitHub installation ownership claims", () => {
       },
       body: value,
     });
-    const env = { CORE_DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as ForgeWorkerEnv;
+    const env = { DB: d1, GITHUB_APP_ID: "12345", GITHUB_WEBHOOK_SECRET: secret } as WasmOjWorkerEnv;
     expect((await githubWebhook(await request(body), env)).status).toBe(200);
     expect(database.prepare("SELECT attempts, outcome FROM github_webhook_deliveries WHERE delivery_id=?").get(deliveryId)).toEqual({ attempts: 2, outcome: "accepted" });
     await expect(githubWebhook(await request(`${body} `), env)).rejects.toMatchObject({ code: "github-webhook-delivery-conflict" });
@@ -376,13 +376,13 @@ describe("GitHub installation ownership claims", () => {
     database.prepare("INSERT INTO github_installation_states (state_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
       .run(stateHash, USER_A, NOW, "2099-01-01T00:00:00.000Z");
     const env = {
-      CORE_DB: d1,
+      DB: d1,
       ENVIRONMENT: "development",
       STAGING_ALLOWED_GITHUB_USER_IDS: "",
-    } as ForgeWorkerEnv;
+    } as WasmOjWorkerEnv;
     const callback = (installationId: number) => new Request(
-      `https://forge.example.test/api/organizer/github/callback?state=${encodeURIComponent(rawState)}&installation_id=${installationId}&setup_action=install`,
-      { headers: { cookie: `forge_session=${sessionToken}; forge_install_state=${rawState}` } },
+      `https://wasm-oj.example.test/api/organizer/github/callback?state=${encodeURIComponent(rawState)}&installation_id=${installationId}&setup_action=install`,
+      { headers: { cookie: `wasm_oj_session=${sessionToken}; wasm_oj_install_state=${rawState}` } },
     );
 
     await expect(completeGithubAppInstall(callback(OTHER_INSTALLATION), env)).rejects.toMatchObject({
