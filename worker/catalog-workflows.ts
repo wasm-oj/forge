@@ -344,16 +344,32 @@ async function materializeJudgePackage(
   };
   const response = await rawBlobResponse(repository, blob, JUDGE_MAX_BYTES);
   if (!response.body) throw new Error("GitHub judge package response has no body.");
-  const created = await env.JUDGE_BUCKET.put(key, response.body, {
-    onlyIf: { etagDoesNotMatch: "*" },
-    sha256: problem.judge_package_sha256,
-    httpMetadata: { contentType: "application/octet-stream" },
-    customMetadata: {
-      schema: "wasm-oj-v2/judge-package",
+  const fixedLength = new FixedLengthStream(problem.judge_package_bytes);
+  const transferAbort = new AbortController();
+  const transfer = response.body.pipeTo(fixedLength.writable, { signal: transferAbort.signal });
+  let created: R2Object | null;
+  try {
+    created = await env.JUDGE_BUCKET.put(key, fixedLength.readable, {
+      onlyIf: { etagDoesNotMatch: "*" },
       sha256: problem.judge_package_sha256,
-      bytes: String(problem.judge_package_bytes),
-    },
-  });
+      httpMetadata: { contentType: "application/octet-stream" },
+      customMetadata: {
+        schema: "wasm-oj-v2/judge-package",
+        sha256: problem.judge_package_sha256,
+        bytes: String(problem.judge_package_bytes),
+      },
+    });
+  } catch (error) {
+    transferAbort.abort(error);
+    await transfer.catch(() => undefined);
+    throw error;
+  }
+  if (created === null) {
+    transferAbort.abort("conditional R2 create lost");
+    await transfer.catch(() => undefined);
+  } else {
+    await transfer;
+  }
   await assertJudgeObject(created ?? await env.JUDGE_BUCKET.head(key), {
     bytes: problem.judge_package_bytes,
     sha256: problem.judge_package_sha256,
