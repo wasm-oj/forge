@@ -268,7 +268,7 @@ export async function listRemoteR2Objects({
     });
     if (!response.ok) throw new Error(`Cloudflare R2 inventory returned HTTP ${response.status}.`);
     const page = await response.json();
-    if (!page || page.success !== true || !Array.isArray(page.result) || !page.result_info) {
+    if (!page || page.success !== true || !Array.isArray(page.result)) {
       throw new TypeError("Cloudflare R2 inventory returned an invalid response.");
     }
     for (const value of page.result) {
@@ -276,8 +276,12 @@ export async function listRemoteR2Objects({
       objects.push({ key: object.key, size: object.size, ...(object.etag === undefined ? {} : { etag: object.etag }) });
       if (objects.length > maximumObjects) throw new Error(`R2 inventory exceeds ${maximumObjects} objects.`);
     }
-    const next = page.result_info.cursor;
-    if (page.result_info.is_truncated === true || (typeof next === "string" && next.length > 0)) {
+    const resultInfo = page.result_info;
+    if (resultInfo !== undefined && (!resultInfo || typeof resultInfo !== "object" || Array.isArray(resultInfo))) {
+      throw new TypeError("Cloudflare R2 inventory pagination metadata is invalid.");
+    }
+    const next = resultInfo?.cursor;
+    if (resultInfo?.is_truncated === true || (typeof next === "string" && next.length > 0)) {
       if (typeof next !== "string" || next.length === 0 || cursors.has(next)) {
         throw new Error("Cloudflare R2 inventory pagination cursor is invalid or repeated.");
       }

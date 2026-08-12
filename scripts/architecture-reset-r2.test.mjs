@@ -107,9 +107,9 @@ test("R2 inventory paginates the bucket and separates conditional judge-package 
         result: second
           ? [{ key: `judge-packages/v1/${"b".repeat(64)}`, size: 20, etag: "etag-2" }]
           : [{ key: "imports/orphan", size: 10, etag: "etag-1" }],
-        result_info: second
-          ? { is_truncated: false, per_page: 1000 }
-          : { is_truncated: true, cursor: "next-page", per_page: 1000 },
+        ...(second
+          ? {}
+          : { result_info: { is_truncated: true, cursor: "next-page", per_page: 1000 } }),
       });
     },
   });
