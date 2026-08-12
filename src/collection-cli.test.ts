@@ -3,7 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { canonicalJsonBytes } from "./core/canonical-json";
-import { BROWSER_PROBLEM_SCHEMA } from "./judge/problem-catalog-loader";
+import {
+  BROWSER_PROBLEM_SCHEMA,
+  problemCollectionRevision,
+  type ProblemCollectionIndex,
+} from "./judge/problem-catalog-loader";
 import { PROBLEMS } from "./judge/problems";
 import { validateJudgePackage } from "./online-judge/judge-package";
 import { runCollectionCli } from "./collection-cli";
@@ -71,18 +75,44 @@ describe("wasm-oj-collection CLI", () => {
     ]);
     await runCollectionCli(["verify", root]);
 
-    const index = JSON.parse(await readFile(path.join(root, "collection/index.json"), "utf8")) as {
-      revision: string;
-      problems: Array<{ bundle: { path: string; sha256: string } }>;
-    };
+    const indexFile = path.join(root, "collection/index.json");
+    const indexBytes = new Uint8Array(await readFile(indexFile));
+    const index = JSON.parse(new TextDecoder().decode(indexBytes)) as ProblemCollectionIndex;
+    expect(indexBytes).toEqual(canonicalJsonBytes(index));
     expect(index.revision).toMatch(/^[0-9a-f]{64}$/);
     expect(index.problems[0]?.bundle.path).toContain(index.problems[0]?.bundle.sha256);
-    const publicBundle = JSON.parse(await readFile(
-      path.join(root, "collection", index.problems[0]!.bundle.path),
-      "utf8",
-    )) as { problem: { judgeCases: Array<{ kind: string }> } };
+    const publicBundleBytes = new Uint8Array(await readFile(path.join(root, "collection", index.problems[0]!.bundle.path)));
+    const publicBundle = JSON.parse(new TextDecoder().decode(publicBundleBytes)) as {
+      problem: { judgeCases: Array<{ kind: string }> };
+    };
+    expect(publicBundleBytes).toEqual(canonicalJsonBytes(publicBundle));
     expect(publicBundle.problem.judgeCases.every((testCase) => testCase.kind === "sample")).toBe(true);
     expect(publicBundle.problem.judgeCases.length).toBeLessThan(problem.judgeCases.length);
+
+    await writeFile(indexFile, `${JSON.stringify(index, null, 2)}\n`);
+    await expect(runCollectionCli(["verify", root])).rejects.toThrow("collection/index.json is not canonical");
+
+    const prettyBundleBytes = new TextEncoder().encode(`${JSON.stringify(publicBundle, null, 2)}\n`);
+    const prettyBundleSha256 = await digest(prettyBundleBytes);
+    const prettyBundlePath = index.problems[0]!.bundle.path.replace(index.problems[0]!.bundle.sha256, prettyBundleSha256);
+    const indexWithPrettyBundle = {
+      ...index,
+      problems: [{
+        ...index.problems[0]!,
+        bundle: {
+          path: prettyBundlePath,
+          sha256: prettyBundleSha256,
+          bytes: prettyBundleBytes.byteLength,
+        },
+      }],
+    };
+    const rewrittenIndex = {
+      ...indexWithPrettyBundle,
+      revision: await problemCollectionRevision(indexWithPrettyBundle),
+    };
+    await writeFile(path.join(root, "collection", prettyBundlePath), prettyBundleBytes);
+    await writeFile(indexFile, canonicalJsonBytes(rewrittenIndex));
+    await expect(runCollectionCli(["verify", root])).rejects.toThrow(`${prettyBundlePath} is not canonical`);
   });
 
   it("fails verification after published bytes are changed", async () => {
