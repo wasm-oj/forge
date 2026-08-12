@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FORGE_CONTRACT_ID } from "../src/core/contract.ts";
+import { WASM_OJ_CONTRACT_ID } from "../src/core/contract.ts";
 import { PINNED_TOOLCHAIN_ASSET_SHA256 } from "../src/core/toolchains.ts";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -14,7 +14,7 @@ const clientRoot = path.join(distRoot, "client");
 const providerFileLimit = 25 * 1024 * 1024;
 const providerWorkerLimit = 10 * 1024 * 1024;
 const chunkByteLength = 16 * 1024 * 1024;
-const manifestName = "forge-sites-chunks.json";
+const manifestName = "wasm-oj-sites-chunks.json";
 const generatedNames: string[] = [];
 
 interface ChunkRecord {
@@ -49,7 +49,7 @@ async function stageChunkTransport(): Promise<ChunkedAssetRecord[]> {
     const chunks: ChunkRecord[] = [];
     for (let offset = 0, index = 0; offset < bytes.byteLength; offset += chunkByteLength, index += 1) {
       const chunk = bytes.slice(offset, Math.min(offset + chunkByteLength, bytes.byteLength));
-      const name = `${path.basename(assetPath)}.forge-chunk-${String(index).padStart(3, "0")}`;
+      const name = `${path.basename(assetPath)}.wasm-oj-chunk-${String(index).padStart(3, "0")}`;
       const chunkPath = `/toolchains/${name}`;
       await writeFile(path.join(publicToolchainRoot, name), chunk, { flag: "wx", mode: 0o644 });
       generatedNames.push(name);
@@ -59,7 +59,7 @@ async function stageChunkTransport(): Promise<ChunkedAssetRecord[]> {
   }
   if (assets.length === 0) throw new Error("Sites toolchain preparation found no provider-limit assets to chunk.");
   await writeFile(path.join(publicToolchainRoot, manifestName), `${JSON.stringify({
-    schema: `${FORGE_CONTRACT_ID}/sites-toolchain-chunks`,
+    schema: `${WASM_OJ_CONTRACT_ID}/sites-toolchain-chunks`,
     assets,
   }, null, 2)}\n`, { flag: "wx", mode: 0o644 });
   generatedNames.push(manifestName);
@@ -87,7 +87,7 @@ async function finalizeSitesOutput(assets: readonly ChunkedAssetRecord[]): Promi
   for (const asset of assets) await rm(path.join(clientRoot, asset.path.slice(1)));
   await removeVerifiedBrowserOnlyDuplicatesFromServer();
   const manifest = JSON.parse(await readFile(path.join(clientRoot, "toolchains", manifestName), "utf8"));
-  if (manifest.schema !== `${FORGE_CONTRACT_ID}/sites-toolchain-chunks`
+  if (manifest.schema !== `${WASM_OJ_CONTRACT_ID}/sites-toolchain-chunks`
     || JSON.stringify(manifest.assets) !== JSON.stringify(assets)) {
     throw new Error("vinext output does not contain the exact staged Sites chunk manifest.");
   }
@@ -160,7 +160,7 @@ async function removeVerifiedBrowserOnlyDuplicatesFromServer(): Promise<void> {
 async function cleanupStaging(): Promise<void> {
   const names = new Set(generatedNames);
   for (const name of await readdir(publicToolchainRoot)) {
-    if (name === manifestName || name.includes(".forge-chunk-")) names.add(name);
+    if (name === manifestName || name.includes(".wasm-oj-chunk-")) names.add(name);
   }
   await Promise.all([...names].map((name) => rm(path.join(publicToolchainRoot, name), { force: true })));
   generatedNames.length = 0;

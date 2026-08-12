@@ -1,4 +1,4 @@
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 
 function cspNonce(): string {
   const bytes = new Uint8Array(24);
@@ -6,7 +6,7 @@ function cspNonce(): string {
   return btoa(String.fromCharCode(...bytes));
 }
 
-export async function withSecurityHeaders(response: Response, env: ForgeWorkerEnv, nonce = cspNonce()): Promise<Response> {
+export async function withSecurityHeaders(response: Response, env: WasmOjWorkerEnv, nonce = cspNonce()): Promise<Response> {
   const headers = new Headers(response.headers);
   headers.set("Cross-Origin-Embedder-Policy", "require-corp");
   headers.set("Cross-Origin-Opener-Policy", "same-origin");

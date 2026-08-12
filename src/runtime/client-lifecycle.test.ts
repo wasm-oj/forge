@@ -1,19 +1,43 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "../core/contract";
 import { costProfileId } from "../core/cost-profile";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { DEFAULT_RESOURCE_POLICY, WEIGHTED_METER_MODEL } from "../core/resources";
 import type {
   BuildArtifact,
   BuildResult,
+  BrowserToolchainSource,
   Project,
   RunConfig,
   RunResult,
 } from "../core/types";
-import { BrowserForgeCompiler } from "./compiler-client";
-import { BrowserForgeRunner } from "./runner-client";
+import { BrowserCompiler } from "./compiler-client";
+import { BrowserRunner } from "./runner-client";
 
 const TEST_COST_PROFILE = costProfileId("zig", "wasip1", "release", "test-content");
+const TEST_TOOLCHAINS = Object.freeze([{
+  kind: "browser",
+  baseUrl: "/test-toolchains/",
+  descriptor: {
+    schema: WASM_OJ_SCHEMAS.toolchainPackage,
+    id: "test-toolchains",
+    version: "1.0.0",
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
+    languages: ["javascript", "rust", "go", "zig"],
+    profiles: [
+      { language: "javascript", target: "wasip1", optimization: "release" },
+      { language: "rust", target: "wasip1", optimization: "release" },
+      { language: "go", target: "wasip1", optimization: "release" },
+      { language: "zig", target: "wasip1", optimization: "release" },
+    ],
+    assets: [{
+      path: "/toolchains/test.bin",
+      bytes: 1,
+      sha256: "0".repeat(64),
+      exportPath: "./assets/test.bin",
+    }],
+  },
+}] satisfies readonly BrowserToolchainSource[]);
 
 interface FakeWorker {
   readonly messages: unknown[];
@@ -66,8 +90,28 @@ beforeEach(() => {
 });
 
 describe("browser client lifecycle", () => {
+  it("requires explicit toolchains and sends only validated sources to each Worker", () => {
+    expect(() => new BrowserCompiler(undefined as never)).toThrow("requires explicit toolchain options");
+    expect(() => new BrowserRunner(undefined as never)).toThrow("requires explicit toolchain options");
+    expect(() => new BrowserCompiler({ toolchains: [] })).toThrow("At least one explicit");
+    expect(() => new BrowserRunner({ toolchains: [] })).toThrow("At least one explicit");
+    expect(workerState.compilers).toHaveLength(0);
+    expect(workerState.runners).toHaveLength(0);
+
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
+    const runner = new BrowserRunner({ toolchains: TEST_TOOLCHAINS });
+    const compilerInitialize = requestsOfType(workerState.compilers[0]!, "initialize")[0]!;
+    const runnerInitialize = requestsOfType(workerState.runners[0]!, "initialize")[0]!;
+    expect(compilerInitialize.toolchains).toEqual(TEST_TOOLCHAINS);
+    expect(runnerInitialize.toolchains).toEqual(TEST_TOOLCHAINS);
+    expect(compilerInitialize).not.toHaveProperty("assetBaseUrl");
+    expect(runnerInitialize).not.toHaveProperty("assetBaseUrl");
+    compiler.dispose();
+    runner.dispose();
+  });
+
   it("fails closed when compiler and runner Workers cannot load", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const compilerWorker = workerState.compilers[0]!;
     const compilerReady = expect(compiler.ready()).rejects.toThrow("compiler load failed");
     dispatch(compilerWorker, "error", { message: "compiler load failed" });
@@ -75,7 +119,7 @@ describe("browser client lifecycle", () => {
     expect(compilerWorker.terminated).toBe(true);
     expect(workerState.compilers).toHaveLength(1);
 
-    const runner = new BrowserForgeRunner();
+    const runner = new BrowserRunner({ toolchains: TEST_TOOLCHAINS });
     const runnerWorker = workerState.runners[0]!;
     const runnerReady = expect(runner.ready()).rejects.toThrow("runner load failed");
     dispatch(runnerWorker, "error", { message: "runner load failed" });
@@ -88,7 +132,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("attempts only one clean replacement after an initialized Worker crashes", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const first = workerState.compilers[0]!;
     respondToInitialization(first);
     await compiler.ready();
@@ -103,7 +147,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("rejects malformed direct compiler inputs before crossing the Worker boundary", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const worker = workerState.compilers[0]!;
     respondToInitialization(worker);
     await compiler.ready();
@@ -117,7 +161,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("retains the Rust Worker so consecutive builds share one Wasmer thread pool", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const worker = workerState.compilers[0]!;
     respondToInitialization(worker);
     await compiler.ready();
@@ -145,7 +189,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("retains the Go Worker so consecutive builds reuse verified toolchain bytes", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const worker = workerState.compilers[0]!;
     respondToInitialization(worker);
     await compiler.ready();
@@ -167,7 +211,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("quiesces a retained Go stage before switching toolchain families", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const goWorker = workerState.compilers[0]!;
     respondToInitialization(goWorker);
     await compiler.ready();
@@ -203,7 +247,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("recycles a warm Rust Worker before its third two-stage build", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const firstWorker = workerState.compilers[0]!;
     respondToInitialization(firstWorker);
     await compiler.ready();
@@ -246,7 +290,7 @@ describe("browser client lifecycle", () => {
   it("does not apply the generic 60-second timeout to a Rust build", async () => {
     vi.useFakeTimers();
     try {
-      const compiler = new BrowserForgeCompiler();
+      const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
       const worker = workerState.compilers[0]!;
       respondToInitialization(worker);
       await compiler.ready();
@@ -272,7 +316,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("recycles bounded compiler state when switching between toolchain families", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const rustWorker = workerState.compilers[0]!;
     respondToInitialization(rustWorker);
     await compiler.ready();
@@ -310,7 +354,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("releases a cancelled compiler build before the stale promise settles", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const firstWorker = workerState.compilers[0]!;
     respondToInitialization(firstWorker);
     await compiler.ready();
@@ -337,7 +381,7 @@ describe("browser client lifecycle", () => {
   });
 
   it("ignores events from a terminated compiler Worker", async () => {
-    const compiler = new BrowserForgeCompiler();
+    const compiler = new BrowserCompiler({ toolchains: TEST_TOOLCHAINS });
     const firstWorker = workerState.compilers[0]!;
     respondToInitialization(firstWorker);
     await compiler.ready();
@@ -355,7 +399,10 @@ describe("browser client lifecycle", () => {
   });
 
   it("releases a cancelled runner execution and keeps stale Worker events isolated", async () => {
-    const runner = new BrowserForgeRunner({ additionalCostBaselines: { [TEST_COST_PROFILE]: 0 } });
+    const runner = new BrowserRunner({
+      toolchains: TEST_TOOLCHAINS,
+      additionalCostBaselines: { [TEST_COST_PROFILE]: 0 },
+    });
     const firstWorker = workerState.runners[0]!;
     respondToInitialization(firstWorker);
     await runner.ready();
@@ -386,7 +433,10 @@ describe("browser client lifecycle", () => {
   });
 
   it("rejects concurrent browser operations without disturbing the accepted run", async () => {
-    const runner = new BrowserForgeRunner({ additionalCostBaselines: { [TEST_COST_PROFILE]: 0 } });
+    const runner = new BrowserRunner({
+      toolchains: TEST_TOOLCHAINS,
+      additionalCostBaselines: { [TEST_COST_PROFILE]: 0 },
+    });
     const worker = workerState.runners[0]!;
     respondToInitialization(worker);
     await runner.ready();
@@ -409,7 +459,10 @@ describe("browser client lifecycle", () => {
   it("terminates a run whose runtime preparation never reaches the guest boundary", async () => {
     vi.useFakeTimers();
     try {
-      const runner = new BrowserForgeRunner({ additionalCostBaselines: { [TEST_COST_PROFILE]: 0 } });
+      const runner = new BrowserRunner({
+        toolchains: TEST_TOOLCHAINS,
+        additionalCostBaselines: { [TEST_COST_PROFILE]: 0 },
+      });
       const worker = workerState.runners[0]!;
       respondToInitialization(worker);
       await runner.ready();
@@ -434,7 +487,10 @@ describe("browser client lifecycle", () => {
   it("starts the user wall-time budget only when runtime preparation reaches the guest", async () => {
     vi.useFakeTimers();
     try {
-      const runner = new BrowserForgeRunner({ additionalCostBaselines: { [TEST_COST_PROFILE]: 0 } });
+      const runner = new BrowserRunner({
+        toolchains: TEST_TOOLCHAINS,
+        additionalCostBaselines: { [TEST_COST_PROFILE]: 0 },
+      });
       const worker = workerState.runners[0]!;
       respondToInitialization(worker);
       await runner.ready();
@@ -557,7 +613,7 @@ function failedBuild(): BuildResult {
 function wasmArtifact(): BuildArtifact {
   return {
     kind: "wasm",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: "artifact",
     projectId: "project",
     cacheKey: "cache",

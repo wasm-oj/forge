@@ -6,6 +6,10 @@ const COMMIT = /^[0-9a-f]{40}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const VERSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,511}$/;
 const MAX_CONTAINER_IDENTITY_BYTES = 16 * 1024;
+const CONTAINER_IDENTITY_SCHEMA = "wasm-oj-platform/container-identity/v2" as const;
+const CONTAINER_IDENTITY_FENCE_SCHEMA = "wasm-oj-platform/container-identity-fence/v2" as const;
+const CONTAINER_PROTOCOL = "wasm-oj-container-v2" as const;
+const CONTRACT_VERSION = 2 as const;
 
 const IDENTITY_KEYS = [
   "compilerSha256",
@@ -53,9 +57,9 @@ const FENCE_KEYS = [
 ] as const;
 
 export interface ProbedContainerIdentity {
-  readonly schema: "forge-container-identity-v1";
-  readonly contract: 1;
-  readonly protocol: "forge-container-v1";
+  readonly schema: typeof CONTAINER_IDENTITY_SCHEMA;
+  readonly contract: typeof CONTRACT_VERSION;
+  readonly protocol: typeof CONTAINER_PROTOCOL;
   readonly releaseId: string;
   readonly gitCommit: string;
   readonly identitySha256: string;
@@ -71,10 +75,10 @@ export interface ContainerIdentityReleaseBinding {
   readonly releaseId: string;
   readonly manifestSha256: string;
   readonly workerVersionId: string;
-  readonly forgeContract: 1;
+  readonly wasmOjContract: typeof CONTRACT_VERSION;
   readonly sourceCommit: string;
   readonly containerIdentitySha256: string;
-  readonly protocol: "forge-container-v1";
+  readonly protocol: typeof CONTAINER_PROTOCOL;
   readonly executionRootSha256: string;
   readonly runtimeRootSha256: string;
   readonly toolchainRootSha256: string;
@@ -92,7 +96,7 @@ export interface ContainerIdentityJobBinding {
 }
 
 export interface ContainerIdentityFence {
-  readonly schema: "forge-container-identity-fence-v1";
+  readonly schema: typeof CONTAINER_IDENTITY_FENCE_SCHEMA;
   readonly environment: ContainerIdentityReleaseBinding["environment"];
   readonly jobId: string;
   readonly attempt: number;
@@ -101,7 +105,7 @@ export interface ContainerIdentityFence {
   readonly manifestSha256: string;
   readonly workerVersionId: string;
   readonly identitySha256: string;
-  readonly protocol: "forge-container-v1";
+  readonly protocol: typeof CONTAINER_PROTOCOL;
   readonly executionRootSha256: string;
   readonly runtimeRootSha256: string;
   readonly toolchainRootSha256: string;
@@ -145,18 +149,18 @@ export function parseProbedContainerIdentity(value: unknown): ProbedContainerIde
   const identity = record(value, "Container identity probe");
   exact(identity, IDENTITY_KEYS, "Container identity probe");
   if (
-    identity.schema !== "forge-container-identity-v1"
-    || identity.contract !== 1
-    || identity.protocol !== "forge-container-v1"
+    identity.schema !== CONTAINER_IDENTITY_SCHEMA
+    || identity.contract !== CONTRACT_VERSION
+    || identity.protocol !== CONTAINER_PROTOCOL
     || typeof identity.releaseId !== "string"
     || !UUID.test(identity.releaseId)
     || typeof identity.gitCommit !== "string"
     || !COMMIT.test(identity.gitCommit)
   ) throw new TypeError("Container identity probe has invalid release coordinates.");
   return {
-    schema: "forge-container-identity-v1",
-    contract: 1,
-    protocol: "forge-container-v1",
+    schema: CONTAINER_IDENTITY_SCHEMA,
+    contract: CONTRACT_VERSION,
+    protocol: CONTAINER_PROTOCOL,
     releaseId: identity.releaseId,
     gitCommit: identity.gitCommit,
     identitySha256: digest(identity.identitySha256, "Container identity"),
@@ -200,9 +204,9 @@ export function assertProbedContainerIdentityMatchesRelease(
     || !SHA256.test(release.manifestSha256)
     || !VERSION_ID.test(release.workerVersionId)
     || !["development", "staging", "production"].includes(release.environment)
-    || release.forgeContract !== 1
+    || release.wasmOjContract !== CONTRACT_VERSION
     || !COMMIT.test(release.sourceCommit)
-    || release.protocol !== "forge-container-v1"
+    || release.protocol !== CONTAINER_PROTOCOL
     || !SHA256.test(release.containerIdentitySha256)
     || !SHA256.test(release.executionRootSha256)
     || !SHA256.test(release.runtimeRootSha256)
@@ -213,7 +217,7 @@ export function assertProbedContainerIdentityMatchesRelease(
   if (
     identity.releaseId !== release.releaseId
     || identity.identitySha256 !== release.containerIdentitySha256
-    || identity.contract !== release.forgeContract
+    || identity.contract !== release.wasmOjContract
     || identity.gitCommit !== release.sourceCommit
     || identity.protocol !== release.protocol
     || identity.executionRootSha256 !== release.executionRootSha256
@@ -250,7 +254,7 @@ export function createContainerIdentityFence(
   ) throw new TypeError("Container job does not match the immutable Worker release binding.");
   assertProbedContainerIdentityMatchesRelease(identity, release);
   return Object.freeze({
-    schema: "forge-container-identity-fence-v1",
+    schema: CONTAINER_IDENTITY_FENCE_SCHEMA,
     environment: release.environment,
     jobId: job.jobId,
     attempt: job.attempt,
@@ -277,9 +281,9 @@ export function assertContainerIdentityFence(
   const fence = record(value, "Container identity fence");
   exact(fence, FENCE_KEYS, "Container identity fence");
   if (
-    fence.schema !== "forge-container-identity-fence-v1"
+    fence.schema !== CONTAINER_IDENTITY_FENCE_SCHEMA
     || !["development", "staging", "production"].includes(fence.environment as string)
-    || fence.protocol !== "forge-container-v1"
+    || fence.protocol !== CONTAINER_PROTOCOL
     || typeof fence.jobId !== "string"
     || !UUID.test(fence.jobId)
     || !Number.isSafeInteger(fence.attempt)
@@ -345,7 +349,7 @@ export async function establishContainerIdentityFence<T>(input: {
     || identity.releaseId !== input.job.expectedReleaseId
     || identity.identitySha256 !== input.job.expectedContainerIdentitySha256
   ) throw new TypeError("Container identity probe does not match the immutable job binding.");
-  // Loading the active release reads its immutable manifest from R2. The exact
+  // Loading the active release reads its canonical manifest from D1. The exact
   // job/image identity check above therefore must remain before this callback.
   const release = await input.loadRelease();
   const fence = createContainerIdentityFence(identity, input.job, release);

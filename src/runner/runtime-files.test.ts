@@ -5,7 +5,7 @@ import { decodeRuntimeFiles, verifyAndDecodeRuntimeFiles } from "./runtime-files
 const encoder = new TextEncoder();
 
 function archive(entries: Array<[string, string]>): Uint8Array {
-  const chunks: Uint8Array[] = [encoder.encode("FORGEFS1")];
+  const chunks: Uint8Array[] = [encoder.encode("WOJFS002")];
   for (const [path, value] of entries) {
     const encodedPath = encoder.encode(path);
     const data = encoder.encode(value);
@@ -40,7 +40,7 @@ describe("runtime file archives", () => {
     expect(() => decodeRuntimeFiles(archive([["/same", "x"], ["/same", "y"]]))).toThrow("duplicate");
   });
 
-  it("rejects the retired pre-Forge archive signature", () => {
+  it("rejects the retired archive signature", () => {
     const retired = archive([["/same", "x"]]);
     retired.set(new Uint8Array([0x4c, 0x57, 0x46, 0x53, 0x31]));
     expect(() => decodeRuntimeFiles(retired)).toThrow("invalid signature");

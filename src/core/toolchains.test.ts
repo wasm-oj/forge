@@ -10,7 +10,7 @@ import {
 } from "./toolchains";
 
 describe("pinned toolchain assets", () => {
-  it("uses one canonical Forge-named asset set with exact digests", () => {
+  it("uses one canonical WASM-OJ-named asset set with exact digests", () => {
     const entries = Object.entries(PINNED_TOOLCHAIN_ASSET_SHA256);
     expect(entries.length).toBeGreaterThan(0);
     for (const [assetPath, sha256] of entries) {
@@ -27,13 +27,13 @@ describe("pinned toolchain assets", () => {
   });
 
   it("binds browser request and cache keys to exact asset content", () => {
-    const base = new URL("https://cdn.example.invalid/forge-assets?tenant=judge");
+    const base = new URL("https://cdn.example.invalid/wasm-oj-assets?tenant=judge");
     const resolved = contentAddressedToolchainAssetUrl(QUICKJS_ASSET_PATH, base);
 
     expect(resolved.href).toBe(
-      `https://cdn.example.invalid/forge-assets/quickjs-0.15.1.wasm.gz.bin?tenant=judge&sha256=${QUICKJS_ASSET_SHA256}`,
+      `https://cdn.example.invalid/wasm-oj-assets/quickjs-0.15.1.wasm.gz.bin?tenant=judge&sha256=${QUICKJS_ASSET_SHA256}`,
     );
-    expect(base.href).toBe("https://cdn.example.invalid/forge-assets?tenant=judge");
+    expect(base.href).toBe("https://cdn.example.invalid/wasm-oj-assets?tenant=judge");
     expect(() => contentAddressedToolchainAssetUrl("/toolchains/unpinned.bin", base))
       .toThrow("No pinned digest");
   });

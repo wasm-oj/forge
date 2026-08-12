@@ -18,7 +18,7 @@ describe("Wasmer secondary-worker policy", () => {
       id: 1,
       memory: new WebAssembly.Memory({ initial: 1, maximum: 2, shared: true }),
       module: new WebAssembly.Module(EMPTY_WASM),
-      sdkUrl: "https://forge.example/assets/wasmer-sdk.js",
+      sdkUrl: "https://wasm-oj.example/assets/wasmer-sdk.js",
     };
     expect(isWasmerThreadInitMessage(message)).toBe(true);
     expect(isWasmerThreadInitMessage({ ...message, id: -1 })).toBe(false);

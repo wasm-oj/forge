@@ -1,5 +1,5 @@
 import { sha256Hex } from "../core/hash.ts";
-import { FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import { CLANG_CC1_PINS_SHA256 } from "../core/toolchains.ts";
 
 export interface ClangPinPlaceholders {
@@ -15,7 +15,7 @@ export interface ClangPinConfig {
 }
 
 export interface ClangPins {
-  schema: typeof FORGE_SCHEMAS.clangPins;
+  schema: typeof WASM_OJ_SCHEMAS.clangPins;
   version: string;
   source: string;
   sourceSha256: string;
@@ -36,7 +36,7 @@ export async function decodeClangPins(bytes: Uint8Array): Promise<ClangPins> {
     );
   }
   const parsed = JSON.parse(decoder.decode(bytes)) as ClangPins;
-  if (parsed.schema !== FORGE_SCHEMAS.clangPins) {
+  if (parsed.schema !== WASM_OJ_SCHEMAS.clangPins) {
     throw new Error(`Unsupported cc1 pin schema '${parsed.schema}'.`);
   }
   for (const key of ["input", "output", "mainFileName", "objects"] as const) {

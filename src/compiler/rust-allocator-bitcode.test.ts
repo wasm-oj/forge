@@ -4,7 +4,7 @@ import { isLlvmBitcode, selectRustAllocatorBitcodeName } from "./rust-allocator-
 describe("Rust allocator bitcode discovery", () => {
   it("selects only rustc's standalone allocator module", () => {
     expect(selectRustAllocatorBitcodeName([
-      "main.forge_submission.abc-cgu.0.rcgu.bc",
+      "main.wasm_oj_submission.abc-cgu.0.rcgu.bc",
       "main.bvtq9sido78cscc61kozca0r4.rcgu.bc",
       "main.o",
     ])).toBe("main.bvtq9sido78cscc61kozca0r4.rcgu.bc");

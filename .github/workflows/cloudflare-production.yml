@@ -29,18 +29,21 @@ jobs:
           node-version: 24.18.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Bind the exact active release to the production deployment
+        env:
+          RELEASE_REQUEST_BASE64: ${{ secrets.WASM_OJ_PRODUCTION_RELEASE_REQUEST_BASE64 }}
+        run: >-
+          node scripts/configure-production-release.mjs
+          --activation-request-base64-env RELEASE_REQUEST_BASE64
+          --config wrangler.quick-production.jsonc
+          --expected-git-commit "$GITHUB_SHA"
       - run: pnpm run typecheck
       - run: pnpm run build
-      - name: Apply pending database migrations
+      - name: Apply non-reset database migrations
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.quick-production.jsonc
-      - name: Backfill published problem catalog metadata
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/backfill-problem-catalog-metadata.mjs
+        run: node scripts/production-migrations.mjs normal --database DB --config wrangler.quick-production.jsonc
       - name: Deploy application, Workflows, and Containers
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
@@ -52,4 +55,3 @@ jobs:
             https://wasm-oj-forge-production.jacob.workers.dev/api/health/live
           curl --fail --retry 6 --retry-all-errors --retry-delay 5 \
             https://wasm-oj-forge-production.jacob.workers.dev/api/health/ready
-          node scripts/verify-production-catalog.mjs

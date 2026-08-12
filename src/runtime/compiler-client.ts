@@ -1,16 +1,21 @@
+import {
+  assertCompilerCacheKey,
+  assertValidProject,
+  snapshotBrowserToolchainSources,
+  toolchainCacheIdentity,
+  toolchainProfileSource,
+  WASM_OJ_STORAGE,
+} from "@wasm-oj/core";
 import type {
   BuildResult,
+  Compiler,
   CompilerRequest,
   CompilerResponse,
   CompilerTraceEvent,
+  BrowserToolchainSource,
   Project,
   WorkerProgress,
-} from "../core/types";
-import { FORGE_STORAGE } from "../core/contract";
-import type { ForgeCompiler } from "../compiler/compiler";
-import { toolchainCacheIdentity } from "../core/toolchains";
-import { assertValidProject } from "../core/project-validation";
-import { assertCompilerCacheKey } from "../core/hash";
+} from "@wasm-oj/core";
 import {
   MAX_OUTPUT_READY_CLANG_STAGES_PER_WORKER,
   assertOutputReadyClangStageBudget,
@@ -42,9 +47,9 @@ interface CompilerOperation {
 const CONTROL_TIMEOUT_MS = 120_000;
 const QUIESCE_TIMEOUT_MS = 10_000;
 
-export interface BrowserForgeCompilerOptions {
-  /** Base URL containing the versioned browser toolchain assets. */
-  assetBaseUrl?: string;
+export interface BrowserCompilerOptions {
+  /** Explicit, contract-validated browser toolchain packages. */
+  toolchains: readonly BrowserToolchainSource[];
 }
 
 type CompilerRequestWithoutId = CompilerRequest extends infer Request
@@ -53,13 +58,13 @@ type CompilerRequestWithoutId = CompilerRequest extends infer Request
     : never
   : never;
 
-export class BrowserForgeCompiler implements ForgeCompiler {
+export class BrowserCompiler implements Compiler {
   private worker: Worker;
   private readonly pending = new Map<string, PendingRequest<unknown>>();
   private readonly progressListeners = new Set<ProgressListener>();
   private readonly traceListeners = new Set<TraceListener>();
   private readyPromise: Promise<void>;
-  private readonly assetBaseUrl?: string;
+  private readonly toolchains: readonly BrowserToolchainSource[];
   private activeOperation: CompilerOperation | undefined;
   private disposed = false;
   private generation = 0;
@@ -69,21 +74,37 @@ export class BrowserForgeCompiler implements ForgeCompiler {
   private outputReadyRustStages = 0;
   private retainedGoStage = false;
 
-  constructor(options: BrowserForgeCompilerOptions = {}) {
-    this.assetBaseUrl = options.assetBaseUrl;
+  constructor(options: BrowserCompilerOptions) {
+    if (!options || typeof options !== "object") {
+      throw new TypeError("BrowserCompiler requires explicit toolchain options.");
+    }
+    this.toolchains = snapshotBrowserToolchainSources(options.toolchains);
     this.worker = this.createWorker();
     this.readyPromise = this.initializeWorker();
   }
 
   cacheIdentity(project: Project): string {
     this.assertActive();
-    return JSON.stringify(toolchainCacheIdentity(project.config.language));
+    const { descriptor } = toolchainProfileSource(
+      this.toolchains,
+      project.config.language,
+      project.config.target,
+      project.config.optimization,
+    ).source;
+    return JSON.stringify({
+      ...toolchainCacheIdentity(project.config.language),
+      source: {
+        id: descriptor.id,
+        version: descriptor.version,
+        assets: descriptor.assets.map(({ path, bytes, sha256 }) => ({ path, bytes, sha256 })),
+      },
+    });
   }
 
   private initializeWorker(): Promise<void> {
     const ready = this.request<void>({
       type: "initialize",
-      assetBaseUrl: this.assetBaseUrl,
+      toolchains: this.toolchains,
     }, CONTROL_TIMEOUT_MS);
     // A replacement Worker is initialized eagerly so the next edit/build can
     // start immediately. It may be disposed before any caller awaits ready();
@@ -113,7 +134,13 @@ export class BrowserForgeCompiler implements ForgeCompiler {
     this.assertActive();
     assertValidProject(project);
     assertCompilerCacheKey(cacheKey);
-    if (this.activeOperation) throw new Error("BrowserForgeCompiler accepts one active operation at a time.");
+    toolchainProfileSource(
+      this.toolchains,
+      project.config.language,
+      project.config.target,
+      project.config.optimization,
+    );
+    if (this.activeOperation) throw new Error("BrowserCompiler accepts one active operation at a time.");
     const boundedClang = usesOutputReadyClang(project);
     const maximumClangStages = assertOutputReadyClangStageBudget(project);
     const maximumRustStages = maximumOutputReadyRustStages(project);
@@ -137,7 +164,7 @@ export class BrowserForgeCompiler implements ForgeCompiler {
     try {
       if (crossesClangBoundary || crossesRustBoundary || crossesGoBoundary) {
         await this.quiesceAndReplaceWorker(
-          new Error("ForgeCompiler Worker recycled at the output-ready stage boundary."),
+          new Error("Compiler Worker recycled at the output-ready stage boundary."),
         );
         this.activeOperation = operation;
       }
@@ -168,23 +195,23 @@ export class BrowserForgeCompiler implements ForgeCompiler {
     } finally {
       if (this.activeOperation === operation) this.activeOperation = undefined;
       if (!this.disposed && buildWorker && this.worker === buildWorker && !retainWorker) {
-        this.replaceWorker(new Error("ForgeCompiler Worker recycled after isolated build."));
+        this.replaceWorker(new Error("Compiler Worker recycled after isolated build."));
       }
     }
   }
 
   async clearToolchainCache(): Promise<void> {
     this.assertActive();
-    if (this.activeOperation) throw new Error("BrowserForgeCompiler accepts one active operation at a time.");
+    if (this.activeOperation) throw new Error("BrowserCompiler accepts one active operation at a time.");
     const operation: CompilerOperation = { kind: "cache-clear" };
     this.activeOperation = operation;
-    this.stopWorker(new Error("ForgeCompiler Worker recycled before clearing caches."));
+    this.stopWorker(new Error("Compiler Worker recycled before clearing caches."));
     const generation = this.generation;
     try {
       const names = await caches.keys();
       await Promise.all([
         ...names
-          .filter((name) => name === FORGE_STORAGE.toolchainCache)
+          .filter((name) => name === WASM_OJ_STORAGE.toolchainCache)
           .map((name) => caches.delete(name)),
         clearClangBuildGraphCache(),
       ]);
@@ -209,9 +236,9 @@ export class BrowserForgeCompiler implements ForgeCompiler {
   restart(): void {
     this.assertActive();
     if (this.activeOperation?.kind === "cache-clear") {
-      throw new Error("Cannot restart BrowserForgeCompiler while clearing its cache.");
+      throw new Error("Cannot restart BrowserCompiler while clearing its cache.");
     }
-    this.replaceWorker(new Error("ForgeCompiler worker restarted."));
+    this.replaceWorker(new Error("Compiler worker restarted."));
   }
 
   dispose(): void {
@@ -221,7 +248,7 @@ export class BrowserForgeCompiler implements ForgeCompiler {
     this.workerDormant = true;
     this.activeOperation = undefined;
     this.worker.terminate();
-    const error = new Error("ForgeCompiler client disposed.");
+    const error = new Error("Compiler client disposed.");
     for (const request of this.pending.values()) {
       if (request.timer) clearTimeout(request.timer);
       request.reject(error);
@@ -232,7 +259,7 @@ export class BrowserForgeCompiler implements ForgeCompiler {
   }
 
   private createWorker(): Worker {
-    const worker = createModuleWorker(CompilerWorkerUrl, { name: "forge-compiler" });
+    const worker = createModuleWorker(CompilerWorkerUrl, { name: "wasm-oj-compiler" });
     worker.addEventListener("message", (event: MessageEvent<CompilerResponse>) => {
       if (!this.disposed && !this.workerDormant && this.worker === worker) this.handleMessage(event.data);
     });
@@ -258,7 +285,7 @@ export class BrowserForgeCompiler implements ForgeCompiler {
     } catch (error) {
       const cause = error instanceof Error ? error : new Error(String(error));
       if (!this.disposed && generation === this.generation) this.replaceWorker(cause);
-      throw new Error("ForgeCompiler could not establish a quiescent Worker boundary.", { cause });
+      throw new Error("Compiler could not establish a quiescent Worker boundary.", { cause });
     }
     this.assertActive();
     if (generation !== this.generation) {
@@ -291,7 +318,7 @@ export class BrowserForgeCompiler implements ForgeCompiler {
   }
 
   private assertActive(): void {
-    if (this.disposed) throw new Error("BrowserForgeCompiler is disposed.");
+    if (this.disposed) throw new Error("BrowserCompiler is disposed.");
   }
 
   private request<T>(request: CompilerRequestWithoutId, timeoutMs: number): Promise<T> {
@@ -304,7 +331,7 @@ export class BrowserForgeCompiler implements ForgeCompiler {
       };
       pending.timer = setTimeout(() => {
         if (!this.pending.delete(requestId)) return;
-        const error = new Error(`ForgeCompiler request exceeded the ${timeoutMs} ms browser boundary.`);
+        const error = new Error(`Compiler request exceeded the ${timeoutMs} ms browser boundary.`);
         reject(error);
         if (!this.disposed) this.replaceWorker(error);
       }, timeoutMs);

@@ -1,10 +1,10 @@
-import type { AuthenticatedSession, ForgeWorkerEnv } from "./env";
+import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { base64Url, constantTimeEqual, hmacSha256Hex, pemPkcs8Bytes, sha256Hex } from "./crypto";
 import { ApiError, readBoundedRequestBytes, readBoundedResponseJson } from "./http";
 
 const encoder = new TextEncoder();
 const GITHUB_API_VERSION = "2022-11-28";
-const MAX_GITHUB_API_JSON_BYTES = 4 * 1024 * 1024;
+const MAX_GITHUB_API_JSON_BYTES = 8 * 1024 * 1024;
 const MAX_GITHUB_PERMISSION_COUNT = 64;
 const MAX_GITHUB_PERMISSION_JSON_BYTES = 8 * 1024;
 export const MAX_GITHUB_INSTALLATION_REPOSITORY_CHANGES = 1_000;
@@ -91,14 +91,14 @@ function sameGithubInstallationAuthority(
 function githubHeaders(token?: string): Headers {
   const headers = new Headers({
     accept: "application/vnd.github+json",
-    "user-agent": "wasm-oj-forge",
+    "user-agent": "wasm-oj",
     "x-github-api-version": GITHUB_API_VERSION,
   });
   if (token) headers.set("authorization", `Bearer ${token}`);
   return headers;
 }
 
-export async function githubAppJwt(env: ForgeWorkerEnv): Promise<string> {
+export async function githubAppJwt(env: WasmOjWorkerEnv): Promise<string> {
   const now = Math.floor(Date.now() / 1_000);
   const header = base64Url(encoder.encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
   const payload = base64Url(encoder.encode(JSON.stringify({ iat: now - 60, exp: now + 9 * 60, iss: env.GITHUB_APP_ID })));
@@ -119,7 +119,7 @@ export async function githubAppJwt(env: ForgeWorkerEnv): Promise<string> {
   return `${signingInput}.${base64Url(new Uint8Array(signature))}`;
 }
 
-async function suspendGithubInstallationForPermissionDrift(env: ForgeWorkerEnv, installationId: number): Promise<void> {
+async function suspendGithubInstallationForPermissionDrift(env: WasmOjWorkerEnv, installationId: number): Promise<void> {
   await env.DB.prepare(
     `UPDATE github_installations
         SET status='suspended', authority_generation=authority_generation+1, updated_at=?
@@ -128,7 +128,7 @@ async function suspendGithubInstallationForPermissionDrift(env: ForgeWorkerEnv, 
 }
 
 async function mintGithubInstallationToken(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   installationId: number,
   authority: GithubInstallationAuthorityCheck,
 ): Promise<string> {
@@ -179,7 +179,7 @@ async function mintGithubInstallationToken(
   return body.token;
 }
 
-export async function githubInstallationToken(env: ForgeWorkerEnv, installationId: number): Promise<string> {
+export async function githubInstallationToken(env: WasmOjWorkerEnv, installationId: number): Promise<string> {
   if (!Number.isSafeInteger(installationId) || installationId < 1) throw new TypeError("Invalid GitHub installation ID.");
   const authority = async () => env.DB.prepare(
     `SELECT permissions_json, repository_selection, status, authority_generation
@@ -190,7 +190,7 @@ export async function githubInstallationToken(env: ForgeWorkerEnv, installationI
 }
 
 export async function githubInstallationProvisioningToken(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   installationId: number,
   userId: string,
   stateHash: string,
@@ -223,6 +223,83 @@ export async function githubApiJson<T>(path: string, token: string): Promise<T> 
   }
 }
 
+export async function githubApiRaw(
+  path: string,
+  token: string,
+  maximumBytes: number,
+  expectedBytes?: number,
+): Promise<Response> {
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) throw new TypeError("GitHub API path is invalid.");
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1) throw new TypeError("GitHub response limit is invalid.");
+  if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes < 0 || expectedBytes > maximumBytes)) {
+    throw new TypeError("GitHub expected response length is invalid.");
+  }
+  const headers = githubHeaders(token);
+  headers.set("accept", "application/vnd.github.raw+json");
+  const response = await fetch(`https://api.github.com${path}`, { headers, redirect: "manual" });
+  if (!response.ok) {
+    try { await response.body?.cancel(); } catch { /* Transport cleanup only. */ }
+    throw new ApiError(502, "github-api-error", `GitHub API request failed with HTTP ${response.status}.`, { path });
+  }
+  const contentLength = response.headers.get("content-length");
+  if (contentLength !== null) {
+    const length = Number(contentLength);
+    if (!Number.isSafeInteger(length) || length < 0 || length > maximumBytes || (expectedBytes !== undefined && length !== expectedBytes)) {
+      try { await response.body?.cancel(); } catch { /* The response is rejected regardless. */ }
+      throw new ApiError(502, "github-blob-length", "GitHub returned an unexpected blob length.", { path });
+    }
+  }
+  if (!response.body) throw new ApiError(502, "github-blob-empty", "GitHub returned an empty blob response.", { path });
+  let received = 0;
+  const bounded = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      if (!(chunk instanceof Uint8Array)) throw new ApiError(502, "github-blob-invalid", "GitHub returned a non-binary blob chunk.", { path });
+      received += chunk.byteLength;
+      if (received > maximumBytes || (expectedBytes !== undefined && received > expectedBytes)) {
+        throw new ApiError(502, "github-blob-length", "GitHub streamed an oversized blob.", { path });
+      }
+      controller.enqueue(chunk);
+    },
+    flush() {
+      if (expectedBytes !== undefined && received !== expectedBytes) {
+        throw new ApiError(502, "github-blob-length", "GitHub streamed an incomplete blob.", { path });
+      }
+    },
+  }));
+  return new Response(bounded, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+export function githubRepositoryCoordinates(
+  value: unknown,
+  repositoryId: number,
+  expectedOwner: string,
+  expectedRepository: string,
+): { readonly owner: string; readonly repository: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("GitHub repository response must be an object.");
+  const repository = value as Record<string, unknown>;
+  if (!repository.owner || typeof repository.owner !== "object" || Array.isArray(repository.owner)) {
+    throw new TypeError("GitHub repository owner must be an object.");
+  }
+  const owner = repository.owner as Record<string, unknown>;
+  if (
+    repository.id !== repositoryId
+    || typeof owner.login !== "string"
+    || typeof repository.name !== "string"
+    || owner.login.length > 100
+    || repository.name.length > 100
+    || /[\u0000-\u001f\u007f]/.test(owner.login)
+    || /[\u0000-\u001f\u007f]/.test(repository.name)
+  ) throw new TypeError("GitHub repository numeric identity is inconsistent.");
+  if (owner.login.toLowerCase() !== expectedOwner.toLowerCase() || repository.name.toLowerCase() !== expectedRepository.toLowerCase()) {
+    throw new TypeError("GitHub repository coordinates changed.");
+  }
+  return { owner: owner.login, repository: repository.name };
+}
+
 interface GithubAppInstallationSuspensionState {
   readonly id?: unknown;
   readonly suspended_at?: unknown;
@@ -243,7 +320,7 @@ function remoteSuspensionTimestamp(value: GithubAppInstallationSuspensionState, 
  * cannot leave the caller guessing whether repository access remains.
  */
 export async function setGithubAppInstallationSuspension(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   installationId: number,
   suspended: boolean,
 ): Promise<string | null> {
@@ -269,13 +346,13 @@ export async function setGithubAppInstallationSuspension(
   throw new ApiError(502, "github-installation-suspension-error", "GitHub installation suspension did not converge after exact remote read-back.");
 }
 
-export async function requireOrganizer(env: ForgeWorkerEnv, session: AuthenticatedSession): Promise<void> {
+export async function requireOrganizer(env: WasmOjWorkerEnv, session: AuthenticatedSession): Promise<void> {
   if (!session.roles.includes("organizer") && !session.roles.includes("admin")) {
     throw new ApiError(403, "organizer-required", "An approved Organizer role is required.");
   }
 }
 
-export async function verifyGithubWebhook(request: Request, env: ForgeWorkerEnv): Promise<{
+export async function verifyGithubWebhook(request: Request, env: WasmOjWorkerEnv): Promise<{
   readonly deliveryId: string;
   readonly eventName: string;
   readonly payload: Record<string, unknown>;
@@ -321,7 +398,7 @@ export async function archiveAuthorizationDigest(
   repositoryId: number,
   commitSha: string,
   indexPath: string,
-  forgeReleaseId: string,
+  wasmOjReleaseId: string,
 ): Promise<string> {
-  return sha256Hex(`${repositoryId}\0${commitSha}\0${indexPath}\0${forgeReleaseId}\n`);
+  return sha256Hex(`${repositoryId}\0${commitSha}\0${indexPath}\0${wasmOjReleaseId}\n`);
 }

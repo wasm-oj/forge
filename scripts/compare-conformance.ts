@@ -5,10 +5,10 @@ import { publishEvidenceFiles } from "./evidence-publication.mjs";
 import { compareConformanceSnapshots, type ConformanceSnapshot } from "../src/conformance/matrix.ts";
 import { sourceTreeProvenance } from "../src/conformance/provenance.ts";
 import { renderConformanceReportEvidence } from "../src/conformance/report.ts";
-import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "../src/core/contract.ts";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "../src/core/contract.ts";
 
 const inputs = process.argv.slice(2);
-const EXPERIMENT_ID = `forge-contract-${FORGE_CONTRACT_VERSION}-conformance`;
+const EXPERIMENT_ID = `wasm-oj-contract-${WASM_OJ_CONTRACT_VERSION}-conformance`;
 const SPEC_PATH = path.resolve(`experiments/${EXPERIMENT_ID}/SPEC.md`);
 if (inputs.length !== 2) {
   throw new Error("Usage: node --experimental-strip-types scripts/compare-conformance.ts <server-record.json> <browser-record.json>");
@@ -20,7 +20,7 @@ const records = await Promise.all(inputs.map(async (input) => {
   const value = JSON.parse(bytes.toString()) as {
     schema: string;
     experimentId: string;
-    forgeContract: number;
+    wasmOjContract: number;
     specSha256: string;
     collectedAt: string;
     sourceTree: { algorithm: string; sha256: string; files: number };
@@ -38,10 +38,10 @@ const records = await Promise.all(inputs.map(async (input) => {
     };
     snapshot: ConformanceSnapshot;
   };
-  if (value.schema !== FORGE_SCHEMAS.conformanceEvidence) throw new Error(`Invalid evidence schema in '${input}'.`);
+  if (value.schema !== WASM_OJ_SCHEMAS.conformanceEvidence) throw new Error(`Invalid evidence schema in '${input}'.`);
   if (value.experimentId !== EXPERIMENT_ID) throw new Error(`Invalid experiment ID in '${input}'.`);
-  if (value.forgeContract !== FORGE_CONTRACT_VERSION) throw new Error(`Forge contract mismatch in '${input}'.`);
-  if (value.snapshot?.schema !== FORGE_SCHEMAS.conformance) throw new Error(`Invalid snapshot schema in '${input}'.`);
+  if (value.wasmOjContract !== WASM_OJ_CONTRACT_VERSION) throw new Error(`WASM-OJ contract mismatch in '${input}'.`);
+  if (value.snapshot?.schema !== WASM_OJ_SCHEMAS.conformance) throw new Error(`Invalid snapshot schema in '${input}'.`);
   if (value.failure !== undefined && value.failure !== null && value.failure !== "") {
     throw new Error(`Evidence '${input}' contains an infrastructure failure: ${String(value.failure)}`);
   }
@@ -57,7 +57,7 @@ const records = await Promise.all(inputs.map(async (input) => {
     validateBrowserNetworkProof(value.networkProof, input);
   }
   if (
-    value.sourceTree?.algorithm !== "forge-source-tree-sha256"
+    value.sourceTree?.algorithm !== "wasm-oj-source-tree-sha256"
     || !/^[0-9a-f]{64}$/.test(value.sourceTree.sha256)
     || !Number.isSafeInteger(value.sourceTree.files)
     || value.sourceTree.files < 1
@@ -91,9 +91,9 @@ if (records[0]!.value.sourceTree.sha256 !== records[1]!.value.sourceTree.sha256)
 
 const report = compareConformanceSnapshots(records.map((record) => record.value.snapshot));
 const table = {
-  schema: FORGE_SCHEMAS.conformanceMatrix,
+  schema: WASM_OJ_SCHEMAS.conformanceMatrix,
   experimentId: EXPERIMENT_ID,
-  forgeContract: FORGE_CONTRACT_VERSION,
+  wasmOjContract: WASM_OJ_CONTRACT_VERSION,
   specSha256: records[0]!.value.specSha256,
   sourceTree: records[0]!.value.sourceTree,
   sourceRecords: records.map((record) => ({
@@ -115,8 +115,8 @@ await publishEvidenceFiles([
   { path: output, bytes: `${JSON.stringify(table, null, 2)}\n` },
   { path: reportPath, bytes: reportMarkdown },
 ]);
-process.stdout.write(`FORGE_CONFORMANCE_MATRIX=${output}\n`);
-process.stdout.write(`FORGE_CONFORMANCE_REPORT=${reportPath}\n`);
+process.stdout.write(`WASM_OJ_CONFORMANCE_MATRIX=${output}\n`);
+process.stdout.write(`WASM_OJ_CONFORMANCE_REPORT=${reportPath}\n`);
 
 function validateBrowserNetworkProof(
   proof: {

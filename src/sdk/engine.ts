@@ -1,7 +1,7 @@
-import type { ForgeCompiler } from "../compiler/compiler";
+import type { Compiler } from "../compiler/compiler";
 import {
   CompileCoordinator,
-  type ForgeArtifactStore,
+  type ArtifactStore,
   type PrecompileOutcome,
 } from "../compiler/coordinator";
 import { resolveDeterminism } from "../core/determinism";
@@ -14,33 +14,33 @@ import type {
   RunResult,
   WorkerProgress,
 } from "../core/types";
-import type { ForgeRunner } from "../runner/runner";
+import type { Runner } from "../runner/runner";
 import { createJudgeExecutor, JudgeEngine, type JudgeEngineOptions, type JudgeResult, type JudgeRunOptions } from "../judge/engine";
 import { validateJudgeSpec, type JudgeSpec } from "../judge/spec";
 import { createSdkProject, type CompileInput } from "./project";
 import type { CompileOptions, ExecuteResult, InteractiveOptions, RunOptions } from "./types";
 import {
-  assertValidForgeReplayBundle,
-  replayForgeBundle,
-  type ForgeReplayBundle,
-  type ForgeReplayOptions,
-  type ForgeReplayResult,
+  assertValidReplayBundle,
+  replayBundle,
+  type ReplayBundle,
+  type ReplayOptions,
+  type ReplayResult,
 } from "../replay/bundle";
 import { assertValidProject } from "../core/project-validation";
 import { assertValidBuildArtifact } from "../core/artifact-validation";
 import type { Project } from "../core/types";
 import {
-  ForgeError,
-  asForgeError,
-  type ForgeErrorOptions,
-  type ForgeErrorStage,
+  WasmOjError,
+  asWasmOjError,
+  type WasmOjErrorOptions,
+  type WasmOjErrorStage,
 } from "../core/errors";
 import {
-  ForgeOperationScheduler,
-  type ForgeOperationEvent,
-  type ForgeOperationEventPayload,
-  type ForgeSubmissionOperation,
-  type ForgeSubmissionRequest,
+  OperationScheduler,
+  type OperationEvent,
+  type OperationEventPayload,
+  type SubmissionOperation,
+  type SubmissionRequest,
 } from "../operations/operation";
 import type { DependencyBuildAdapter, DependencyBuildBundle } from "../dependencies/build";
 import type {
@@ -48,16 +48,16 @@ import type {
   DependencyManifest,
   ResolveDependencyOptions,
 } from "../dependencies/types";
-import type { ForgeDependencyManager } from "../dependencies/manager";
+import type { DependencyManager } from "../dependencies/manager";
 
-export type { ForgeArtifactStore } from "../compiler/coordinator";
+export type { ArtifactStore } from "../compiler/coordinator";
 
-export interface ForgeEngineOptions {
-  compiler: ForgeCompiler;
-  runner: ForgeRunner;
-  artifactStore?: ForgeArtifactStore;
+export interface EngineOptions {
+  compiler: Compiler;
+  runner: Runner;
+  artifactStore?: ArtifactStore;
   judge?: JudgeEngineOptions;
-  dependencyManager?: ForgeDependencyManager;
+  dependencyManager?: DependencyManager;
 }
 
 export interface JudgeProjectResult {
@@ -66,21 +66,21 @@ export interface JudgeProjectResult {
 }
 
 /** High-level compile/run API shared by browser and server hosts. */
-export class ForgeEngine {
-  protected readonly compiler: ForgeCompiler;
-  protected readonly runner: ForgeRunner;
-  private readonly artifactStore?: ForgeArtifactStore;
-  private readonly dependencyManager?: ForgeDependencyManager;
+export class Engine {
+  protected readonly compiler: Compiler;
+  protected readonly runner: Runner;
+  private readonly artifactStore?: ArtifactStore;
+  private readonly dependencyManager?: DependencyManager;
   private readonly compilation: CompileCoordinator;
-  private readonly operationScheduler: ForgeOperationScheduler;
-  private readonly observationListeners = new Set<(event: ForgeOperationEvent) => void>();
+  private readonly operationScheduler: OperationScheduler;
+  private readonly observationListeners = new Set<(event: OperationEvent) => void>();
   private disposed = false;
   private cacheClearActive = false;
   private cacheClearOperation?: Promise<void>;
   /** Extensible judge registry for custom input providers and output matchers. */
   readonly judging: JudgeEngine;
 
-  constructor(options: ForgeEngineOptions) {
+  constructor(options: EngineOptions) {
     this.compiler = options.compiler;
     this.runner = options.runner;
     this.artifactStore = options.artifactStore;
@@ -100,10 +100,26 @@ export class ForgeEngine {
           interactor,
           interaction,
         ),
+        ...(this.runner.runTrusted === undefined ? {} : {
+          runTrusted: (program, run) => this.runner.runTrusted!(program, {
+            ...run,
+            args: [...run.args],
+            env: { ...run.env },
+            files: Object.fromEntries(Object.entries(run.files).map(([path, contents]) => [path, contents.slice()])),
+            outputPaths: [...run.outputPaths],
+          }),
+        }),
+        ...(this.runner.interactTrusted === undefined ? {} : {
+          interactTrusted: (contestant, interactor, interaction) => this.runner.interactTrusted!(
+            contestant,
+            interactor,
+            interaction,
+          ),
+        }),
       }),
       options.judge,
     );
-    this.operationScheduler = new ForgeOperationScheduler({
+    this.operationScheduler = new OperationScheduler({
       executeSubmission: (request, observe) => this.executeSubmission(request, observe),
       cancelActiveSubmission: () => this.cancelExecution(),
     }, (event) => this.notifyObservation(event));
@@ -139,17 +155,17 @@ export class ForgeEngine {
   }
 
   /** Subscribe to operation-scoped, structured host observations. */
-  onObservation(listener: (event: ForgeOperationEvent) => void): () => void {
+  onObservation(listener: (event: OperationEvent) => void): () => void {
     this.assertActive();
-    if (typeof listener !== "function") throw new TypeError("Forge observation listener must be a function.");
+    if (typeof listener !== "function") throw new TypeError("WASM-OJ observation listener must be a function.");
     this.observationListeners.add(listener);
     return () => this.observationListeners.delete(listener);
   }
 
   /** Enqueue one independently observable and cancellable compile-and-judge submission. */
-  submit(request: ForgeSubmissionRequest): ForgeSubmissionOperation {
+  submit(request: SubmissionRequest): SubmissionOperation {
     this.assertActive();
-    if (this.cacheClearActive) throw new ForgeError("ForgeEngine is clearing its caches.", {
+    if (this.cacheClearActive) throw new WasmOjError("Engine is clearing its caches.", {
       code: "operation-conflict",
       stage: "operation",
       retryable: true,
@@ -169,7 +185,7 @@ export class ForgeEngine {
   ): Promise<DependencyLock> {
     this.assertActive();
     const dependencyManager = this.dependencyManager;
-    if (!dependencyManager) throw new ForgeError("ForgeEngine has no dependency manager.", {
+    if (!dependencyManager) throw new WasmOjError("Engine has no dependency manager.", {
       code: "unsupported",
       stage: "dependency",
     });
@@ -186,7 +202,7 @@ export class ForgeEngine {
   ): Promise<DependencyBuildBundle> {
     this.assertActive();
     const dependencyManager = this.dependencyManager;
-    if (!dependencyManager) throw new ForgeError("ForgeEngine has no dependency manager.", {
+    if (!dependencyManager) throw new WasmOjError("Engine has no dependency manager.", {
       code: "unsupported",
       stage: "dependency",
     });
@@ -228,11 +244,11 @@ export class ForgeEngine {
     );
   }
 
-  async replay(bundle: ForgeReplayBundle, options?: ForgeReplayOptions): Promise<ForgeReplayResult> {
+  async replay(bundle: ReplayBundle, options?: ReplayOptions): Promise<ReplayResult> {
     this.assertAvailable();
-    stableInput(() => assertValidForgeReplayBundle(bundle), "replay");
+    stableInput(() => assertValidReplayBundle(bundle), "replay");
     return stableBoundary(
-      () => replayForgeBundle(this, bundle, options),
+      () => replayBundle(this, bundle, options),
       { code: "replay-failure", stage: "replay", retryable: false },
     );
   }
@@ -347,8 +363,8 @@ export class ForgeEngine {
   clearCache(): Promise<void> {
     this.assertActive();
     if (this.cacheClearOperation) return this.cacheClearOperation;
-    if (this.operationScheduler.hasPending()) throw new ForgeError(
-      "ForgeEngine cannot clear caches while submission operations are pending.",
+    if (this.operationScheduler.hasPending()) throw new WasmOjError(
+      "Engine cannot clear caches while submission operations are pending.",
       {
         code: "operation-conflict",
         stage: "storage",
@@ -394,7 +410,7 @@ export class ForgeEngine {
   }
 
   private assertActive(): void {
-    if (this.disposed) throw new ForgeError("ForgeEngine is disposed.", {
+    if (this.disposed) throw new WasmOjError("Engine is disposed.", {
       code: "disposed",
       stage: "operation",
     });
@@ -402,13 +418,13 @@ export class ForgeEngine {
 
   private assertAvailable(): void {
     this.assertActive();
-    if (this.cacheClearActive) throw new ForgeError("ForgeEngine is clearing its caches.", {
+    if (this.cacheClearActive) throw new WasmOjError("Engine is clearing its caches.", {
       code: "operation-conflict",
       stage: "operation",
       retryable: true,
     });
-    if (this.operationScheduler.hasPending()) throw new ForgeError(
-      "Direct ForgeEngine operations are unavailable while submission operations are pending.",
+    if (this.operationScheduler.hasPending()) throw new WasmOjError(
+      "Direct Engine operations are unavailable while submission operations are pending.",
       {
         code: "operation-conflict",
         stage: "operation",
@@ -423,8 +439,8 @@ export class ForgeEngine {
   }
 
   private async executeSubmission(
-    request: ForgeSubmissionRequest,
-    observe: (event: ForgeOperationEventPayload) => void,
+    request: SubmissionRequest,
+    observe: (event: OperationEventPayload) => void,
   ): Promise<JudgeProjectResult> {
     this.assertActive();
     const removeCompilerProgress = this.compiler.onProgress((progress) => observe({ type: "progress", progress }));
@@ -439,7 +455,7 @@ export class ForgeEngine {
           cache: this.artifactStore !== undefined && compileCacheRequested(request.compile ?? {}),
         });
       } catch (error) {
-        throw asForgeError(error, {
+        throw asWasmOjError(error, {
           code: "compiler-failure",
           stage: "compile",
           retryable: true,
@@ -476,7 +492,7 @@ export class ForgeEngine {
         });
         return { build, judge };
       } catch (error) {
-        throw asForgeError(error, {
+        throw asWasmOjError(error, {
           code: "judge-failure",
           stage: "judge",
           retryable: false,
@@ -490,7 +506,7 @@ export class ForgeEngine {
     }
   }
 
-  private notifyObservation(event: ForgeOperationEvent): void {
+  private notifyObservation(event: OperationEvent): void {
     for (const listener of this.observationListeners) {
       try {
         listener(event);
@@ -585,20 +601,20 @@ function dataRecord(value: unknown, label: string): Record<string, unknown> {
 
 async function stableBoundary<T>(
   operation: () => Promise<T>,
-  options: Omit<ForgeErrorOptions, "cause">,
+  options: Omit<WasmOjErrorOptions, "cause">,
 ): Promise<T> {
   try {
     return await operation();
   } catch (error) {
-    throw asForgeError(error, options);
+    throw asWasmOjError(error, options);
   }
 }
 
-function stableInput<T>(operation: () => T, stage: ForgeErrorStage): T {
+function stableInput<T>(operation: () => T, stage: WasmOjErrorStage): T {
   try {
     return operation();
   } catch (error) {
-    throw asForgeError(error, {
+    throw asWasmOjError(error, {
       code: "invalid-input",
       stage,
       retryable: false,
@@ -606,10 +622,10 @@ function stableInput<T>(operation: () => T, stage: ForgeErrorStage): T {
   }
 }
 
-export async function createForgeEngine(
-  options: ForgeEngineOptions,
-): Promise<ForgeEngine> {
-  const engine = new ForgeEngine(options);
+export async function createEngine(
+  options: EngineOptions,
+): Promise<Engine> {
+  const engine = new Engine(options);
   try {
     await engine.ready();
     return engine;

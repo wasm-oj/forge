@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import initRuntimeCore, { compile_pipeline_forge as compilePipelineForge } from "../runner/generated/runtime-core.js";
+import initRuntimeCore, { GoCompilerSession as RuntimeCoreGoCompilerSession } from "../runner/generated/runtime-core.js";
 import runtimeCoreWasmUrl from "../runner/generated/runtime-core_bg.wasm?url";
 import {
   GO_ARCHIVE_PATH,
@@ -22,6 +22,11 @@ import {
 import { parseGoDiagnostics } from "../core/diagnostics";
 import { sha256Hex } from "../core/hash";
 import { contentAddressedToolchainAssetUrl } from "../core/toolchains";
+import {
+  BrowserGoCompilerSession,
+  type RuntimeCoreCompileStage,
+  type RuntimeCoreGoSessionConstructor,
+} from "./go-compiler-session";
 import { moduleWorkerBaseUrl } from "./module-worker";
 
 const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
@@ -31,6 +36,7 @@ const COMPILER_OUTPUT_LIMIT_BYTES = 32 * 1024 * 1024;
 
 let requestTail = Promise.resolve();
 let toolchain: Promise<GoStageToolchain> | undefined;
+let resolvedToolchain: GoStageToolchain | undefined;
 let toolchainBaseUrl: string | undefined;
 
 scope.addEventListener("message", (event: MessageEvent<GoStageRequest>) => {
@@ -51,10 +57,11 @@ interface CompilerPipelineResult {
   error?: { code: string; message: string };
 }
 
+type CompilerPipelineOutput = NonNullable<CompilerPipelineResult["result"]>;
+
 interface GoStageToolchain {
-  packageBytes: Uint8Array;
   manifest: ReturnType<typeof decodeGoToolchainManifest>;
-  standardLibraryFiles: Record<string, Uint8Array>;
+  session: BrowserGoCompilerSession<CompilerPipelineOutput>;
 }
 
 async function compile(message: Extract<GoStageRequest, { type: "compile" }>): Promise<GoCompileResult> {
@@ -71,7 +78,6 @@ async function compile(message: Extract<GoStageRequest, { type: "compile" }>): P
     ...dependencies.map((item) => ({ importPath: item.importPath, archivePath: item.archivePath })),
   ];
   const files = encodeGoCompilerFiles({
-    ...loaded.standardLibraryFiles,
     ...Object.fromEntries(message.request.files.map((file) => [`/work/${file.path}`, file.content])),
     ...Object.fromEntries((message.request.dependencyFiles ?? []).map((file) => [`/work/${file.path}`, file.content])),
     "/work/importcfg": goImportConfig(importPackages, false),
@@ -84,13 +90,7 @@ async function compile(message: Extract<GoStageRequest, { type: "compile" }>): P
     cwd: "/work",
     outputLimitBytes: COMPILER_OUTPUT_LIMIT_BYTES,
   };
-  const response = await compilePipelineForge({
-    toolchain: {
-      package: loaded.packageBytes,
-      memoryLimitBytes: COMPILER_MEMORY_LIMIT_BYTES,
-    },
-    files,
-    stages: [
+  const stages: RuntimeCoreCompileStage[] = [
       ...dependencies.map((dependency) => ({
         ...common,
         command: "go-compile",
@@ -109,10 +109,10 @@ async function compile(message: Extract<GoStageRequest, { type: "compile" }>): P
         args: goLinkArguments(message.request.optimization),
         outputPaths: [GO_OUTPUT_PATH],
       },
-    ],
-  }) as CompilerPipelineResult;
+    ];
+  const response = await loaded.session.compile(files, stages) as CompilerPipelineResult;
   if (!response.ok || !response.result) {
-    throw new Error(response.error?.message ?? "The Forge Go compiler pipeline failed.");
+    throw new Error(response.error?.message ?? "The WASM-OJ Go compiler pipeline failed.");
   }
   const decoder = new TextDecoder();
   const stdout = response.result.stages.map((stage) => decoder.decode(stage.stdout)).join("");
@@ -136,6 +136,8 @@ async function compile(message: Extract<GoStageRequest, { type: "compile" }>): P
 async function respond(message: GoStageRequest): Promise<void> {
   try {
     if (message.type === "shutdown") {
+      resolvedToolchain?.session.dispose();
+      resolvedToolchain = undefined;
       toolchain = undefined;
       toolchainBaseUrl = undefined;
       scope.postMessage({ type: "shutdown-complete" } satisfies GoStageResponse);
@@ -169,15 +171,26 @@ async function initializeToolchain(baseUrl: URL): Promise<GoStageToolchain> {
     loadGoManifest(baseUrl),
     loadGoStandardLibrary(baseUrl),
   ]);
-  return {
-    packageBytes,
+  const loaded = {
     manifest,
-    standardLibraryFiles: decodeGoStandardLibrary(standardLibrary, manifest.packages),
+    session: BrowserGoCompilerSession.hydrate<CompilerPipelineOutput>(
+      RuntimeCoreGoCompilerSession as RuntimeCoreGoSessionConstructor<CompilerPipelineOutput>,
+      {
+        digest: GO_TOOLCHAIN.manifestSha256,
+        toolchain: {
+          package: packageBytes,
+          memoryLimitBytes: COMPILER_MEMORY_LIMIT_BYTES,
+        },
+        standardLibraryFiles: decodeGoStandardLibrary(standardLibrary, manifest.packages),
+      },
+    ),
   };
+  resolvedToolchain = loaded;
+  return loaded;
 }
 
 async function loadGoPackage(baseUrl: URL): Promise<Uint8Array> {
-  const compressed = await loadVerifiedAsset(baseUrl, GO_TOOLCHAIN.packageAsset, GO_TOOLCHAIN.packageCompressedSha256);
+  const compressed = await loadVerifiedAssetResponse(baseUrl, GO_TOOLCHAIN.packageAsset, GO_TOOLCHAIN.packageCompressedSha256);
   const bytes = await gunzip(compressed, "Go WebC");
   await verifyDigest("decompressed Go WebC", bytes, GO_TOOLCHAIN.packageSha256);
   return bytes;
@@ -189,7 +202,7 @@ async function loadGoManifest(baseUrl: URL) {
 }
 
 async function loadGoStandardLibrary(baseUrl: URL): Promise<Uint8Array> {
-  const compressed = await loadVerifiedAsset(
+  const compressed = await loadVerifiedAssetResponse(
     baseUrl,
     GO_TOOLCHAIN.standardLibraryAsset,
     GO_TOOLCHAIN.standardLibraryCompressedSha256,
@@ -199,10 +212,18 @@ async function loadGoStandardLibrary(baseUrl: URL): Promise<Uint8Array> {
   return bytes;
 }
 
-async function gunzip(compressed: Uint8Array, label: string): Promise<Uint8Array> {
-  const body = new Response(compressed.slice().buffer).body;
+async function gunzip(compressed: Response, label: string): Promise<Uint8Array> {
+  const body = compressed.body;
   if (!body) throw new Error(`Pinned ${label} response has no body.`);
   return new Uint8Array(await new Response(body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+}
+
+async function loadVerifiedAssetResponse(baseUrl: URL, assetPath: string, expected: string): Promise<Response> {
+  const response = await fetch(contentAddressedToolchainAssetUrl(assetPath, baseUrl));
+  if (!response.ok) throw new Error(`Unable to load pinned Go toolchain asset '${assetPath}' (${response.status}).`);
+  const bytes = new Uint8Array(await response.clone().arrayBuffer());
+  await verifyDigest(assetPath, bytes, expected);
+  return response;
 }
 
 async function loadVerifiedAsset(baseUrl: URL, assetPath: string, expected: string): Promise<Uint8Array> {

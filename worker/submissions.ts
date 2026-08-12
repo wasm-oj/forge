@@ -1,54 +1,43 @@
-import { parseOfficialSubmissionRequest, type OfficialSubmissionRequest, type SubmissionVerdict } from "../src/online-judge/contracts";
+import { parseOfficialSubmissionRequest, type SubmissionVerdict } from "../src/online-judge/contracts";
 import { parseStoredProblemTitle } from "../src/online-judge/stored-problem-title";
 import { authenticatedSession, requireMutationSession, requireSession } from "./auth";
 import { sha256Hex } from "./crypto";
-import type { AuthenticatedSession, ForgeWorkerEnv } from "./env";
+import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { ApiError, jsonResponse, readJsonBody } from "./http";
 import { requireOfficialSubmissionRiskTurnstile, requireStagingFormalAccess } from "./formal-access";
 import { requireFormalMutationsEnabled } from "./formal-mutations";
 import { assertActiveRelease } from "./release";
-import { assertProblemVersionAcceptsSubmission } from "./rejudge";
-import { putImmutableObject } from "./immutable-r2";
-import {
-  CANCEL_ACTIVE_SUBMISSION_ATTEMPTS_SQL,
-  CANCEL_OWNED_NONTERMINAL_SUBMISSION_SQL,
-  SETTLE_CANCELLED_SUBMISSION_OUTBOX_SQL,
-} from "./submission-lifecycle";
-import {
-  prepareSubmissionEventInsert,
-  replaySubmissionEvents,
-} from "./submission-events";
-import {
-  MAX_NONTERMINAL_SUBMISSIONS,
-  MAX_QUEUED_SUBMISSIONS_PER_USER,
-  submissionCapacitySnapshot,
-} from "./submission-capacity";
-import { deriveSubmissionAttemptToken, type SubmissionWorkflowParameters } from "./submission-workflow-identity";
-import { operationalLog } from "./structured-log";
+import { prepareSubmissionEventInsert, replaySubmissionEvents } from "./submission-events";
+import { MAX_QUEUED_SUBMISSIONS, MAX_QUEUED_SUBMISSIONS_PER_USER, submissionCapacitySnapshot } from "./submission-capacity";
+import { deriveSubmissionAttemptToken } from "./submission-workflow-identity";
+import { dispatchSubmissionJobs } from "./dispatcher";
 
-interface ManagedProblemRow {
+const SOURCE_MAX_BYTES = 2 * 1024 * 1024;
+const SOURCE_TOMBSTONE = new TextEncoder().encode('{"schema":"wasm-oj-platform/erased-submission-source/v1"}\n');
+
+interface ProblemVersionRow {
   readonly id: string;
+  readonly problem_series_id: string;
   readonly problem_slug: string;
-  readonly snapshot_status: string;
-  readonly snapshot_mode: string;
-  readonly allowed_languages_json: string;
-  readonly compile_profiles_json: string;
+  readonly mode: "official-practice" | "contest";
+  readonly execution_semantic_sha256: string;
+  readonly allowed_profiles_json: string;
 }
 
 interface SubmissionRow {
   readonly id: string;
   readonly user_id: string;
-  readonly managed_problem_version_id: string;
+  readonly problem_version_id: string;
+  readonly problem_mode: "official-practice" | "contest";
   readonly contest_id: string | null;
+  readonly source_id: string;
+  readonly source_state: string;
   readonly language: string;
   readonly target: string;
   readonly optimization: string;
   readonly entry_path: string;
-  readonly source_r2_key: string;
-  readonly source_digest: string;
-  readonly source_erased_at: string | null;
-  readonly forge_release_id: string;
-  readonly forge_manifest_sha256: string;
+  readonly wasm_oj_release_id: string;
+  readonly wasm_oj_manifest_sha256: string;
   readonly state: string;
   readonly verdict: SubmissionVerdict | null;
   readonly visibility: string;
@@ -61,119 +50,81 @@ interface SubmissionRow {
   readonly completed_at: string | null;
 }
 
-export const INSERT_OFFICIAL_SUBMISSION_SQL = `WITH candidate (
-  id, user_id, managed_problem_version_id, contest_id, language, target, optimization,
-  entry_path, source_r2_key, source_digest, forge_release_id, forge_manifest_sha256,
-  environment, admitted_at
-) AS (
-  SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-)
-INSERT INTO submissions (
-  id, user_id, managed_problem_version_id, contest_id, language, target, optimization,
-  entry_path, source_r2_key, source_digest, forge_release_id, forge_manifest_sha256,
-  state, visibility, admitted_at, created_at, updated_at
-)
-SELECT id, user_id, managed_problem_version_id, contest_id, language, target, optimization,
-       entry_path, source_r2_key, source_digest, forge_release_id, forge_manifest_sha256,
-       'admitting', 'private', admitted_at, admitted_at, admitted_at
-FROM candidate
-WHERE EXISTS (SELECT 1 FROM users WHERE id=candidate.user_id AND status='active')
-  AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=candidate.user_id)
-  AND EXISTS (
-    SELECT 1 FROM formal_mutation_controls
-    WHERE environment=candidate.environment AND formal_mutations_enabled=1
-  )
-  AND EXISTS (
-    SELECT 1
-    FROM managed_problem_versions
-    JOIN managed_snapshots ON managed_snapshots.id=managed_problem_versions.snapshot_id
-    WHERE managed_problem_versions.id=candidate.managed_problem_version_id
-      AND managed_snapshots.status='published'
-      AND (
-        (candidate.contest_id IS NULL AND managed_snapshots.mode='official-practice')
-        OR (candidate.contest_id IS NOT NULL AND managed_snapshots.mode='contest')
-      )
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM rejudge_batches
-    WHERE old_problem_version_id=candidate.managed_problem_version_id
-      AND status IN ('queued','running','ready')
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM effective_problem_versions
-    WHERE original_problem_version_id=candidate.managed_problem_version_id
-  )
-  AND (
-    candidate.contest_id IS NULL
-    OR EXISTS (
-      SELECT 1
-      FROM contests
-      JOIN contest_problems ON contest_problems.contest_id=contests.id
-      WHERE contests.id=candidate.contest_id
-        AND contest_problems.managed_problem_version_id=candidate.managed_problem_version_id
-        AND contests.status='published'
-        AND contests.starts_at<=candidate.admitted_at
-        AND contests.ends_at>candidate.admitted_at
-        AND (
-          contests.access_mode='public'
-          OR EXISTS (
-            SELECT 1 FROM contest_participants
-            WHERE contest_id=contests.id AND user_id=candidate.user_id
-          )
-        )
-    )
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM submission_idempotency
-    WHERE user_id=candidate.user_id AND idempotency_key=?
-  )
-    AND (
-      SELECT COUNT(*) FROM submissions
-       WHERE state IN ('admitting','queued','waiting-capacity','preparing','compiling','running','finalizing')
-    ) < ${MAX_NONTERMINAL_SUBMISSIONS}
-    AND (
-      SELECT COUNT(*) FROM submissions
-       WHERE user_id=candidate.user_id AND state IN ('admitting','queued','waiting-capacity')
-    ) < ${MAX_QUEUED_SUBMISSIONS_PER_USER}`;
+interface SubmissionProductRow extends SubmissionRow {
+  readonly problem_slug: string;
+  readonly title_json: string;
+  readonly contest_record_id: string | null;
+  readonly contest_title: string | null;
+}
 
-export const INSERT_OFFICIAL_SUBMISSION_IDEMPOTENCY_SQL = `INSERT INTO submission_idempotency
-  (user_id, idempotency_key, request_digest, submission_id, created_at)
-  SELECT ?, ?, ?, ?, admitted_at
-  FROM submissions
-  WHERE id=? AND user_id=? AND state='admitting'
-    AND source_r2_key=? AND source_digest=?
-  `;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-export const INSERT_OFFICIAL_SUBMISSION_ATTEMPT_SQL = `INSERT INTO submission_attempts
-  (submission_id, attempt, token_hash, container_key, state)
-  SELECT id, 1, ?, ?, 'created'
-  FROM submissions
-  WHERE id=? AND user_id=? AND state='admitting'
-    AND source_r2_key=? AND source_digest=?
-  ON CONFLICT(submission_id, attempt) DO NOTHING`;
+export const SUBMISSION_PRODUCT_SELECT_SQL = `SELECT
+    origin.id,
+    origin.user_id,
+    CASE WHEN origin.contest_id IS NOT NULL
+      THEN origin.problem_version_id
+      ELSE COALESCE(effective.effective_problem_version_id, origin.problem_version_id)
+    END AS problem_version_id,
+    versions.mode AS problem_mode,
+    origin.contest_id,
+    origin.source_id,
+    sources.state AS source_state,
+    origin.language,
+    origin.target,
+    origin.optimization,
+    origin.entry_path,
+    origin.wasm_oj_release_id,
+    origin.wasm_oj_manifest_sha256,
+    CASE WHEN result.id IS NULL THEN origin.state ELSE result.state END AS state,
+    CASE WHEN result.id IS NULL THEN origin.verdict ELSE result.verdict END AS verdict,
+    origin.visibility,
+    CASE WHEN result.id IS NULL THEN origin.score ELSE result.score END AS score,
+    CASE WHEN result.id IS NULL THEN origin.fully_passed_cases ELSE result.fully_passed_cases END AS fully_passed_cases,
+    CASE WHEN result.id IS NULL THEN origin.deterministic_cost ELSE result.deterministic_cost END AS deterministic_cost,
+    CASE WHEN result.id IS NULL THEN origin.peak_memory_bytes ELSE result.peak_memory_bytes END AS peak_memory_bytes,
+    origin.created_at,
+    CASE WHEN result.id IS NULL THEN origin.updated_at ELSE result.updated_at END AS updated_at,
+    CASE WHEN result.id IS NULL THEN origin.completed_at ELSE result.completed_at END AS completed_at,
+    versions.problem_slug,
+    versions.title_json,
+    contests.id AS contest_record_id,
+    contests.title AS contest_title
+  FROM submissions AS origin
+  JOIN submission_sources AS sources ON sources.id=origin.source_id
+  LEFT JOIN effective_submission_results AS effective
+    ON effective.origin_submission_id=origin.id
+  LEFT JOIN submissions AS result
+    ON result.id=effective.effective_submission_id
+  JOIN problem_version_details AS versions
+    ON versions.id=CASE WHEN origin.contest_id IS NOT NULL
+      THEN origin.problem_version_id
+      ELSE COALESCE(effective.effective_problem_version_id, origin.problem_version_id)
+    END
+  LEFT JOIN contests ON contests.id=origin.contest_id`;
 
-export const INSERT_OFFICIAL_SUBMISSION_OUTBOX_SQL = `INSERT INTO outbox
-  (id, kind, aggregate_id, payload_json, created_at)
-  SELECT ?, 'start-submission-workflow', id, ?, admitted_at
-  FROM submissions
-  WHERE id=? AND user_id=? AND state='admitting'
-    AND source_r2_key=? AND source_digest=?
-  ON CONFLICT DO NOTHING`;
+export interface SubmissionListQuery {
+  readonly limit: number;
+  readonly cursor: { readonly before: string; readonly beforeId: string } | null;
+}
 
-export const QUEUE_ADMITTED_SUBMISSION_SQL = `UPDATE submissions
-  SET state='queued', updated_at=?
-  WHERE id=? AND user_id=? AND state='admitting'
-    AND source_r2_key=? AND source_digest=?
-    AND EXISTS (
-      SELECT 1 FROM submission_attempts
-      WHERE submission_id=submissions.id AND attempt=1 AND state='created'
-    )
-    AND EXISTS (
-      SELECT 1 FROM outbox
-      WHERE aggregate_id=submissions.id AND kind='start-submission-workflow' AND delivered_at IS NULL
-    )
-    AND EXISTS (SELECT 1 FROM users WHERE users.id=submissions.user_id AND users.status='active')
-    AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=submissions.user_id)`;
+export function parseSubmissionListQuery(url: URL): SubmissionListQuery {
+  const rawLimit = url.searchParams.get("limit") ?? "50";
+  if (!/^[1-9][0-9]*$/.test(rawLimit) || !Number.isSafeInteger(Number(rawLimit)) || Number(rawLimit) > 100) {
+    throw new ApiError(400, "submission-limit-invalid", "Submission limit must be an integer from 1 to 100.");
+  }
+  const before = url.searchParams.get("before");
+  const beforeId = url.searchParams.get("beforeId");
+  if ((before === null) !== (beforeId === null)) {
+    throw new ApiError(400, "submission-cursor-invalid", "Submission cursor requires both before and beforeId.");
+  }
+  if (before === null || beforeId === null) return { limit: Number(rawLimit), cursor: null };
+  const beforeTimestamp = Date.parse(before);
+  if (!Number.isFinite(beforeTimestamp) || new Date(beforeTimestamp).toISOString() !== before || !UUID_PATTERN.test(beforeId)) {
+    throw new ApiError(400, "submission-cursor-invalid", "Submission cursor is invalid.");
+  }
+  return { limit: Number(rawLimit), cursor: { before, beforeId } };
+}
 
 function canonicalValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalValue);
@@ -186,44 +137,111 @@ function canonicalBytes(value: unknown): Uint8Array {
   return new TextEncoder().encode(`${JSON.stringify(canonicalValue(value))}\n`);
 }
 
-function sha256Bytes(digest: string): Uint8Array {
+function digestBytes(digest: string): Uint8Array {
   return Uint8Array.from(digest.match(/.{2}/g) ?? [], (byte) => Number.parseInt(byte, 16));
 }
 
-async function putSource(
-  env: ForgeWorkerEnv,
-  key: string,
-  bytes: Uint8Array,
-  digest: string,
-  metadata: Record<string, string>,
-): Promise<void> {
-  const options = {
-    httpMetadata: { contentType: "application/json" },
-    customMetadata: { ...metadata, sha256: digest },
-    sha256: sha256Bytes(digest),
-  } satisfies R2PutOptions;
-  await putImmutableObject(env.JUDGE_BUCKET, key, bytes, digest, options);
+export function submissionSourceKey(sourceId: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(sourceId)) {
+    throw new TypeError("Submission source ID is invalid.");
+  }
+  return `submission-sources/v2/${sourceId}`;
 }
 
-async function managedProblem(env: ForgeWorkerEnv, id: string): Promise<ManagedProblemRow> {
-  const row = await env.DB.prepare(
-    "SELECT managed_problem_versions.id, managed_problem_versions.problem_slug, managed_problem_versions.allowed_languages_json, managed_problem_versions.compile_profiles_json, managed_snapshots.status AS snapshot_status, managed_snapshots.mode AS snapshot_mode FROM managed_problem_versions JOIN managed_snapshots ON managed_snapshots.id = managed_problem_versions.snapshot_id WHERE managed_problem_versions.id = ?",
-  ).bind(id).first<ManagedProblemRow>();
-  if (!row || row.snapshot_status !== "published") throw new ApiError(404, "managed-problem-not-found", "Managed problem version is not published.");
+async function putSourceConditional(
+  env: WasmOjWorkerEnv,
+  sourceId: string,
+  bytes: Uint8Array,
+  digest: string,
+): Promise<void> {
+  if (bytes.byteLength < 1 || bytes.byteLength > SOURCE_MAX_BYTES) throw new Error("Submission source exceeds its object limit.");
+  const key = submissionSourceKey(sourceId);
+  const created = await env.JUDGE_BUCKET.put(key, bytes, {
+    onlyIf: { etagDoesNotMatch: "*" },
+    httpMetadata: { contentType: "application/json" },
+    customMetadata: { kind: "submission-source", sourceId, sha256: digest },
+    sha256: digestBytes(digest),
+  });
+  if (created) return;
+  const existing = await env.JUDGE_BUCKET.head(key);
+  if (
+    !existing
+    || existing.size !== bytes.byteLength
+    || existing.customMetadata?.kind !== "submission-source"
+    || existing.customMetadata.sourceId !== sourceId
+    || existing.customMetadata.sha256 !== digest
+  ) throw new ApiError(409, "source-object-conflict", "Submission source identity is already tombstoned or bound to different bytes.");
+}
+
+export async function tombstoneSubmissionSource(env: WasmOjWorkerEnv, sourceId: string): Promise<void> {
+  const key = submissionSourceKey(sourceId);
+  const digest = await sha256Hex(SOURCE_TOMBSTONE);
+  await env.JUDGE_BUCKET.put(key, SOURCE_TOMBSTONE, {
+    httpMetadata: { contentType: "application/json" },
+    customMetadata: { kind: "erased", sourceId, sha256: digest },
+    sha256: digestBytes(digest),
+  });
+  const head = await env.JUDGE_BUCKET.head(key);
+  if (
+    !head
+    || head.size !== SOURCE_TOMBSTONE.byteLength
+    || head.customMetadata?.kind !== "erased"
+    || head.customMetadata.sourceId !== sourceId
+    || head.customMetadata.sha256 !== digest
+  ) throw new Error("Submission source tombstone did not cross the R2 persistence barrier.");
+  const now = new Date().toISOString();
+  await env.DB.prepare(`UPDATE submission_sources
+      SET state='erased', owner_user_id=NULL, content_sha256=NULL, bytes=NULL, erased_at=?,
+          erasure_next_attempt_at=NULL, erasure_last_error=NULL
+    WHERE id=? AND state='erasing'`)
+    .bind(now, sourceId).run();
+}
+
+async function beginSourceErasure(env: WasmOjWorkerEnv, sourceId: string, now = new Date()): Promise<void> {
+  const timestamp = now.toISOString();
+  await env.DB.prepare(`UPDATE submission_sources
+      SET state='erasing', content_sha256=NULL, bytes=NULL,
+          erasure_requested_at=COALESCE(erasure_requested_at, ?),
+          erasure_next_attempt_at=COALESCE(erasure_next_attempt_at, ?),
+          erasure_last_error=NULL
+    WHERE id=? AND state IN ('reserved','ready','erasing')`)
+    .bind(timestamp, timestamp, sourceId).run();
+}
+
+async function problemVersion(env: WasmOjWorkerEnv, id: string): Promise<ProblemVersionRow> {
+  const row = await env.DB.prepare(`SELECT versions.id, versions.problem_series_id, versions.problem_slug, versions.mode,
+      versions.execution_semantic_sha256, versions.allowed_profiles_json
+    FROM problem_version_details AS versions
+    JOIN judge_packages AS packages
+      ON packages.sha256=versions.execution_semantic_sha256 AND packages.state='ready'
+    WHERE versions.id=?`)
+    .bind(id).first<ProblemVersionRow>();
+  if (!row) throw new ApiError(404, "problem-version-not-found", "Problem version is not published.");
   return row;
 }
 
 async function verifyContestAdmission(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   session: AuthenticatedSession,
-  request: OfficialSubmissionRequest,
+  contestId: string | undefined,
+  problemVersionId: string,
 ): Promise<void> {
-  if (!request.contestId) return;
-  const contest = await env.DB.prepare(
-    "SELECT contests.starts_at, contests.ends_at, contests.status, contests.access_mode, contest_problems.managed_problem_version_id, contest_participants.user_id AS participant_user_id FROM contests JOIN contest_problems ON contest_problems.contest_id = contests.id LEFT JOIN contest_participants ON contest_participants.contest_id = contests.id AND contest_participants.user_id = ? WHERE contests.id = ? AND contest_problems.managed_problem_version_id = ?",
-  ).bind(session.userId, request.contestId, request.managedProblemVersionId).first<{
-    starts_at: string; ends_at: string; status: string; access_mode: string; managed_problem_version_id: string; participant_user_id: string | null;
-  }>();
+  if (!contestId) return;
+  const contest = await env.DB.prepare(`SELECT contests.starts_at, contests.ends_at, contests.status,
+      contests.access_mode, participants.user_id AS participant_user_id
+    FROM contests
+    JOIN contest_problems ON contest_problems.contest_id=contests.id
+      AND contest_problems.problem_version_id=?
+    LEFT JOIN contest_participants AS participants
+      ON participants.contest_id=contests.id AND participants.user_id=?
+    WHERE contests.id=?`)
+    .bind(problemVersionId, session.userId, contestId).first<{
+      readonly starts_at: string;
+      readonly ends_at: string;
+      readonly status: string;
+      readonly access_mode: string;
+      readonly participant_user_id: string | null;
+    }>();
   const now = new Date().toISOString();
   if (!contest || contest.status !== "published" || now < contest.starts_at || now >= contest.ends_at) {
     throw new ApiError(409, "contest-not-running", "Contest is not accepting submissions.");
@@ -233,107 +251,117 @@ async function verifyContestAdmission(
   }
 }
 
-async function submissionForOwner(env: ForgeWorkerEnv, submissionId: string, userId: string): Promise<SubmissionRow> {
-  const row = await env.DB.prepare("SELECT * FROM submissions WHERE id = ? AND user_id = ? AND rejudge_batch_id IS NULL")
+async function submissionForOwner(env: WasmOjWorkerEnv, submissionId: string, userId: string): Promise<SubmissionRow> {
+  const row = await env.DB.prepare(`SELECT submissions.*,
+      CASE WHEN submissions.contest_id IS NULL THEN 'official-practice' ELSE 'contest' END AS problem_mode,
+      sources.state AS source_state
+    FROM submissions JOIN submission_sources AS sources ON sources.id=submissions.source_id
+    WHERE submissions.id=? AND submissions.user_id=?
+      AND NOT EXISTS (SELECT 1 FROM rejudge_jobs WHERE new_submission_id=submissions.id)`)
     .bind(submissionId, userId).first<SubmissionRow>();
   if (!row) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   return row;
 }
 
-async function finishAdmittingSubmission(
-  env: ForgeWorkerEnv,
-  input: {
-    readonly submissionId: string;
-    readonly userId: string;
-    readonly sourceR2Key: string;
-    readonly sourceDigest: string;
-    readonly sourceBytes: Uint8Array;
-    readonly workflowParameters: SubmissionWorkflowParameters;
-  },
-): Promise<void> {
-  await putSource(env, input.sourceR2Key, input.sourceBytes, input.sourceDigest, {
-    submissionId: input.submissionId,
-    userId: input.userId,
-  });
+async function finalizeSourceAdmission(
+  env: WasmOjWorkerEnv,
+  input: { readonly sourceId: string; readonly submissionId: string; readonly userId: string; readonly erasureEpoch: number },
+): Promise<boolean> {
   const timestamp = new Date().toISOString();
   const attemptToken = await deriveSubmissionAttemptToken(env.ACCOUNT_ERASURE_HMAC_SECRET, input.submissionId, 1);
-  await env.DB.batch([
-    env.DB.prepare(INSERT_OFFICIAL_SUBMISSION_ATTEMPT_SQL)
-      .bind(await sha256Hex(attemptToken), `${input.submissionId}:1`, input.submissionId, input.userId, input.sourceR2Key, input.sourceDigest),
-    env.DB.prepare(INSERT_OFFICIAL_SUBMISSION_OUTBOX_SQL)
-      .bind(crypto.randomUUID(), JSON.stringify(input.workflowParameters), input.submissionId, input.userId, input.sourceR2Key, input.sourceDigest),
-    env.DB.prepare(QUEUE_ADMITTED_SUBMISSION_SQL)
-      .bind(timestamp, input.submissionId, input.userId, input.sourceR2Key, input.sourceDigest),
+  const [, , , queued] = await env.DB.batch([
+    env.DB.prepare(`UPDATE submission_sources
+        SET state='ready', ready_at=?
+      WHERE id=? AND owner_user_id=? AND state='reserved' AND admission_erasure_epoch=?
+        AND EXISTS (SELECT 1 FROM users WHERE id=? AND status='active' AND erasure_epoch=?)
+        AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=?)`)
+      .bind(timestamp, input.sourceId, input.userId, input.erasureEpoch, input.userId, input.erasureEpoch, input.userId),
+    env.DB.prepare(`INSERT INTO submission_attempts
+        (submission_id, attempt, token_hash, state)
+      SELECT submissions.id, 1, ?, 'created'
+        FROM submissions JOIN submission_sources AS sources ON sources.id=submissions.source_id
+       WHERE submissions.id=? AND submissions.user_id=? AND submissions.state='admitting'
+         AND sources.id=? AND sources.state='ready'
+      ON CONFLICT(submission_id, attempt) DO NOTHING`)
+      .bind(await sha256Hex(attemptToken), input.submissionId, input.userId, input.sourceId),
+    env.DB.prepare(`INSERT INTO workflow_outbox
+        (id, state, submission_id, attempts, created_at, updated_at)
+      SELECT ?, 'pending', submissions.id, 0, ?, ?
+        FROM submissions JOIN submission_sources AS sources ON sources.id=submissions.source_id
+       WHERE submissions.id=? AND submissions.user_id=? AND submissions.state='admitting'
+         AND sources.id=? AND sources.state='ready'
+      ON CONFLICT DO NOTHING`)
+      .bind(crypto.randomUUID(), timestamp, timestamp, input.submissionId, input.userId, input.sourceId),
+    env.DB.prepare(`UPDATE submissions SET state='queued', updated_at=?
+      WHERE id=? AND user_id=? AND source_id=? AND state='admitting'
+        AND EXISTS (SELECT 1 FROM submission_sources WHERE id=? AND state='ready')
+        AND EXISTS (SELECT 1 FROM submission_attempts WHERE submission_id=? AND attempt=1 AND state='created')
+        AND EXISTS (SELECT 1 FROM workflow_outbox WHERE submission_id=? AND state='pending')`)
+      .bind(timestamp, input.submissionId, input.userId, input.sourceId, input.sourceId, input.submissionId, input.submissionId),
   ]);
-  const queued = await env.DB.prepare("SELECT state FROM submissions WHERE id=? AND user_id=?")
-    .bind(input.submissionId, input.userId).first<{ readonly state: string }>();
-  if (!queued || queued.state === "admitting") throw new Error("Submission admission could not be queued.");
-  if (!["queued", "waiting-capacity", "preparing", "compiling", "running", "finalizing"].includes(queued.state)) return;
-  try {
-    await env.SUBMISSION_WORKFLOW.create({ id: input.submissionId, params: input.workflowParameters });
-    await env.DB.prepare("UPDATE outbox SET delivered_at=?, attempts=attempts+1, payload_json='{}', last_error=NULL WHERE aggregate_id=? AND kind='start-submission-workflow' AND delivered_at IS NULL")
-      .bind(new Date().toISOString(), input.submissionId).run();
-  } catch {
-    operationalLog("warn", {
-      event: "workflow.delivery-deferred",
-      outcome: "deferred",
-      code: "start-submission-workflow",
-      aggregateType: "submission",
-      aggregateId: input.submissionId,
-    });
-  }
+  if (queued?.meta.changes === 1) return true;
+  const exact = await env.DB.prepare(`SELECT submissions.state, sources.state AS source_state,
+      attempts.state AS attempt_state, outbox.state AS outbox_state
+    FROM submissions
+    JOIN submission_sources AS sources ON sources.id=submissions.source_id
+    LEFT JOIN submission_attempts AS attempts ON attempts.submission_id=submissions.id AND attempts.attempt=1
+    LEFT JOIN workflow_outbox AS outbox ON outbox.submission_id=submissions.id
+    WHERE submissions.id=? AND submissions.user_id=? AND sources.id=?`)
+    .bind(input.submissionId, input.userId, input.sourceId).first<{
+      readonly state: string;
+      readonly source_state: string;
+      readonly attempt_state: string | null;
+      readonly outbox_state: string | null;
+    }>();
+  return Boolean(exact && exact.state !== "admitting" && exact.source_state === "ready" && exact.attempt_state && exact.outbox_state);
 }
 
-export async function reconcileAdmittingSubmission(
-  env: ForgeWorkerEnv,
-  submissionId: string,
-  now = new Date(),
-): Promise<boolean> {
-  const row = await env.DB.prepare(`SELECT id, user_id, source_r2_key, source_digest,
-      forge_release_id, forge_manifest_sha256, state, updated_at
-    FROM submissions WHERE id=? AND rejudge_batch_id IS NULL`)
+export async function reconcileAdmittingSubmission(env: WasmOjWorkerEnv, submissionId: string, now = new Date()): Promise<boolean> {
+  const row = await env.DB.prepare(`SELECT submissions.id, submissions.user_id, submissions.source_id,
+      submissions.state, submissions.updated_at, sources.content_sha256, sources.bytes,
+      sources.state AS source_state, sources.admission_erasure_epoch
+    FROM submissions JOIN submission_sources AS sources ON sources.id=submissions.source_id
+    WHERE submissions.id=?`)
     .bind(submissionId).first<{
       readonly id: string;
       readonly user_id: string;
-      readonly source_r2_key: string;
-      readonly source_digest: string;
-      readonly forge_release_id: string;
-      readonly forge_manifest_sha256: string;
+      readonly source_id: string;
       readonly state: string;
       readonly updated_at: string;
+      readonly content_sha256: string | null;
+      readonly bytes: number | null;
+      readonly source_state: string;
+      readonly admission_erasure_epoch: number;
     }>();
   if (!row || row.state !== "admitting") return true;
   if (Date.parse(row.updated_at) > now.getTime() - 2 * 60 * 1_000) return false;
-  const object = await env.JUDGE_BUCKET.get(row.source_r2_key);
-  if (object && object.size > 0 && object.size <= 2 * 1024 * 1024 && object.customMetadata?.sha256 === row.source_digest) {
-    const bytes = new Uint8Array(await object.arrayBuffer());
-    try {
-      if (bytes.byteLength === object.size && await sha256Hex(bytes) === row.source_digest) {
-        await finishAdmittingSubmission(env, {
-          submissionId: row.id,
-          userId: row.user_id,
-          sourceR2Key: row.source_r2_key,
-          sourceDigest: row.source_digest,
-          sourceBytes: bytes,
-          workflowParameters: {
-            submissionId: row.id,
-            attempt: 1,
-            expectedReleaseId: row.forge_release_id,
-            expectedManifestSha256: row.forge_manifest_sha256,
-          },
-        });
-        return true;
-      }
-    } finally {
-      bytes.fill(0);
+  const head = await env.JUDGE_BUCKET.head(submissionSourceKey(row.source_id));
+  if (
+    row.source_state === "reserved"
+    && row.content_sha256
+    && row.bytes
+    && head?.size === row.bytes
+    && head.customMetadata?.kind === "submission-source"
+    && head.customMetadata.sha256 === row.content_sha256
+  ) {
+    if (await finalizeSourceAdmission(env, {
+      sourceId: row.source_id,
+      submissionId: row.id,
+      userId: row.user_id,
+      erasureEpoch: row.admission_erasure_epoch,
+    })) {
+      await dispatchSubmissionJobs(env);
+      return true;
     }
   }
-  await env.JUDGE_BUCKET.delete(row.source_r2_key);
-  if (await env.JUDGE_BUCKET.head(row.source_r2_key)) throw new Error("Stranded submission source cleanup failed.");
+  await beginSourceErasure(env, row.source_id, now);
+  await tombstoneSubmissionSource(env, row.source_id);
   const timestamp = now.toISOString();
   await env.DB.batch([
-    env.DB.prepare("UPDATE submissions SET state='infrastructure-error', score=0, fully_passed_cases=0, updated_at=?, completed_at=? WHERE id=? AND state='admitting'")
-      .bind(timestamp, timestamp, row.id),
+    env.DB.prepare(`UPDATE submissions
+        SET state='infrastructure-error', verdict='judge-error', score=0, fully_passed_cases=0,
+            updated_at=?, completed_at=?
+      WHERE id=? AND state='admitting'`).bind(timestamp, timestamp, row.id),
     prepareSubmissionEventInsert(env.DB, {
       submissionId: row.id,
       eventKey: "admission-source-unavailable",
@@ -345,24 +373,39 @@ export async function reconcileAdmittingSubmission(
   return true;
 }
 
-export async function createSubmission(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function createSubmission(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await requireMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
-  const input = parseOfficialSubmissionRequest(await readJsonBody(request, 2 * 1024 * 1024));
-  const problem = await managedProblem(env, input.managedProblemVersionId);
-  const allowedLanguages = JSON.parse(problem.allowed_languages_json) as unknown;
-  const compileProfiles = JSON.parse(problem.compile_profiles_json) as unknown;
-  const selectedProfile = compileProfiles && typeof compileProfiles === "object" && !Array.isArray(compileProfiles)
-    ? (compileProfiles as Record<string, { target?: unknown; optimization?: unknown }>)[input.language]
+  const input = parseOfficialSubmissionRequest(await readJsonBody(request, SOURCE_MAX_BYTES));
+  const problem = await problemVersion(env, input.problemVersionId);
+  const allowedProfiles = JSON.parse(problem.allowed_profiles_json) as unknown;
+  const selectedProfile = allowedProfiles && typeof allowedProfiles === "object" && !Array.isArray(allowedProfiles)
+    ? (allowedProfiles as Record<string, { target?: unknown; optimization?: unknown }>)[input.language]
     : undefined;
-  if (!Array.isArray(allowedLanguages) || !allowedLanguages.includes(input.language) || selectedProfile?.target !== input.target || selectedProfile.optimization !== input.optimization) {
-    throw new ApiError(409, "compile-profile-not-allowed", "Language, target, or optimization is not allowed by this managed problem version.");
+  if (selectedProfile?.target !== input.target || selectedProfile.optimization !== input.optimization) {
+    throw new ApiError(409, "compile-profile-not-allowed", "Language, target, or optimization is not allowed by this problem version.");
   }
-  if (!input.contestId && problem.snapshot_mode !== "official-practice") {
-    throw new ApiError(409, "contest-context-required", "Contest problem versions require a contest submission context.");
+  if ((input.contestId ? "contest" : "official-practice") !== problem.mode) {
+    throw new ApiError(409, "submission-context-invalid", "Problem version does not match the submission context.");
   }
-  await verifyContestAdmission(env, session, input);
+  await verifyContestAdmission(env, session, input.contestId, input.problemVersionId);
   const requestDigest = await sha256Hex(canonicalBytes(input));
+  const existing = await env.DB.prepare("SELECT submission_id, request_digest FROM submission_idempotency WHERE user_id=? AND idempotency_key=?")
+    .bind(session.userId, input.idempotencyKey).first<{ readonly submission_id: string; readonly request_digest: string }>();
+  if (existing) {
+    if (existing.request_digest !== requestDigest) throw new ApiError(409, "idempotency-conflict", "Idempotency key was already used for different source.");
+    return submissionCreatedResponse(request, env, existing.submission_id, true);
+  }
+  await requireFormalMutationsEnabled(env, request);
+  const formalRiskRequestKey = await sha256Hex(canonicalBytes({ idempotencyKey: input.idempotencyKey, requestDigest }));
+  await requireOfficialSubmissionRiskTurnstile(request, env, session.userId, formalRiskRequestKey);
+  const capacity = await submissionCapacitySnapshot(env, session.userId);
+  if (capacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) throw new ApiError(429, "submission-queue-full", "This account already has three queued submissions.");
+  if (capacity.globalQueued >= MAX_QUEUED_SUBMISSIONS) throw new ApiError(429, "submission-capacity", "The submission queue is temporarily full.");
+  const activeRelease = await assertActiveRelease(env.DB, env.ENVIRONMENT, env.WASM_OJ_RELEASE_ID, env.WASM_OJ_RELEASE_MANIFEST_SHA256);
+  const user = await env.DB.prepare("SELECT erasure_epoch FROM users WHERE id=? AND status='active'")
+    .bind(session.userId).first<{ readonly erasure_epoch: number }>();
+  if (!user) throw new ApiError(409, "account-unavailable", "Account is not available for submission.");
   const compileRequest = {
     language: input.language,
     target: input.target,
@@ -370,206 +413,105 @@ export async function createSubmission(request: Request, env: ForgeWorkerEnv): P
     entry: input.entry,
     sourceFiles: input.sourceFiles,
   };
-  const sourceSnapshot = {
-    schema: "forge-official-source-v1",
+  const sourceBytes = canonicalBytes({
+    schema: "wasm-oj-platform/official-source/v1",
     sourceDigest: await sha256Hex(canonicalBytes(compileRequest)),
     request: compileRequest,
-  };
-  const sourceBytes = canonicalBytes(sourceSnapshot);
+  });
   const sourceDigest = await sha256Hex(sourceBytes);
-
-  const replay = async (submissionId: string): Promise<Response> => {
-    const current = await submissionForOwner(env, submissionId, session.userId);
-    if (current.state === "admitting") {
-      const workflowParameters = {
-        submissionId,
-        attempt: 1,
-        expectedReleaseId: current.forge_release_id,
-        expectedManifestSha256: current.forge_manifest_sha256,
-      } satisfies SubmissionWorkflowParameters;
-      await finishAdmittingSubmission(env, {
-        submissionId,
-        userId: session.userId,
-        sourceR2Key: current.source_r2_key,
-        sourceDigest: current.source_digest,
-        sourceBytes,
-        workflowParameters,
-      });
-    }
-    return submissionCreatedResponse(request, env, submissionId, true);
-  };
-
-  const existing = await env.DB.prepare("SELECT submission_id, request_digest FROM submission_idempotency WHERE user_id=? AND idempotency_key=?")
-    .bind(session.userId, input.idempotencyKey).first<{ readonly submission_id: string; readonly request_digest: string }>();
-  if (existing) {
-    if (existing.request_digest !== requestDigest) throw new ApiError(409, "idempotency-conflict", "Idempotency key was already used for different source.");
-    return replay(existing.submission_id);
-  }
-
-  await requireFormalMutationsEnabled(env);
-  const formalRiskRequestKey = await sha256Hex(canonicalBytes({ idempotencyKey: input.idempotencyKey, requestDigest }));
-  await requireOfficialSubmissionRiskTurnstile(request, env, session.userId, formalRiskRequestKey);
-  await assertProblemVersionAcceptsSubmission(env, problem.id);
-  const capacity = await submissionCapacitySnapshot(env, session.userId);
-  if (capacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) throw new ApiError(429, "submission-queue-full", "This account already has three queued submissions.");
-  if (capacity.globalNonterminal >= MAX_NONTERMINAL_SUBMISSIONS) throw new ApiError(429, "submission-capacity", "The submission queue is temporarily full.");
-
-  const activeRelease = await assertActiveRelease(env.DB, env.JUDGE_BUCKET, env.ENVIRONMENT, env.FORGE_RELEASE_ID, env.FORGE_RELEASE_MANIFEST_SHA256);
+  const sourceId = crypto.randomUUID();
   const submissionId = crypto.randomUUID();
-  const sourceR2Key = `sources/${session.userId}/${submissionId}.${sourceDigest}.json`;
-  const workflowParameters = {
-    submissionId,
-    attempt: 1,
-    expectedReleaseId: activeRelease.releaseId,
-    expectedManifestSha256: activeRelease.manifestSha256,
-  } satisfies SubmissionWorkflowParameters;
-
+  const timestamp = new Date().toISOString();
   try {
-    const [inserted, idempotency] = await env.DB.batch([
-      env.DB.prepare(INSERT_OFFICIAL_SUBMISSION_SQL).bind(
-        submissionId,
-        session.userId,
-        input.managedProblemVersionId,
-        input.contestId ?? null,
-        input.language,
-        input.target,
-        input.optimization,
-        input.entry,
-        sourceR2Key,
-        sourceDigest,
-        activeRelease.releaseId,
-        activeRelease.manifestSha256,
-        env.ENVIRONMENT,
-        input.idempotencyKey,
-      ),
-      env.DB.prepare(INSERT_OFFICIAL_SUBMISSION_IDEMPOTENCY_SQL)
-        .bind(session.userId, input.idempotencyKey, requestDigest, submissionId, submissionId, session.userId, sourceR2Key, sourceDigest),
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO submission_sources
+          (id, owner_user_id, content_sha256, bytes, state, admission_erasure_epoch, created_at)
+        SELECT ?, id, ?, ?, 'reserved', erasure_epoch, ? FROM users
+         WHERE id=? AND status='active' AND erasure_epoch=?
+           AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=users.id)`)
+        .bind(sourceId, sourceDigest, sourceBytes.byteLength, timestamp, session.userId, user.erasure_epoch),
+      env.DB.prepare(`INSERT INTO submissions
+          (id, origin_submission_id, origin_submitted_at, user_id, problem_version_id, problem_series_id,
+           execution_semantic_sha256, contest_id,
+           source_id, language, target, optimization, entry_path, wasm_oj_release_id, wasm_oj_manifest_sha256,
+           state, visibility, admitted_at, created_at, updated_at)
+        SELECT ?, ?, ?, ?, versions.id, versions.problem_series_id,
+               versions.execution_semantic_sha256, ?, ?, ?, ?, ?, ?, ?, ?,
+               'admitting', 'private', ?, ?, ?
+          FROM problem_version_details AS versions
+          JOIN submission_sources AS sources ON sources.id=? AND sources.owner_user_id=? AND sources.state='reserved'
+         WHERE versions.id=? AND versions.execution_semantic_sha256=?
+           AND ((versions.mode='official-practice' AND ? IS NULL
+                 AND EXISTS (SELECT 1 FROM official_practice_heads WHERE problem_version_id=versions.id))
+             OR (versions.mode='contest' AND ? IS NOT NULL
+                 AND EXISTS (SELECT 1 FROM contest_problems WHERE contest_id=? AND problem_version_id=versions.id)))
+           AND (SELECT COUNT(*) FROM submissions WHERE state IN ('admitting','queued')) < ?
+           AND (SELECT COUNT(*) FROM submissions WHERE user_id=? AND state IN ('admitting','queued')) < ?`)
+        .bind(
+          submissionId, submissionId, timestamp, session.userId, input.contestId ?? null, sourceId,
+          input.language, input.target, input.optimization, input.entry,
+          activeRelease.releaseId, activeRelease.manifestSha256,
+          timestamp, timestamp, timestamp,
+          sourceId, session.userId, input.problemVersionId, problem.execution_semantic_sha256,
+          input.contestId ?? null, input.contestId ?? null, input.contestId ?? null,
+          MAX_QUEUED_SUBMISSIONS, session.userId, MAX_QUEUED_SUBMISSIONS_PER_USER,
+        ),
+      env.DB.prepare(`INSERT INTO submission_idempotency
+          (user_id, idempotency_key, request_digest, submission_id, created_at)
+        VALUES (?, ?, ?, ?, ?)`)
+        .bind(session.userId, input.idempotencyKey, requestDigest, submissionId, timestamp),
     ]);
-    if (inserted?.meta.changes !== 1 || idempotency?.meta.changes !== 1) {
-      const winner = await env.DB.prepare("SELECT submission_id, request_digest FROM submission_idempotency WHERE user_id=? AND idempotency_key=?")
-        .bind(session.userId, input.idempotencyKey).first<{ readonly submission_id: string; readonly request_digest: string }>();
-      if (winner?.request_digest === requestDigest) return replay(winner.submission_id);
-      const updatedCapacity = await submissionCapacitySnapshot(env, session.userId);
-      if (updatedCapacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) throw new ApiError(429, "submission-queue-full", "This account already has three queued submissions.");
-      if (updatedCapacity.globalNonterminal >= MAX_NONTERMINAL_SUBMISSIONS) throw new ApiError(429, "submission-capacity", "The submission queue is temporarily full.");
-      await requireFormalMutationsEnabled(env);
-      if (input.contestId) await verifyContestAdmission(env, session, input);
-      await assertProblemVersionAcceptsSubmission(env, problem.id);
-      throw new ApiError(409, "submission-admission-rejected", "The submission is no longer eligible for admission.");
-    }
   } catch (error) {
     const winner = await env.DB.prepare("SELECT submission_id, request_digest FROM submission_idempotency WHERE user_id=? AND idempotency_key=?")
       .bind(session.userId, input.idempotencyKey).first<{ readonly submission_id: string; readonly request_digest: string }>();
-    if (winner?.request_digest === requestDigest) return replay(winner.submission_id);
+    if (winner?.request_digest === requestDigest) return submissionCreatedResponse(request, env, winner.submission_id, true);
+    const currentCapacity = await submissionCapacitySnapshot(env, session.userId);
+    if (currentCapacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) {
+      throw new ApiError(429, "submission-queue-full", "This account already has three queued submissions.");
+    }
+    if (currentCapacity.globalQueued >= MAX_QUEUED_SUBMISSIONS) {
+      throw new ApiError(429, "submission-capacity", "The submission queue is temporarily full.");
+    }
     throw error;
   }
-
-  await finishAdmittingSubmission(env, {
+  await putSourceConditional(env, sourceId, sourceBytes, sourceDigest);
+  const finalized = await finalizeSourceAdmission(env, {
+    sourceId,
     submissionId,
     userId: session.userId,
-    sourceR2Key,
-    sourceDigest,
-    sourceBytes,
-    workflowParameters,
+    erasureEpoch: user.erasure_epoch,
   });
+  if (!finalized) {
+    await beginSourceErasure(env, sourceId);
+    await tombstoneSubmissionSource(env, sourceId);
+    throw new ApiError(409, "submission-admission-erased", "Account erasure or authorization changed during source admission.");
+  }
+  await dispatchSubmissionJobs(env);
   return submissionCreatedResponse(request, env, submissionId, false);
 }
 
-async function submissionCreatedResponse(
-  request: Request,
-  env: ForgeWorkerEnv,
-  submissionId: string,
-  replayed: boolean,
-): Promise<Response> {
+async function submissionCreatedResponse(request: Request, env: WasmOjWorkerEnv, submissionId: string, replayed: boolean): Promise<Response> {
   const snapshot = await env.DB.prepare("SELECT state FROM submissions WHERE id=?")
     .bind(submissionId).first<{ readonly state: string }>();
   if (!snapshot) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   const base = new URL(request.url);
   base.pathname = `/api/submissions/${submissionId}/events`;
   base.search = "";
-  return jsonResponse({
-    submissionId,
-    state: snapshot.state,
-    // The create response carries only the authoritative state, not the public
-    // verdict/resource summary. Replaying from zero hydrates both fresh and
-    // idempotently replayed submissions without fabricating result details.
-    eventCursor: 0,
-    eventsUrl: base.toString(),
-    replayed,
-  }, replayed ? 200 : 202);
+  return jsonResponse({ submissionId, state: snapshot.state, eventCursor: 0, eventsUrl: base.toString(), replayed }, replayed ? 200 : 202);
 }
 
-export async function getSubmission(request: Request, env: ForgeWorkerEnv, submissionId: string): Promise<Response> {
-  const session = await authenticatedSession(request, env);
-  const row = await env.DB.prepare("SELECT * FROM submissions WHERE id = ? AND rejudge_batch_id IS NULL")
-    .bind(submissionId).first<SubmissionRow>();
-  if (!row || !submissionDetailReadable(row, session?.userId)) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
-  const owner = row.user_id === session?.userId;
-  const [problem, contest] = await Promise.all([
-    env.DB.prepare("SELECT problem_slug, title_json FROM managed_problem_versions WHERE id=?")
-      .bind(row.managed_problem_version_id).first<{ problem_slug: string; title_json: string }>(),
-    row.contest_id
-      ? env.DB.prepare("SELECT id, title FROM contests WHERE id=?").bind(row.contest_id).first<{ id: string; title: string }>()
-      : Promise.resolve(null),
-  ]);
-  return jsonResponse({ submission: {
-    ...publicSubmissionProjection(row),
-    owner,
-    sourceAvailable: row.source_erased_at === null,
-    problem: problem ? { slug: problem.problem_slug, title: parseStoredProblemTitle(problem.title_json) } : null,
-    contest: contest ? { id: contest.id, title: contest.title } : null,
-  } });
-}
-
-export function submissionDetailReadable(
-  row: Pick<SubmissionRow, "user_id" | "state" | "visibility">,
-  viewerUserId?: string,
-): boolean {
+export function submissionDetailReadable(row: Pick<SubmissionRow, "user_id" | "state" | "visibility">, viewerUserId?: string): boolean {
   return row.user_id === viewerUserId || (row.state === "completed" && row.visibility === "public");
 }
 
-export async function listOwnSubmissions(request: Request, env: ForgeWorkerEnv): Promise<Response> {
-  const session = await requireSession(request, env);
-  const url = new URL(request.url);
-  const rawLimit = Number(url.searchParams.get("limit") ?? "50");
-  const limit = Number.isSafeInteger(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50;
-  const before = url.searchParams.get("before");
-  const beforeId = url.searchParams.get("beforeId");
-  if ((before === null) !== (beforeId === null)) throw new ApiError(400, "submission-cursor-invalid", "Submission cursor fields must be provided together.");
-  if (before !== null && (Number.isNaN(Date.parse(before)) || new Date(before).toISOString() !== before || !beforeId || !/^[0-9a-f-]{36}$/.test(beforeId))) {
-    throw new ApiError(400, "submission-cursor-invalid", "Submission cursor is invalid.");
-  }
-  const rows = await env.DB.prepare(`SELECT id, user_id, managed_problem_version_id, contest_id, language, target, optimization, entry_path, source_r2_key, source_digest, state, verdict, visibility, score, fully_passed_cases, deterministic_cost, peak_memory_bytes, created_at, updated_at, completed_at
-    FROM submissions
-    WHERE user_id=? AND (? IS NULL OR created_at<? OR (created_at=? AND id<?))
-    ORDER BY created_at DESC, id DESC LIMIT ?`)
-    .bind(session.userId, before, before, before, beforeId, limit).all<SubmissionRow>();
-  const problemIds = [...new Set(rows.results.map((row) => row.managed_problem_version_id))];
-  const contestIds = [...new Set(rows.results.flatMap((row) => row.contest_id ? [row.contest_id] : []))];
-  const problems = problemIds.length === 0 ? [] : (await env.DB.prepare(`SELECT id, problem_slug, title_json FROM managed_problem_versions WHERE id IN (${problemIds.map(() => "?").join(",")})`)
-    .bind(...problemIds).all<{ id: string; problem_slug: string; title_json: string }>()).results;
-  const contests = contestIds.length === 0 ? [] : (await env.DB.prepare(`SELECT id, title FROM contests WHERE id IN (${contestIds.map(() => "?").join(",")})`)
-    .bind(...contestIds).all<{ id: string; title: string }>()).results;
-  const problemById = new Map(problems.map((problem) => [problem.id, problem] as const));
-  const contestById = new Map(contests.map((contest) => [contest.id, contest] as const));
-  const last = rows.results.at(-1);
-  return jsonResponse({
-    submissions: rows.results.map((row) => {
-      const problem = problemById.get(row.managed_problem_version_id);
-      return {
-        ...publicSubmissionProjection(row),
-        problem: problem ? { slug: problem.problem_slug, title: parseStoredProblemTitle(problem.title_json) } : null,
-        contest: row.contest_id ? { id: row.contest_id, title: contestById.get(row.contest_id)?.title ?? "Contest" } : null,
-      };
-    }),
-    nextCursor: rows.results.length === limit && last ? { before: last.created_at, beforeId: last.id } : null,
-  });
+export function submissionMayBecomePublic(row: Pick<SubmissionRow, "state">): boolean {
+  return row.state === "completed";
 }
 
 export function publicSubmissionProjection(row: SubmissionRow): Record<string, unknown> {
   return {
     id: row.id,
-    managedProblemVersionId: row.managed_problem_version_id,
+    problemVersionId: row.problem_version_id,
     contestId: row.contest_id,
     language: row.language,
     target: row.target,
@@ -588,38 +530,107 @@ export function publicSubmissionProjection(row: SubmissionRow): Record<string, u
   };
 }
 
-export async function getSubmissionEvents(request: Request, env: ForgeWorkerEnv, submissionId: string): Promise<Response> {
+function submissionProductProjection(row: SubmissionProductRow, viewerUserId?: string): Record<string, unknown> {
+  return {
+    ...publicSubmissionProjection(row),
+    owner: row.user_id === viewerUserId,
+    sourceAvailable: row.source_state === "ready",
+    problem: {
+      slug: row.problem_slug,
+      title: parseStoredProblemTitle(row.title_json),
+    },
+    contest: row.contest_record_id && row.contest_title !== null
+      ? { id: row.contest_record_id, title: row.contest_title }
+      : null,
+  };
+}
+
+async function submissionProductRow(
+  env: WasmOjWorkerEnv,
+  submissionId: string,
+): Promise<SubmissionProductRow | null> {
+  return env.DB.prepare(`${SUBMISSION_PRODUCT_SELECT_SQL}
+    WHERE origin.id=? AND origin.origin_submission_id=origin.id`)
+    .bind(submissionId).first<SubmissionProductRow>();
+}
+
+export async function getSubmission(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
+  const session = await authenticatedSession(request, env);
+  const row = await submissionProductRow(env, submissionId);
+  if (!row || !submissionDetailReadable(row, session?.userId)) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
+  return jsonResponse({ submission: submissionProductProjection(row, session?.userId) });
+}
+
+export async function listOwnSubmissions(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await requireSession(request, env);
-  const submission = await submissionForOwner(env, submissionId, session.userId);
-  const source = new URL(request.url);
-  const rawAfter = source.searchParams.get("after") ?? "0";
-  if (!/^(?:0|[1-9][0-9]*)$/.test(rawAfter)) {
-    throw new ApiError(400, "cursor-invalid", "Event cursor must be a non-negative integer.");
-  }
-  const after = Number(rawAfter);
-  if (!Number.isSafeInteger(after)) throw new ApiError(400, "cursor-invalid", "Event cursor is too large.");
-  const events = await replaySubmissionEvents(env, submissionId, after, 100);
+  const query = parseSubmissionListQuery(new URL(request.url));
+  const statement = env.DB.prepare(`${SUBMISSION_PRODUCT_SELECT_SQL}
+    WHERE origin.user_id=? AND origin.origin_submission_id=origin.id
+      ${query.cursor ? "AND (origin.created_at<? OR (origin.created_at=? AND origin.id<?))" : ""}
+    ORDER BY origin.created_at DESC, origin.id DESC LIMIT ?`);
+  const rows = query.cursor
+    ? await statement.bind(
+      session.userId,
+      query.cursor.before,
+      query.cursor.before,
+      query.cursor.beforeId,
+      query.limit + 1,
+    ).all<SubmissionProductRow>()
+    : await statement.bind(session.userId, query.limit + 1).all<SubmissionProductRow>();
+  const hasMore = rows.results.length > query.limit;
+  const page = rows.results.slice(0, query.limit);
+  const tail = hasMore ? page.at(-1) : undefined;
   return jsonResponse({
-    events,
-    nextCursor: events.at(-1)?.sequence ?? after,
-    state: submission.state,
+    submissions: page.map((row) => submissionProductProjection(row, session.userId)),
+    nextCursor: tail ? { before: tail.created_at, beforeId: tail.id } : null,
   });
 }
 
-export async function cancelSubmission(request: Request, env: ForgeWorkerEnv, submissionId: string): Promise<Response> {
+export async function getSubmissionEvents(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
+  const session = await requireSession(request, env);
+  await submissionForOwner(env, submissionId, session.userId);
+  const rawAfter = new URL(request.url).searchParams.get("after") ?? "0";
+  if (!/^(?:0|[1-9][0-9]*)$/.test(rawAfter) || !Number.isSafeInteger(Number(rawAfter))) {
+    throw new ApiError(400, "cursor-invalid", "Event cursor must be a non-negative safe integer.");
+  }
+  const after = Number(rawAfter);
+  const events = await replaySubmissionEvents(env, submissionId, after, 100);
+  const submission = await submissionProductRow(env, submissionId);
+  if (!submission || submission.user_id !== session.userId) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
+  return jsonResponse({
+    events,
+    nextCursor: events.at(-1)?.sequence ?? after,
+    summary: {
+      state: submission.state,
+      verdict: submission.verdict,
+      score: submission.score,
+      fullyPassedCases: submission.fully_passed_cases,
+      deterministicCost: submission.deterministic_cost,
+      peakMemoryBytes: submission.peak_memory_bytes,
+      updatedAt: submission.updated_at,
+      completedAt: submission.completed_at,
+    },
+  });
+}
+
+export async function cancelSubmission(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
+  // Cancellation remains available while formal admissions are paused so a
+  // maintenance drain can converge without accepting any new durable work.
   const session = await requireMutationSession(request, env);
   const row = await submissionForOwner(env, submissionId, session.userId);
-  if (["completed", "compile-error", "judge-error", "infrastructure-error"].includes(row.state)) {
+  if (["completed", "compile-error", "judge-error", "infrastructure-error", "cancelled"].includes(row.state)) {
     return jsonResponse({ submissionId, state: row.state, changed: false });
   }
   const now = new Date().toISOString();
   const [claim] = await env.DB.batch([
-    env.DB.prepare(CANCEL_OWNED_NONTERMINAL_SUBMISSION_SQL)
+    env.DB.prepare(`UPDATE submissions SET state='cancelled', verdict='cancelled', updated_at=?, completed_at=COALESCE(completed_at, ?)
+      WHERE id=? AND user_id=? AND state NOT IN ('completed','compile-error','judge-error','infrastructure-error','cancelled')`)
       .bind(now, now, submissionId, session.userId),
-    env.DB.prepare(CANCEL_ACTIVE_SUBMISSION_ATTEMPTS_SQL)
-      .bind(now, submissionId, submissionId),
-    env.DB.prepare(SETTLE_CANCELLED_SUBMISSION_OUTBOX_SQL)
-      .bind(now, "cancelled-before-delivery", submissionId, submissionId),
+    env.DB.prepare("UPDATE submission_attempts SET state='cancelled', finished_at=COALESCE(finished_at, ?) WHERE submission_id=? AND state IN ('created','running')")
+      .bind(now, submissionId),
+    env.DB.prepare(`UPDATE workflow_outbox SET state='cancelled', settled_at=?, updated_at=?, last_error='cancelled-before-delivery'
+      WHERE submission_id=? AND state='pending'`)
+      .bind(now, now, submissionId),
     prepareSubmissionEventInsert(env.DB, {
       submissionId,
       eventKey: "api:cancelled",
@@ -628,69 +639,163 @@ export async function cancelSubmission(request: Request, env: ForgeWorkerEnv, su
       requiredState: "cancelled",
     }),
   ]);
-  const changed = claim?.meta.changes === 1;
-  if (!changed) {
-    const current = await submissionForOwner(env, submissionId, session.userId);
-    if (current.state !== "cancelled") return jsonResponse({ submissionId, state: current.state, changed: false });
-  }
-  try {
-    await env.SUBMISSION_WORKFLOW.get(submissionId).then((instance) => instance.terminate());
-  } catch {
-    operationalLog("warn", {
-      event: "workflow.delivery-deferred",
-      outcome: "deferred",
-      code: "cancelled-in-d1",
-      aggregateType: "submission",
-      aggregateId: submissionId,
-    });
-  }
-  return jsonResponse({ submissionId, state: "cancelled", changed });
+  try { await env.SUBMISSION_WORKFLOW.get(submissionId).then((instance) => instance.terminate()); } catch { /* D1 cancellation is authoritative. */ }
+  await dispatchSubmissionJobs(env);
+  return jsonResponse({ submissionId, state: "cancelled", changed: claim?.meta.changes === 1 });
 }
 
-export async function updateSubmissionVisibility(request: Request, env: ForgeWorkerEnv, submissionId: string): Promise<Response> {
+export async function updateSubmissionVisibility(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
   const session = await requireMutationSession(request, env);
-  const row = await submissionForOwner(env, submissionId, session.userId);
+  await requireFormalMutationsEnabled(env, request);
+  const row = await submissionProductRow(env, submissionId);
+  if (!row || row.user_id !== session.userId) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   const body = await readJsonBody(request, 8 * 1024);
-  if (!body || typeof body !== "object" || Array.isArray(body) || !Object.hasOwn(body, "visibility") || Object.keys(body).length !== 1) {
-    throw new ApiError(400, "visibility-invalid", "Visibility payload is invalid.");
-  }
-  const visibility = (body as { visibility?: unknown }).visibility;
+  if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 1) throw new ApiError(400, "visibility-invalid", "Visibility payload is invalid.");
+  const visibility = (body as Record<string, unknown>).visibility;
   if (visibility !== "private" && visibility !== "public") throw new ApiError(400, "visibility-invalid", "Visibility must be private or public.");
-  if (visibility === "public" && row.state !== "completed") throw new ApiError(409, "submission-not-complete", "Only completed source can be made public.");
+  if (visibility === "public" && !submissionMayBecomePublic(row)) throw new ApiError(409, "submission-not-complete", "Only completed source can be made public.");
   if (visibility === "public" && row.contest_id) {
-    const contest = await env.DB.prepare("SELECT ends_at FROM contests WHERE id = ?").bind(row.contest_id).first<{ ends_at: string }>();
+    const contest = await env.DB.prepare("SELECT ends_at FROM contests WHERE id=?").bind(row.contest_id).first<{ readonly ends_at: string }>();
     if (!contest || contest.ends_at > new Date().toISOString()) throw new ApiError(409, "contest-source-embargo", "Contest source remains private until the contest ends.");
   }
-  await env.DB.prepare("UPDATE submissions SET visibility = ?, updated_at = ? WHERE id = ?")
-    .bind(visibility, new Date().toISOString(), submissionId).run();
+  await env.DB.prepare("UPDATE submissions SET visibility=?, updated_at=? WHERE id=?").bind(visibility, new Date().toISOString(), submissionId).run();
   return jsonResponse({ submissionId, visibility });
 }
 
-export async function publicSubmissionSource(request: Request, env: ForgeWorkerEnv, submissionId: string): Promise<Response> {
+export async function publicSubmissionSource(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
   const session = await authenticatedSession(request, env);
-  const row = await env.DB.prepare("SELECT * FROM submissions WHERE id = ? AND rejudge_batch_id IS NULL")
-    .bind(submissionId).first<SubmissionRow>();
+  const row = await env.DB.prepare(`SELECT submissions.user_id, submissions.visibility, sources.id AS source_id,
+      sources.state AS source_state, sources.content_sha256, sources.bytes
+    FROM submissions JOIN submission_sources AS sources ON sources.id=submissions.source_id
+    WHERE submissions.id=? AND NOT EXISTS (SELECT 1 FROM rejudge_jobs WHERE new_submission_id=submissions.id)`)
+    .bind(submissionId).first<{
+      readonly user_id: string;
+      readonly visibility: string;
+      readonly source_id: string;
+      readonly source_state: string;
+      readonly content_sha256: string | null;
+      readonly bytes: number | null;
+    }>();
   if (!row || (row.visibility !== "public" && row.user_id !== session?.userId)) throw new ApiError(404, "source-not-found", "Submission source is private.");
-  const source = await env.JUDGE_BUCKET.get(row.source_r2_key);
-  if (
-    !source
-    || source.size < 1 || source.size > 2 * 1024 * 1024
-    || source.customMetadata?.sha256 !== row.source_digest
-  ) throw new ApiError(500, "source-object-integrity", "Submission source is unavailable or inconsistent.");
-  const sourceBytes = new Uint8Array(await source.arrayBuffer());
-  if (sourceBytes.byteLength !== source.size || await sha256Hex(sourceBytes) !== row.source_digest) {
-    throw new ApiError(500, "source-object-integrity", "Submission source failed digest verification.");
+  if (row.source_state !== "ready" || !row.content_sha256 || !row.bytes) throw new ApiError(410, "source-erased", "Submission source was erased.");
+  const source = await env.JUDGE_BUCKET.get(submissionSourceKey(row.source_id));
+  if (!source || source.size !== row.bytes || source.customMetadata?.kind !== "submission-source" || source.customMetadata.sha256 !== row.content_sha256) {
+    throw new ApiError(500, "source-object-integrity", "Submission source is unavailable or inconsistent.");
   }
-  return new Response(sourceBytes, {
-    headers: {
-      "content-type": "application/json",
-      "content-length": String(sourceBytes.byteLength),
-      "cache-control": "private, no-store",
-    },
+  const bytes = new Uint8Array(await source.arrayBuffer());
+  if (await sha256Hex(bytes) !== row.content_sha256) throw new ApiError(500, "source-object-integrity", "Submission source failed digest verification.");
+  return new Response(bytes, { headers: { "content-type": "application/json", "content-length": String(bytes.byteLength), "cache-control": "private, no-store" } });
+}
+
+export interface SubmissionPolicySummary {
+  readonly totalCases: number;
+  readonly outputAcceptedCases: number;
+  readonly policies: readonly [
+    SubmissionPolicySummaryLevel,
+    SubmissionPolicySummaryLevel,
+    SubmissionPolicySummaryLevel,
+  ];
+}
+
+export interface SubmissionPolicySummaryLevel {
+  readonly id: "baseline" | "efficient" | "optimal";
+  readonly earnedCases: number;
+  readonly costExceededCases: number;
+  readonly memoryExceededCases: number;
+  readonly logicalTimeExceededCases: number;
+}
+
+function exactPolicyRecord(value: unknown, keys: readonly string[], label: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} is invalid.`);
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).length !== keys.length || keys.some((key) => !Object.hasOwn(record, key))) {
+    throw new Error(`${label} is invalid.`);
+  }
+  return record;
+}
+
+function policyCount(value: unknown, totalCases: number, label: string): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > totalCases) {
+    throw new Error(`${label} is invalid.`);
+  }
+  return value as number;
+}
+
+export function parseSubmissionPolicySummary(stored: string): SubmissionPolicySummary {
+  if (stored.length < 1 || new TextEncoder().encode(stored).byteLength > 2 * 1024) {
+    throw new Error("Submission policy summary is invalid.");
+  }
+  const root = exactPolicyRecord(JSON.parse(stored) as unknown, ["totalCases", "outputAcceptedCases", "policies"], "Submission policy summary");
+  if (!Number.isSafeInteger(root.totalCases) || (root.totalCases as number) < 1 || (root.totalCases as number) > 10_000) {
+    throw new Error("Submission policy total is invalid.");
+  }
+  const totalCases = root.totalCases as number;
+  const outputAcceptedCases = policyCount(root.outputAcceptedCases, totalCases, "Submission output-accepted count");
+  if (!Array.isArray(root.policies) || root.policies.length !== 3) throw new Error("Submission policy levels are invalid.");
+  const expectedIds = ["baseline", "efficient", "optimal"] as const;
+  const policies = root.policies.map((value, index): SubmissionPolicySummaryLevel => {
+    const record = exactPolicyRecord(value, [
+      "id", "earnedCases", "costExceededCases", "memoryExceededCases", "logicalTimeExceededCases",
+    ], "Submission policy level");
+    const id = expectedIds[index]!;
+    if (record.id !== id) throw new Error("Submission policy order is invalid.");
+    const earnedCases = policyCount(record.earnedCases, outputAcceptedCases, "Submission earned count");
+    const costExceededCases = policyCount(record.costExceededCases, outputAcceptedCases, "Submission cost-exceeded count");
+    const memoryExceededCases = policyCount(record.memoryExceededCases, outputAcceptedCases, "Submission memory-exceeded count");
+    const logicalTimeExceededCases = policyCount(record.logicalTimeExceededCases, outputAcceptedCases, "Submission logical-time-exceeded count");
+    if ([costExceededCases, memoryExceededCases, logicalTimeExceededCases]
+      .some((failureCount) => earnedCases + failureCount > outputAcceptedCases)) {
+      throw new Error("Submission policy level contradicts its earned cases.");
+    }
+    return {
+      id,
+      earnedCases,
+      costExceededCases,
+      memoryExceededCases,
+      logicalTimeExceededCases,
+    };
+  }) as unknown as SubmissionPolicySummary["policies"];
+  return { totalCases, outputAcceptedCases, policies };
+}
+
+export async function getSubmissionPolicySummary(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
+  const session = await authenticatedSession(request, env);
+  const row = await env.DB.prepare(`SELECT origin.user_id, origin.visibility, origin.contest_id,
+      contests.ends_at AS contest_ends_at,
+      COALESCE(result.state, origin.state) AS state,
+      COALESCE(result.policy_summary_json, origin.policy_summary_json) AS policy_summary_json
+    FROM submissions AS requested
+    JOIN submissions AS origin ON origin.id=requested.origin_submission_id
+    LEFT JOIN effective_submission_results AS effective
+      ON effective.origin_submission_id=origin.id
+    LEFT JOIN submissions AS result ON result.id=effective.effective_submission_id
+    LEFT JOIN contests ON contests.id=origin.contest_id
+    WHERE requested.id=?`)
+    .bind(submissionId).first<{
+      readonly user_id: string;
+      readonly visibility: string;
+      readonly contest_id: string | null;
+      readonly contest_ends_at: string | null;
+      readonly state: string;
+      readonly policy_summary_json: string | null;
+    }>();
+  if (!row || !submissionDetailReadable(row, session?.userId)) {
+    throw new ApiError(404, "submission-not-found", "Submission does not exist.");
+  }
+  if (row.user_id !== session?.userId && row.contest_id !== null
+    && (row.contest_ends_at === null || row.contest_ends_at > new Date().toISOString())) {
+    throw new ApiError(404, "submission-not-found", "Submission does not exist.");
+  }
+  if (row.state !== "completed" || row.policy_summary_json === null) {
+    throw new ApiError(409, "policy-summary-unavailable", "Policy summary is unavailable for this submission.");
+  }
+  return jsonResponse({ submissionId, policySummary: parseSubmissionPolicySummary(row.policy_summary_json) }, 200, {
+    "cache-control": "private, no-store",
+    vary: "Cookie",
   });
 }
 
-export async function managedMatch(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function managedMatch(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const url = new URL(request.url);
   const repository = url.searchParams.get("repository");
   const revision = url.searchParams.get("revision");
@@ -698,13 +803,23 @@ export async function managedMatch(request: Request, env: ForgeWorkerEnv): Promi
     throw new ApiError(400, "managed-match-invalid", "repository and collection revision are required.");
   }
   const [owner, name] = repository.split("/");
-  const result = await env.DB.prepare(
-    "SELECT managed_snapshots.id AS snapshot_id, managed_problem_versions.problem_slug, managed_problem_versions.id AS problem_version_id FROM github_repositories JOIN collection_imports ON collection_imports.github_repository_id = github_repositories.github_repository_id JOIN managed_snapshots ON managed_snapshots.import_id = collection_imports.id JOIN managed_problem_versions ON managed_problem_versions.snapshot_id = managed_snapshots.id WHERE github_repositories.owner_login = ? COLLATE NOCASE AND github_repositories.name = ? COLLATE NOCASE AND github_repositories.is_private = 0 AND managed_snapshots.collection_revision = ? AND managed_snapshots.mode = 'official-practice' AND managed_snapshots.status = 'published' AND NOT EXISTS (SELECT 1 FROM effective_problem_versions WHERE original_problem_version_id=managed_problem_versions.id) AND NOT EXISTS (SELECT 1 FROM rejudge_batches WHERE old_problem_version_id=managed_problem_versions.id AND status IN ('queued','running','ready')) ORDER BY managed_problem_versions.problem_number",
-  ).bind(owner, name, revision).all<{ snapshot_id: string; problem_slug: string; problem_version_id: string }>();
+  const result = await env.DB.prepare(`SELECT publications.id AS publication_id, versions.problem_slug,
+      versions.id AS problem_version_id
+    FROM github_repositories AS repositories
+    JOIN problem_collections AS collections ON collections.github_repository_id=repositories.github_repository_id
+    JOIN collection_revisions AS revisions ON revisions.collection_id=collections.id
+    JOIN catalog_publications AS publications ON publications.collection_revision_id=revisions.id
+      AND publications.mode='official-practice'
+    JOIN problem_version_details AS versions ON versions.catalog_publication_id=publications.id
+    JOIN official_practice_heads AS heads ON heads.problem_version_id=versions.id
+    WHERE repositories.owner_login=? COLLATE NOCASE AND repositories.name=? COLLATE NOCASE
+      AND repositories.is_private=0 AND revisions.collection_revision_sha256=?
+    ORDER BY versions.problem_number`)
+    .bind(owner, name, revision).all<{ readonly publication_id: string; readonly problem_slug: string; readonly problem_version_id: string }>();
   if (result.results.length === 0) return jsonResponse({ matched: false });
   return jsonResponse({
     matched: true,
-    snapshotId: result.results[0]?.snapshot_id,
+    publicationId: result.results[0]?.publication_id,
     problems: Object.fromEntries(result.results.map((row) => [row.problem_slug, row.problem_version_id])),
   });
 }

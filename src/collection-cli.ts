@@ -6,15 +6,31 @@ import { pathToFileURL } from "node:url";
 import {
   BROWSER_COLLECTION_SCHEMA,
   BROWSER_PROBLEM_SCHEMA,
+  canonicalJsonBytes,
+  contestPublicProjectionBytes,
+  deriveJudgeData,
+  derivePracticePublic,
+  encodeJudgePackage,
+  assertJudgeDataMatchesPracticePublic,
+  MANAGED_COLLECTION_SCHEMA,
+  parseManagedCollectionSource,
+  parseManagedCollectionV2,
   parseProblemCollectionIndex,
   parseStandaloneProblemBundle,
   problemCollectionRevision,
+  validateJudgePackage,
   verifyProblemBundleBytes,
   verifyProblemCollectionRevision,
+  type BuiltinLanguage,
+  type JudgePackageAssetInput,
+  type JudgePackageInput,
+  type ManagedCollectionSource,
+  type ManagedCollectionV2,
+  type ManagedRepositoryObject,
+  type ManagedSourceObject,
   type ProblemCollectionEntry,
   type ProblemCollectionIndex,
-} from "./judge/problem-catalog-loader";
-import { parseManagedCollectionContract } from "./online-judge/managed-collection";
+} from "@wasm-oj/core";
 
 const SOURCE_SCHEMA = "wasm-oj-browser-collection-source-v1";
 const DEFAULT_INDEX_PATH = "collection/index.json";
@@ -27,6 +43,7 @@ interface CliOptions {
   readonly indexPath: string;
   readonly sourcePath: string;
   readonly managedPath?: string;
+  readonly managedSourcePath?: string;
 }
 
 interface AuthoredCollectionProblem {
@@ -66,21 +83,23 @@ function resolveInside(root: string, relativeValue: unknown, label: string): str
 function parseOptions(arguments_: readonly string[]): CliOptions {
   const [commandValue, ...rest] = arguments_;
   if (commandValue !== "build" && commandValue !== "validate" && commandValue !== "verify") {
-    return fail("Usage: forge-collection <build|validate|verify> [repository-root] [--index path] [--source path] [--managed path]");
+    return fail("Usage: wasm-oj-collection <build|validate|verify> [repository-root] [--index path] [--source path] [--managed path] [--managed-source path]");
   }
   let root = ".";
   let indexPath = DEFAULT_INDEX_PATH;
   let sourcePath = DEFAULT_SOURCE_PATH;
   let managedPath: string | undefined;
+  let managedSourcePath: string | undefined;
   let sawRoot = false;
   for (let index = 0; index < rest.length; index += 1) {
     const argument = rest[index];
-    if (argument === "--index" || argument === "--source" || argument === "--managed") {
+    if (argument === "--index" || argument === "--source" || argument === "--managed" || argument === "--managed-source") {
       const value = rest[index + 1];
       if (!value) return fail(`${argument} requires a path.`);
       if (argument === "--index") indexPath = normalizedRelativePath(value, "index path");
       else if (argument === "--source") sourcePath = normalizedRelativePath(value, "source path");
-      else managedPath = normalizedRelativePath(value, "managed contract path");
+      else if (argument === "--managed") managedPath = normalizedRelativePath(value, "managed contract path");
+      else managedSourcePath = normalizedRelativePath(value, "managed source path");
       index += 1;
       continue;
     }
@@ -89,7 +108,16 @@ function parseOptions(arguments_: readonly string[]): CliOptions {
     root = argument;
     sawRoot = true;
   }
-  return { command: commandValue, root: path.resolve(root), indexPath, sourcePath, ...(managedPath ? { managedPath } : {}) };
+  if (commandValue !== "build" && managedSourcePath) return fail("--managed-source is only valid for build.");
+  if (commandValue === "build" && managedPath && !managedSourcePath) return fail("--managed requires --managed-source when building.");
+  return {
+    command: commandValue,
+    root: path.resolve(root),
+    indexPath,
+    sourcePath,
+    ...(managedPath ? { managedPath } : {}),
+    ...(managedSourcePath ? { managedSourcePath } : {}),
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -177,7 +205,7 @@ async function validatePublishedCollection(options: CliOptions, strict: boolean)
   const index = parseProblemCollectionIndex(parseJson(indexBytes, options.indexPath));
   await verifyProblemCollectionRevision(index);
   if (strict && !Buffer.from(indexBytes).equals(Buffer.from(canonicalJson(index)))) {
-    fail(`${options.indexPath} is not canonical; run forge-collection build.`);
+    fail(`${options.indexPath} is not canonical; run wasm-oj-collection build.`);
   }
   const indexDirectory = path.posix.dirname(options.indexPath);
   for (const entry of index.problems) {
@@ -191,7 +219,7 @@ async function validatePublishedCollection(options: CliOptions, strict: boolean)
     const bytes = new Uint8Array(await readFile(resolveInside(options.root, repositoryPath, `problem '${entry.id}' bundle`)));
     const problem = await verifyProblemBundleBytes(bytes, entry);
     if (strict && !Buffer.from(bytes).equals(Buffer.from(canonicalJson({ schema: BROWSER_PROBLEM_SCHEMA, problem })))) {
-      fail(`${repositoryPath} is not canonical; run forge-collection build.`);
+      fail(`${repositoryPath} is not canonical; run wasm-oj-collection build.`);
     }
   }
   if (strict) await rejectUndeclaredContentAddressedBundles(options, index);
@@ -203,36 +231,51 @@ async function validateManagedContract(options: CliOptions, index: ProblemCollec
   const managedPath = options.managedPath;
   if (!managedPath) fail("managed contract path is required.");
   const contractBytes = new Uint8Array(await readFile(resolveInside(options.root, managedPath, "managed contract path")));
-  if (contractBytes.byteLength < 1 || contractBytes.byteLength > 2 * 1024 * 1024) fail("managed collection contract must contain between 1 byte and 2 MiB.");
-  const contract = parseManagedCollectionContract(parseJson(contractBytes, managedPath));
+  const contract = parseManagedCollectionV2(contractBytes);
   if (contract.collectionRevision !== index.revision) fail("managed collection revision does not match collection/index.json.");
-  if (JSON.stringify(contract.problems.map((problem) => problem.id)) !== JSON.stringify(index.problems.map((problem) => problem.id))) {
+  if (JSON.stringify(contract.problems.map((problem) => problem.slug)) !== JSON.stringify(index.problems.map((problem) => problem.id))) {
     fail("managed collection problems must exactly match index order.");
   }
-  for (const problem of contract.problems) {
-    for (const reference of problem.references) {
-      for (const file of reference.files) {
-        await verifyManagedFile(options, file, `reference '${problem.id}/${reference.language}/${file.path}'`);
-      }
+  const indexDirectory = path.posix.dirname(options.indexPath);
+  for (const [position, publication] of contract.problems.entries()) {
+    const entry = index.problems[position]!;
+    const practiceRepositoryPath = path.posix.join(indexDirectory, entry.bundle.path);
+    const practiceBytes = new Uint8Array(await readFile(resolveInside(options.root, practiceRepositoryPath, `problem '${entry.id}' bundle`)));
+    const practice = await verifyProblemBundleBytes(practiceBytes, entry);
+
+    const contestBytes = await readPublishedObject(options, indexDirectory, publication.contestPublic, `contest-public '${publication.slug}'`);
+    const expectedContestBytes = contestPublicProjectionBytes(practice, entry.bundle.sha256);
+    if (!Buffer.from(contestBytes).equals(Buffer.from(expectedContestBytes))) {
+      fail(`contest-public '${publication.slug}' is not the deterministic projection of its practice bundle.`);
     }
-    if (problem.judge.kind !== "text") {
-      for (const file of problem.judge.program.files) {
-        await verifyManagedFile(options, file, `${problem.judge.kind} source '${problem.id}/${file.path}'`);
-      }
-      for (const asset of problem.judge.program.assets) {
-        await verifyManagedFile(options, asset, `${problem.judge.kind} asset '${problem.id}/${asset.path}'`);
-      }
+
+    const packageBytes = await readPublishedObject(options, indexDirectory, publication.judgePackage, `judge package '${publication.slug}'`);
+    const validatedPackage = await validateJudgePackage(packageBytes, {
+      expectedBytes: publication.judgePackage.bytes,
+      expectedSha256: publication.judgePackage.sha256,
+      memoryLimitBytes: Math.max(...practice.scoring.policies.map((policy) => policy.limits.memoryLimitBytes)),
+    });
+    if (JSON.stringify(validatedPackage.manifest.allowedProfiles) !== JSON.stringify(publication.allowedProfiles)) {
+      fail(`judge package '${publication.slug}' allowedProfiles disagree with collection/managed.json.`);
     }
+    assertJudgeDataMatchesPracticePublic(
+      validatedPackage.judgeData,
+      practice,
+      Object.keys(publication.allowedProfiles) as BuiltinLanguage[],
+    );
   }
 }
 
-async function verifyManagedFile(
+async function readPublishedObject(
   options: CliOptions,
-  file: { readonly repositoryPath: string; readonly bytes: number; readonly sha256: string },
+  indexDirectory: string,
+  object: ManagedRepositoryObject,
   label: string,
-): Promise<void> {
-  const bytes = new Uint8Array(await readFile(resolveInside(options.root, file.repositoryPath, label)));
-  if (bytes.byteLength !== file.bytes || await sha256Hex(bytes) !== file.sha256) fail(`${label} failed integrity verification.`);
+): Promise<Uint8Array> {
+  const repositoryPath = path.posix.join(indexDirectory, object.repositoryPath);
+  const bytes = new Uint8Array(await readFile(resolveInside(options.root, repositoryPath, label)));
+  if (bytes.byteLength !== object.bytes || await sha256Hex(bytes) !== object.sha256) fail(`${label} failed integrity verification.`);
+  return bytes;
 }
 
 async function rejectUndeclaredContentAddressedBundles(options: CliOptions, index: ProblemCollectionIndex): Promise<void> {
@@ -249,13 +292,19 @@ async function rejectUndeclaredContentAddressedBundles(options: CliOptions, inde
   if (undeclared.length > 0) fail(`undeclared content-addressed bundles: ${undeclared.join(", ")}.`);
 }
 
-async function buildCollection(options: CliOptions): Promise<ProblemCollectionIndex> {
+interface BuiltCollection {
+  readonly index: ProblemCollectionIndex;
+  readonly authoredProblems: readonly ReturnType<typeof parseStandaloneProblemBundle>[];
+}
+
+async function buildCollection(options: CliOptions): Promise<BuiltCollection> {
   const sourceFile = resolveInside(options.root, options.sourcePath, "source path");
   const source = parseAuthoredCollection(parseJson(new Uint8Array(await readFile(sourceFile)), options.sourcePath));
   const indexDirectory = path.posix.dirname(options.indexPath);
   const outputDirectory = resolveInside(options.root, path.posix.join(indexDirectory, "problems"), "bundle output directory");
   await mkdir(outputDirectory, { recursive: true });
   const entries: ProblemCollectionEntry[] = [];
+  const authoredProblems: ReturnType<typeof parseStandaloneProblemBundle>[] = [];
   for (const [position, authored] of source.problems.entries()) {
     const sourceBytes = new Uint8Array(await readFile(resolveInside(options.root, authored.bundlePath, `problem ${position + 1} source bundle`)));
     const problem = parseStandaloneProblemBundle(parseJson(sourceBytes, authored.bundlePath));
@@ -266,7 +315,9 @@ async function buildCollection(options: CliOptions): Promise<ProblemCollectionIn
         fail(`problem '${problem.id}' ${locale} statement must contain between 1 byte and 2 MiB.`);
       }
     }
-    const bundleBytes = canonicalJson({ schema: BROWSER_PROBLEM_SCHEMA, problem });
+    authoredProblems.push(problem);
+    const practice = derivePracticePublic(problem);
+    const bundleBytes = canonicalJson({ schema: BROWSER_PROBLEM_SCHEMA, problem: practice });
     const digest = await sha256Hex(bundleBytes);
     const bundleName = `${String(problem.number).padStart(3, "0")}-${problem.id}.${digest}.json`;
     await writeFile(path.join(outputDirectory, bundleName), bundleBytes);
@@ -279,7 +330,7 @@ async function buildCollection(options: CliOptions): Promise<ProblemCollectionIn
       statementPaths: authored.statementPaths,
       difficulty: problem.difficulty,
       tags: problem.tags,
-      caseCount: problem.judgeCases.length,
+      caseCount: practice.judgeCases.length,
       bundle: { path: `problems/${bundleName}`, sha256: digest, bytes: bundleBytes.byteLength },
     });
   }
@@ -296,14 +347,116 @@ async function buildCollection(options: CliOptions): Promise<ProblemCollectionIn
   const indexFile = resolveInside(options.root, options.indexPath, "index path");
   await mkdir(path.dirname(indexFile), { recursive: true });
   await writeFile(indexFile, canonicalJson(index));
-  return index;
+  return { index, authoredProblems };
 }
 
-export async function runForgeCollectionCli(arguments_: readonly string[]): Promise<void> {
+async function readDeclaredManagedSourceObject(
+  options: CliOptions,
+  object: ManagedSourceObject,
+  label: string,
+): Promise<Uint8Array> {
+  const bytes = new Uint8Array(await readFile(resolveInside(options.root, object.path, label)));
+  if (bytes.byteLength !== object.bytes || await sha256Hex(bytes) !== object.sha256) {
+    fail(`${label} failed declared size or digest verification.`);
+  }
+  return bytes;
+}
+
+async function managedJudgeInput(
+  options: CliOptions,
+  problem: ManagedCollectionSource["problems"][number],
+): Promise<JudgePackageInput["judge"]> {
+  if (problem.judge.kind === "text") return { kind: "text" };
+  const artifact = await readDeclaredManagedSourceObject(options, problem.judge.artifact, `${problem.judge.kind} artifact '${problem.slug}'`);
+  const assets: JudgePackageAssetInput[] = [];
+  for (const asset of problem.judge.assets) {
+    assets.push({
+      guestPath: asset.guestPath,
+      contents: await readDeclaredManagedSourceObject(options, asset, `${problem.judge.kind} asset '${problem.slug}/${asset.path}'`),
+    });
+  }
+  return problem.judge.kind === "checker"
+    ? { kind: "checker", runtimeProfile: problem.judge.artifact.runtimeProfile, artifact, assets, args: problem.judge.args }
+    : { kind: "interactive", runtimeProfile: problem.judge.artifact.runtimeProfile, artifact, assets, args: problem.judge.args, inputPath: problem.judge.inputPath };
+}
+
+async function buildManagedCollection(
+  options: CliOptions,
+  index: ProblemCollectionIndex,
+  authoredProblems: readonly ReturnType<typeof parseStandaloneProblemBundle>[],
+): Promise<{ readonly path: string; readonly contract: ManagedCollectionV2 }> {
+  const managedSourcePath = options.managedSourcePath;
+  if (!managedSourcePath) fail("managed source path is required.");
+  const sourceBytes = new Uint8Array(await readFile(resolveInside(options.root, managedSourcePath, "managed source path")));
+  const source = parseManagedCollectionSource(parseJson(sourceBytes, managedSourcePath));
+  if (JSON.stringify(source.problems.map((problem) => problem.slug)) !== JSON.stringify(index.problems.map((problem) => problem.id))) {
+    fail("managed source problems must exactly match collection/index.json order.");
+  }
+
+  const indexDirectory = path.posix.dirname(options.indexPath);
+  const publicationDirectory = path.posix.join(indexDirectory, "managed");
+  await mkdir(resolveInside(options.root, publicationDirectory, "managed publication directory"), { recursive: true });
+  const publications: ManagedCollectionV2["problems"][number][] = [];
+  for (const [position, sourceProblem] of source.problems.entries()) {
+    const entry = index.problems[position]!;
+    const practiceRepositoryPath = path.posix.join(indexDirectory, entry.bundle.path);
+    const practiceBytes = new Uint8Array(await readFile(resolveInside(options.root, practiceRepositoryPath, `problem '${entry.id}' bundle`)));
+    const practice = await verifyProblemBundleBytes(practiceBytes, entry);
+    const authored = authoredProblems[position];
+    if (!authored || authored.id !== entry.id) fail(`authoring source for '${entry.id}' is unavailable.`);
+
+    const contestBytes = contestPublicProjectionBytes(practice, entry.bundle.sha256);
+    const contestSha256 = await sha256Hex(contestBytes);
+    const contestName = `${String(entry.number).padStart(3, "0")}-${entry.id}.${contestSha256}.contest.json`;
+    await writeFile(resolveInside(options.root, path.posix.join(publicationDirectory, contestName), `contest-public '${entry.id}' output`), contestBytes);
+
+    const encoded = await encodeJudgePackage({
+      judgeData: deriveJudgeData(authored, Object.keys(sourceProblem.allowedProfiles) as BuiltinLanguage[]),
+      allowedProfiles: sourceProblem.allowedProfiles,
+      judge: await managedJudgeInput(options, sourceProblem),
+    });
+    const validated = await validateJudgePackage(encoded.bytes, {
+      expectedBytes: encoded.bytes.byteLength,
+      expectedSha256: encoded.executionSemanticSha256,
+      memoryLimitBytes: Math.max(...practice.scoring.policies.map((policy) => policy.limits.memoryLimitBytes)),
+    });
+    assertJudgeDataMatchesPracticePublic(
+      validated.judgeData,
+      practice,
+      Object.keys(sourceProblem.allowedProfiles) as BuiltinLanguage[],
+    );
+    const packageName = `${String(entry.number).padStart(3, "0")}-${entry.id}.${encoded.executionSemanticSha256}.wasmojjudge`;
+    await writeFile(resolveInside(options.root, path.posix.join(publicationDirectory, packageName), `judge package '${entry.id}' output`), encoded.bytes);
+
+    publications.push({
+      slug: entry.id,
+      allowedProfiles: sourceProblem.allowedProfiles,
+      contestPublic: { repositoryPath: `managed/${contestName}`, bytes: contestBytes.byteLength, sha256: contestSha256 },
+      judgePackage: { repositoryPath: `managed/${packageName}`, bytes: encoded.bytes.byteLength, sha256: encoded.executionSemanticSha256 },
+    });
+  }
+  const contract = parseManagedCollectionV2(canonicalJsonBytes({
+    schema: MANAGED_COLLECTION_SCHEMA,
+    collectionRevision: index.revision,
+    problems: publications,
+  }));
+  const managedPath = options.managedPath ?? path.posix.join(indexDirectory, "managed.json");
+  const outputFile = resolveInside(options.root, managedPath, "managed contract output");
+  await mkdir(path.dirname(outputFile), { recursive: true });
+  await writeFile(outputFile, canonicalJsonBytes(contract));
+  return { path: managedPath, contract };
+}
+
+export async function runCollectionCli(arguments_: readonly string[]): Promise<void> {
   const options = parseOptions(arguments_);
-  const index = options.command === "build"
-    ? await buildCollection(options)
-    : await validatePublishedCollection(options, options.command === "verify");
+  let index: ProblemCollectionIndex;
+  if (options.command === "build") {
+    const built = await buildCollection(options);
+    index = built.index;
+    if (options.managedSourcePath) await buildManagedCollection(options, index, built.authoredProblems);
+  } else {
+    index = await validatePublishedCollection(options, options.command === "verify");
+  }
   process.stdout.write(`${options.command} ok: ${index.problems.length} problems, revision ${index.revision}\n`);
 }
 
@@ -311,8 +464,8 @@ const invokedDirectly = process.argv[1]
   ? import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
   : false;
 if (invokedDirectly) {
-  runForgeCollectionCli(process.argv.slice(2)).catch((error: unknown) => {
-    process.stderr.write(`forge-collection: ${error instanceof Error ? error.message : String(error)}\n`);
+  runCollectionCli(process.argv.slice(2)).catch((error: unknown) => {
+    process.stderr.write(`wasm-oj-collection: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
   });
 }

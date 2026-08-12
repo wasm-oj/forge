@@ -21,7 +21,7 @@ export function maximumOutputReadyClangStages(project: Project): number {
   const sources = new Set(project.files.filter((file) => sourcePattern.test(file.path)).map((file) => file.path));
   sources.add(project.config.entry);
   const pchFile = project.config.language === "cpp"
-    ? project.files.find((file) => file.path.split("/").at(-1) === "forge.pch.hpp")
+    ? project.files.find((file) => file.path.split("/").at(-1) === "wasm-oj.pch.hpp")
     : undefined;
   const pch = pchFile && !isToolchainLibcxxPchHeader(pchFile.content) ? 1 : 0;
   return sources.size + pch + 2;

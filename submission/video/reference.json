@@ -1,0 +1,18 @@
+{
+  "source": "/Users/jacoblincool/Library/Application Support/Video Studio MLX/Voices/21C4D7D1-68B2-476D-9BE4-F94478C974F7.mp3",
+  "normalized": "/Users/jacoblincool/Documents/GitHub/wasi-compiler-in-browser/submission/video/reference-21C4D7D1.wav",
+  "duration_s": 12.072,
+  "source_format": {
+    "codec": "mp3",
+    "sample_rate_hz": 48000,
+    "channels": 1
+  },
+  "normalized_format": {
+    "codec": "pcm_s16le",
+    "sample_rate_hz": 24000,
+    "channels": 1
+  },
+  "provided_transcript": "Introducing Video Studio MLX, an outstanding application that allows you and your AI agent to generate video footage and validate your video creations.",
+  "asr_transcript": "Introducing Video Studio MLX, an outstanding application that allows you and your AI agent to generate video footage and validate your video creations.",
+  "exact_match": true
+}

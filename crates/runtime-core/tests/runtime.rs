@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use wasm_oj_forge_runtime_core::{DeterminismConfig, ResourcePolicy, RunError, RunRequest, run};
+use wasm_oj_runtime_core::{DeterminismConfig, ResourcePolicy, RunError, RunRequest, run};
 
 fn request(wat_source: &str) -> RunRequest {
     RunRequest {
@@ -141,7 +141,7 @@ fn traps_thread_network_and_process_capabilities_before_wasmer_can_execute_them(
         assert_eq!(result.code, 1);
         assert_eq!(
             result.termination,
-            wasm_oj_forge_runtime_core::ExecutionTermination::Trap
+            wasm_oj_runtime_core::ExecutionTermination::Trap
         );
         assert!(
             result
@@ -289,7 +289,7 @@ fn sleep_beyond_the_logical_time_budget_has_its_own_termination() {
     assert_eq!(result.code, 137);
     assert_eq!(
         result.termination,
-        wasm_oj_forge_runtime_core::ExecutionTermination::LogicalTimeLimit
+        wasm_oj_runtime_core::ExecutionTermination::LogicalTimeLimit
     );
     assert_eq!(result.trap_message, None);
     assert_eq!(result.metrics.logical_time_ns, 10_000_000);
@@ -305,7 +305,7 @@ fn terminates_an_infinite_loop_by_instruction_budget() {
     assert_eq!(result.code, 137);
     assert_eq!(
         result.termination,
-        wasm_oj_forge_runtime_core::ExecutionTermination::InstructionLimit
+        wasm_oj_runtime_core::ExecutionTermination::InstructionLimit
     );
     assert_eq!(result.metrics.cost, 20);
 }
@@ -346,7 +346,7 @@ fn enforces_a_combined_stdout_stderr_limit() {
     assert_eq!(result.code, 137);
     assert_eq!(
         result.termination,
-        wasm_oj_forge_runtime_core::ExecutionTermination::OutputLimit
+        wasm_oj_runtime_core::ExecutionTermination::OutputLimit
     );
     assert_eq!(result.stdout, b"1234");
     assert_eq!(result.metrics.stdout_bytes, 4);
@@ -558,7 +558,7 @@ fn guest_filesystem_preopen_allows_ephemeral_file_creation_and_writes() {
     assert_eq!(result.code, 0, "{result:?}");
     assert_eq!(
         result.termination,
-        wasm_oj_forge_runtime_core::ExecutionTermination::Exited
+        wasm_oj_runtime_core::ExecutionTermination::Exited
     );
 }
 
@@ -583,7 +583,7 @@ fn classifies_write_time_filesystem_quota_exhaustion() {
     assert_eq!(result.code, 137);
     assert_eq!(
         result.termination,
-        wasm_oj_forge_runtime_core::ExecutionTermination::FilesystemLimit
+        wasm_oj_runtime_core::ExecutionTermination::FilesystemLimit
     );
     assert_eq!(result.files["/created.txt"].as_ref(), b"");
     assert_eq!(result.metrics.filesystem_bytes, 0);

@@ -30,10 +30,10 @@ import json
 import sys
 import sysconfig
 
-sys.stderr.write("FORGE_SMOKE:" + json.dumps({
+sys.stderr.write("WASM_OJ_SMOKE:" + json.dumps({
     "absSrcdir": sysconfig.get_config_var("abs_srcdir"),
-    "compiled": bool(compile("value = 6 * 7", "<forge-smoke>", "exec")),
-    "sha256": hashlib.sha256(b"forge").hexdigest(),
+    "compiled": bool(compile("value = 6 * 7", "<wasm-oj-smoke>", "exec")),
+    "sha256": hashlib.sha256(b"wasm-oj").hexdigest(),
     "socketBuiltin": "_socket" in sys.builtin_module_names,
     "socketSpec": importlib.util.find_spec("_socket") is not None,
     "socketState": sysconfig.get_config_var("MODULE__SOCKET_STATE"),
@@ -42,13 +42,13 @@ sys.stderr.write("FORGE_SMOKE:" + json.dumps({
 }, sort_keys=True, separators=(",", ":")) + "\n")
 `}
 ${PYTHON_RUNTIME_FILES_EXPORT_SCRIPT}`);
-  const smokeLine = output.stderr.split("\n").find((line) => line.startsWith("FORGE_SMOKE:"));
+  const smokeLine = output.stderr.split("\n").find((line) => line.startsWith("WASM_OJ_SMOKE:"));
   if (!smokeLine) throw new Error(`Python runtime smoke emitted no result: ${output.stderr}`);
-  const smoke = JSON.parse(smokeLine.slice("FORGE_SMOKE:".length));
+  const smoke = JSON.parse(smokeLine.slice("WASM_OJ_SMOKE:".length));
   const expectedSmoke = {
     absSrcdir: "/usr/src/cpython-3.14.6",
     compiled: true,
-    sha256: "71b41d6dd48dc58eba8f5cf9edf30fef6597fdf285a521bb8fcbad4b3d50887d",
+    sha256: "1425f8c83525231bcc1710131e927c852ed3a6950c1cf1578d0a3d52bef7c4b2",
     socketBuiltin: false,
     socketSpec: false,
     socketState: "n/a",
@@ -60,7 +60,7 @@ ${PYTHON_RUNTIME_FILES_EXPORT_SCRIPT}`);
   }
   const archive = output.stdoutBytes.slice();
   const files = decodeRuntimeFiles(archive);
-  process.stdout.write(`FORGE_PYTHON_INSPECTION:${JSON.stringify({
+  process.stdout.write(`WASM_OJ_PYTHON_INSPECTION:${JSON.stringify({
     archiveSha256: createHash("sha256").update(archive).digest("hex"),
     archiveBytes: archive.byteLength,
     smoke,

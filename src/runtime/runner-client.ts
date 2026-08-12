@@ -1,5 +1,13 @@
+import {
+  createExtendedCostBaselineRegistry,
+  resolveArtifactCostBudget,
+  snapshotBrowserToolchainSources,
+  unavailableExecutionMetrics,
+  WEIGHTED_METER_MODEL,
+} from "@wasm-oj/core";
 import type {
   BuildArtifact,
+  BrowserToolchainSource,
   BrowserRuntimeDriverPlugin,
   InteractiveRunConfig,
   InteractiveRunResult,
@@ -7,16 +15,10 @@ import type {
   RunnerResponse,
   RunConfig,
   RunResult,
+  Runner,
   WorkerProgress,
-} from "../core/types";
-import type { ForgeRunner } from "../runner/runner";
-import { WEIGHTED_METER_MODEL } from "../core/resources";
-import {
-  createExtendedCostBaselineRegistry,
-  resolveArtifactCostBudget,
-  unavailableExecutionMetrics,
-  type CostBaselineRegistry,
-} from "../core/cost";
+  CostBaselineRegistry,
+} from "@wasm-oj/core";
 import RunnerWorkerUrl from "./runner.worker?worker&url";
 import { createModuleWorker } from "./module-worker";
 import { validateBrowserRuntimeDriverPlugins } from "./browser-runtime-plugin";
@@ -40,10 +42,10 @@ interface RunnerOperation {
 
 const CONTROL_TIMEOUT_MS = 120_000;
 
-export interface BrowserForgeRunnerOptions {
-  /** Base URL containing versioned runtime assets. */
-  assetBaseUrl?: string;
-  /** Calibrated profiles for downstream languages; canonical Forge profiles cannot be replaced. */
+export interface BrowserRunnerOptions {
+  /** Explicit, contract-validated browser toolchain packages. */
+  toolchains: readonly BrowserToolchainSource[];
+  /** Calibrated profiles for downstream languages; canonical WASM-OJ profiles cannot be replaced. */
   additionalCostBaselines?: Readonly<Record<string, number>>;
   /** Trusted same-origin, content-pinned RuntimeDriver modules loaded inside the runner Worker. */
   runtimeDriverPlugins?: readonly BrowserRuntimeDriverPlugin[];
@@ -55,13 +57,13 @@ type RunnerRequestWithoutId = RunnerRequest extends infer Request
     : never
   : never;
 
-export class BrowserForgeRunner implements ForgeRunner {
+export class BrowserRunner implements Runner {
   private worker: Worker;
   private readonly pending = new Map<string, PendingRequest<unknown>>();
   private readonly progressListeners = new Set<ProgressListener>();
   private readonly streamListeners = new Set<StreamListener>();
   private readyPromise: Promise<void>;
-  private readonly assetBaseUrl?: string;
+  private readonly toolchains: readonly BrowserToolchainSource[];
   private readonly additionalCostBaselines: Readonly<Record<string, number>>;
   private readonly runtimeDriverPlugins: readonly BrowserRuntimeDriverPlugin[];
   private readonly costBaselines: CostBaselineRegistry;
@@ -71,8 +73,11 @@ export class BrowserForgeRunner implements ForgeRunner {
   private generation = 0;
   private workerInitialized = false;
 
-  constructor(options: BrowserForgeRunnerOptions = {}) {
-    this.assetBaseUrl = options.assetBaseUrl;
+  constructor(options: BrowserRunnerOptions) {
+    if (!options || typeof options !== "object") {
+      throw new TypeError("BrowserRunner requires explicit toolchain options.");
+    }
+    this.toolchains = snapshotBrowserToolchainSources(options.toolchains);
     this.additionalCostBaselines = Object.freeze({ ...options.additionalCostBaselines });
     this.runtimeDriverPlugins = options.runtimeDriverPlugins?.length
       ? validateBrowserRuntimeDriverPlugins(options.runtimeDriverPlugins, location.href)
@@ -85,7 +90,7 @@ export class BrowserForgeRunner implements ForgeRunner {
   private initializeWorker(): Promise<void> {
     const ready = this.request<void>({
       type: "initialize",
-      assetBaseUrl: this.assetBaseUrl,
+      toolchains: this.toolchains,
       additionalCostBaselines: this.additionalCostBaselines,
       runtimeDriverPlugins: this.runtimeDriverPlugins,
     }, CONTROL_TIMEOUT_MS);
@@ -130,7 +135,7 @@ export class BrowserForgeRunner implements ForgeRunner {
     config: InteractiveRunConfig,
   ): Promise<InteractiveRunResult> {
     this.assertActive();
-    if (this.activeOperation) throw new Error("BrowserForgeRunner accepts one active operation at a time.");
+    if (this.activeOperation) throw new Error("BrowserRunner accepts one active operation at a time.");
     const operation: RunnerOperation = { kind: "interact" };
     this.activeOperation = operation;
     const generation = this.generation;
@@ -183,7 +188,7 @@ export class BrowserForgeRunner implements ForgeRunner {
 
   private async runOperation(artifact: BuildArtifact, config: RunConfig): Promise<RunResult> {
     this.assertActive();
-    if (this.activeOperation) throw new Error("BrowserForgeRunner accepts one active operation at a time.");
+    if (this.activeOperation) throw new Error("BrowserRunner accepts one active operation at a time.");
     const operation: RunnerOperation = { kind: "run" };
     this.activeOperation = operation;
     const generation = this.generation;
@@ -220,7 +225,7 @@ export class BrowserForgeRunner implements ForgeRunner {
 
   private async clearRuntimeCacheOperation(): Promise<void> {
     this.assertActive();
-    if (this.activeOperation) throw new Error("BrowserForgeRunner accepts one active operation at a time.");
+    if (this.activeOperation) throw new Error("BrowserRunner accepts one active operation at a time.");
     const operation: RunnerOperation = { kind: "cache-clear" };
     this.activeOperation = operation;
     const generation = this.generation;
@@ -250,9 +255,9 @@ export class BrowserForgeRunner implements ForgeRunner {
   restart(): void {
     this.assertActive();
     if (this.activeOperation?.kind === "cache-clear") {
-      throw new Error("Cannot restart BrowserForgeRunner while clearing its cache.");
+      throw new Error("Cannot restart BrowserRunner while clearing its cache.");
     }
-    this.replaceWorker(new Error("ForgeRunner worker restarted."));
+    this.replaceWorker(new Error("Runner worker restarted."));
   }
 
   dispose(): void {
@@ -261,13 +266,13 @@ export class BrowserForgeRunner implements ForgeRunner {
     this.generation += 1;
     this.activeOperation = undefined;
     this.worker.terminate();
-    this.rejectAll(new Error("ForgeRunner client disposed."));
+    this.rejectAll(new Error("Runner client disposed."));
     this.progressListeners.clear();
     this.streamListeners.clear();
   }
 
   private createWorker(): Worker {
-    const worker = createModuleWorker(RunnerWorkerUrl, { name: "forge-runner" });
+    const worker = createModuleWorker(RunnerWorkerUrl, { name: "wasm-oj-runner" });
     worker.addEventListener("message", (event: MessageEvent<RunnerResponse>) => {
       if (!this.disposed && this.worker === worker) this.handleMessage(event.data);
     });
@@ -310,7 +315,7 @@ export class BrowserForgeRunner implements ForgeRunner {
   }
 
   private assertActive(): void {
-    if (this.disposed) throw new Error("BrowserForgeRunner is disposed.");
+    if (this.disposed) throw new Error("BrowserRunner is disposed.");
   }
 
   private track<Result>(operation: Promise<Result>): Promise<Result> {
@@ -337,7 +342,7 @@ export class BrowserForgeRunner implements ForgeRunner {
         pending.boundaryTimer = setTimeout(() => {
           if (!this.pending.delete(requestId)) return;
           const error = new Error(
-            `ForgeRunner runtime preparation exceeded the ${preparationTimeoutMs} ms browser boundary.`,
+            `Runner runtime preparation exceeded the ${preparationTimeoutMs} ms browser boundary.`,
           );
           reject(error);
           if (!this.disposed) this.replaceWorker(error);
@@ -345,7 +350,7 @@ export class BrowserForgeRunner implements ForgeRunner {
       } else if (timeoutMs !== undefined) {
         pending.boundaryTimer = setTimeout(() => {
           if (!this.pending.delete(requestId)) return;
-          const error = new Error(`ForgeRunner request exceeded the ${timeoutMs} ms browser boundary.`);
+          const error = new Error(`Runner request exceeded the ${timeoutMs} ms browser boundary.`);
           reject(error);
           if (!this.disposed) this.replaceWorker(error);
         }, timeoutMs);
@@ -408,7 +413,7 @@ export class BrowserForgeRunner implements ForgeRunner {
       if (!current || !current.timeoutResult) return;
       this.pending.delete(requestId);
       const result = current.timeoutResult();
-      this.replaceWorker(new Error("ForgeRunner worker replaced after wall-time termination."));
+      this.replaceWorker(new Error("Runner worker replaced after wall-time termination."));
       current.resolve(result);
     }, request.timeoutMs);
   }

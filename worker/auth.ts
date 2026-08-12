@@ -1,10 +1,10 @@
-import type { AuthenticatedSession, ForgeWorkerEnv } from "./env";
+import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { constantTimeEqual, randomToken, sha256Hex } from "./crypto";
 import { ApiError, assertSameOrigin, cookieHeader, jsonResponse, parseCookies, readBoundedResponseJson } from "./http";
 
-const SESSION_COOKIE = "forge_session";
-const CSRF_COOKIE = "forge_csrf";
-const OAUTH_VERIFIER_COOKIE = "forge_oauth_verifier";
+const SESSION_COOKIE = "wasm_oj_session";
+const CSRF_COOKIE = "wasm_oj_csrf";
+const OAUTH_VERIFIER_COOKIE = "wasm_oj_oauth_verifier";
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
 const OAUTH_STATE_SECONDS = 10 * 60;
 const MAX_GITHUB_AUTH_RESPONSE_BYTES = 1024 * 1024;
@@ -23,11 +23,11 @@ function safeReturnPath(value: string | null): string {
   return value;
 }
 
-function oauthRedirectUri(env: ForgeWorkerEnv): string {
+function oauthRedirectUri(env: WasmOjWorkerEnv): string {
   return new URL("/api/auth/github/callback", env.PUBLIC_ORIGIN).toString();
 }
 
-export async function beginGithubLogin(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function beginGithubLogin(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const requestUrl = new URL(request.url);
   const state = randomToken();
   const verifier = randomToken(48);
@@ -60,7 +60,7 @@ export async function beginGithubLogin(request: Request, env: ForgeWorkerEnv): P
   return new Response(null, { status: 302, headers });
 }
 
-export async function completeGithubLogin(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function completeGithubLogin(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const url = new URL(request.url);
   const state = url.searchParams.get("state");
   const code = url.searchParams.get("code");
@@ -76,7 +76,7 @@ export async function completeGithubLogin(request: Request, env: ForgeWorkerEnv)
   }
   const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
-    headers: { accept: "application/json", "content-type": "application/json", "user-agent": "wasm-oj-forge" },
+    headers: { accept: "application/json", "content-type": "application/json", "user-agent": "wasm-oj" },
     body: JSON.stringify({
       client_id: env.GITHUB_OAUTH_CLIENT_ID,
       client_secret: env.GITHUB_OAUTH_CLIENT_SECRET,
@@ -98,7 +98,7 @@ export async function completeGithubLogin(request: Request, env: ForgeWorkerEnv)
     headers: {
       accept: "application/vnd.github+json",
       authorization: `Bearer ${tokenBody.access_token}`,
-      "user-agent": "wasm-oj-forge",
+      "user-agent": "wasm-oj",
       "x-github-api-version": "2022-11-28",
     },
     redirect: "manual",
@@ -137,7 +137,7 @@ export async function completeGithubLogin(request: Request, env: ForgeWorkerEnv)
   return new Response(null, { status: 302, headers });
 }
 
-export async function authenticatedSession(request: Request, env: ForgeWorkerEnv): Promise<AuthenticatedSession | undefined> {
+export async function authenticatedSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession | undefined> {
   const token = parseCookies(request).get(SESSION_COOKIE);
   if (!token) return undefined;
   const row = await env.DB.prepare(
@@ -155,18 +155,18 @@ export async function authenticatedSession(request: Request, env: ForgeWorkerEnv
   };
 }
 
-export async function requireSession(request: Request, env: ForgeWorkerEnv): Promise<AuthenticatedSession> {
+export async function requireSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession> {
   const session = await authenticatedSession(request, env);
   if (!session) throw new ApiError(401, "authentication-required", "Sign in with GitHub to continue.");
   return session;
 }
 
-export async function requireMutationSession(request: Request, env: ForgeWorkerEnv): Promise<AuthenticatedSession> {
+export async function requireMutationSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession> {
   assertSameOrigin(request, env.PUBLIC_ORIGIN);
   const session = await requireSession(request, env);
   const cookies = parseCookies(request);
   const csrfCookie = cookies.get(CSRF_COOKIE);
-  const csrfHeader = request.headers.get("x-forge-csrf");
+  const csrfHeader = request.headers.get("x-wasm-oj-csrf");
   const sessionToken = cookies.get(SESSION_COOKIE);
   if (!csrfCookie || !csrfHeader || !sessionToken || !constantTimeEqual(csrfCookie, csrfHeader)) {
     throw new ApiError(403, "csrf-rejected", "CSRF verification failed.");
@@ -179,12 +179,12 @@ export async function requireMutationSession(request: Request, env: ForgeWorkerE
   return session;
 }
 
-export async function sessionResponse(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function sessionResponse(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await authenticatedSession(request, env);
   return jsonResponse({ authenticated: Boolean(session), ...(session ? { user: session } : {}) });
 }
 
-export async function logout(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function logout(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   await requireMutationSession(request, env);
   const sessionToken = parseCookies(request).get(SESSION_COOKIE);
   if (sessionToken) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Hex(sessionToken)).run();

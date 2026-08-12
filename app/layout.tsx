@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { resolveRequestOrigin } from "@/src/core/request-origin";
-import { AppShell } from "@/src/components/app-shell";
+import { AppShell } from "@/src/features/platform/components/app-shell";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
@@ -18,18 +18,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const description = "Learn programming with official practice problems, browser-local runs, contests, and verified submissions.";
   return {
     metadataBase,
-    title: "WASM OJ Forge",
+    title: "WASM-OJ",
     description,
     icons: { icon: "/favicon.svg" },
     openGraph: {
-      title: "WASM OJ Forge",
+      title: "WASM-OJ",
       description: "Official practice, browser-local runs, contests, and verified submissions.",
       type: "website",
-      images: [{ url: new URL("/og.png", metadataBase).toString(), width: 1200, height: 630, alt: "WASM OJ Forge — deterministic browser-local compilation and judging" }],
+      images: [{ url: new URL("/og.png", metadataBase).toString(), width: 1200, height: 630, alt: "WASM-OJ — deterministic browser-local compilation and judging" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "WASM OJ Forge",
+      title: "WASM-OJ",
       description: "Official practice, browser-local runs, contests, and verified submissions.",
       images: [new URL("/og.png", metadataBase).toString()],
     },

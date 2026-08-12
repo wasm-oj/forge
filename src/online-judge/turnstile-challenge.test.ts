@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { turnstileChallengeResponse } from "../../worker/turnstile-challenge";
-import type { ForgeWorkerEnv } from "../../worker/env";
+import type { WasmOjWorkerEnv } from "../../worker/env";
 
 const env = {
   PUBLIC_ORIGIN: "https://app-staging.example.test",
   TURNSTILE_SITE_KEY: "site-key",
-} as ForgeWorkerEnv;
+} as WasmOjWorkerEnv;
 
 describe("same-origin Turnstile challenge route", () => {
   it("renders only a nonce-bound, action-bound no-store challenge", async () => {

@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { sourceTreeProvenance } from "../src/conformance/provenance.ts";
-import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "../src/core/contract.ts";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "../src/core/contract.ts";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const experiment = `forge-contract-${FORGE_CONTRACT_VERSION}-conformance`;
+const experiment = `wasm-oj-contract-${WASM_OJ_CONTRACT_VERSION}-conformance`;
 const matrixPath = path.join(root, "experiments", experiment, "runs/tables/conformance-matrix.json");
 const specPath = path.join(root, "experiments", experiment, "SPEC.md");
 const [matrixBytes, specBytes, sourceTree] = await Promise.all([
@@ -16,9 +16,9 @@ const [matrixBytes, specBytes, sourceTree] = await Promise.all([
 ]);
 const matrix = JSON.parse(matrixBytes.toString("utf8"));
 
-if (matrix.schema !== FORGE_SCHEMAS.conformanceMatrix) throw new Error("Canonical conformance matrix has the wrong schema.");
-if (matrix.experimentId !== experiment || matrix.forgeContract !== FORGE_CONTRACT_VERSION) {
-  throw new Error("Canonical conformance matrix is bound to another Forge contract.");
+if (matrix.schema !== WASM_OJ_SCHEMAS.conformanceMatrix) throw new Error("Canonical conformance matrix has the wrong schema.");
+if (matrix.experimentId !== experiment || matrix.wasmOjContract !== WASM_OJ_CONTRACT_VERSION) {
+  throw new Error("Canonical conformance matrix is bound to another WASM-OJ contract.");
 }
 if (matrix.specSha256 !== sha256(specBytes)) throw new Error("Canonical conformance matrix does not bind the current specification.");
 if (matrix.sourceTree?.algorithm !== sourceTree.algorithm

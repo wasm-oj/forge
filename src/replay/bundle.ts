@@ -1,5 +1,5 @@
 import { assertValidBuildArtifact } from "../core/artifact-validation.ts";
-import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import { resolveDeterminism } from "../core/determinism.ts";
 import { sha256Hex } from "../core/hash.ts";
 import { assertValidProject } from "../core/project-validation.ts";
@@ -19,7 +19,7 @@ import type { DependencyOfflineBundle } from "../dependencies/types.ts";
 import type { JudgeResult } from "../judge/engine.ts";
 import { validateJudgeSpec, type JudgeFileInputSpec, type JudgeInputSpec, type JudgeSpec } from "../judge/spec.ts";
 
-const MAGIC = new TextEncoder().encode("FORGRPL1");
+const MAGIC = new TextEncoder().encode("WOJRPL02");
 const HEADER_BYTES = MAGIC.byteLength + 8 + 4;
 const SHA256_BYTES = 32;
 const MAX_BUNDLE_BYTES = 512 * 1024 * 1024;
@@ -35,14 +35,14 @@ type PortableNode = PortableScalar
   | ["o", Array<[string, PortableNode]>]
   | ["b", string, number];
 
-export interface ForgeReplayRunOperation {
+export interface ReplayRunOperation {
   kind: "run";
   config: RunConfig;
   expected: DeterministicTranscript;
   expectedSha256: string;
 }
 
-export interface ForgeReplayJudgeCaseTranscript {
+export interface ReplayJudgeCaseTranscript {
   id: string;
   verdict: JudgeResult["cases"][number]["verdict"];
   message?: string;
@@ -50,35 +50,35 @@ export interface ForgeReplayJudgeCaseTranscript {
   interaction?: Omit<InteractiveRunResult, "durationMs">;
 }
 
-export interface ForgeReplayJudgeTranscript {
+export interface ReplayJudgeTranscript {
   verdict: JudgeResult["verdict"];
   completed: number;
   total: number;
-  cases: ForgeReplayJudgeCaseTranscript[];
+  cases: ReplayJudgeCaseTranscript[];
   metrics: JudgeResult["metrics"];
 }
 
-export interface ForgeReplayJudgeOperation {
+export interface ReplayJudgeOperation {
   kind: "judge";
   spec: JudgeSpec;
-  expected: ForgeReplayJudgeTranscript;
+  expected: ReplayJudgeTranscript;
   expectedSha256: string;
 }
 
-export type ForgeReplayOperation = ForgeReplayRunOperation | ForgeReplayJudgeOperation;
+export type ReplayOperation = ReplayRunOperation | ReplayJudgeOperation;
 
-export interface ForgeReplayBundle {
-  schema: typeof FORGE_SCHEMAS.replayBundle;
-  forgeContract: typeof FORGE_CONTRACT_VERSION;
+export interface ReplayBundle {
+  schema: typeof WASM_OJ_SCHEMAS.replayBundle;
+  wasmOjContract: typeof WASM_OJ_CONTRACT_VERSION;
   projectSha256: string;
   artifactSha256: string;
   project: Project;
   artifact: BuildArtifact;
   dependencies?: DependencyOfflineBundle;
-  operation: ForgeReplayOperation;
+  operation: ReplayOperation;
 }
 
-export type ForgeReplayBundleInput = {
+export type ReplayBundleInput = {
   project: Project;
   artifact: BuildArtifact;
   dependencies?: DependencyOfflineBundle;
@@ -88,18 +88,18 @@ export type ForgeReplayBundleInput = {
   operation: { kind: "judge"; spec: JudgeSpec; result: JudgeResult };
 });
 
-export interface ForgeReplayHost {
+export interface ReplayHost {
   compileProject(project: Project, options?: { cache?: boolean }): Promise<BuildResult>;
   run(artifact: BuildArtifact, config: RunConfig): Promise<RunResult>;
   judge(artifact: BuildArtifact, spec: JudgeSpec): Promise<JudgeResult>;
 }
 
-export interface ForgeReplayOptions {
+export interface ReplayOptions {
   /** Rebuild sources and compare the stable artifact digest before execution. Defaults to true. */
   recompile?: boolean;
 }
 
-export interface ForgeReplayResult {
+export interface ReplayResult {
   compatible: boolean;
   mismatches: readonly string[];
   build?: BuildResult;
@@ -107,13 +107,13 @@ export interface ForgeReplayResult {
   judge?: JudgeResult;
 }
 
-export interface ForgeReplayDecodeOptions {
+export interface ReplayDecodeOptions {
   maxBundleBytes?: number;
   maxManifestBytes?: number;
   maxBlobs?: number;
 }
 
-export async function createForgeReplayBundle(input: ForgeReplayBundleInput): Promise<ForgeReplayBundle> {
+export async function createReplayBundle(input: ReplayBundleInput): Promise<ReplayBundle> {
   assertValidProject(input.project);
   const project = structuredClone(input.project);
   project.files = canonicalProjectFiles(project.files);
@@ -130,7 +130,7 @@ export async function createForgeReplayBundle(input: ForgeReplayBundleInput): Pr
     : structuredClone(input.dependencies);
   if (dependencies) await assertOfflineDependencies(dependencies);
 
-  let operation: ForgeReplayOperation;
+  let operation: ReplayOperation;
   if (input.operation.kind === "run") {
     const config = canonicalRunConfig(input.operation.config);
     const expected = replayRunTranscript(input.operation.result);
@@ -151,9 +151,9 @@ export async function createForgeReplayBundle(input: ForgeReplayBundleInput): Pr
       expectedSha256: await portableSha256(expected),
     };
   }
-  const bundle: ForgeReplayBundle = {
-    schema: FORGE_SCHEMAS.replayBundle,
-    forgeContract: FORGE_CONTRACT_VERSION,
+  const bundle: ReplayBundle = {
+    schema: WASM_OJ_SCHEMAS.replayBundle,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     projectSha256,
     artifactSha256,
     project,
@@ -161,52 +161,52 @@ export async function createForgeReplayBundle(input: ForgeReplayBundleInput): Pr
     ...(dependencies ? { dependencies } : {}),
     operation,
   };
-  await assertValidForgeReplayBundle(bundle);
+  await assertValidReplayBundle(bundle);
   return bundle;
 }
 
-export async function assertValidForgeReplayBundle(value: unknown): Promise<void> {
-  if (!isRecord(value) || value.schema !== FORGE_SCHEMAS.replayBundle
-    || value.forgeContract !== FORGE_CONTRACT_VERSION) {
-    throw new Error("ForgeReplayBundle does not use the active Forge contract.");
+export async function assertValidReplayBundle(value: unknown): Promise<void> {
+  if (!isRecord(value) || value.schema !== WASM_OJ_SCHEMAS.replayBundle
+    || value.wasmOjContract !== WASM_OJ_CONTRACT_VERSION) {
+    throw new Error("ReplayBundle does not use the active WASM-OJ contract.");
   }
   const bundleKeys = Object.keys(value).sort();
   const expectedBundleKeys = [
-    "artifact", "artifactSha256", "forgeContract", "operation", "project", "projectSha256", "schema",
+    "artifact", "artifactSha256", "wasmOjContract", "operation", "project", "projectSha256", "schema",
     ...(value.dependencies === undefined ? [] : ["dependencies"]),
   ].sort();
   if (JSON.stringify(bundleKeys) !== JSON.stringify(expectedBundleKeys)) {
-    throw new Error("ForgeReplayBundle contains unexpected fields.");
+    throw new Error("ReplayBundle contains unexpected fields.");
   }
   assertValidProject(value.project);
   const project = value.project;
-  if (project.updatedAt !== 0) throw new Error("ForgeReplayBundle project.updatedAt must be normalized to zero.");
+  if (project.updatedAt !== 0) throw new Error("ReplayBundle project.updatedAt must be normalized to zero.");
   if (JSON.stringify(project.files.map((file) => file.path))
     !== JSON.stringify(canonicalProjectFiles(project.files).map((file) => file.path))) {
-    throw new Error("ForgeReplayBundle project files must be canonically sorted.");
+    throw new Error("ReplayBundle project files must be canonically sorted.");
   }
-  requireSha256(value.projectSha256, "ForgeReplayBundle project");
+  requireSha256(value.projectSha256, "ReplayBundle project");
   if (value.projectSha256 !== await portableSha256(project)) {
-    throw new Error("ForgeReplayBundle project digest mismatch.");
+    throw new Error("ReplayBundle project digest mismatch.");
   }
   assertValidBuildArtifact(value.artifact, { project, cacheKey: (value.artifact as BuildArtifact).cacheKey });
   const artifact = value.artifact;
-  requireSha256(value.artifactSha256, "ForgeReplayBundle artifact");
+  requireSha256(value.artifactSha256, "ReplayBundle artifact");
   if (artifact.id !== `replay:${value.artifactSha256}` || artifact.createdAt !== 0 || artifact.durationMs !== 0
     || value.artifactSha256 !== await artifactDigest(artifact)) {
-    throw new Error("ForgeReplayBundle artifact metadata or digest is not canonical.");
+    throw new Error("ReplayBundle artifact metadata or digest is not canonical.");
   }
   if (value.dependencies !== undefined) await assertOfflineDependencies(value.dependencies);
   if (!isRecord(value.operation) || (value.operation.kind !== "run" && value.operation.kind !== "judge")) {
-    throw new Error("ForgeReplayBundle operation must be 'run' or 'judge'.");
+    throw new Error("ReplayBundle operation must be 'run' or 'judge'.");
   }
-  requireSha256(value.operation.expectedSha256, "ForgeReplayBundle expected transcript");
+  requireSha256(value.operation.expectedSha256, "ReplayBundle expected transcript");
   if (value.operation.kind === "run") {
     requireExactKeys(value.operation, ["config", "expected", "expectedSha256", "kind"], "run operation");
     const canonicalConfig = canonicalRunConfig(value.operation.config as RunConfig);
     if (JSON.stringify(await toPortableNode(value.operation.config, new Map()))
       !== JSON.stringify(await toPortableNode(canonicalConfig, new Map()))) {
-      throw new Error("ForgeReplayBundle run config is not canonical.");
+      throw new Error("ReplayBundle run config is not canonical.");
     }
     validateDeterministicTranscript(value.operation.expected);
   } else {
@@ -215,22 +215,22 @@ export async function assertValidForgeReplayBundle(value: unknown): Promise<void
     validateJudgeTranscript(value.operation.expected);
   }
   if (value.operation.expectedSha256 !== await portableSha256(value.operation.expected)) {
-    throw new Error("ForgeReplayBundle expected transcript digest mismatch.");
+    throw new Error("ReplayBundle expected transcript digest mismatch.");
   }
   // Reject accessors, class instances, functions, undefined, and other values
   // that cannot cross the canonical replay transport.
   await toPortableNode(value, new Map());
 }
 
-export async function encodeForgeReplayBundle(bundle: ForgeReplayBundle): Promise<Uint8Array> {
-  await assertValidForgeReplayBundle(bundle);
+export async function encodeReplayBundle(bundle: ReplayBundle): Promise<Uint8Array> {
+  await assertValidReplayBundle(bundle);
   const blobs = new Map<string, Uint8Array>();
   const manifest = encoder.encode(JSON.stringify(await toPortableNode(bundle, blobs)));
-  if (manifest.byteLength > MAX_MANIFEST_BYTES) throw new Error("ForgeReplayBundle manifest exceeds its byte limit.");
+  if (manifest.byteLength > MAX_MANIFEST_BYTES) throw new Error("ReplayBundle manifest exceeds its byte limit.");
   const orderedBlobs = [...blobs].sort(([left], [right]) => left.localeCompare(right));
-  if (orderedBlobs.length > MAX_BLOBS) throw new Error("ForgeReplayBundle contains too many binary blobs.");
+  if (orderedBlobs.length > MAX_BLOBS) throw new Error("ReplayBundle contains too many binary blobs.");
   const total = orderedBlobs.reduce((size, [, bytes]) => safeAdd(size, SHA256_BYTES + 8 + bytes.byteLength), HEADER_BYTES + manifest.byteLength);
-  if (total > MAX_BUNDLE_BYTES) throw new Error("ForgeReplayBundle exceeds its encoded byte limit.");
+  if (total > MAX_BUNDLE_BYTES) throw new Error("ReplayBundle exceeds its encoded byte limit.");
   const output = new Uint8Array(total);
   output.set(MAGIC, 0);
   const view = new DataView(output.buffer);
@@ -250,72 +250,72 @@ export async function encodeForgeReplayBundle(bundle: ForgeReplayBundle): Promis
   return output;
 }
 
-export async function decodeForgeReplayBundle(
+export async function decodeReplayBundle(
   encoded: Uint8Array,
-  options: ForgeReplayDecodeOptions = {},
-): Promise<ForgeReplayBundle> {
+  options: ReplayDecodeOptions = {},
+): Promise<ReplayBundle> {
   const maxBundleBytes = positiveLimit(options.maxBundleBytes ?? MAX_BUNDLE_BYTES, "replay bundle byte limit");
   const maxManifestBytes = positiveLimit(options.maxManifestBytes ?? MAX_MANIFEST_BYTES, "replay manifest byte limit");
   const maxBlobs = positiveLimit(options.maxBlobs ?? MAX_BLOBS, "replay blob count limit");
   if (!(encoded instanceof Uint8Array) || encoded.byteLength < HEADER_BYTES || encoded.byteLength > maxBundleBytes) {
-    throw new Error("ForgeReplayBundle transport has an invalid byte length.");
+    throw new Error("ReplayBundle transport has an invalid byte length.");
   }
-  if (!equalBytes(encoded.subarray(0, MAGIC.byteLength), MAGIC)) throw new Error("ForgeReplayBundle transport magic is invalid.");
+  if (!equalBytes(encoded.subarray(0, MAGIC.byteLength), MAGIC)) throw new Error("ReplayBundle transport magic is invalid.");
   const view = new DataView(encoded.buffer, encoded.byteOffset, encoded.byteLength);
-  const manifestLength = readU64(view, MAGIC.byteLength, "ForgeReplayBundle manifest length");
+  const manifestLength = readU64(view, MAGIC.byteLength, "ReplayBundle manifest length");
   const blobCount = view.getUint32(MAGIC.byteLength + 8, false);
-  if (manifestLength > maxManifestBytes || blobCount > maxBlobs) throw new Error("ForgeReplayBundle transport exceeds its decode limits.");
+  if (manifestLength > maxManifestBytes || blobCount > maxBlobs) throw new Error("ReplayBundle transport exceeds its decode limits.");
   let offset = HEADER_BYTES;
-  if (offset + manifestLength > encoded.byteLength) throw new Error("ForgeReplayBundle manifest is truncated.");
+  if (offset + manifestLength > encoded.byteLength) throw new Error("ReplayBundle manifest is truncated.");
   let node: unknown;
   let manifestText: string;
   try {
     manifestText = decoder.decode(encoded.subarray(offset, offset + manifestLength));
     node = JSON.parse(manifestText);
   } catch (error) {
-    throw new Error("ForgeReplayBundle manifest is not canonical UTF-8 JSON.", { cause: error });
+    throw new Error("ReplayBundle manifest is not canonical UTF-8 JSON.", { cause: error });
   }
-  if (manifestText !== JSON.stringify(node)) throw new Error("ForgeReplayBundle manifest JSON is not canonical.");
+  if (manifestText !== JSON.stringify(node)) throw new Error("ReplayBundle manifest JSON is not canonical.");
   offset += manifestLength;
   const blobs = new Map<string, Uint8Array>();
   let previousDigest = "";
   for (let index = 0; index < blobCount; index += 1) {
-    if (offset + SHA256_BYTES + 8 > encoded.byteLength) throw new Error("ForgeReplayBundle blob header is truncated.");
+    if (offset + SHA256_BYTES + 8 > encoded.byteLength) throw new Error("ReplayBundle blob header is truncated.");
     const digest = bytesToHex(encoded.subarray(offset, offset + SHA256_BYTES));
     offset += SHA256_BYTES;
-    if (digest <= previousDigest) throw new Error("ForgeReplayBundle blobs must be sorted and unique.");
+    if (digest <= previousDigest) throw new Error("ReplayBundle blobs must be sorted and unique.");
     previousDigest = digest;
-    const length = readU64(view, offset, `ForgeReplayBundle blob ${index} length`);
+    const length = readU64(view, offset, `ReplayBundle blob ${index} length`);
     offset += 8;
-    if (offset + length > encoded.byteLength) throw new Error(`ForgeReplayBundle blob '${digest}' is truncated.`);
+    if (offset + length > encoded.byteLength) throw new Error(`ReplayBundle blob '${digest}' is truncated.`);
     const bytes = encoded.slice(offset, offset + length);
     offset += length;
-    if (await sha256Hex(bytes) !== digest) throw new Error(`ForgeReplayBundle blob '${digest}' failed integrity verification.`);
+    if (await sha256Hex(bytes) !== digest) throw new Error(`ReplayBundle blob '${digest}' failed integrity verification.`);
     blobs.set(digest, bytes);
   }
-  if (offset !== encoded.byteLength) throw new Error("ForgeReplayBundle transport has trailing bytes.");
+  if (offset !== encoded.byteLength) throw new Error("ReplayBundle transport has trailing bytes.");
   const used = new Set<string>();
   const decoded = fromPortableNode(node, blobs, used);
-  if (used.size !== blobs.size) throw new Error("ForgeReplayBundle transport contains unreferenced blobs.");
-  await assertValidForgeReplayBundle(decoded);
+  if (used.size !== blobs.size) throw new Error("ReplayBundle transport contains unreferenced blobs.");
+  await assertValidReplayBundle(decoded);
   // The only accepted JSON spelling is the exact canonical node encoding.
   const roundTripBlobs = new Map<string, Uint8Array>();
   if (JSON.stringify(await toPortableNode(decoded, roundTripBlobs)) !== JSON.stringify(node)) {
-    throw new Error("ForgeReplayBundle manifest is not canonical.");
+    throw new Error("ReplayBundle manifest is not canonical.");
   }
-  return decoded as ForgeReplayBundle;
+  return decoded as ReplayBundle;
 }
 
-export async function forgeReplayBundleSha256(bundle: ForgeReplayBundle): Promise<string> {
-  return sha256Hex(await encodeForgeReplayBundle(bundle));
+export async function replayBundleSha256(bundle: ReplayBundle): Promise<string> {
+  return sha256Hex(await encodeReplayBundle(bundle));
 }
 
-export async function replayForgeBundle(
-  host: ForgeReplayHost,
-  bundle: ForgeReplayBundle,
-  options: ForgeReplayOptions = {},
-): Promise<ForgeReplayResult> {
-  await assertValidForgeReplayBundle(bundle);
+export async function replayBundle(
+  host: ReplayHost,
+  bundle: ReplayBundle,
+  options: ReplayOptions = {},
+): Promise<ReplayResult> {
+  await assertValidReplayBundle(bundle);
   const mismatches: string[] = [];
   let artifact = bundle.artifact;
   let build: BuildResult | undefined;
@@ -339,7 +339,7 @@ export async function replayForgeBundle(
   return { compatible: mismatches.length === 0, mismatches: sortedUnique(mismatches), build, judge };
 }
 
-export function judgeTranscript(result: JudgeResult): ForgeReplayJudgeTranscript {
+export function judgeTranscript(result: JudgeResult): ReplayJudgeTranscript {
   return {
     verdict: result.verdict,
     completed: result.completed,
@@ -374,21 +374,21 @@ function replayRunTranscript(result: RunResult): DeterministicTranscript {
 function canonicalRunConfig(value: RunConfig): RunConfig {
   if (!isRecord(value) || !Array.isArray(value.args) || value.args.some((item) => typeof item !== "string")
     || typeof value.stdin !== "string" || !isRecord(value.env)) {
-    throw new Error("ForgeReplayBundle run config is malformed.");
+    throw new Error("ReplayBundle run config is malformed.");
   }
   const env = Object.fromEntries(Object.entries(value.env).sort(([left], [right]) => left.localeCompare(right)).map(([name, entry]) => {
     if (!name || name.includes("=") || name.includes("\0") || typeof entry !== "string" || entry.includes("\0")) {
-      throw new Error(`ForgeReplayBundle run environment '${name}' is invalid.`);
+      throw new Error(`ReplayBundle run environment '${name}' is invalid.`);
     }
     return [name, entry];
   }));
   const files = Object.fromEntries(Object.entries(value.files ?? {}).sort(([left], [right]) => left.localeCompare(right)).map(([path, bytes]) => {
     requireGuestPath(path, "run input file");
-    if (!(bytes instanceof Uint8Array)) throw new Error(`ForgeReplayBundle run input '${path}' must be bytes.`);
+    if (!(bytes instanceof Uint8Array)) throw new Error(`ReplayBundle run input '${path}' must be bytes.`);
     return [path, bytes.slice()];
   }));
   const outputPaths = [...(value.outputPaths ?? [])].map((path) => requireGuestPath(path, "run output file")).sort();
-  if (new Set(outputPaths).size !== outputPaths.length) throw new Error("ForgeReplayBundle run output paths must be unique.");
+  if (new Set(outputPaths).size !== outputPaths.length) throw new Error("ReplayBundle run output paths must be unique.");
   const cwd = value.cwd === undefined ? undefined : requireGuestPath(value.cwd, "run cwd", true);
   return {
     args: [...value.args],
@@ -424,20 +424,20 @@ function requireInlineFileInput(input: JudgeFileInputSpec, label: string): void 
 }
 
 async function assertOfflineDependencies(value: unknown): Promise<void> {
-  if (!isRecord(value) || value.schema !== FORGE_SCHEMAS.dependencyOfflineBundle
-    || value.forgeContract !== FORGE_CONTRACT_VERSION || !isRecord(value.payloads)) {
-    throw new Error("ForgeReplayBundle dependencies must be a Forge offline dependency bundle.");
+  if (!isRecord(value) || value.schema !== WASM_OJ_SCHEMAS.dependencyOfflineBundle
+    || value.wasmOjContract !== WASM_OJ_CONTRACT_VERSION || !isRecord(value.payloads)) {
+    throw new Error("ReplayBundle dependencies must be a WASM-OJ offline dependency bundle.");
   }
   assertValidDependencyLock(value.lock);
   const lock = value.lock;
   const expected = new Set(lock.packages.map((item) => item.integritySha256));
   const actual = Object.keys(value.payloads).sort();
   if (actual.length !== expected.size || actual.some((digest) => !expected.has(digest))) {
-    throw new Error("ForgeReplayBundle dependency payloads do not match their lock.");
+    throw new Error("ReplayBundle dependency payloads do not match their lock.");
   }
   for (const [digest, payload] of Object.entries(value.payloads)) {
     if (!(payload instanceof Uint8Array) || await sha256Hex(payload) !== digest) {
-      throw new Error(`ForgeReplayBundle dependency '${digest}' failed integrity verification.`);
+      throw new Error(`ReplayBundle dependency '${digest}' failed integrity verification.`);
     }
   }
 }
@@ -449,32 +449,32 @@ async function portableSha256(value: unknown): Promise<string> {
 async function toPortableNode(value: unknown, blobs: Map<string, Uint8Array>, seen = new Set<object>()): Promise<PortableNode> {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new Error("ForgeReplayBundle cannot encode non-finite numbers.");
+    if (!Number.isFinite(value)) throw new Error("ReplayBundle cannot encode non-finite numbers.");
     return Object.is(value, -0) ? 0 : value;
   }
   if (value instanceof Uint8Array) {
     const bytes = value.slice();
     const digest = await sha256Hex(bytes);
     const existing = blobs.get(digest);
-    if (existing && !equalBytes(existing, bytes)) throw new Error("ForgeReplayBundle encountered a SHA-256 collision.");
+    if (existing && !equalBytes(existing, bytes)) throw new Error("ReplayBundle encountered a SHA-256 collision.");
     blobs.set(digest, bytes);
     return ["b", digest, bytes.byteLength];
   }
-  if (typeof value !== "object" || value === undefined) throw new Error("ForgeReplayBundle contains a non-portable value.");
-  if (seen.has(value)) throw new Error("ForgeReplayBundle cannot encode cyclic data.");
+  if (typeof value !== "object" || value === undefined) throw new Error("ReplayBundle contains a non-portable value.");
+  if (seen.has(value)) throw new Error("ReplayBundle cannot encode cyclic data.");
   seen.add(value);
   try {
     if (Array.isArray(value)) {
-      if (Object.keys(value).length !== value.length) throw new Error("ForgeReplayBundle arrays must be dense.");
+      if (Object.keys(value).length !== value.length) throw new Error("ReplayBundle arrays must be dense.");
       return ["a", await Promise.all(value.map((item) => toPortableNode(item, blobs, seen)))];
     }
     const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) throw new Error("ForgeReplayBundle objects must be plain data records.");
+    if (prototype !== Object.prototype && prototype !== null) throw new Error("ReplayBundle objects must be plain data records.");
     const entries: Array<[string, PortableNode]> = [];
     for (const key of Object.keys(value).sort()) {
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor?.enumerable || !("value" in descriptor) || descriptor.value === undefined) {
-        throw new Error(`ForgeReplayBundle field '${key}' is not portable.`);
+        throw new Error(`ReplayBundle field '${key}' is not portable.`);
       }
       entries.push([key, await toPortableNode(descriptor.value, blobs, seen)]);
     }
@@ -491,10 +491,10 @@ function fromPortableNode(
 ): unknown {
   if (value === null || typeof value === "string" || typeof value === "boolean"
     || (typeof value === "number" && Number.isFinite(value) && !Object.is(value, -0))) return value;
-  if (!Array.isArray(value) || value.length !== 2 && value.length !== 3) throw new Error("ForgeReplayBundle manifest contains an invalid node.");
+  if (!Array.isArray(value) || value.length !== 2 && value.length !== 3) throw new Error("ReplayBundle manifest contains an invalid node.");
   if (value[0] === "b" && value.length === 3 && typeof value[1] === "string" && Number.isSafeInteger(value[2])) {
     const bytes = blobs.get(value[1]);
-    if (!bytes || bytes.byteLength !== value[2]) throw new Error(`ForgeReplayBundle manifest refers to missing blob '${value[1]}'.`);
+    if (!bytes || bytes.byteLength !== value[2]) throw new Error(`ReplayBundle manifest refers to missing blob '${value[1]}'.`);
     used.add(value[1]);
     return bytes.slice();
   }
@@ -506,22 +506,22 @@ function fromPortableNode(
     let previous = "";
     for (const entry of value[1]) {
       if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string" || entry[0] <= previous) {
-        throw new Error("ForgeReplayBundle object keys must be sorted and unique.");
+        throw new Error("ReplayBundle object keys must be sorted and unique.");
       }
-      if (entry[0] === "__proto__") throw new Error("ForgeReplayBundle object contains a forbidden key.");
+      if (entry[0] === "__proto__") throw new Error("ReplayBundle object contains a forbidden key.");
       previous = entry[0];
       result[entry[0]] = fromPortableNode(entry[1], blobs, used);
     }
     return result;
   }
-  throw new Error("ForgeReplayBundle manifest contains an unknown node tag.");
+  throw new Error("ReplayBundle manifest contains an unknown node tag.");
 }
 
 function validateDeterministicTranscript(value: unknown): void {
   if (!isRecord(value) || !Number.isInteger(value.code) || typeof value.stdout !== "string"
     || typeof value.stderr !== "string" || !isRecord(value.files) || typeof value.termination !== "string"
     || !isRecord(value.determinism) || !isRecord(value.resources) || !isRecord(value.metrics)) {
-    throw new Error("ForgeReplayBundle run transcript is malformed.");
+    throw new Error("ReplayBundle run transcript is malformed.");
   }
   resolveDeterminism(value.determinism);
   resolveResourcePolicy(value.resources);
@@ -534,11 +534,11 @@ function validateDeterministicTranscript(value: unknown): void {
 function validateJudgeTranscript(value: unknown): void {
   if (!isRecord(value) || typeof value.verdict !== "string" || !Number.isSafeInteger(value.completed)
     || !Number.isSafeInteger(value.total) || !Array.isArray(value.cases) || !isRecord(value.metrics)) {
-    throw new Error("ForgeReplayBundle judge transcript is malformed.");
+    throw new Error("ReplayBundle judge transcript is malformed.");
   }
   for (const item of value.cases) {
     if (!isRecord(item) || typeof item.id !== "string" || typeof item.verdict !== "string") {
-      throw new Error("ForgeReplayBundle judge case transcript is malformed.");
+      throw new Error("ReplayBundle judge case transcript is malformed.");
     }
     if (item.run !== undefined) validateDeterministicTranscript(item.run);
   }
@@ -571,7 +571,7 @@ function requireGuestPath(value: unknown, label: string, allowRoot = false): str
   if (typeof value !== "string" || !value.startsWith("/") || value.includes("\\") || value.includes("\0")
     || value.includes("//") || value.split("/").some((part) => part === "." || part === "..")
     || (!allowRoot && value === "/") || (value !== "/" && value.endsWith("/"))) {
-    throw new Error(`ForgeReplayBundle ${label} must be an absolute normalized guest path.`);
+    throw new Error(`ReplayBundle ${label} must be an absolute normalized guest path.`);
   }
   return value;
 }
@@ -583,7 +583,7 @@ function readU64(view: DataView, offset: number, label: string): number {
 }
 
 function writeU64(view: DataView, offset: number, value: number): void {
-  if (!Number.isSafeInteger(value) || value < 0) throw new Error("ForgeReplayBundle length is invalid.");
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error("ReplayBundle length is invalid.");
   view.setBigUint64(offset, BigInt(value), false);
 }
 
@@ -592,7 +592,7 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 function hexToBytes(value: string): Uint8Array {
-  requireSha256(value, "ForgeReplayBundle blob");
+  requireSha256(value, "ReplayBundle blob");
   return Uint8Array.from({ length: SHA256_BYTES }, (_, index) => Number.parseInt(value.slice(index * 2, index * 2 + 2), 16));
 }
 
@@ -605,7 +605,7 @@ function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
 
 function safeAdd(left: number, right: number): number {
   const result = left + right;
-  if (!Number.isSafeInteger(result)) throw new Error("ForgeReplayBundle byte length exceeds the safe integer range.");
+  if (!Number.isSafeInteger(result)) throw new Error("ReplayBundle byte length exceeds the safe integer range.");
   return result;
 }
 
@@ -624,7 +624,7 @@ function sortedUnique(values: readonly string[]): string[] {
 
 function requireExactKeys(value: Record<string, unknown>, expected: readonly string[], label: string): void {
   if (JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...expected].sort())) {
-    throw new Error(`ForgeReplayBundle ${label} contains unexpected fields.`);
+    throw new Error(`ReplayBundle ${label} contains unexpected fields.`);
   }
 }
 

@@ -14,7 +14,7 @@
 
 ## 複雜度
 
-初始化、彙總、回答分別為 `O(P)`、`O(N)`、`O(Q)`，總時間 `O(P+N+Q)`，核心資料結構的輔助空間為 `O(P)`。C、C++、Go reference 串流讀寫；Rust、Python 會保留完整輸入與輸出，JavaScript、TypeScript 保留 Forge `readAsString()` 提供的單一輸入字串，但以固定 64 KiB 分塊輸出。由於每筆觀測、查詢與答案都只有常數個定長整數 token，依實際 resident allocations 計算，七語言 reference 的共同最壞空間上界為 `O(P+N+Q)`。讀取全部資料本身已有 `Ω(P+N+Q)` 的最壞情況下界，因此時間為漸進最佳。
+初始化、彙總、回答分別為 `O(P)`、`O(N)`、`O(Q)`，總時間 `O(P+N+Q)`，核心資料結構的輔助空間為 `O(P)`。C、C++、Go reference 串流讀寫；Rust、Python 會保留完整輸入與輸出，JavaScript、TypeScript 保留 WASM-OJ `readAsString()` 提供的單一輸入字串，但以固定 64 KiB 分塊輸出。由於每筆觀測、查詢與答案都只有常數個定長整數 token，依實際 resident allocations 計算，七語言 reference 的共同最壞空間上界為 `O(P+N+Q)`。讀取全部資料本身已有 `Ω(P+N+Q)` 的最壞情況下界，因此時間為漸進最佳。
 
 ## 常見錯誤
 

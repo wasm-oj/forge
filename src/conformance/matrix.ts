@@ -1,4 +1,4 @@
-import { FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 import type { BuildArtifact, BuildResult, RunResult, TargetAbi } from "../core/types.ts";
 import { canonicalFileEntries } from "../core/project-files.ts";
@@ -85,7 +85,7 @@ export interface ConformanceReport {
 }
 
 export interface ConformanceSnapshot {
-  schema: typeof FORGE_SCHEMAS.conformance;
+  schema: typeof WASM_OJ_SCHEMAS.conformance;
   host: string;
   repetitions: number;
   caseIds: string[];
@@ -132,7 +132,7 @@ export async function runConformanceHost(
     await options.onSample?.(sample, samples.length, cases.length);
   }
   return {
-    schema: FORGE_SCHEMAS.conformance,
+    schema: WASM_OJ_SCHEMAS.conformance,
     host: host.id,
     repetitions,
     caseIds: cases.map((item) => item.id),
@@ -181,7 +181,7 @@ export function compareConformanceSnapshots(
 
 function validateConformanceSnapshot(snapshot: ConformanceSnapshot): void {
   if (!snapshot || typeof snapshot !== "object") throw new TypeError("Conformance snapshot must be an object.");
-  if (snapshot.schema !== FORGE_SCHEMAS.conformance) {
+  if (snapshot.schema !== WASM_OJ_SCHEMAS.conformance) {
     throw new Error(`Unsupported conformance schema '${String(snapshot.schema)}'.`);
   }
   if (!isIdentifier(snapshot.host)) throw new Error("Conformance snapshot host must be a non-empty trimmed identifier.");
@@ -419,7 +419,7 @@ function bytesToHex(bytes: Uint8Array): string {
 export async function artifactDigest(artifact: BuildArtifact): Promise<string> {
   const metadata = {
     kind: artifact.kind,
-    forgeContract: artifact.forgeContract,
+    wasmOjContract: artifact.wasmOjContract,
     projectId: artifact.projectId,
     cacheKey: artifact.cacheKey,
     name: artifact.name,

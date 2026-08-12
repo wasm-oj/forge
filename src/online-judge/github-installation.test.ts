@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ForgeWorkerEnv } from "../../worker/env";
+import type { WasmOjWorkerEnv } from "../../worker/env";
 import {
   githubInstallationToken,
   githubReadOnlyInstallationAuthorization,
@@ -60,12 +60,12 @@ async function githubAppPrivateKey(): Promise<string> {
   return `-----BEGIN PRIVATE KEY-----\n${base64}\n-----END PRIVATE KEY-----`;
 }
 
-async function tokenEnvironment(database: InstallationAuthorityDatabase): Promise<ForgeWorkerEnv> {
+async function tokenEnvironment(database: InstallationAuthorityDatabase): Promise<WasmOjWorkerEnv> {
   return {
     DB: database as unknown as D1Database,
     GITHUB_APP_ID: "12345",
     GITHUB_APP_PRIVATE_KEY: await githubAppPrivateKey(),
-  } as ForgeWorkerEnv;
+  } as WasmOjWorkerEnv;
 }
 
 function tokenResponse(overrides: Record<string, unknown> = {}): Response {
@@ -103,7 +103,7 @@ describe("GitHub installation token boundary", () => {
           bind: () => ({ first: async () => null }),
         }),
       },
-    } as unknown as ForgeWorkerEnv;
+    } as unknown as WasmOjWorkerEnv;
 
     await expect(githubInstallationToken(env, 42)).rejects.toMatchObject({
       status: 403,

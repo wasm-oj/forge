@@ -1,4 +1,4 @@
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 import { formalMutationStatus, type FormalMutationStatus } from "./formal-mutations";
 import { assertActiveRelease } from "./release";
 
@@ -24,15 +24,14 @@ async function databaseIsReady(database: D1Database): Promise<boolean> {
   }
 }
 
-export async function detailedReadiness(env: ForgeWorkerEnv): Promise<Readiness> {
+export async function detailedReadiness(env: WasmOjWorkerEnv): Promise<Readiness> {
   const [database, release, formalMutations] = await Promise.all([
     databaseIsReady(env.DB),
     assertActiveRelease(
       env.DB,
-      env.JUDGE_BUCKET,
       env.ENVIRONMENT,
-      env.FORGE_RELEASE_ID,
-      env.FORGE_RELEASE_MANIFEST_SHA256,
+      env.WASM_OJ_RELEASE_ID,
+      env.WASM_OJ_RELEASE_MANIFEST_SHA256,
     ).then(() => true, () => false),
     formalMutationStatus(env).catch(() => null),
   ]);
@@ -40,7 +39,7 @@ export async function detailedReadiness(env: ForgeWorkerEnv): Promise<Readiness>
     ready: database && release && formalMutations !== null,
     checkedAt: new Date().toISOString(),
     environment: env.ENVIRONMENT,
-    releaseId: env.FORGE_RELEASE_ID,
+    releaseId: env.WASM_OJ_RELEASE_ID,
     formalMutations,
     checks: { database, release, formalMutationControl: formalMutations !== null },
   };

@@ -5,26 +5,26 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { sha256Hex } from "./sha256";
 import {
-  forgeRuntimeIdentityBytes,
-  FORGE_RUNTIME_COMPONENTS,
-  FORGE_RUNTIME_IDENTITY_SHA256,
-  verifyForgeRuntimeIdentity,
+  runtimeIdentityBytes,
+  WASM_OJ_RUNTIME_COMPONENTS,
+  WASM_OJ_RUNTIME_IDENTITY_SHA256,
+  verifyRuntimeIdentity,
 } from "./runtime-identity";
 
-describe("Forge runtime identity", () => {
+describe("WASM-OJ runtime identity", () => {
   it("is reproducible from one exported canonical document", async () => {
-    expect(new TextDecoder().decode(forgeRuntimeIdentityBytes())).toBe(
-      `${JSON.stringify(FORGE_RUNTIME_COMPONENTS)}\n`,
+    expect(new TextDecoder().decode(runtimeIdentityBytes())).toBe(
+      `${JSON.stringify(WASM_OJ_RUNTIME_COMPONENTS)}\n`,
     );
-    await expect(verifyForgeRuntimeIdentity()).resolves.toBeUndefined();
-    expect(await sha256Hex(forgeRuntimeIdentityBytes())).toBe(FORGE_RUNTIME_IDENTITY_SHA256);
+    await expect(verifyRuntimeIdentity()).resolves.toBeUndefined();
+    expect(await sha256Hex(runtimeIdentityBytes())).toBe(WASM_OJ_RUNTIME_IDENTITY_SHA256);
   });
 
   it("pins the executable browser runtime bytes", async () => {
     const runtimeCore = await readFile(fileURLToPath(new URL("../runner/generated/runtime-core_bg.wasm", import.meta.url)));
     const wasmerSdk = await readFile(fileURLToPath(import.meta.resolve("@wasmer/sdk/wasm")));
-    expect(await sha256Hex(runtimeCore)).toBe(FORGE_RUNTIME_COMPONENTS.runtimeCoreWasmSha256);
-    expect(await sha256Hex(wasmerSdk)).toBe(FORGE_RUNTIME_COMPONENTS.wasmerSdkWasmSha256);
+    expect(await sha256Hex(runtimeCore)).toBe(WASM_OJ_RUNTIME_COMPONENTS.runtimeCoreWasmSha256);
+    expect(await sha256Hex(wasmerSdk)).toBe(WASM_OJ_RUNTIME_COMPONENTS.wasmerSdkWasmSha256);
   });
 
   it("pins Cargo.lock, runtime-core source, and both vendored patches", async () => {
@@ -51,6 +51,6 @@ describe("Forge runtime identity", () => {
       return { bytes: contents.byteLength, path: relative, sha256: await sha256Hex(contents) };
     }));
     expect(await sha256Hex(new TextEncoder().encode(`${JSON.stringify(table)}\n`)))
-      .toBe(FORGE_RUNTIME_COMPONENTS.runtimeSourceRootSha256);
+      .toBe(WASM_OJ_RUNTIME_COMPONENTS.runtimeSourceRootSha256);
   });
 });

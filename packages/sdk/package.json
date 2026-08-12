@@ -1,0 +1,62 @@
+{
+  "name": "@wasm-oj/sdk",
+  "version": "0.2.0",
+  "description": "Convenience entrypoints for the WASM-OJ SDK packages.",
+  "license": "MIT",
+  "author": "JacobLinCool",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wasm-oj/forge.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/wasm-oj/forge#readme",
+  "bugs": {
+    "url": "https://github.com/wasm-oj/forge/issues"
+  },
+  "keywords": ["online-judge", "wasi", "wasm", "sdk"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./organizer": {
+      "types": "./dist/organizer.d.ts",
+      "import": "./dist/organizer.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-library.mjs --package @wasm-oj/sdk",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@wasm-oj/browser": "workspace:0.2.0",
+    "@wasm-oj/contracts": "workspace:0.2.0",
+    "@wasm-oj/core": "workspace:0.2.0",
+    "@wasm-oj/organizer": "workspace:0.2.0",
+    "@wasm-oj/server": "workspace:0.2.0"
+  }
+}

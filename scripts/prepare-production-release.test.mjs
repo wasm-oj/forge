@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { FORGE_RUNTIME_IDENTITY_SHA256 } from "../src/core/runtime-identity.ts";
-import { verifyForgeReleaseManifestBytes } from "../src/release-manifest.ts";
+import { parseCanonicalJsonBytes } from "../src/core/canonical-json.ts";
+import { WASM_OJ_RUNTIME_IDENTITY_SHA256 } from "../src/core/runtime-identity.ts";
+import { verifyReleaseManifestBytes } from "../src/release-manifest.ts";
 import { prepareProductionRelease } from "./prepare-production-release.mjs";
 
 const digest = (character) => character.repeat(64);
@@ -23,14 +24,14 @@ function canonical(value) {
 function identityBytes(overrides = {}) {
   return canonical({
     compilerSha256: digest("a"),
-    contract: 1,
+    contract: 2,
     executionRootSha256: digest("b"),
     gitCommit,
-    protocol: "forge-container-v1",
+    protocol: "wasm-oj-container-v2",
     releaseId,
     runnerSha256: digest("c"),
     runtimeRootSha256: digest("d"),
-    schema: "forge-container-identity-v1",
+    schema: "wasm-oj-platform/container-identity/v2",
     toolchainRootSha256: digest("e"),
     ...overrides,
   });
@@ -38,10 +39,10 @@ function identityBytes(overrides = {}) {
 
 function template() {
   return {
-    schema: "wasm-oj-forge-v1/release-manifest",
+    schema: "wasm-oj-v2/release-manifest",
     releaseId: "01988dc1-5c00-7000-8000-000000000000",
-    version: "0.1.0-production.1",
-    forgeContract: 1,
+    version: "0.2.0-production.1",
+    wasmOjContract: 2,
     createdAt: "2026-08-01T00:00:00.000Z",
     source: {
       repository: "https://github.com/wasm-oj/forge",
@@ -76,10 +77,10 @@ function template() {
       },
     },
     runtime: {
-      protocolVersion: "forge-container-v1",
+      protocolVersion: "wasm-oj-container-v2",
       executionRootSha256: digest("8"),
       rootSha256: digest("9"),
-      runtimeIdentitySha256: FORGE_RUNTIME_IDENTITY_SHA256,
+      runtimeIdentitySha256: WASM_OJ_RUNTIME_IDENTITY_SHA256,
       runtimeCoreSha256: digest("0"),
       wasmerVersion: "7.2.1",
       wasmerSha256: digest("1"),
@@ -94,7 +95,7 @@ function template() {
       costCalibrationSha256: digest("0"),
     },
     migrations: { databaseSha256: digest("1") },
-    provenance: { issuer: "owner-fast-hotfix", subject: "wasm-oj-forge-production" },
+    provenance: { issuer: "owner-fast-hotfix", subject: "wasm-oj-production" },
   };
 }
 
@@ -102,7 +103,7 @@ function prepare(overrides = {}) {
   return prepareProductionRelease({
     template: template(),
     releaseId,
-    version: "0.1.0-production.2",
+    version: "0.2.0-production.2",
     gitCommit,
     sourceTreeSha256: digest("2"),
     containerIdentityBytes: identityBytes(),
@@ -115,9 +116,9 @@ function prepare(overrides = {}) {
 
 test("prepares one canonical manifest from actual release coordinates and Container identity", async () => {
   const prepared = prepare();
-  const manifest = await verifyForgeReleaseManifestBytes(prepared.manifestBytes, prepared.manifestSha256);
+  const manifest = await verifyReleaseManifestBytes(prepared.manifestBytes, prepared.manifestSha256);
   assert.equal(manifest.releaseId, releaseId);
-  assert.equal(manifest.version, "0.1.0-production.2");
+  assert.equal(manifest.version, "0.2.0-production.2");
   assert.deepEqual(manifest.source, {
     repository: "https://github.com/wasm-oj/forge",
     commit: gitCommit,
@@ -138,7 +139,10 @@ test("prepares one canonical manifest from actual release coordinates and Contai
   assert.deepEqual(manifest.evidence, template().evidence);
   assert.deepEqual(manifest.artifacts.workerBundle, template().artifacts.workerBundle);
   assert.deepEqual(manifest.artifacts.staticAssets, template().artifacts.staticAssets);
-  assert.equal(prepared.manifestKey, `releases/${releaseId}/manifest-${prepared.manifestSha256}.json`);
+  assert.deepEqual(parseCanonicalJsonBytes(prepared.activationRequestBytes, "activation request"), {
+    expectedCurrentReleaseId: null,
+    manifest,
+  });
 });
 
 test("updates only explicitly supplied Worker and static artifact records", () => {
@@ -151,15 +155,18 @@ test("updates only explicitly supplied Worker and static artifact records", () =
   assert.deepEqual(prepared.manifest.evidence, template().evidence);
 });
 
-test("emits direct 0016 activation SQL without qualification machinery", () => {
-  const sql = prepare().activationSql;
-  const candidate = sql.indexOf("'candidate'");
-  const retired = sql.indexOf("status='retired'");
-  const active = sql.indexOf("status='active'", retired + 1);
-  const pointer = sql.indexOf("INSERT INTO forge_active_releases");
-  assert.ok(candidate >= 0 && candidate < retired && retired < active && active < pointer);
-  assert.doesNotMatch(sql, /qualification/i);
-  assert.match(sql, new RegExp(releaseId, "g"));
+test("emits a canonical activation request with an explicit current-release precondition", () => {
+  const expectedCurrentReleaseId = "01988dc1-5c00-7000-8000-000000000000";
+  const prepared = prepare({ expectedCurrentReleaseId });
+  assert.deepEqual(prepared.activationRequest, {
+    expectedCurrentReleaseId,
+    manifest: prepared.manifest,
+  });
+  assert.deepEqual(
+    parseCanonicalJsonBytes(prepared.activationRequestBytes, "activation request"),
+    prepared.activationRequest,
+  );
+  assert.equal("activationSql" in prepared, false);
 });
 
 test("rejects a Container identity from another release or noncanonical bytes", () => {

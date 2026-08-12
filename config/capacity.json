@@ -1,0 +1,15 @@
+{
+  "submission": {
+    "globalActive": 50,
+    "globalQueued": 500,
+    "perUserActive": 1,
+    "perUserQueued": 3,
+    "rejudgeActive": 10
+  },
+  "catalog": {
+    "globalActive": 5,
+    "globalQueued": 50,
+    "perOrganizerActive": 1,
+    "perOrganizerQueued": 3
+  }
+}

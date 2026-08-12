@@ -32,13 +32,13 @@ const CANONICAL_BUILD_ROOT: &str = "/usr/src/cpython-3.14.6/cross-build/wasm32-w
 const CANONICAL_BUILD_PYTHON: &str =
     "/usr/src/cpython-3.14.6/cross-build/aarch64-apple-darwin/python.exe";
 const CANONICAL_WASI_SDK_ROOT: &str = "/opt/wasi-sdk-24.0";
-const RUNTIME_FILES_FORMAT: &str = "FORGEFS1";
+const RUNTIME_FILES_FORMAT: &str = "WOJFS002";
 const RUNTIME_FILES_CACHE_KEY: &str =
-    "wasm-oj-forge-v1:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip";
+    "wasm-oj-v2:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip";
 const RUNTIME_FILES_GUEST_PATH: &str = "/cpython/lib/python314.zip";
 const RUNTIME_FILES_ARCHIVE_SHA256: &str =
-    "8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba";
-const RUNTIME_FILES_ARCHIVE_BYTES: u64 = 10_652_546;
+    "44d894f91487f20c2bb04fe496a9343db37d8720fb706472c2b4a7f3300db039";
+const RUNTIME_FILES_ARCHIVE_BYTES: u64 = 10_652_540;
 const SOURCE_URL: &str = "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz";
 const SPDX_URL: &str = "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz.spdx.json";
 const WASI_SDK_URL: &str = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-arm64-macos.tar.gz";
@@ -251,7 +251,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let compressed = fs::read(&compressed_path)?;
     let manifest = serde_json::json!({
-        "schema": "wasm-oj-forge-v1/python-toolchain",
+        "schema": "wasm-oj-v2/python-toolchain",
         "version": VERSION,
         "target": TARGET,
         "source": {
@@ -636,7 +636,7 @@ fn render_canonical_sysconfig(
     canonicalize_sysconfig(&mut variables)?;
     let canonical_json = format!("{}\n", serde_json::to_string_pretty(&variables)?);
     let canonical_python = format!(
-        "# Canonical system configuration generated for WASM OJ Forge.\n\
+        "# Canonical system configuration generated for WASM-OJ.\n\
          build_time_vars = {canonical_json}"
     );
     Ok((canonical_json, canonical_python))

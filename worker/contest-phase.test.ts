@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 import { contestPhase } from "./product";
 import { managedMatch } from "./submissions";
 
@@ -16,13 +16,14 @@ describe("contest phase", () => {
 describe("managed collection matching", () => {
   it("matches a published immutable collection without coupling it to the active release", async () => {
     const prepare = vi.fn((sql: string) => {
-      expect(sql).not.toContain("collection_imports.forge_release_id");
+      expect(sql).toContain("catalog_publications");
+      expect(sql).toContain("official_practice_heads");
       return {
         bind: (...values: unknown[]) => ({
           all: async () => {
             expect(values).toEqual(["wasm-oj", "official-problems", "a".repeat(64)]);
             return { results: [{
-              snapshot_id: "11111111-1111-4111-8111-111111111111",
+              publication_id: "11111111-1111-4111-8111-111111111111",
               problem_slug: "two-sum",
               problem_version_id: "22222222-2222-4222-8222-222222222222",
             }] };
@@ -30,12 +31,12 @@ describe("managed collection matching", () => {
         }),
       };
     });
-    const response = await managedMatch(new Request(`https://forge.test/api/collections/managed-match?repository=wasm-oj/official-problems&revision=${"a".repeat(64)}`), {
+    const response = await managedMatch(new Request(`https://wasm-oj.test/api/collections/managed-match?repository=wasm-oj/official-problems&revision=${"a".repeat(64)}`), {
       DB: { prepare } as unknown as D1Database,
-    } as ForgeWorkerEnv);
+    } as WasmOjWorkerEnv);
     expect(await response.json()).toEqual({
       matched: true,
-      snapshotId: "11111111-1111-4111-8111-111111111111",
+      publicationId: "11111111-1111-4111-8111-111111111111",
       problems: { "two-sum": "22222222-2222-4222-8222-222222222222" },
     });
   });

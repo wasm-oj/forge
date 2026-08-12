@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { computeFileTreeIdentity } from "./tree-digest.mjs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { computeFileTreeInventory, deriveFileTreeInventory } from "./tree-digest.mjs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -14,25 +14,30 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-const [compiler, runner, runtimeTree, toolchainTree, executionTree] = await Promise.all([
-  readFile("/app/runtime/forge-compiler"),
-  readFile("/app/runtime/forge-runner"),
-  computeFileTreeIdentity("/app/runtime"),
-  computeFileTreeIdentity("/app/public/toolchains"),
-  computeFileTreeIdentity("/app", { excludedRelativePaths: ["release"], allowInternalSymlinks: true }),
-]);
+const executionTree = await computeFileTreeInventory("/app", {
+  excludedRelativePaths: ["release"],
+  allowInternalSymlinks: true,
+});
+const runtimeTree = deriveFileTreeInventory(executionTree, "runtime");
+const toolchainTree = deriveFileTreeInventory(executionTree, "public/toolchains");
+const compiler = executionTree.entries.find((entry) => entry.path === "runtime/wasm-oj-compiler");
+const runner = executionTree.entries.find((entry) => entry.path === "runtime/wasm-oj-runner");
+if (!compiler || !("sha256" in compiler) || !compiler.executable
+  || !runner || !("sha256" in runner) || !runner.executable) {
+  throw new Error("Container execution inventory is missing its native executables.");
+}
 // Keys are intentionally inserted in lexical order. identity.mjs independently
 // re-canonicalizes and rejects any byte-level disagreement at container start.
 const identity = {
-  compilerSha256: sha256(compiler),
-  contract: 1,
+  compilerSha256: compiler.sha256,
+  contract: 2,
   executionRootSha256: executionTree.rootSha256,
-  gitCommit: required("FORGE_GIT_COMMIT", /^[0-9a-f]{40}$/),
-  protocol: "forge-container-v1",
-  releaseId: required("FORGE_RELEASE_ID", UUID),
-  runnerSha256: sha256(runner),
+  gitCommit: required("WASM_OJ_GIT_COMMIT", /^[0-9a-f]{40}$/),
+  protocol: "wasm-oj-container-v2",
+  releaseId: required("WASM_OJ_RELEASE_ID", UUID),
+  runnerSha256: runner.sha256,
   runtimeRootSha256: runtimeTree.rootSha256,
-  schema: "forge-container-identity-v1",
+  schema: "wasm-oj-platform/container-identity/v2",
   toolchainRootSha256: toolchainTree.rootSha256,
 };
 await mkdir("/app/release", { recursive: true });

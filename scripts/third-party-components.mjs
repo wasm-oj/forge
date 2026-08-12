@@ -4,7 +4,7 @@ import path from "node:path";
 import { readPnpmLock, requireLockedPackage } from "./pnpm-lock.mjs";
 
 export const COMPONENT_MANIFEST_PATH = "licenses/components.json";
-export const COMPONENT_MANIFEST_SCHEMA = "wasm-oj-forge-v1/third-party-components";
+export const COMPONENT_MANIFEST_SCHEMA = "wasm-oj-v2/third-party-components";
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const SRI_PATTERN = /^sha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}$/;

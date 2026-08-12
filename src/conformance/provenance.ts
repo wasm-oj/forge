@@ -7,7 +7,7 @@ const EVIDENCE_RUN = /^experiments\/[^/]+\/runs\//;
 const GENERATED_EVIDENCE = new Set(["docs/conformance-report.md"]);
 
 export interface SourceTreeProvenance {
-  algorithm: "forge-source-tree-sha256";
+  algorithm: "wasm-oj-source-tree-sha256";
   sha256: string;
   files: number;
 }
@@ -65,7 +65,7 @@ export async function sourceTreeProvenanceAtCommit(
   });
   const manifest = entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n";
   return {
-    algorithm: "forge-source-tree-sha256",
+    algorithm: "wasm-oj-source-tree-sha256",
     sha256: createHash("sha256").update(manifest).digest("hex"),
     files: entries.length,
   };

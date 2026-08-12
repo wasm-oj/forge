@@ -16,7 +16,7 @@ describe("bounded server transports", () => {
   });
 
   it("reads only regular, stable files within the requested cap", async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), "forge-bounded-transport-"));
+    const directory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-bounded-transport-"));
     try {
       const response = path.join(directory, "response.bin");
       await writeFile(response, "12345");

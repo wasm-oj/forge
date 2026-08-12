@@ -1,15 +1,15 @@
 {
-  "schema": "wasm-oj-forge-v1/clang-pins",
+  "schema": "wasm-oj-v2/clang-pins",
   "version": "22.0.0-git20542-10",
   "source": "clang-22.0.0-git20542-10.webc",
   "sourceSha256": "21ded33b9c6d4e1aaad5528c940bdaf6c3e84be77ea8f522f018ca7289a2a224",
   "command": "clang",
   "linkerCommand": "wasm-ld",
   "placeholders": {
-    "input": "__FORGE_INPUT__",
-    "output": "__FORGE_OUTPUT__",
-    "mainFileName": "__FORGE_MAIN_FILE_NAME__",
-    "objects": "__FORGE_OBJECTS__"
+    "input": "__WASM_OJ_INPUT__",
+    "output": "__WASM_OJ_OUTPUT__",
+    "mainFileName": "__WASM_OJ_MAIN_FILE_NAME__",
+    "objects": "__WASM_OJ_OBJECTS__"
   },
   "configs": {
     "c-debug": {
@@ -24,7 +24,7 @@
         "-disable-free",
         "-clear-ast-before-backend",
         "-main-file-name",
-        "__FORGE_MAIN_FILE_NAME__",
+        "__WASM_OJ_MAIN_FILE_NAME__",
         "-mrelocation-model",
         "static",
         "-mframe-pointer=none",
@@ -57,10 +57,10 @@
         "-fgnuc-version=4.2.1",
         "-fskip-odr-check-in-gmf",
         "-o",
-        "__FORGE_OUTPUT__",
+        "__WASM_OJ_OUTPUT__",
         "-x",
         "c",
-        "__FORGE_INPUT__"
+        "__WASM_OJ_INPUT__"
       ],
       "link": [
         "-m",
@@ -68,11 +68,11 @@
         "-L/usr/lib/wasm32-unknown-wasip1",
         "-L/usr/lib/wasm32-wasip1",
         "/usr/lib/wasm32-wasip1/crt1-command.o",
-        "__FORGE_OBJECTS__",
+        "__WASM_OJ_OBJECTS__",
         "-lc",
         "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
         "-o",
-        "__FORGE_OUTPUT__"
+        "__WASM_OJ_OUTPUT__"
       ]
     },
     "c-release": {
@@ -87,7 +87,7 @@
         "-disable-free",
         "-clear-ast-before-backend",
         "-main-file-name",
-        "__FORGE_MAIN_FILE_NAME__",
+        "__WASM_OJ_MAIN_FILE_NAME__",
         "-mrelocation-model",
         "static",
         "-mframe-pointer=none",
@@ -122,10 +122,10 @@
         "-vectorize-loops",
         "-vectorize-slp",
         "-o",
-        "__FORGE_OUTPUT__",
+        "__WASM_OJ_OUTPUT__",
         "-x",
         "c",
-        "__FORGE_INPUT__"
+        "__WASM_OJ_INPUT__"
       ],
       "link": [
         "-m",
@@ -133,11 +133,11 @@
         "-L/usr/lib/wasm32-unknown-wasip1",
         "-L/usr/lib/wasm32-wasip1",
         "/usr/lib/wasm32-wasip1/crt1-command.o",
-        "__FORGE_OBJECTS__",
+        "__WASM_OJ_OBJECTS__",
         "-lc",
         "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
         "-o",
-        "__FORGE_OUTPUT__"
+        "__WASM_OJ_OUTPUT__"
       ]
     },
     "cpp-debug": {
@@ -152,7 +152,7 @@
         "-disable-free",
         "-clear-ast-before-backend",
         "-main-file-name",
-        "__FORGE_MAIN_FILE_NAME__",
+        "__WASM_OJ_MAIN_FILE_NAME__",
         "-mrelocation-model",
         "static",
         "-mframe-pointer=none",
@@ -192,10 +192,10 @@
         "-fno-implicit-modules",
         "-fskip-odr-check-in-gmf",
         "-o",
-        "__FORGE_OUTPUT__",
+        "__WASM_OJ_OUTPUT__",
         "-x",
         "c++",
-        "__FORGE_INPUT__"
+        "__WASM_OJ_INPUT__"
       ],
       "link": [
         "-m",
@@ -203,13 +203,13 @@
         "-L/usr/lib/wasm32-unknown-wasip1",
         "-L/usr/lib/wasm32-wasip1",
         "/usr/lib/wasm32-wasip1/crt1-command.o",
-        "__FORGE_OBJECTS__",
+        "__WASM_OJ_OBJECTS__",
         "-lc++",
         "-lc++abi",
         "-lc",
         "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
         "-o",
-        "__FORGE_OUTPUT__"
+        "__WASM_OJ_OUTPUT__"
       ]
     },
     "cpp-release": {
@@ -224,7 +224,7 @@
         "-disable-free",
         "-clear-ast-before-backend",
         "-main-file-name",
-        "__FORGE_MAIN_FILE_NAME__",
+        "__WASM_OJ_MAIN_FILE_NAME__",
         "-mrelocation-model",
         "static",
         "-mframe-pointer=none",
@@ -266,10 +266,10 @@
         "-vectorize-loops",
         "-vectorize-slp",
         "-o",
-        "__FORGE_OUTPUT__",
+        "__WASM_OJ_OUTPUT__",
         "-x",
         "c++",
-        "__FORGE_INPUT__"
+        "__WASM_OJ_INPUT__"
       ],
       "link": [
         "-m",
@@ -277,13 +277,13 @@
         "-L/usr/lib/wasm32-unknown-wasip1",
         "-L/usr/lib/wasm32-wasip1",
         "/usr/lib/wasm32-wasip1/crt1-command.o",
-        "__FORGE_OBJECTS__",
+        "__WASM_OJ_OBJECTS__",
         "-lc++",
         "-lc++abi",
         "-lc",
         "/usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
         "-o",
-        "__FORGE_OUTPUT__"
+        "__WASM_OJ_OUTPUT__"
       ]
     }
   }

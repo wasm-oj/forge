@@ -226,7 +226,7 @@ async function loadProblem(entry, expectedNumber, validate) {
   if (
     scoring.maximumPoints !== 100
     || calibration.status !== "measured"
-    || calibration.method !== "forge-v1-compiled-average-optimal-rounded-v1"
+    || calibration.method !== "wasm-oj-v2/compiled-average-optimal-rounded/v1"
   ) {
     fail(`${expectedManifest} has an unsupported scoring contract`);
   }
@@ -436,11 +436,11 @@ async function main() {
     if (current !== output) {
       fail("generated TypeScript problem fixture is stale; run pnpm problems:generate");
     }
-    console.log("verified generated Forge problem fixture for 45 localized problems");
+    console.log("verified generated WASM-OJ problem fixture for 45 localized problems");
     return;
   }
   await atomicWrite(OUTPUT_PATH, output);
-  console.log("generated Forge problem fixture for 45 localized problems");
+  console.log("generated WASM-OJ problem fixture for 45 localized problems");
 }
 
 await main();

@@ -22,31 +22,31 @@ describe("single D1 rejudge schema", () => {
     expect(columns(database, "rejudge_batches")).toEqual(expect.arrayContaining([
       "idempotency_key",
       "request_digest",
-      "forge_release_id",
-      "forge_manifest_sha256",
-      "ready_count",
-      "failed_count",
+      "wasm_oj_release_id",
+      "wasm_oj_manifest_sha256",
       "cancel_requested_at",
-      "mappings_finalized_at",
-    ]));
-    expect(columns(database, "effective_problem_versions")).toEqual([
-      "original_problem_version_id",
-      "effective_problem_version_id",
-      "rejudge_batch_id",
       "effective_at",
+    ]));
+    expect(columns(database, "effective_submission_results")).toEqual([
+      "origin_submission_id",
+      "effective_submission_id",
+      "effective_problem_version_id",
+      "effective_rejudge_batch_id",
+      "became_effective_at",
     ]);
     expect(columns(database, "submissions")).toEqual(expect.arrayContaining([
       "admitted_at",
-      "rejudge_batch_id",
-      "rejudge_of_submission_id",
-      "source_erased_at",
+      "origin_submission_id",
+      "origin_submitted_at",
+      "problem_series_id",
+      "source_id",
     ]));
     expect(columns(database, "rejudge_jobs")).toEqual(expect.arrayContaining([
+      "origin_submission_id",
       "old_submission_id",
       "new_submission_id",
+      "source_id",
       "state",
-      "erasure_excluded_at",
-      "workflow_payload_json",
     ]));
     expect(columns(database, "submission_events")).toEqual([
       "id",
@@ -54,12 +54,6 @@ describe("single D1 rejudge schema", () => {
       "event_key",
       "payload_json",
       "created_at",
-    ]);
-    expect(columns(database, "effective_rejudges")).toEqual([
-      "old_submission_id",
-      "rejudge_batch_id",
-      "new_submission_id",
-      "became_effective_at",
     ]);
     for (const removed of [
       "formal_submission_admissions",
@@ -69,19 +63,41 @@ describe("single D1 rejudge schema", () => {
       "submission_outbox",
       "rejudge_result_outbox",
       "core_outbox",
+      "effective_problem_versions",
+      "effective_rejudges",
+      "outbox",
+      "rejudge_results",
+      "maintenance_tasks",
     ]) {
       expect(database.prepare("SELECT 1 FROM sqlite_schema WHERE type='table' AND name=?").get(removed)).toBeUndefined();
     }
-    expect(columns(database, "outbox")).toEqual([
+    expect(columns(database, "workflow_outbox")).toEqual([
       "id",
-      "kind",
-      "aggregate_id",
-      "payload_json",
-      "created_at",
-      "delivered_at",
+      "catalog_validation_job_id",
+      "catalog_publish_job_id",
+      "submission_id",
+      "state",
       "attempts",
       "last_error",
+      "created_at",
+      "updated_at",
+      "settled_at",
     ]);
+    expect(columns(database, "problem_versions")).toEqual([
+      "id",
+      "catalog_publication_id",
+      "problem_series_id",
+      "execution_semantic_sha256",
+      "created_at",
+    ]);
+    expect(columns(database, "submission_sources")).toEqual(expect.arrayContaining([
+      "erasure_requested_at",
+      "erasure_attempts",
+      "erasure_next_attempt_at",
+      "erasure_last_error",
+    ]));
+    expect(columns(database, "submissions")).not.toContain("problem_mode");
+    expect(columns(database, "submission_attempts")).not.toContain("container_key");
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 });

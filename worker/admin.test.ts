@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { revokeOrganizerRole } from "./admin";
 import { sha256Hex } from "./crypto";
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 
 const ADMIN_USER_ID = "11111111-1111-4111-8111-111111111111";
 const TARGET_USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -29,18 +29,18 @@ async function revocationEnvironment(targetIsAdmin: boolean) {
     }),
   }));
   return {
-    env: { DB: { prepare } as unknown as D1Database, PUBLIC_ORIGIN: "https://forge.test" } as ForgeWorkerEnv,
+    env: { DB: { prepare } as unknown as D1Database, PUBLIC_ORIGIN: "https://wasm-oj.test" } as WasmOjWorkerEnv,
     deletion,
   };
 }
 
 function revocationRequest(): Request {
-  return new Request(`https://forge.test/api/admin/organizers/${TARGET_USER_ID}/revoke`, {
+  return new Request(`https://wasm-oj.test/api/admin/organizers/${TARGET_USER_ID}/revoke`, {
     method: "POST",
     headers: {
-      origin: "https://forge.test",
-      cookie: "forge_session=session-token; forge_csrf=csrf-token",
-      "x-forge-csrf": "csrf-token",
+      origin: "https://wasm-oj.test",
+      cookie: "wasm_oj_session=session-token; wasm_oj_csrf=csrf-token",
+      "x-wasm-oj-csrf": "csrf-token",
       "content-type": "application/json",
     },
     body: "{}",

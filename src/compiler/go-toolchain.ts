@@ -1,5 +1,5 @@
 import type { Diagnostic, OptimizationLevel, ProjectFile } from "../core/types.ts";
-import { FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import {
   GO_COMPRESSED_PACKAGE_SHA256,
   GO_PACKAGE_ASSET_PATH,
@@ -77,7 +77,7 @@ export function decodeGoToolchainManifest(bytes: Uint8Array): GoToolchainManifes
     "wasi_snapshot_preview1.sock_shutdown",
   ];
   if (
-    manifest.schema !== FORGE_SCHEMAS.goToolchain
+    manifest.schema !== WASM_OJ_SCHEMAS.goToolchain
     || manifest.version !== GO_TOOLCHAIN.version
     || manifest.target !== GO_TOOLCHAIN.target
     || compiler.command !== "go-compile"
@@ -90,7 +90,7 @@ export function decodeGoToolchainManifest(bytes: Uint8Array): GoToolchainManifes
     || output.compressedSha256 !== GO_TOOLCHAIN.packageCompressedSha256
     || standardLibrary.sha256 !== GO_TOOLCHAIN.standardLibrarySha256
     || standardLibrary.compressedSha256 !== GO_TOOLCHAIN.standardLibraryCompressedSha256
-    || standardLibrary.format !== "FORGEGO1"
+    || standardLibrary.format !== "WOJGO002"
   ) {
     throw new Error("Pinned Go toolchain manifest does not match the compiler contract.");
   }
@@ -129,7 +129,31 @@ export function decodeGoStandardLibrary(
   bytes: Uint8Array,
   packages: readonly GoPackageContract[],
 ): Record<string, Uint8Array> {
-  if (bytes.byteLength < 12 || new TextDecoder().decode(bytes.subarray(0, 8)) !== "FORGEGO1") {
+  const { dataOffset, entries } = goStandardLibraryLayout(bytes, packages);
+  const files: Record<string, Uint8Array> = {
+    "/go/VERSION": new TextEncoder().encode(`go${GO_VERSION}\n`),
+  };
+  for (const entry of entries) {
+    files[entry.archivePath] = bytes.subarray(
+      dataOffset + entry.offset,
+      dataOffset + entry.offset + entry.length,
+    );
+  }
+  return files;
+}
+
+export function validateGoStandardLibrary(
+  bytes: Uint8Array,
+  packages: readonly GoPackageContract[],
+): void {
+  goStandardLibraryLayout(bytes, packages);
+}
+
+function goStandardLibraryLayout(
+  bytes: Uint8Array,
+  packages: readonly GoPackageContract[],
+): { dataOffset: number; entries: readonly GoStandardLibraryIndexEntry[] } {
+  if (bytes.byteLength < 12 || new TextDecoder().decode(bytes.subarray(0, 8)) !== "WOJGO002") {
     throw new Error("Pinned Go standard library has an invalid format header.");
   }
   const indexLength = new DataView(bytes.buffer, bytes.byteOffset + 8, 4).getUint32(0, true);
@@ -139,9 +163,7 @@ export function decodeGoStandardLibrary(
   if (!Array.isArray(parsed) || parsed.length !== packages.length) {
     throw new Error("Pinned Go standard-library index does not match the manifest.");
   }
-  const files: Record<string, Uint8Array> = {
-    "/go/VERSION": new TextEncoder().encode(`go${GO_VERSION}\n`),
-  };
+  const entries: GoStandardLibraryIndexEntry[] = [];
   let expectedOffset = 0;
   for (let index = 0; index < packages.length; index += 1) {
     const entry = asRecord(parsed[index], "standardLibrary[]") as unknown as GoStandardLibraryIndexEntry;
@@ -158,16 +180,13 @@ export function decodeGoStandardLibrary(
     ) {
       throw new Error("Pinned Go standard-library index contains a non-canonical archive entry.");
     }
-    files[entry.archivePath] = bytes.slice(
-      dataOffset + entry.offset,
-      dataOffset + entry.offset + entry.length,
-    );
+    entries.push(entry);
     expectedOffset += entry.length;
   }
   if (dataOffset + expectedOffset !== bytes.byteLength) {
     throw new Error("Pinned Go standard library contains trailing or missing archive bytes.");
   }
-  return files;
+  return { dataOffset, entries: Object.freeze(entries) };
 }
 
 /** Normalize the runtime-core compiler filesystem contract to raw bytes. */
@@ -226,7 +245,7 @@ export function goCompileDependencyArguments(
     "-p", dependency.importPath,
     "-lang", GO_LANGUAGE_VERSION,
     "-complete",
-    `-buildid=forge_dependency_${dependency.importPath}`,
+    `-buildid=wasm_oj_dependency_${dependency.importPath}`,
     "-c=1",
     "-dwarf=false",
     "-trimpath", "/work=.",
@@ -248,7 +267,7 @@ export function goCompileArguments(files: readonly ProjectFile[], optimization: 
     "-p", "main",
     "-lang", GO_LANGUAGE_VERSION,
     "-complete",
-    "-buildid=forge_submission",
+    "-buildid=wasm_oj_submission",
     "-c=1",
     "-dwarf=false",
     "-trimpath", "/work=.",

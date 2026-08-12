@@ -1,4 +1,4 @@
-import { ProfileView } from "@/src/components/profile-view";
+import { ProfileView } from "@/src/features/profiles/components/profile-view";
 
 export default async function ProfilePage({ params }: { readonly params: Promise<{ readonly login: string }> }) {
   const { login } = await params;

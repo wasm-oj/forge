@@ -8,11 +8,11 @@ const problem = PROBLEMS[0]!;
 describe("managed public problem projection", () => {
   it("accepts and sanitizes the exact practice role", () => {
     expect(parseManagedPublicProblemProjection({
-      schema: "forge-practice-problem-projection-v1",
+      schema: "wasm-oj-platform/practice-problem-projection/v1",
       problem,
       digest: DIGEST,
     }, "official-practice", DIGEST)).toEqual({
-      schema: "forge-practice-problem-projection-v1",
+      schema: "wasm-oj-platform/practice-problem-projection/v1",
       problem,
       digest: DIGEST,
     });
@@ -25,13 +25,13 @@ describe("managed public problem projection", () => {
       judgeCases: problem.judgeCases.filter((testCase) => testCase.kind === "sample"),
     };
     expect(parseManagedPublicProblemProjection({
-      schema: "forge-contest-public-problem-projection-v1",
+      schema: "wasm-oj-platform/contest-public-problem-projection/v1",
       problem: publicProblem,
       digest: DIGEST,
     }, "contest", DIGEST).problem).toEqual(publicProblem);
 
     expect(() => parseManagedPublicProblemProjection({
-      schema: "forge-contest-public-problem-projection-v1",
+      schema: "wasm-oj-platform/contest-public-problem-projection/v1",
       problem: { ...publicProblem, judgeCases: problem.judgeCases },
       digest: DIGEST,
     }, "contest", DIGEST)).toThrow("non-public");
@@ -39,8 +39,8 @@ describe("managed public problem projection", () => {
 
   it("rejects a hidden judge role even when its content address is valid", () => {
     expect(() => parseManagedPublicProblemProjection({
-      schema: "forge-server-judge-projection-v1",
-      forgeReleaseId: crypto.randomUUID(),
+      schema: "wasm-oj-platform/server-judge-projection/v1",
+      wasmOjReleaseId: crypto.randomUUID(),
       allowedProfiles: {},
       judge: { kind: "text" },
       problem,

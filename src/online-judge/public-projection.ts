@@ -6,7 +6,7 @@ const DIGEST = /^[0-9a-f]{64}$/;
 export type ManagedPublicProjectionMode = "official-practice" | "contest";
 
 export interface ManagedPublicProblemProjection {
-  readonly schema: "forge-practice-problem-projection-v1" | "forge-contest-public-problem-projection-v1";
+  readonly schema: "wasm-oj-platform/practice-problem-projection/v1" | "wasm-oj-platform/contest-public-problem-projection/v1";
   readonly problem: JudgeProblem;
   readonly digest: string;
 }
@@ -27,8 +27,8 @@ export function parseManagedPublicProblemProjection(
     || record.digest !== expectedBundleDigest
   ) throw new TypeError("Managed public projection is not bound to its problem bundle.");
   const expectedSchema = mode === "contest"
-    ? "forge-contest-public-problem-projection-v1"
-    : "forge-practice-problem-projection-v1";
+    ? "wasm-oj-platform/contest-public-problem-projection/v1"
+    : "wasm-oj-platform/practice-problem-projection/v1";
   if (record.schema !== expectedSchema) throw new TypeError("Managed public projection has the wrong semantic role.");
   let problem: JudgeProblem;
   if (mode === "contest") {

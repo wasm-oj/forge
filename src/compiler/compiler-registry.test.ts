@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BuildResult, Project, WorkerProgress } from "../core/types";
-import type { ForgeCompiler } from "./compiler";
-import { ForgeCompilerRegistry } from "./compiler-registry";
+import type { Compiler } from "./compiler";
+import { CompilerRegistry } from "./compiler-registry";
 
 function compiler(result: BuildResult) {
   let progressListener: ((value: WorkerProgress) => void) | undefined;
@@ -9,7 +9,7 @@ function compiler(result: BuildResult) {
     progressListener = undefined;
   });
   return {
-    cacheIdentity: vi.fn(() => "forge-test-compiler-1"),
+    cacheIdentity: vi.fn(() => "wasm-oj-test-compiler-1"),
     ready: vi.fn(() => Promise.resolve()),
     build: vi.fn(async () => result),
     onProgress: vi.fn((listener: (value: WorkerProgress) => void) => {
@@ -22,7 +22,7 @@ function compiler(result: BuildResult) {
     dispose: vi.fn(),
     emitProgress: (progress: WorkerProgress) => progressListener?.(progress),
     removeProgressListener,
-  } satisfies ForgeCompiler & {
+  } satisfies Compiler & {
     emitProgress(progress: WorkerProgress): void;
     removeProgressListener: ReturnType<typeof vi.fn>;
   };
@@ -75,18 +75,18 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-describe("ForgeCompilerRegistry", () => {
+describe("CompilerRegistry", () => {
   it("routes a seventh language's cache identity and build to its registered compiler", async () => {
     const builtin = compiler(failure);
     const custom = compiler(failure);
-    const registry = new ForgeCompilerRegistry([
+    const registry = new CompilerRegistry([
       { languages: ["c"], compiler: builtin },
       { languages: ["zig"], compiler: custom },
     ]);
     const zigProject = project("zig");
 
     expect(registry.languages()).toEqual(["c", "zig"]);
-    expect(registry.cacheIdentity(zigProject)).toBe("forge-test-compiler-1");
+    expect(registry.cacheIdentity(zigProject)).toBe("wasm-oj-test-compiler-1");
     expect(custom.cacheIdentity).toHaveBeenCalledWith(zigProject);
     expect(builtin.cacheIdentity).not.toHaveBeenCalled();
     await expect(registry.build(zigProject, "key")).resolves.toBe(failure);
@@ -97,7 +97,7 @@ describe("ForgeCompilerRegistry", () => {
 
   it("owns shared compiler lifecycle exactly once and forwards progress until disposal", async () => {
     const shared = compiler(failure);
-    const registry = new ForgeCompilerRegistry([
+    const registry = new CompilerRegistry([
       { languages: ["c"], compiler: shared },
       { languages: ["cpp"], compiler: shared },
     ]);
@@ -134,7 +134,7 @@ describe("ForgeCompilerRegistry", () => {
   });
 
   it("rejects ambiguous registration and freezes routing after identity selection", () => {
-    const registry = new ForgeCompilerRegistry();
+    const registry = new CompilerRegistry();
     registry.register(["c"], compiler(failure));
     expect(() => registry.register(["c"], compiler(failure))).toThrow("already has");
     registry.cacheIdentity(project("c"));
@@ -143,7 +143,7 @@ describe("ForgeCompilerRegistry", () => {
   });
 
   it("does not commit a route when compiler progress subscription fails", () => {
-    const registry = new ForgeCompilerRegistry();
+    const registry = new CompilerRegistry();
     const broken = compiler(failure);
     broken.onProgress.mockImplementationOnce(() => {
       throw new Error("subscription failed");
@@ -151,7 +151,7 @@ describe("ForgeCompilerRegistry", () => {
 
     expect(() => registry.register(["zig"], broken)).toThrow("subscription failed");
     expect(registry.languages()).toEqual([]);
-    expect(() => registry.cacheIdentity(project("zig"))).toThrow("No ForgeCompiler");
+    expect(() => registry.cacheIdentity(project("zig"))).toThrow("No Compiler");
     registry.dispose();
     expect(broken.dispose).not.toHaveBeenCalled();
   });
@@ -160,7 +160,7 @@ describe("ForgeCompilerRegistry", () => {
     const first = compiler(failure);
     const second = compiler(failure);
 
-    expect(() => new ForgeCompilerRegistry([
+    expect(() => new CompilerRegistry([
       { languages: ["c"], compiler: first },
       { languages: ["c"], compiler: second },
     ])).toThrow("already has");
@@ -170,7 +170,7 @@ describe("ForgeCompilerRegistry", () => {
   });
 
   it("rejects malformed compiler contracts before taking ownership", () => {
-    const registry = new ForgeCompilerRegistry();
+    const registry = new CompilerRegistry();
     expect(() => registry.register(["zig"], { onProgress: vi.fn() } as never))
       .toThrow("cacheIdentity");
     expect(registry.languages()).toEqual([]);
@@ -178,9 +178,9 @@ describe("ForgeCompilerRegistry", () => {
   });
 
   it("fails explicitly when no compiler owns a language", async () => {
-    const registry = new ForgeCompilerRegistry();
-    expect(() => registry.cacheIdentity(project("zig"))).toThrow("No ForgeCompiler");
-    await expect(registry.build(project("zig"), "key")).rejects.toThrow("No ForgeCompiler");
+    const registry = new CompilerRegistry();
+    expect(() => registry.cacheIdentity(project("zig"))).toThrow("No Compiler");
+    await expect(registry.build(project("zig"), "key")).rejects.toThrow("No Compiler");
     registry.dispose();
   });
 
@@ -190,7 +190,7 @@ describe("ForgeCompilerRegistry", () => {
     implementation.ready
       .mockImplementationOnce(() => firstReady.promise)
       .mockResolvedValue(undefined);
-    const registry = new ForgeCompilerRegistry([{ languages: ["c"], compiler: implementation }]);
+    const registry = new CompilerRegistry([{ languages: ["c"], compiler: implementation }]);
 
     const build = registry.build(project("c"), "key");
     registry.restart();
@@ -208,7 +208,7 @@ describe("ForgeCompilerRegistry", () => {
     implementation.ready
       .mockRejectedValueOnce(new Error("initialization failed"))
       .mockResolvedValue(undefined);
-    const registry = new ForgeCompilerRegistry([{ languages: ["c"], compiler: implementation }]);
+    const registry = new CompilerRegistry([{ languages: ["c"], compiler: implementation }]);
 
     await expect(registry.ready()).rejects.toThrow("initialization failed");
     await expect(registry.ready()).resolves.toBeUndefined();
@@ -225,7 +225,7 @@ describe("ForgeCompilerRegistry", () => {
     first.dispose.mockImplementation(() => {
       throw new Error("first disposal failed");
     });
-    const registry = new ForgeCompilerRegistry([
+    const registry = new CompilerRegistry([
       { languages: ["c"], compiler: first },
       { languages: ["cpp"], compiler: second },
     ]);

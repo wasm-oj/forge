@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { deserialize, serialize } from "node:v8";
 import { buildServerProjectInProcess } from "./server-compiler.ts";
+import { deserializeServerToolchainSources } from "./toolchain-sources.ts";
 import { readBoundedRegularFile } from "./bounded-transport.ts";
 import { withProcessKeepalive } from "./process-keepalive.mjs";
 
@@ -15,7 +16,8 @@ try {
   const result = await withProcessKeepalive(buildServerProjectInProcess(
     {
       compilerExecutable: encoded.compilerExecutable,
-      toolchainDirectory: encoded.toolchainDirectory,
+      toolchains: deserializeServerToolchainSources(encoded.toolchains),
+      verifiedToolchain: encoded.verifiedToolchain === true,
     },
     encoded.project,
     encoded.cacheKey,
@@ -32,13 +34,13 @@ try {
 }
 
 function requiredResponsePath() {
-  const value = process.env.FORGE_BUILD_RESPONSE;
-  if (!value) throw new Error("FORGE_BUILD_RESPONSE is required.");
+  const value = process.env.WASM_OJ_BUILD_RESPONSE;
+  if (!value) throw new Error("WASM_OJ_BUILD_RESPONSE is required.");
   return value;
 }
 
 function requiredRequestPath() {
-  const value = process.env.FORGE_BUILD_REQUEST;
-  if (!value) throw new Error("FORGE_BUILD_REQUEST is required.");
+  const value = process.env.WASM_OJ_BUILD_REQUEST;
+  if (!value) throw new Error("WASM_OJ_BUILD_REQUEST is required.");
   return value;
 }

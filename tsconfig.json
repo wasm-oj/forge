@@ -26,5 +26,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "dist", "problems"]
+  "exclude": ["node_modules", "dist", "problems", "packages/*/dist"]
 }

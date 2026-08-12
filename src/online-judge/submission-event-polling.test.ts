@@ -17,7 +17,20 @@ function event(sequence: number, payload: Record<string, unknown>): SequencedSub
 }
 
 function replay(events: readonly SequencedSubmissionEvent[], nextCursor: number, state: SubmissionState): Response {
-  return Response.json({ events, nextCursor, state });
+  return Response.json({
+    events,
+    nextCursor,
+    summary: {
+      state,
+      verdict: state === "completed" ? "accepted" : null,
+      score: state === "completed" ? 100 : null,
+      fullyPassedCases: state === "completed" ? 1 : null,
+      deterministicCost: state === "completed" ? 10 : null,
+      peakMemoryBytes: state === "completed" ? 65_536 : null,
+      updatedAt: TIMESTAMP,
+      completedAt: state === "completed" || state === "cancelled" ? TIMESTAMP : null,
+    },
+  });
 }
 
 class FakeFocusTarget {
@@ -102,7 +115,7 @@ describe("official submission event polling client", () => {
     expect(statuses).toEqual(expect.arrayContaining(["replaying", "connected", "completed"]));
   });
 
-  it("uses 1/2/4/8/10 second transport backoff and retries from the same cursor", async () => {
+  it("uses 1/2/5/10 second transport backoff and retries from the same cursor", async () => {
     vi.useFakeTimers();
     const requestedCursors: string[] = [];
     const statuses: SubmissionPollingConnectionState[] = [];
@@ -122,13 +135,38 @@ describe("official submission event polling client", () => {
 
     const running = client.run();
     await vi.advanceTimersByTimeAsync(0);
-    for (const delay of [1_000, 2_000, 4_000, 8_000, 10_000, 10_000]) {
+    for (const delay of [1_000, 2_000, 5_000, 10_000, 10_000, 10_000]) {
       await vi.advanceTimersByTimeAsync(delay);
     }
 
     await expect(running).resolves.toEqual({ kind: "terminal", state: "completed", cursor: 21 });
     expect(requestedCursors).toEqual(Array.from({ length: 7 }, () => "0"));
     expect(statuses.filter((state) => state === "reconnecting")).toHaveLength(6);
+  });
+
+  it("backs off unchanged polls through 1/2/5/10 seconds and resets after an event", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const client = new SubmissionEventPollingClient({
+      eventsUrl: EVENTS_URL,
+      focusTarget: null,
+      fetch: vi.fn(async () => {
+        calls += 1;
+        if (calls <= 4) return replay([], 0, "running");
+        if (calls === 5) return replay([event(1, { kind: "case-progress", completedCases: 1, totalCases: 2 })], 1, "running");
+        return replay([event(2, { kind: "state", state: "completed" })], 2, "completed");
+      }) as unknown as typeof fetch,
+      onEvent: () => undefined,
+    });
+
+    const running = client.run();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toBe(1);
+    for (const [delay, expectedCalls] of [[1_000, 2], [2_000, 3], [5_000, 4], [10_000, 5], [1_000, 6]] as const) {
+      await vi.advanceTimersByTimeAsync(delay);
+      expect(calls).toBe(expectedCalls);
+    }
+    await expect(running).resolves.toMatchObject({ kind: "terminal", cursor: 2 });
   });
 
   it("polls immediately when the window regains focus", async () => {
@@ -208,7 +246,16 @@ describe("official submission event polling client", () => {
         stdout: "hidden-case-canary",
       }],
       nextCursor: 1,
-      state: "running",
+      summary: {
+        state: "running",
+        verdict: null,
+        score: null,
+        fullyPassedCases: null,
+        deterministicCost: null,
+        peakMemoryBytes: null,
+        updatedAt: TIMESTAMP,
+        completedAt: null,
+      },
     }));
     const client = new SubmissionEventPollingClient({
       eventsUrl: EVENTS_URL,

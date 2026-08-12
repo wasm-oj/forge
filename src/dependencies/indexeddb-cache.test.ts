@@ -1,6 +1,6 @@
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FORGE_STORAGE } from "../core/contract.ts";
+import { WASM_OJ_STORAGE } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 import { IndexedDbDependencyCache } from "./indexeddb-cache.ts";
 
@@ -47,7 +47,7 @@ describe("IndexedDbDependencyCache", () => {
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(FORGE_STORAGE.dependencyCache, 1);
+    const request = indexedDB.open(WASM_OJ_STORAGE.dependencyCache, 1);
     request.addEventListener("success", () => resolve(request.result), { once: true });
     request.addEventListener("error", () => reject(request.error), { once: true });
   });

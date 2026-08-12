@@ -14,10 +14,10 @@ use wasmer::js::AsJs;
 use wasmer::{AsStoreMut, Instance};
 
 pub const METER_MODEL: &str = "weighted";
-const METERING_MODULE: &str = "wasm_oj_forge_metering";
+const METERING_MODULE: &str = "wasm_oj_metering";
 const GAS_COUNTER_NAME: &str = "gas_counter";
-pub(crate) const CONTESTANT_METERING_MODULE: &str = "wasm_oj_forge_contestant_metering";
-pub(crate) const INTERACTOR_METERING_MODULE: &str = "wasm_oj_forge_interactor_metering";
+pub(crate) const CONTESTANT_METERING_MODULE: &str = "wasm_oj_contestant_metering";
+pub(crate) const INTERACTOR_METERING_MODULE: &str = "wasm_oj_interactor_metering";
 pub(crate) const HOST_GAS_FUNCTION: &str = "charge";
 
 #[derive(Debug)]

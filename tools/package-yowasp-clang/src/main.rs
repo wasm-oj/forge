@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let compressed = fs::read(&compressed_path)?;
     let manifest = serde_json::json!({
-        "schema": "wasm-oj-forge-v1/clang-toolchain",
+        "schema": "wasm-oj-v2/clang-toolchain",
         "version": VERSION,
         "sourceSha256": source_sha256,
         "coreSha256": sha256(&core),

@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { ForgeError } from "../core/errors";
+import { WasmOjError } from "../core/errors";
 import type { JudgeProjectResult } from "../sdk/engine";
 import {
-  ForgeOperationScheduler,
-  type ForgeOperationEvent,
-  type ForgeOperationSchedulerHost,
-  type ForgeSubmissionRequest,
+  OperationScheduler,
+  type OperationEvent,
+  type OperationSchedulerHost,
+  type SubmissionRequest,
 } from "./operation";
 
-const request = (id: string, signal?: AbortSignal): ForgeSubmissionRequest => ({
+const request = (id: string, signal?: AbortSignal): SubmissionRequest => ({
   id,
   input: { language: "c", entry: "main.c", files: { "main.c": "int main(){}" } },
-  spec: { version: 1, cases: [] },
+  spec: { version: 2, cases: [] },
   ...(signal === undefined ? {} : { signal }),
 });
 
@@ -25,20 +25,20 @@ const result = (): JudgeProjectResult => ({
   },
 });
 
-describe("ForgeOperationScheduler", () => {
+describe("OperationScheduler", () => {
   it("runs submissions in FIFO order and correlates every observation", async () => {
     const first = deferred<JudgeProjectResult>();
     const second = deferred<JudgeProjectResult>();
     const started: string[] = [];
-    const observations: ForgeOperationEvent[] = [];
+    const observations: OperationEvent[] = [];
     const host = {
-      executeSubmission: vi.fn((submission: ForgeSubmissionRequest) => {
+      executeSubmission: vi.fn((submission: SubmissionRequest) => {
         started.push(submission.id!);
         return submission.id === "first" ? first.promise : second.promise;
       }),
       cancelActiveSubmission: vi.fn(),
-    } satisfies ForgeOperationSchedulerHost;
-    const scheduler = new ForgeOperationScheduler(host, (event) => observations.push(event));
+    } satisfies OperationSchedulerHost;
+    const scheduler = new OperationScheduler(host, (event) => observations.push(event));
 
     const firstOperation = scheduler.submit(request("first"));
     const secondOperation = scheduler.submit(request("second"));
@@ -66,8 +66,8 @@ describe("ForgeOperationScheduler", () => {
     const host = {
       executeSubmission: vi.fn(() => active.promise),
       cancelActiveSubmission: vi.fn(),
-    } satisfies ForgeOperationSchedulerHost;
-    const scheduler = new ForgeOperationScheduler(host);
+    } satisfies OperationSchedulerHost;
+    const scheduler = new OperationScheduler(host);
     const first = scheduler.submit(request("active"));
     const queued = scheduler.submit(request("queued"));
     await until(() => first.state() === "running");
@@ -90,8 +90,8 @@ describe("ForgeOperationScheduler", () => {
     const host = {
       executeSubmission: vi.fn(() => active.promise),
       cancelActiveSubmission: vi.fn(() => active.reject(new Error("host cancelled"))),
-    } satisfies ForgeOperationSchedulerHost;
-    const scheduler = new ForgeOperationScheduler(host);
+    } satisfies OperationSchedulerHost;
+    const scheduler = new OperationScheduler(host);
     const operation = scheduler.submit(request("abortable", abort.signal));
     await until(() => operation.state() === "running");
 
@@ -108,11 +108,11 @@ describe("ForgeOperationScheduler", () => {
     const host = {
       executeSubmission: vi.fn(async () => result()),
       cancelActiveSubmission: vi.fn(),
-    } satisfies ForgeOperationSchedulerHost;
-    const scheduler = new ForgeOperationScheduler(host);
+    } satisfies OperationSchedulerHost;
+    const scheduler = new OperationScheduler(host);
     scheduler.submit(request("same"));
 
-    expect(() => scheduler.submit(request("same"))).toThrow(ForgeError);
+    expect(() => scheduler.submit(request("same"))).toThrow(WasmOjError);
     expect(() => scheduler.submit(request("same"))).toThrow(expect.objectContaining({
       code: "operation-conflict",
     }));
@@ -126,8 +126,8 @@ describe("ForgeOperationScheduler", () => {
         return result();
       }),
       cancelActiveSubmission: vi.fn(),
-    } satisfies ForgeOperationSchedulerHost;
-    const scheduler = new ForgeOperationScheduler(host);
+    } satisfies OperationSchedulerHost;
+    const scheduler = new OperationScheduler(host);
     const operation = scheduler.submit(request("observed"));
     const throwing = vi.fn(() => { throw new Error("observer failure"); });
     operation.onEvent(throwing);
@@ -139,12 +139,12 @@ describe("ForgeOperationScheduler", () => {
 
   it("starts a scoped observer with the operation's current state snapshot", async () => {
     const pending = deferred<JudgeProjectResult>();
-    const scheduler = new ForgeOperationScheduler({
+    const scheduler = new OperationScheduler({
       executeSubmission: vi.fn(() => pending.promise),
       cancelActiveSubmission: vi.fn(),
     });
     const operation = scheduler.submit(request("snapshot"));
-    const events: ForgeOperationEvent[] = [];
+    const events: OperationEvent[] = [];
     operation.onEvent((event) => events.push(event));
 
     expect(events).toEqual([expect.objectContaining({
@@ -159,9 +159,9 @@ describe("ForgeOperationScheduler", () => {
   });
 
   it("scopes an existing infrastructure error to the submission identity", async () => {
-    const scheduler = new ForgeOperationScheduler({
+    const scheduler = new OperationScheduler({
       executeSubmission: vi.fn(async () => {
-        throw new ForgeError("Compiler failed.", {
+        throw new WasmOjError("Compiler failed.", {
           code: "compiler-failure",
           stage: "compile",
           retryable: true,
@@ -170,7 +170,7 @@ describe("ForgeOperationScheduler", () => {
       cancelActiveSubmission: vi.fn(),
     });
     const operation = scheduler.submit(request("failed-submission"));
-    const events: ForgeOperationEvent[] = [];
+    const events: OperationEvent[] = [];
     operation.onEvent((event) => events.push(event));
 
     await expect(operation.result).rejects.toMatchObject({

@@ -8,7 +8,6 @@ import { init, Runtime, Wasmer } from "@wasmer/sdk/node";
 import {
   PYTHON_COMPRESSED_PACKAGE_SHA256,
   PYTHON_PACKAGE,
-  PYTHON_PACKAGE_ASSET_PATH,
   PYTHON_PACKAGE_SHA256,
 } from "../core/toolchains.ts";
 
@@ -26,11 +25,11 @@ try {
   const input = parseInput(JSON.parse(await readStdin()));
   await init({ log: "warn" });
   runtime = new Runtime({ registry: null });
-  const packagePath = resolvePackagePath(input.toolchainDirectory);
+  const packagePath = input.toolchainAsset;
   const compressed = await readFile(packagePath);
-  verifyDigest(packagePath, compressed, PYTHON_COMPRESSED_PACKAGE_SHA256);
-  const expanded = new Uint8Array(gunzipSync(compressed));
-  verifyDigest(packagePath, expanded, PYTHON_PACKAGE_SHA256);
+  if (!input.verifiedToolchain) verifyDigest(packagePath, compressed, PYTHON_COMPRESSED_PACKAGE_SHA256);
+  const expanded = uint8View(gunzipSync(compressed));
+  if (!input.verifiedToolchain) verifyDigest(packagePath, expanded, PYTHON_PACKAGE_SHA256);
   pkg = await Wasmer.fromFile(expanded, runtime);
 
   const commandMap = pkg.commands;
@@ -122,7 +121,8 @@ try {
 }
 
 function parseInput(value) {
-  if (!isRecord(value) || typeof value.toolchainDirectory !== "string" || !isRecord(value.request)) {
+  if (!isRecord(value) || typeof value.toolchainAsset !== "string"
+    || !path.isAbsolute(value.toolchainAsset) || !isRecord(value.request)) {
     throw new Error("The runner stage received an invalid request envelope.");
   }
   const request = value.request;
@@ -131,7 +131,7 @@ function parseInput(value) {
     || request.command !== "python"
     || (request.operation !== "command-binary" && request.operation !== "runtime-files")
   ) {
-    throw new Error("The runner stage request does not name a pinned Forge runtime command.");
+    throw new Error("The runner stage request does not name a pinned WASM-OJ runtime command.");
   }
   if (
     request.operation === "runtime-files"
@@ -140,7 +140,8 @@ function parseInput(value) {
     throw new Error("The runner stage runtime-files arguments are invalid.");
   }
   return {
-    toolchainDirectory: path.resolve(value.toolchainDirectory),
+    toolchainAsset: value.toolchainAsset,
+    verifiedToolchain: value.verifiedToolchain === true,
     request: request.operation === "command-binary"
       ? {
           operation: request.operation,
@@ -156,20 +157,15 @@ function parseInput(value) {
   };
 }
 
-function resolvePackagePath(toolchainDirectory) {
-  const packagePath = path.resolve(toolchainDirectory, path.basename(PYTHON_PACKAGE_ASSET_PATH));
-  const relative = path.relative(toolchainDirectory, packagePath);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error(`Pinned package path escapes '${toolchainDirectory}'.`);
-  }
-  return packagePath;
-}
-
 function verifyDigest(filename, bytes, expected) {
   const actual = createHash("sha256").update(bytes).digest("hex");
   if (actual !== expected) {
     throw new Error(`Pinned package '${filename}' has digest ${actual}; expected ${expected}.`);
   }
+}
+
+function uint8View(bytes) {
+  return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
 function uniqueCommands(commandMap) {
@@ -181,8 +177,8 @@ function uniqueCommands(commandMap) {
 }
 
 function requiredResponsePath() {
-  const value = process.env.FORGE_RUNNER_STAGE_RESPONSE;
-  if (!value) throw new Error("FORGE_RUNNER_STAGE_RESPONSE is required.");
+  const value = process.env.WASM_OJ_RUNNER_STAGE_RESPONSE;
+  if (!value) throw new Error("WASM_OJ_RUNNER_STAGE_RESPONSE is required.");
   return value;
 }
 

@@ -1,7 +1,8 @@
 use crate::capabilities::attach_capability_denials;
 use crate::deterministic::{COMPILER_DETERMINISM, attach_deterministic_imports};
 use crate::filesystem::{
-    RuntimeProjectFilesystem, compiler_project_files, is_normalized_guest_path, read_files,
+    RuntimeProjectFilesystem, compiler_project_files, compiler_project_files_with_base,
+    is_normalized_guest_path, read_files,
 };
 use crate::module_imports::attach_imported_memory;
 use crate::module_policy::{DEFERRED_START_EXPORT, defer_start_section, validate_memory_limit};
@@ -114,13 +115,41 @@ impl CompilerToolchain {
         files: std::collections::BTreeMap<String, serde_bytes::ByteBuf>,
         stages: Vec<CompileRequest>,
     ) -> Result<CompilePipelineResult, RunError> {
+        self.validate_pipeline(&files, &stages)?;
+        let output_paths = pipeline_output_paths(&stages);
+        let filesystem = compiler_project_files(&files, &output_paths)?;
+        self.compile_pipeline_in_filesystem(stages, filesystem)
+    }
+
+    /// Compile a source snapshot over a session-owned immutable filesystem.
+    ///
+    /// The immutable base is referenced by the per-build copy-on-write overlay;
+    /// its bytes are not copied into each pipeline request or mutable project
+    /// filesystem.
+    pub async fn compile_pipeline_with_base(
+        &self,
+        files: std::collections::BTreeMap<String, serde_bytes::ByteBuf>,
+        stages: Vec<CompileRequest>,
+        immutable: Arc<dyn virtual_fs::FileSystem + Send + Sync>,
+    ) -> Result<CompilePipelineResult, RunError> {
+        self.validate_pipeline(&files, &stages)?;
+        let output_paths = pipeline_output_paths(&stages);
+        let filesystem = compiler_project_files_with_base(&files, &output_paths, immutable)?;
+        self.compile_pipeline_in_filesystem(stages, filesystem)
+    }
+
+    fn validate_pipeline(
+        &self,
+        files: &std::collections::BTreeMap<String, serde_bytes::ByteBuf>,
+        stages: &[CompileRequest],
+    ) -> Result<(), RunError> {
         if stages.is_empty() {
             return Err(RunError::InvalidRequest(
                 "a compiler pipeline requires at least one stage".to_string(),
             ));
         }
-        crate::run::validate_mounted_files(&files, "compiler")?;
-        for stage in &stages {
+        crate::run::validate_mounted_files(files, "compiler")?;
+        for stage in stages {
             validate_compile_request(stage, &self.package)?;
             if !stage.files.is_empty() {
                 return Err(RunError::InvalidRequest(
@@ -129,11 +158,14 @@ impl CompilerToolchain {
                 ));
             }
         }
-        let output_paths = stages
-            .iter()
-            .flat_map(|stage| stage.output_paths.iter().cloned())
-            .collect::<Vec<_>>();
-        let filesystem = compiler_project_files(&files, &output_paths)?;
+        Ok(())
+    }
+
+    fn compile_pipeline_in_filesystem(
+        &self,
+        stages: Vec<CompileRequest>,
+        filesystem: RuntimeProjectFilesystem,
+    ) -> Result<CompilePipelineResult, RunError> {
         let mut results = Vec::with_capacity(stages.len());
         for stage in stages {
             let result = self.compile_direct(stage, &filesystem)?;
@@ -447,6 +479,13 @@ impl CompilerToolchain {
             termination,
         })
     }
+}
+
+fn pipeline_output_paths(stages: &[CompileRequest]) -> Vec<String> {
+    stages
+        .iter()
+        .flat_map(|stage| stage.output_paths.iter().cloned())
+        .collect()
 }
 
 fn compiler_runtime(

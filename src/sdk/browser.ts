@@ -1,10 +1,10 @@
-export * from "./core";
-export { Forge } from "./forge";
-export type { ForgeOptions } from "./forge";
-export { BrowserForgeCompiler } from "../runtime/compiler-client";
-export type { BrowserForgeCompilerOptions } from "../runtime/compiler-client";
-export { BrowserForgeRunner } from "../runtime/runner-client";
-export type { BrowserForgeRunnerOptions } from "../runtime/runner-client";
+export * from "@wasm-oj/core";
+export { createBrowserEngine } from "./browser-engine";
+export type { BrowserEngineOptions } from "./browser-engine";
+export { BrowserCompiler } from "../runtime/compiler-client";
+export type { BrowserCompilerOptions } from "../runtime/compiler-client";
+export { BrowserRunner } from "../runtime/runner-client";
+export type { BrowserRunnerOptions } from "../runtime/runner-client";
 export {
   BROWSER_RUNTIME_PLUGIN_LIMITS,
   validateBrowserRuntimeDriverPlugins,
@@ -16,13 +16,13 @@ export { IndexedDbDependencyCache } from "../dependencies/indexeddb-cache";
 export {
   cacheStorageParticipant,
   createDefaultBrowserStorageCoordinator,
-  ForgeStorageCoordinator,
+  StorageCoordinator,
 } from "../storage/coordinator";
-export type { ForgeStorageCoordinatorOptions } from "../storage/coordinator";
+export type { StorageCoordinatorOptions } from "../storage/coordinator";
 export type {
-  ForgeStorageEntry,
-  ForgeStorageMaintenanceResult,
-  ForgeStorageParticipant,
-  ForgeStorageParticipantReport,
-  ForgeStorageReport,
+  StorageEntry,
+  StorageMaintenanceResult,
+  StorageParticipant,
+  StorageParticipantReport,
+  StorageReport,
 } from "../storage/types";

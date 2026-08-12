@@ -1,0 +1,32 @@
+{
+  "name": "@wasm-oj/toolchain-python",
+  "version": "0.1.0",
+  "description": "Digest-pinned CPython assets for the WASM-OJ SDK.",
+  "license": "SEE LICENSE IN THIRD_PARTY_NOTICES.md",
+  "author": "JacobLinCool",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wasm-oj/forge.git",
+    "directory": "packages/toolchain-python"
+  },
+  "homepage": "https://github.com/wasm-oj/forge#readme",
+  "bugs": { "url": "https://github.com/wasm-oj/forge/issues" },
+  "keywords": ["wasi", "wasm", "python", "compiler"],
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./assets/python-3.14.6-wasip1.manifest.json": "./assets/python-3.14.6-wasip1.manifest.json",
+    "./assets/python-3.14.6-wasip1.webc.gz.bin": "./assets/python-3.14.6-wasip1.webc.gz.bin",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "assets", "licenses", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+  "engines": { "node": ">=24.18.0 <25" },
+  "scripts": {
+    "build": "node ../../scripts/build-library.mjs --package @wasm-oj/toolchain-python",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": { "@wasm-oj/contracts": "workspace:0.2.0" }
+}

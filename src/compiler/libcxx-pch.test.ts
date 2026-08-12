@@ -9,7 +9,7 @@ import {
 } from "../core/toolchains.ts";
 import {
   decodeLibcxxPchManifest,
-  FORGE_LIBCXX_PCH_HEADER,
+  WASM_OJ_LIBCXX_PCH_HEADER,
   isToolchainLibcxxPchHeader,
 } from "./libcxx-pch.ts";
 
@@ -17,8 +17,8 @@ describe("toolchain-admitted libc++ PCH", () => {
   it("binds both deterministic PCH profiles to the pinned Clang package and canonical header", async () => {
     const manifestBytes = new Uint8Array(await readFile(asset(CLANG_LIBCXX_PCH_MANIFEST_ASSET_PATH)));
     const manifest = await decodeLibcxxPchManifest(manifestBytes);
-    expect(isToolchainLibcxxPchHeader(FORGE_LIBCXX_PCH_HEADER)).toBe(true);
-    expect(isToolchainLibcxxPchHeader(`${FORGE_LIBCXX_PCH_HEADER}\n`)).toBe(false);
+    expect(isToolchainLibcxxPchHeader(WASM_OJ_LIBCXX_PCH_HEADER)).toBe(true);
+    expect(isToolchainLibcxxPchHeader(`${WASM_OJ_LIBCXX_PCH_HEADER}\n`)).toBe(false);
 
     for (const profile of ["cpp-debug", "cpp-release"] as const) {
       const declared = CLANG_LIBCXX_PCH[profile];

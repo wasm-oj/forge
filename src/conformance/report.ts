@@ -1,10 +1,10 @@
 import type { ConformanceReport, ConformanceSample } from "./matrix.ts";
-import { FORGE_CONTRACT_ID } from "../core/contract.ts";
+import { WASM_OJ_CONTRACT_ID } from "../core/contract.ts";
 
-export const CONFORMANCE_SUMMARY_START = "<!-- forge-conformance-summary:start -->";
-export const CONFORMANCE_SUMMARY_END = "<!-- forge-conformance-summary:end -->";
-export const CONFORMANCE_MATRIX_START = "<!-- forge-conformance-matrix:start -->";
-export const CONFORMANCE_MATRIX_END = "<!-- forge-conformance-matrix:end -->";
+export const CONFORMANCE_SUMMARY_START = "<!-- wasm-oj-conformance-summary:start -->";
+export const CONFORMANCE_SUMMARY_END = "<!-- wasm-oj-conformance-summary:end -->";
+export const CONFORMANCE_MATRIX_START = "<!-- wasm-oj-conformance-matrix:start -->";
+export const CONFORMANCE_MATRIX_END = "<!-- wasm-oj-conformance-matrix:end -->";
 
 const SERVER_HOST = "server-native";
 const BROWSER_HOST = "browser-wasmer-js";
@@ -21,7 +21,7 @@ export function renderConformanceReportEvidence(
   const summary = [
     `This report records real local server and browser runs on ${date}`,
     `(${REPORT_TIME_ZONE}). The canonical matrix is generated from independent append-only`,
-    `evidence records under \`${FORGE_CONTRACT_ID}\`; it is not a synthetic estimate.`,
+    `evidence records under \`${WASM_OJ_CONTRACT_ID}\`; it is not a synthetic estimate.`,
   ].join("\n");
   return replaceMarkedBlock(
     replaceMarkedBlock(

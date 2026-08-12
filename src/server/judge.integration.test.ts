@@ -3,34 +3,36 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import type { BuildArtifact } from "../core/types";
+import type { TrustedJudgeProgram } from "../online-judge/trusted-judge-wasm";
 import { wasmCheckerMatcher } from "../judge/spec";
-import { createForgeEngine, type ForgeEngine } from "../sdk/engine";
+import { createEngine, type Engine } from "../sdk/engine";
 import type { CompileInput } from "../sdk/project";
-import { ServerForgeCompiler } from "./server-compiler";
-import { ServerForgeRunner } from "./server-runner";
+import { ServerCompiler } from "./server-compiler";
+import { ServerRunner } from "./server-runner";
+import { testToolchains } from "./test-toolchains.test-helper";
 
-const enabled = process.env.FORGE_RUN_JUDGE_INTEGRATION === "1";
+const enabled = process.env.WASM_OJ_RUN_JUDGE_INTEGRATION === "1";
 
 describe.skipIf(!enabled)("real server judge contracts", () => {
-  let engine: ForgeEngine;
+  let engine: Engine;
   let cacheDirectory: string;
 
   beforeAll(async () => {
     execFileSync("cargo", [
       "build", "--locked", "--manifest-path", "crates/runtime-core/Cargo.toml", "--release",
-      "--bin", "forge-runner", "--bin", "forge-compiler",
+      "--bin", "wasm-oj-runner", "--bin", "wasm-oj-compiler",
     ], { stdio: "pipe" });
-    cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-judge-integration-"));
-    engine = await createForgeEngine({
-      compiler: new ServerForgeCompiler({
-        compilerExecutable: path.resolve("crates/runtime-core/target/release/forge-compiler"),
-        toolchainDirectory: path.resolve("public/toolchains"),
+    cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-judge-integration-"));
+    engine = await createEngine({
+      compiler: new ServerCompiler({
+        compilerExecutable: path.resolve("crates/runtime-core/target/release/wasm-oj-compiler"),
+        toolchains: testToolchains(),
       }),
-      runner: new ServerForgeRunner({
-        runtimeExecutable: path.resolve("crates/runtime-core/target/release/forge-runner"),
-        toolchainDirectory: path.resolve("public/toolchains"),
+      runner: new ServerRunner({
+        runtimeExecutable: path.resolve("crates/runtime-core/target/release/wasm-oj-runner"),
+        toolchains: testToolchains(),
         cacheDirectory,
       }),
     });
@@ -41,7 +43,7 @@ describe.skipIf(!enabled)("real server judge contracts", () => {
     if (cacheDirectory) await rm(cacheDirectory, { recursive: true, force: true });
   });
 
-  it("runs a compiled Wasm checker inside ForgeRunner", { timeout: 300_000 }, async () => {
+  it("runs a compiled Wasm checker inside Runner", { timeout: 300_000 }, async () => {
     const candidate = await compileC("candidate", [
         "#include <stdio.h>",
         "int main(void) {",
@@ -66,12 +68,12 @@ describe.skipIf(!enabled)("real server judge contracts", () => {
       ].join("\n"));
 
     const result = await engine.judge(candidate, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "batch",
         id: "compiled-checker",
         input: { kind: "inline", value: "40 2\n" },
-        matcher: wasmCheckerMatcher(checker, "42\n"),
+        matcher: wasmCheckerMatcher(asTrustedJudge(checker), "42\n"),
       }],
     });
 
@@ -105,14 +107,14 @@ describe.skipIf(!enabled)("real server judge contracts", () => {
       ].join("\n"));
 
     const result = await engine.judge(contestant, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "interactive",
         id: "compiled-dialogue",
         input: { kind: "inline", value: "42\n" },
         files: { "/judge/secret.txt": { kind: "inline", value: "never-mounted-for-contestant\n" } },
         interactor: {
-          artifact: interactor,
+          program: asTrustedJudge(interactor),
           inputPath: "/judge/input.txt",
           args: ["/judge/input.txt"],
         },
@@ -145,5 +147,10 @@ describe.skipIf(!enabled)("real server judge contracts", () => {
       throw new Error(`Failed to compile ${name}: ${result.stderr}`);
     }
     return result.artifact;
+  }
+
+  function asTrustedJudge(artifact: BuildArtifact): TrustedJudgeProgram {
+    if (artifact.kind !== "wasm") throw new Error("Trusted judge compilation must produce a Wasm artifact.");
+    return { runtimeProfile: "c-wasip1-release", wasm: artifact.bytes };
   }
 });

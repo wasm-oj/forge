@@ -14,7 +14,7 @@
     "uncompressedBytes": 103666690
   },
   "resourcesSha256": "79eef0c336fe55cf03ff8f5b42b784c8168f929a3603138b2c6301f4601e4c86",
-  "schema": "wasm-oj-forge-v1/clang-toolchain",
+  "schema": "wasm-oj-v2/clang-toolchain",
   "sourceSha256": "6230ea1afa9691fa065935cf68c01642ff9b31c183fe8ac64cdfda025df06009",
   "version": "22.0.0-git20542-10"
 }

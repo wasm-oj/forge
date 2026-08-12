@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   costProfileId,
-  createForgeEngine,
-  FORGE_CONTRACT_VERSION,
-  ForgeCompilerRegistry,
+  createEngine,
+  WASM_OJ_CONTRACT_VERSION,
+  CompilerRegistry,
   type BuildResult,
-  type ForgeCompiler,
-  type ForgeRunner,
+  type Compiler,
+  type Runner,
   type Project,
   type RunResult,
 } from "./core";
@@ -17,7 +17,7 @@ function zigCompiler() {
   const bytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
   return {
     cacheIdentity: vi.fn((project: Project) => [
-      "forge-test-zig-compiler-1",
+      "wasm-oj-test-zig-compiler-1",
       ZIG_TOOLCHAIN_CONTENT,
       project.config.target,
       project.config.optimization,
@@ -28,7 +28,7 @@ function zigCompiler() {
       diagnostics: [],
       artifact: {
         kind: "wasm",
-        forgeContract: FORGE_CONTRACT_VERSION,
+        wasmOjContract: WASM_OJ_CONTRACT_VERSION,
         id: `zig:${cacheKey}`,
         projectId: project.id,
         cacheKey,
@@ -57,7 +57,7 @@ function zigCompiler() {
     cancel: vi.fn(),
     restart: vi.fn(),
     dispose: vi.fn(),
-  } satisfies ForgeCompiler;
+  } satisfies Compiler;
 }
 
 function unusedRunner() {
@@ -74,18 +74,18 @@ function unusedRunner() {
     cancelAndWait: vi.fn(() => Promise.resolve()),
     restart: vi.fn(),
     dispose: vi.fn(),
-  } satisfies ForgeRunner;
+  } satisfies Runner;
 }
 
 describe("downstream language library contract", () => {
-  it("compiles a seventh language through the public ForgeEngine contract", async () => {
+  it("compiles a seventh language through the public Engine contract", async () => {
     const compiler = zigCompiler();
     const runner = unusedRunner();
-    const registry = new ForgeCompilerRegistry([{
+    const registry = new CompilerRegistry([{
       languages: ["zig"],
       compiler,
     }]);
-    const engine = await createForgeEngine({ compiler: registry, runner });
+    const engine = await createEngine({ compiler: registry, runner });
 
     try {
       const result = await engine.compile({
@@ -98,7 +98,7 @@ describe("downstream language library contract", () => {
 
       expect(result.success).toBe(true);
       expect(result.artifact).toMatchObject({
-        forgeContract: FORGE_CONTRACT_VERSION,
+        wasmOjContract: WASM_OJ_CONTRACT_VERSION,
         language: "zig",
         target: "wasip1",
         optimization: "release",

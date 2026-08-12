@@ -5,7 +5,7 @@ import {
   loadProblemCollection,
 } from "./problem-catalog-loader";
 
-const runIntegration = process.env.FORGE_RUN_PROBLEM_COLLECTION_INTEGRATION === "1";
+const runIntegration = process.env.WASM_OJ_RUN_PROBLEM_COLLECTION_INTEGRATION === "1";
 
 describe.runIf(runIntegration)("published wasm-oj/problems collection", () => {
   it("loads the public index and verifies every published problem bundle", async () => {

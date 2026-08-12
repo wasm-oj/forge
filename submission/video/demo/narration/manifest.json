@@ -1,0 +1,1754 @@
+{
+  "intro": {
+    "text": "Online judging has a resource problem. Every compilation and test consumes centralized server capacity. Moving that work into the browser solves scaling, but creates another problem. Wall-clock timing changes across devices. WASM OJ Forge asks: how can we distribute execution without changing what the result means? Our answer measures reproducible computational work instead of machine speed.",
+    "path": "/Users/jacoblincool/Documents/GitHub/wasi-compiler-in-browser/submission/video/demo/narration/intro.wav",
+    "duration_s": 28.846667,
+    "passed": true,
+    "wer": 0.0,
+    "transcript": "Online judging has a resource problem. Every compilation and test consumes centralized server capacity. Moving that work into the browser solves scaling, but creates another problem. Wall clock timing changes across devices. Wasm OJ Forge asks: How can we distribute execution without changing what the result means? Our answer measures reproducible computational work instead of machine speed.",
+    "words": [
+      {
+        "text": "Online",
+        "start": 0.32,
+        "end": 0.8
+      },
+      {
+        "text": "judging",
+        "start": 0.8,
+        "end": 1.28
+      },
+      {
+        "text": "has",
+        "start": 1.28,
+        "end": 1.52
+      },
+      {
+        "text": "a",
+        "start": 1.52,
+        "end": 1.6
+      },
+      {
+        "text": "resource",
+        "start": 1.6,
+        "end": 2.08
+      },
+      {
+        "text": "problem",
+        "start": 2.08,
+        "end": 2.56
+      },
+      {
+        "text": "Every",
+        "start": 3.268,
+        "end": 3.508
+      },
+      {
+        "text": "compilation",
+        "start": 3.508,
+        "end": 4.228
+      },
+      {
+        "text": "and",
+        "start": 4.228,
+        "end": 4.388
+      },
+      {
+        "text": "test",
+        "start": 4.388,
+        "end": 4.868
+      },
+      {
+        "text": "consumes",
+        "start": 4.868,
+        "end": 5.428
+      },
+      {
+        "text": "centralized",
+        "start": 5.428,
+        "end": 6.228
+      },
+      {
+        "text": "server",
+        "start": 6.228,
+        "end": 6.628
+      },
+      {
+        "text": "capacity",
+        "start": 6.628,
+        "end": 7.428
+      },
+      {
+        "text": "Moving",
+        "start": 8.301333,
+        "end": 8.621333
+      },
+      {
+        "text": "that",
+        "start": 8.621333,
+        "end": 8.781333
+      },
+      {
+        "text": "work",
+        "start": 8.781333,
+        "end": 9.181333
+      },
+      {
+        "text": "into",
+        "start": 9.341333,
+        "end": 9.661333
+      },
+      {
+        "text": "the",
+        "start": 9.661333,
+        "end": 9.741333
+      },
+      {
+        "text": "browser",
+        "start": 9.741333,
+        "end": 10.301333
+      },
+      {
+        "text": "solves",
+        "start": 10.301333,
+        "end": 10.701333
+      },
+      {
+        "text": "scaling",
+        "start": 10.701333,
+        "end": 11.341333
+      },
+      {
+        "text": "but",
+        "start": 11.581333,
+        "end": 11.821333
+      },
+      {
+        "text": "creates",
+        "start": 11.821333,
+        "end": 12.221333
+      },
+      {
+        "text": "another",
+        "start": 12.221333,
+        "end": 12.541333
+      },
+      {
+        "text": "problem",
+        "start": 12.541333,
+        "end": 13.101333
+      },
+      {
+        "text": "Wallclock",
+        "start": 13.788,
+        "end": 14.268
+      },
+      {
+        "text": "timing",
+        "start": 14.268,
+        "end": 14.748
+      },
+      {
+        "text": "changes",
+        "start": 14.748,
+        "end": 15.148
+      },
+      {
+        "text": "across",
+        "start": 15.148,
+        "end": 15.468
+      },
+      {
+        "text": "devices",
+        "start": 15.468,
+        "end": 16.268
+      },
+      {
+        "text": "WASM",
+        "start": 17.114667,
+        "end": 17.434667
+      },
+      {
+        "text": "OJ",
+        "start": 17.434667,
+        "end": 17.834667
+      },
+      {
+        "text": "Forge",
+        "start": 17.834667,
+        "end": 18.394667
+      },
+      {
+        "text": "asks",
+        "start": 18.394667,
+        "end": 18.954667
+      },
+      {
+        "text": "how",
+        "start": 19.194667,
+        "end": 19.274667
+      },
+      {
+        "text": "can",
+        "start": 19.274667,
+        "end": 19.514667
+      },
+      {
+        "text": "we",
+        "start": 19.514667,
+        "end": 19.594667
+      },
+      {
+        "text": "distribute",
+        "start": 19.594667,
+        "end": 20.154667
+      },
+      {
+        "text": "execution",
+        "start": 20.154667,
+        "end": 20.954667
+      },
+      {
+        "text": "without",
+        "start": 20.954667,
+        "end": 21.354667
+      },
+      {
+        "text": "changing",
+        "start": 21.354667,
+        "end": 21.754667
+      },
+      {
+        "text": "what",
+        "start": 21.754667,
+        "end": 21.994667
+      },
+      {
+        "text": "the",
+        "start": 21.994667,
+        "end": 22.074667
+      },
+      {
+        "text": "result",
+        "start": 22.074667,
+        "end": 22.474667
+      },
+      {
+        "text": "means",
+        "start": 22.474667,
+        "end": 23.034667
+      },
+      {
+        "text": "Our",
+        "start": 23.934667,
+        "end": 24.174667
+      },
+      {
+        "text": "answer",
+        "start": 24.174667,
+        "end": 24.494667
+      },
+      {
+        "text": "measures",
+        "start": 24.494667,
+        "end": 25.054667
+      },
+      {
+        "text": "reproducible",
+        "start": 25.054667,
+        "end": 25.934667
+      },
+      {
+        "text": "computational",
+        "start": 25.934667,
+        "end": 26.734667
+      },
+      {
+        "text": "work",
+        "start": 26.734667,
+        "end": 27.054667
+      },
+      {
+        "text": "instead",
+        "start": 27.134667,
+        "end": 27.534667
+      },
+      {
+        "text": "of",
+        "start": 27.534667,
+        "end": 27.694667
+      },
+      {
+        "text": "machine",
+        "start": 27.694667,
+        "end": 28.094667
+      },
+      {
+        "text": "speed",
+        "start": 28.094667,
+        "end": 28.574667
+      }
+    ],
+    "parts": 6,
+    "sentence_pause_ms": 180
+  },
+  "architecture": {
+    "text": "The design follows one clear boundary. The browser downloads and verifies problem bundles and pinned toolchains. Your source code, inputs, outputs, build artifacts, and verdicts stay on your device. Real language toolchains produce portable WebAssembly programs inside isolated workers. Wasmer then runs them under deterministic limits for instruction cost, logical time, memory, output, and the virtual file system.",
+    "path": "/Users/jacoblincool/Documents/GitHub/wasi-compiler-in-browser/submission/video/demo/narration/architecture.wav",
+    "duration_s": 30.074667,
+    "passed": true,
+    "wer": 0.017,
+    "transcript": "The design follows one clear boundary. The browser downloads and verifies problem bundles and pinned toolchains. Your source code, inputs, outputs, build artifacts, and verdicts stay on your device. Real language toolchains produce portable WebAssembly programs inside isolated workers. Wasmir then runs them under deterministic limits for instruction cost, logical time, memory, output, and the virtual file system.",
+    "words": [
+      {
+        "text": "The",
+        "start": 0.4,
+        "end": 0.48
+      },
+      {
+        "text": "design",
+        "start": 0.48,
+        "end": 1.04
+      },
+      {
+        "text": "follows",
+        "start": 1.04,
+        "end": 1.44
+      },
+      {
+        "text": "one",
+        "start": 1.44,
+        "end": 1.84
+      },
+      {
+        "text": "clear",
+        "start": 1.84,
+        "end": 2.08
+      },
+      {
+        "text": "boundary",
+        "start": 2.08,
+        "end": 2.72
+      },
+      {
+        "text": "The",
+        "start": 3.268,
+        "end": 3.348
+      },
+      {
+        "text": "browser",
+        "start": 3.348,
+        "end": 3.908
+      },
+      {
+        "text": "downloads",
+        "start": 3.908,
+        "end": 4.628
+      },
+      {
+        "text": "and",
+        "start": 4.628,
+        "end": 4.788
+      },
+      {
+        "text": "verifies",
+        "start": 4.788,
+        "end": 5.428
+      },
+      {
+        "text": "problem",
+        "start": 5.428,
+        "end": 5.908
+      },
+      {
+        "text": "bundles",
+        "start": 5.908,
+        "end": 6.468
+      },
+      {
+        "text": "and",
+        "start": 6.708,
+        "end": 6.868
+      },
+      {
+        "text": "pinned",
+        "start": 6.868,
+        "end": 7.268
+      },
+      {
+        "text": "toolchains",
+        "start": 7.268,
+        "end": 8.068
+      },
+      {
+        "text": "Your",
+        "start": 8.498667,
+        "end": 8.658667
+      },
+      {
+        "text": "source",
+        "start": 8.658667,
+        "end": 9.058667
+      },
+      {
+        "text": "code",
+        "start": 9.058667,
+        "end": 9.458667
+      },
+      {
+        "text": "inputs",
+        "start": 9.538667,
+        "end": 10.098667
+      },
+      {
+        "text": "outputs",
+        "start": 10.098667,
+        "end": 10.818667
+      },
+      {
+        "text": "build",
+        "start": 10.898667,
+        "end": 11.138667
+      },
+      {
+        "text": "artifacts",
+        "start": 11.218667,
+        "end": 11.938667
+      },
+      {
+        "text": "and",
+        "start": 12.018667,
+        "end": 12.258667
+      },
+      {
+        "text": "verdicts",
+        "start": 12.258667,
+        "end": 12.738667
+      },
+      {
+        "text": "stay",
+        "start": 12.738667,
+        "end": 13.058667
+      },
+      {
+        "text": "on",
+        "start": 13.058667,
+        "end": 13.298667
+      },
+      {
+        "text": "your",
+        "start": 13.298667,
+        "end": 13.378667
+      },
+      {
+        "text": "device",
+        "start": 13.378667,
+        "end": 14.098667
+      },
+      {
+        "text": "Real",
+        "start": 14.806667,
+        "end": 15.046667
+      },
+      {
+        "text": "language",
+        "start": 15.046667,
+        "end": 15.686667
+      },
+      {
+        "text": "toolchains",
+        "start": 15.686667,
+        "end": 16.326667
+      },
+      {
+        "text": "produce",
+        "start": 16.326667,
+        "end": 16.886667
+      },
+      {
+        "text": "portable",
+        "start": 16.886667,
+        "end": 17.446667
+      },
+      {
+        "text": "WebAssembly",
+        "start": 17.446667,
+        "end": 18.166667
+      },
+      {
+        "text": "programs",
+        "start": 18.166667,
+        "end": 18.726667
+      },
+      {
+        "text": "inside",
+        "start": 18.726667,
+        "end": 19.286667
+      },
+      {
+        "text": "isolated",
+        "start": 19.366667,
+        "end": 20.006667
+      },
+      {
+        "text": "workers",
+        "start": 20.086667,
+        "end": 20.806667
+      },
+      {
+        "text": "Wasmer",
+        "start": 21.386667,
+        "end": 21.946667
+      },
+      {
+        "text": "then",
+        "start": 21.946667,
+        "end": 22.266667
+      },
+      {
+        "text": "runs",
+        "start": 22.266667,
+        "end": 22.586667
+      },
+      {
+        "text": "them",
+        "start": 22.586667,
+        "end": 22.826667
+      },
+      {
+        "text": "under",
+        "start": 22.826667,
+        "end": 23.066667
+      },
+      {
+        "text": "deterministic",
+        "start": 23.066667,
+        "end": 23.946667
+      },
+      {
+        "text": "limits",
+        "start": 23.946667,
+        "end": 24.346667
+      },
+      {
+        "text": "for",
+        "start": 24.346667,
+        "end": 24.426667
+      },
+      {
+        "text": "instruction",
+        "start": 24.506667,
+        "end": 25.066667
+      },
+      {
+        "text": "cost",
+        "start": 25.066667,
+        "end": 25.466667
+      },
+      {
+        "text": "logical",
+        "start": 25.786667,
+        "end": 26.266667
+      },
+      {
+        "text": "time",
+        "start": 26.266667,
+        "end": 26.746667
+      },
+      {
+        "text": "memory",
+        "start": 26.826667,
+        "end": 27.386667
+      },
+      {
+        "text": "output",
+        "start": 27.466667,
+        "end": 27.946667
+      },
+      {
+        "text": "and",
+        "start": 28.346667,
+        "end": 28.666667
+      },
+      {
+        "text": "the",
+        "start": 28.666667,
+        "end": 28.826667
+      },
+      {
+        "text": "virtual",
+        "start": 28.826667,
+        "end": 29.226667
+      },
+      {
+        "text": "file",
+        "start": 29.226667,
+        "end": 29.626667
+      },
+      {
+        "text": "system",
+        "start": 29.626667,
+        "end": 30.106667
+      }
+    ],
+    "parts": 5,
+    "sentence_pause_ms": 180
+  },
+  "compile": {
+    "text": "The interface keeps the familiar online judge workflow. Learners can browse forty-five bilingual systems problems and choose from seven languages. Progressive scoring rules explain how each solution earns points. Monaco supports multi-file editing. Here, this C solution compiles entirely inside the browser. No source file, and no compilation job, is uploaded.",
+    "path": "/Users/jacoblincool/Documents/GitHub/wasi-compiler-in-browser/submission/video/demo/narration/compile.wav",
+    "duration_s": 26.286667,
+    "passed": true,
+    "wer": 0.02,
+    "transcript": "The interface keeps the familiar online judge workflow. Learners can browse forty-five bilingual systems problems and choose from seven languages. Progressive scoring rules explain how each solution earns points. Monaco supports multi-file editing. Here, the C solution compiles entirely inside the browser. No source file and no compilation job is uploaded.",
+    "words": [
+      {
+        "text": "The",
+        "start": 0.56,
+        "end": 0.64
+      },
+      {
+        "text": "interface",
+        "start": 0.64,
+        "end": 1.28
+      },
+      {
+        "text": "keeps",
+        "start": 1.28,
+        "end": 1.52
+      },
+      {
+        "text": "the",
+        "start": 1.52,
+        "end": 1.68
+      },
+      {
+        "text": "familiar",
+        "start": 1.68,
+        "end": 2.24
+      },
+      {
+        "text": "online",
+        "start": 2.24,
+        "end": 2.72
+      },
+      {
+        "text": "judge",
+        "start": 2.72,
+        "end": 3.12
+      },
+      {
+        "text": "workflow",
+        "start": 3.12,
+        "end": 3.76
+      },
+      {
+        "text": "Learners",
+        "start": 4.585333,
+        "end": 5.065333
+      },
+      {
+        "text": "can",
+        "start": 5.065333,
+        "end": 5.225333
+      },
+      {
+        "text": "browse",
+        "start": 5.225333,
+        "end": 5.705333
+      },
+      {
+        "text": "fortyfive",
+        "start": 5.705333,
+        "end": 6.505333
+      },
+      {
+        "text": "bilingual",
+        "start": 6.585333,
+        "end": 7.065333
+      },
+      {
+        "text": "systems",
+        "start": 7.065333,
+        "end": 7.545333
+      },
+      {
+        "text": "problems",
+        "start": 7.545333,
+        "end": 8.185333
+      },
+      {
+        "text": "and",
+        "start": 8.505333,
+        "end": 8.665333
+      },
+      {
+        "text": "choose",
+        "start": 8.665333,
+        "end": 9.065333
+      },
+      {
+        "text": "from",
+        "start": 9.065333,
+        "end": 9.305333
+      },
+      {
+        "text": "seven",
+        "start": 9.305333,
+        "end": 9.625333
+      },
+      {
+        "text": "languages",
+        "start": 9.625333,
+        "end": 10.345333
+      },
+      {
+        "text": "Progressive",
+        "start": 11.090667,
+        "end": 11.570667
+      },
+      {
+        "text": "scoring",
+        "start": 11.570667,
+        "end": 12.050667
+      },
+      {
+        "text": "rules",
+        "start": 12.050667,
+        "end": 12.450667
+      },
+      {
+        "text": "explain",
+        "start": 12.770667,
+        "end": 13.410667
+      },
+      {
+        "text": "how",
+        "start": 13.410667,
+        "end": 13.490667
+      },
+      {
+        "text": "each",
+        "start": 13.570667,
+        "end": 13.810667
+      },
+      {
+        "text": "solution",
+        "start": 13.810667,
+        "end": 14.370667
+      },
+      {
+        "text": "earns",
+        "start": 14.450667,
+        "end": 14.770667
+      },
+      {
+        "text": "points",
+        "start": 14.770667,
+        "end": 15.330667
+      },
+      {
+        "text": "Monaco",
+        "start": 15.884,
+        "end": 16.364
+      },
+      {
+        "text": "supports",
+        "start": 16.364,
+        "end": 16.924
+      },
+      {
+        "text": "multifile",
+        "start": 16.924,
+        "end": 17.644
+      },
+      {
+        "text": "editing",
+        "start": 17.644,
+        "end": 18.204
+      },
+      {
+        "text": "Here",
+        "start": 18.784,
+        "end": 19.184
+      },
+      {
+        "text": "this",
+        "start": 19.184,
+        "end": 19.344
+      },
+      {
+        "text": "C",
+        "start": 19.344,
+        "end": 19.584
+      },
+      {
+        "text": "solution",
+        "start": 19.584,
+        "end": 20.144
+      },
+      {
+        "text": "compiles",
+        "start": 20.144,
+        "end": 20.704
+      },
+      {
+        "text": "entirely",
+        "start": 20.704,
+        "end": 21.424
+      },
+      {
+        "text": "inside",
+        "start": 21.424,
+        "end": 21.904
+      },
+      {
+        "text": "the",
+        "start": 21.904,
+        "end": 21.984
+      },
+      {
+        "text": "browser",
+        "start": 21.984,
+        "end": 22.544
+      },
+      {
+        "text": "No",
+        "start": 23.145333,
+        "end": 23.305333
+      },
+      {
+        "text": "source",
+        "start": 23.305333,
+        "end": 23.705333
+      },
+      {
+        "text": "file",
+        "start": 23.705333,
+        "end": 24.025333
+      },
+      {
+        "text": "and",
+        "start": 24.025333,
+        "end": 24.185333
+      },
+      {
+        "text": "no",
+        "start": 24.185333,
+        "end": 24.345333
+      },
+      {
+        "text": "compilation",
+        "start": 24.345333,
+        "end": 25.065333
+      },
+      {
+        "text": "job",
+        "start": 25.065333,
+        "end": 25.385333
+      },
+      {
+        "text": "is",
+        "start": 25.465333,
+        "end": 25.625333
+      },
+      {
+        "text": "uploaded",
+        "start": 25.625333,
+        "end": 26.185333
+      }
+    ],
+    "parts": 6,
+    "sentence_pause_ms": 180
+  },
+  "self_test": {
+    "text": "Before submitting, the learner can run any custom input against the latest artifact. The result shows standard output, exit status, peak memory, and logical time. It also reports a normalized instruction cost. That budget is deterministic. A slow laptop and a fast desktop can apply the same policy.",
+    "path": "/Users/jacoblincool/Documents/GitHub/wasi-compiler-in-browser/submission/video/demo/narration/self_test.wav",
+    "duration_s": 21.456,
+    "passed": true,
+    "wer": 0.042,
+    "transcript": "Before submitting, the learner can run any custom input against the latest artifact. The results show standard output, exit status, peak memory, and logical time. It also reports a normalized instruction cost. That budget is deterministic. A slow laptop and a fast desktop can apply the same policy.",
+    "words": [
+      {
+        "text": "Before",
+        "start": 0.72,
+        "end": 1.12
+      },
+      {
+        "text": "submitting",
+        "start": 1.12,
+        "end": 1.76
+      },
+      {
+        "text": "the",
+        "start": 1.84,
+        "end": 2.0
+      },
+      {
+        "text": "learner",
+        "start": 2.0,
+        "end": 2.4
+      },
+      {
+        "text": "can",
+        "start": 2.4,
+        "end": 2.56
+      },
+      {
+        "text": "run",
+        "start": 2.56,
+        "end": 2.8
+      },
+      {
+        "text": "any",
+        "start": 2.88,
+        "end": 3.12
+      },
+      {
+        "text": "custom",
+        "start": 3.12,
+        "end": 3.52
+      },
+      {
+        "text": "input",
+        "start": 3.6,
+        "end": 4.0
+      },
+      {
+        "text": "against",
+        "start": 4.08,
+        "end": 4.56
+      },
+      {
+        "text": "the",
+        "start": 4.56,
+        "end": 4.72
+      },
+      {
+        "text": "latest",
+        "start": 4.72,
+        "end": 5.2
+      },
+      {
+        "text": "artifact",
+        "start": 5.28,
+        "end": 5.92
+      },
+      {
+        "text": "The",
+        "start": 6.270667,
+        "end": 6.350667
+      },
+      {
+        "text": "result",
+        "start": 6.350667,
+        "end": 6.750667
+      },
+      {
+        "text": "shows",
+        "start": 6.750667,
+        "end": 7.070667
+      },
+      {
+        "text": "standard",
+        "start": 7.070667,
+        "end": 7.470667
+      },
+      {
+        "text": "output",
+        "start": 7.550667,
+        "end": 8.030667
+      },
+      {
+        "text": "exit",
+        "start": 8.270667,
+        "end": 8.670667
+      },
+      {
+        "text": "status",
+        "start": 8.670667,
+        "end": 9.150667
+      },
+      {
+        "text": "peak",
+        "start": 9.470667,
+        "end": 9.710667
+      },
+      {
+        "text": "memory",
+        "start": 9.710667,
+        "end": 10.190667
+      },
+      {
+        "text": "and",
+        "start": 10.350667,
+        "end": 10.510667
+      },
+      {
+        "text": "logical",
+        "start": 10.510667,
+        "end": 10.990667
+      },
+      {
+        "text": "time",
+        "start": 10.990667,
+        "end": 11.470667
+      },
+      {
+        "text": "It",
+        "start": 11.944,
+        "end": 12.104
+      },
+      {
+        "text": "also",
+        "start": 12.104,
+        "end": 12.504
+      },
+      {
+        "text": "reports",
+        "start": 12.504,
+        "end": 12.984
+      },
+      {
+        "text": "a",
+        "start": 12.984,
+        "end": 13.064
+      },
+      {
+        "text": "normalized",
+        "start": 13.064,
+        "end": 13.704
+      },
+      {
+        "text": "instruction",
+        "start": 13.784,
+        "end": 14.344
+      },
+      {
+        "text": "cost",
+        "start": 14.344,
+        "end": 14.744
+      },
+      {
+        "text": "That",
+        "start": 15.446667,
+        "end": 15.686667
+      },
+      {
+        "text": "budget",
+        "start": 15.686667,
+        "end": 16.086667
+      },
+      {
+        "text": "is",
+        "start": 16.246667,
+        "end": 16.326667
+      },
+      {
+        "text": "deterministic",
+        "start": 16.326667,
+        "end": 17.286667
+      },
+      {
+        "text": "A",
+        "start": 17.605333,
+        "end": 17.685333
+      },
+      {
+        "text": "slow",
+        "start": 17.685333,
+        "end": 18.005333
+      },
+      {
+        "text": "laptop",
+        "start": 18.005333,
+        "end": 18.565333
+      },
+      {
+        "text": "and",
+        "start": 18.645333,
+        "end": 18.805333
+      },
+      {
+        "text": "a",
+        "start": 18.805333,
+        "end": 18.805333
+      },
+      {
+        "text": "fast",
+        "start": 18.805333,
+        "end": 19.205333
+      },
+      {
+        "text": "desktop",
+        "start": 19.205333,
+        "end": 19.845333
+      },
+      {
+        "text": "can",
+        "start": 19.845333,
+        "end": 20.005333
+      },
+      {
+        "text": "apply",
+        "start": 20.005333,
+        "end": 20.405333
+      },
+      {
+        "text": "the",
+        "start": 20.405333,
+        "end": 20.485333
+      },
+      {
+        "text": "same",
+        "start": 20.485333,
+        "end": 20.805333
+      },
+      {
+        "text": "policy",
+        "start": 20.805333,
+        "end": 21.445333
+      }
+    ],
+    "parts": 5,
+    "sentence_pause_ms": 180
+  },
+  "judge": {
+    "text": "Submit runs the complete test set locally. This solution passes all four cases and earns one hundred points. Each case keeps its own cost and memory evidence. That same evidence supports progressive scoring when a solution passes only a broader resource tier. The verdict is inspectable, educational, and reproducible.",
+    "path": "/Users/jacoblincool/Documents/GitHub/wasi-compiler-in-browser/submission/video/demo/narration/judge.wav",
+    "duration_s": 22.949333,
+    "passed": true,
+    "wer": 0.0,
+    "transcript": "Submit runs the complete test set locally. This solution passes all four cases and earns one hundred points. Each case keeps its own cost and memory evidence. That same evidence supports progressive scoring, when a solution passes only a broader resource tier. The verdict is inspectable, educational, and reproducible.",
+    "words": [
+      {
+        "text": "Submit",
+        "start": 0.24,
+        "end": 0.64
+      },
+      {
+        "text": "runs",
+        "start": 0.64,
+        "end": 1.04
+      },
+      {
+        "text": "the",
+        "start": 1.04,
+        "end": 1.12
+      },
+      {
+        "text": "complete",
+        "start": 1.12,
+        "end": 1.6
+      },
+      {
+        "text": "test",
+        "start": 1.68,
+        "end": 2.08
+      },
+      {
+        "text": "set",
+        "start": 2.08,
+        "end": 2.24
+      },
+      {
+        "text": "locally",
+        "start": 2.24,
+        "end": 2.88
+      },
+      {
+        "text": "This",
+        "start": 3.604,
+        "end": 3.764
+      },
+      {
+        "text": "solution",
+        "start": 3.764,
+        "end": 4.244
+      },
+      {
+        "text": "passes",
+        "start": 4.244,
+        "end": 4.644
+      },
+      {
+        "text": "all",
+        "start": 4.644,
+        "end": 4.884
+      },
+      {
+        "text": "four",
+        "start": 4.884,
+        "end": 5.124
+      },
+      {
+        "text": "cases",
+        "start": 5.124,
+        "end": 5.684
+      },
+      {
+        "text": "and",
+        "start": 6.004,
+        "end": 6.164
+      },
+      {
+        "text": "earns",
+        "start": 6.164,
+        "end": 6.484
+      },
+      {
+        "text": "one",
+        "start": 6.484,
+        "end": 6.724
+      },
+      {
+        "text": "hundred",
+        "start": 6.724,
+        "end": 7.124
+      },
+      {
+        "text": "points",
+        "start": 7.124,
+        "end": 7.684
+      },
+      {
+        "text": "Each",
+        "start": 8.189333,
+        "end": 8.509333
+      },
+      {
+        "text": "case",
+        "start": 8.509333,
+        "end": 8.829333
+      },
+      {
+        "text": "keeps",
+        "start": 8.829333,
+        "end": 9.149333
+      },
+      {
+        "text": "its",
+        "start": 9.149333,
+        "end": 9.309333
+      },
+      {
+        "text": "own",
+        "start": 9.389333,
+        "end": 9.629333
+      },
+      {
+        "text": "cost",
+        "start": 9.629333,
+        "end": 9.949333
+      },
+      {
+        "text": "and",
+        "start": 9.949333,
+        "end": 10.109333
+      },
+      {
+        "text": "memory",
+        "start": 10.109333,
+        "end": 10.429333
+      },
+      {
+        "text": "evidence",
+        "start": 10.429333,
+        "end": 11.149333
+      },
+      {
+        "text": "That",
+        "start": 11.74,
+        "end": 11.98
+      },
+      {
+        "text": "same",
+        "start": 11.98,
+        "end": 12.22
+      },
+      {
+        "text": "evidence",
+        "start": 12.22,
+        "end": 12.7
+      },
+      {
+        "text": "supports",
+        "start": 12.7,
+        "end": 13.26
+      },
+      {
+        "text": "progressive",
+        "start": 13.26,
+        "end": 13.98
+      },
+      {
+        "text": "scoring",
+        "start": 13.98,
+        "end": 14.54
+      },
+      {
+        "text": "when",
+        "start": 15.02,
+        "end": 15.18
+      },
+      {
+        "text": "a",
+        "start": 15.18,
+        "end": 15.26
+      },
+      {
+        "text": "solution",
+        "start": 15.26,
+        "end": 15.82
+      },
+      {
+        "text": "passes",
+        "start": 15.82,
+        "end": 16.38
+      },
+      {
+        "text": "only",
+        "start": 16.54,
+        "end": 16.86
+      },
+      {
+        "text": "a",
+        "start": 16.94,
+        "end": 17.02
+      },
+      {
+        "text": "broader",
+        "start": 17.02,
+        "end": 17.5
+      },
+      {
+        "text": "resource",
+        "start": 17.5,
+        "end": 18.06
+      },
+      {
+        "text": "tier",
+        "start": 18.06,
+        "end": 18.46
+      },
+      {
+        "text": "The",
+        "start": 19.168,
+        "end": 19.248
+      },
+      {
+        "text": "verdict",
+        "start": 19.248,
+        "end": 19.728
+      },
+      {
+        "text": "is",
+        "start": 19.728,
+        "end": 19.888
+      },
+      {
+        "text": "inspectable",
+        "start": 19.888,
+        "end": 20.688
+      },
+      {
+        "text": "educational",
+        "start": 20.768,
+        "end": 21.568
+      },
+      {
+        "text": "and",
+        "start": 21.648,
+        "end": 21.808
+      },
+      {
+        "text": "reproducible",
+        "start": 21.808,
+        "end": 22.688
+      }
+    ],
+    "parts": 5,
+    "sentence_pause_ms": 180
+  },
+  "codex": {
+    "text": "Codex with GPT five point six was our engineering partner throughout Build Week. It helped us recover invariants from earlier prototypes. We used it to design shared browser and server contracts, implement seven language toolchains, and debug isolation boundaries. It also helped create conformance and regression tests. We kept product decisions explicit. We accepted performance claims only when executable evidence supported them. WASM OJ Forge lets classrooms scale the judge without scaling the server.",
+    "path": "/Users/jacoblincool/Documents/GitHub/wasi-compiler-in-browser/submission/video/demo/narration/codex.wav",
+    "duration_s": 36.877333,
+    "passed": true,
+    "wer": 0.014,
+    "transcript": "Codex with GPT Five Point Six was our engineering partner throughout Build Week. It helped us recover invariants from earlier prototypes. We used it to design shared browser and server contracts, implement seven-language toolchains, and debug isolation boundaries. It also helped create conformance and regression tests. We kept product decisions explicit. We accepted performance claims only when executable evidence supported them. Wazem OJ Forge lets classrooms scale the judge without scaling the server.",
+    "words": [
+      {
+        "text": "Codex",
+        "start": 0.32,
+        "end": 0.8
+      },
+      {
+        "text": "with",
+        "start": 0.8,
+        "end": 0.96
+      },
+      {
+        "text": "GPT",
+        "start": 0.96,
+        "end": 1.68
+      },
+      {
+        "text": "five",
+        "start": 1.68,
+        "end": 2.08
+      },
+      {
+        "text": "point",
+        "start": 2.08,
+        "end": 2.32
+      },
+      {
+        "text": "six",
+        "start": 2.32,
+        "end": 2.8
+      },
+      {
+        "text": "was",
+        "start": 3.04,
+        "end": 3.2
+      },
+      {
+        "text": "our",
+        "start": 3.2,
+        "end": 3.36
+      },
+      {
+        "text": "engineering",
+        "start": 3.36,
+        "end": 4.0
+      },
+      {
+        "text": "partner",
+        "start": 4.0,
+        "end": 4.48
+      },
+      {
+        "text": "throughout",
+        "start": 4.56,
+        "end": 4.96
+      },
+      {
+        "text": "Build",
+        "start": 5.04,
+        "end": 5.36
+      },
+      {
+        "text": "Week",
+        "start": 5.36,
+        "end": 5.6
+      },
+      {
+        "text": "It",
+        "start": 6.014667,
+        "end": 6.094667
+      },
+      {
+        "text": "helped",
+        "start": 6.094667,
+        "end": 6.414667
+      },
+      {
+        "text": "us",
+        "start": 6.414667,
+        "end": 6.654667
+      },
+      {
+        "text": "recover",
+        "start": 6.654667,
+        "end": 7.134667
+      },
+      {
+        "text": "invariants",
+        "start": 7.134667,
+        "end": 7.854667
+      },
+      {
+        "text": "from",
+        "start": 7.854667,
+        "end": 8.174667
+      },
+      {
+        "text": "earlier",
+        "start": 8.254667,
+        "end": 8.734667
+      },
+      {
+        "text": "prototypes",
+        "start": 8.734667,
+        "end": 9.614667
+      },
+      {
+        "text": "We",
+        "start": 10.445333,
+        "end": 10.605333
+      },
+      {
+        "text": "used",
+        "start": 10.605333,
+        "end": 10.925333
+      },
+      {
+        "text": "it",
+        "start": 10.925333,
+        "end": 11.165333
+      },
+      {
+        "text": "to",
+        "start": 11.165333,
+        "end": 11.245333
+      },
+      {
+        "text": "design",
+        "start": 11.245333,
+        "end": 11.805333
+      },
+      {
+        "text": "shared",
+        "start": 11.805333,
+        "end": 12.205333
+      },
+      {
+        "text": "browser",
+        "start": 12.205333,
+        "end": 12.685333
+      },
+      {
+        "text": "and",
+        "start": 12.765333,
+        "end": 12.925333
+      },
+      {
+        "text": "server",
+        "start": 12.925333,
+        "end": 13.325333
+      },
+      {
+        "text": "contracts",
+        "start": 13.325333,
+        "end": 14.125333
+      },
+      {
+        "text": "implement",
+        "start": 14.605333,
+        "end": 15.085333
+      },
+      {
+        "text": "seven",
+        "start": 15.085333,
+        "end": 15.485333
+      },
+      {
+        "text": "language",
+        "start": 15.485333,
+        "end": 15.965333
+      },
+      {
+        "text": "toolchains",
+        "start": 15.965333,
+        "end": 16.605333
+      },
+      {
+        "text": "and",
+        "start": 16.845333,
+        "end": 17.005333
+      },
+      {
+        "text": "debug",
+        "start": 17.005333,
+        "end": 17.485333
+      },
+      {
+        "text": "isolation",
+        "start": 17.485333,
+        "end": 18.205333
+      },
+      {
+        "text": "boundaries",
+        "start": 18.205333,
+        "end": 19.005333
+      },
+      {
+        "text": "It",
+        "start": 19.388,
+        "end": 19.548
+      },
+      {
+        "text": "also",
+        "start": 19.628,
+        "end": 19.948
+      },
+      {
+        "text": "helped",
+        "start": 19.948,
+        "end": 20.348
+      },
+      {
+        "text": "create",
+        "start": 20.428,
+        "end": 20.828
+      },
+      {
+        "text": "conformance",
+        "start": 20.988,
+        "end": 21.708
+      },
+      {
+        "text": "and",
+        "start": 21.708,
+        "end": 21.868
+      },
+      {
+        "text": "regression",
+        "start": 21.868,
+        "end": 22.428
+      },
+      {
+        "text": "tests",
+        "start": 22.428,
+        "end": 23.068
+      },
+      {
+        "text": "We",
+        "start": 23.493333,
+        "end": 23.653333
+      },
+      {
+        "text": "kept",
+        "start": 23.653333,
+        "end": 23.893333
+      },
+      {
+        "text": "product",
+        "start": 23.893333,
+        "end": 24.293333
+      },
+      {
+        "text": "decisions",
+        "start": 24.293333,
+        "end": 24.933333
+      },
+      {
+        "text": "explicit",
+        "start": 25.013333,
+        "end": 25.813333
+      },
+      {
+        "text": "We",
+        "start": 26.590667,
+        "end": 26.750667
+      },
+      {
+        "text": "accepted",
+        "start": 26.750667,
+        "end": 27.470667
+      },
+      {
+        "text": "performance",
+        "start": 27.470667,
+        "end": 27.950667
+      },
+      {
+        "text": "claims",
+        "start": 27.950667,
+        "end": 28.430667
+      },
+      {
+        "text": "only",
+        "start": 28.590667,
+        "end": 28.990667
+      },
+      {
+        "text": "when",
+        "start": 28.990667,
+        "end": 29.230667
+      },
+      {
+        "text": "executable",
+        "start": 29.310667,
+        "end": 30.110667
+      },
+      {
+        "text": "evidence",
+        "start": 30.110667,
+        "end": 30.510667
+      },
+      {
+        "text": "supported",
+        "start": 30.510667,
+        "end": 31.070667
+      },
+      {
+        "text": "them",
+        "start": 31.070667,
+        "end": 31.310667
+      },
+      {
+        "text": "WASM",
+        "start": 31.997333,
+        "end": 32.397333
+      },
+      {
+        "text": "OJ",
+        "start": 32.397333,
+        "end": 32.797333
+      },
+      {
+        "text": "Forge",
+        "start": 32.797333,
+        "end": 33.277333
+      },
+      {
+        "text": "lets",
+        "start": 33.357333,
+        "end": 33.597333
+      },
+      {
+        "text": "classrooms",
+        "start": 33.597333,
+        "end": 34.237333
+      },
+      {
+        "text": "scale",
+        "start": 34.237333,
+        "end": 34.637333
+      },
+      {
+        "text": "the",
+        "start": 34.637333,
+        "end": 34.797333
+      },
+      {
+        "text": "judge",
+        "start": 34.797333,
+        "end": 35.277333
+      },
+      {
+        "text": "without",
+        "start": 35.277333,
+        "end": 35.677333
+      },
+      {
+        "text": "scaling",
+        "start": 35.677333,
+        "end": 36.157333
+      },
+      {
+        "text": "the",
+        "start": 36.157333,
+        "end": 36.237333
+      },
+      {
+        "text": "server",
+        "start": 36.237333,
+        "end": 36.717333
+      }
+    ],
+    "parts": 7,
+    "sentence_pause_ms": 180
+  }
+}

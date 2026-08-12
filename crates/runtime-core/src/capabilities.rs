@@ -1,10 +1,10 @@
 use wasmer::{AsStoreMut, ExternType, Function, Imports, Module, RuntimeError};
 
-/// Returns whether an import exposes host state that Forge deliberately keeps
+/// Returns whether an import exposes host state that WASM-OJ deliberately keeps
 /// outside the deterministic judge contract.
 ///
 /// Denied imports that are part of an admitted ABI remain valid at module
-/// validation time. Forge resolves each declared function with its exact
+/// validation time. WASM-OJ resolves each declared function with its exact
 /// signature and replaces the Wasmer implementation with a fail-closed trap,
 /// so no forbidden host implementation is reachable.
 pub(crate) fn is_denied_capability(namespace: &str, name: &str) -> bool {
@@ -62,7 +62,7 @@ pub(crate) fn attach_capability_denials(
 
     for (namespace, name, function_type) in denied {
         let capability = format!("{namespace}.{name}");
-        let error_message = format!("Forge denied nondeterministic capability {capability}");
+        let error_message = format!("WASM-OJ denied nondeterministic capability {capability}");
         let denial = Function::new(store, function_type, move |_| {
             Err(RuntimeError::new(error_message.clone()))
         });

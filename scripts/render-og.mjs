@@ -60,7 +60,7 @@ try {
     <main class="frame">
       <section>
         <div class="eyebrow"><span class="mark"></span>WASM OJ</div>
-        <h1>Forge code.<br><span>Judge locally.</span></h1>
+        <h1>Compile in WebAssembly.<br><span>Judge locally.</span></h1>
         <p class="lead">A deterministic compiler and online-judge library that runs entirely in the browser.</p>
         <div class="badges">
           <span class="badge">C · C++ · Rust</span>
@@ -69,9 +69,9 @@ try {
         </div>
       </section>
       <section class="terminal">
-        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bar-label">forge.local</span></div>
-        <pre><span class="muted">01</span>  <span class="gold">const</span> artifact = <span class="gold">await</span> forge.compile(project)
-<span class="muted">02</span>  <span class="gold">const</span> result = <span class="gold">await</span> forge.run(artifact, {
+        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bar-label">wasm-oj.local</span></div>
+        <pre><span class="muted">01</span>  <span class="gold">const</span> artifact = <span class="gold">await</span> engine.compile(project)
+<span class="muted">02</span>  <span class="gold">const</span> result = <span class="gold">await</span> engine.run(artifact, {
 <span class="muted">03</span>    target: <span class="green">"wasip1"</span>,
 <span class="muted">04</span>    randomSeed: <span class="green">42</span>,
 <span class="muted">05</span>    instructionBudget: <span class="green">10_000_000</span>

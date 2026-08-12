@@ -1,4 +1,4 @@
-import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "./contract.ts";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "./contract.ts";
 import { costProfileId, isCostProfileFor } from "./cost-profile.ts";
 import {
   canonicalFileEntries,
@@ -50,19 +50,19 @@ function requiredTrimmedString(value: unknown, label: string, maximum = 16_384):
 
 function serializeRuntimeBundleManifest(data: RuntimeBundleManifestData): string {
   return JSON.stringify({
-    schema: FORGE_SCHEMAS.runtimeBundle,
-    version: FORGE_CONTRACT_VERSION,
+    schema: WASM_OJ_SCHEMAS.runtimeBundle,
+    version: WASM_OJ_CONTRACT_VERSION,
     name: data.name,
     target: data.target,
     language: data.language,
     runtime: { package: data.runtimePackage, command: data.command },
-    execution: { deterministic: true, contractVersion: FORGE_CONTRACT_VERSION },
+    execution: { deterministic: true, contractVersion: WASM_OJ_CONTRACT_VERSION },
     entry: data.entry,
     files: [...data.files],
   }, null, 2);
 }
 
-/** Canonical Forge manifest constructor for built-in and downstream runtime bundles. */
+/** Canonical WASM-OJ manifest constructor for built-in and downstream runtime bundles. */
 export function createRuntimeBundleManifest(
   project: Project,
   runtimePackage: string,
@@ -126,12 +126,12 @@ function parseRuntimeBundleManifest(artifact: RuntimeBundleArtifact): RuntimeBun
     throw new Error("Runtime bundle manifest files must be unique and canonically sorted.");
   }
   if (
-    manifest.schema !== FORGE_SCHEMAS.runtimeBundle
-    || manifest.version !== FORGE_CONTRACT_VERSION
+    manifest.schema !== WASM_OJ_SCHEMAS.runtimeBundle
+    || manifest.version !== WASM_OJ_CONTRACT_VERSION
     || executionRecord.deterministic !== true
-    || executionRecord.contractVersion !== FORGE_CONTRACT_VERSION
+    || executionRecord.contractVersion !== WASM_OJ_CONTRACT_VERSION
   ) {
-    throw new Error("Runtime bundle manifest does not match the current Forge contract.");
+    throw new Error("Runtime bundle manifest does not match the current WASM-OJ contract.");
   }
   const data: RuntimeBundleManifestData = {
     name: manifest.name,
@@ -143,7 +143,7 @@ function parseRuntimeBundleManifest(artifact: RuntimeBundleArtifact): RuntimeBun
     files,
   };
   if (artifact.manifest !== serializeRuntimeBundleManifest(data)) {
-    throw new Error("Runtime bundle manifest must use the canonical Forge representation without extra fields.");
+    throw new Error("Runtime bundle manifest must use the canonical WASM-OJ representation without extra fields.");
   }
   return data;
 }
@@ -161,7 +161,7 @@ function expectedBuiltinArtifactName(project: Project): string {
     case "typescript":
       return `${project.name}.${project.config.language}-${project.config.target}.json`;
     default:
-      throw new Error(`Forge has no built-in artifact name for '${project.config.language}'.`);
+      throw new Error(`WASM-OJ has no built-in artifact name for '${project.config.language}'.`);
   }
 }
 
@@ -178,9 +178,9 @@ function expectedRuntimeEntry(project: Project): string {
 }
 
 function assertArtifactMetadata(artifact: Record<string, unknown>): void {
-  if (artifact.forgeContract !== FORGE_CONTRACT_VERSION) {
+  if (artifact.wasmOjContract !== WASM_OJ_CONTRACT_VERSION) {
     throw new Error(
-      `Artifact Forge contract '${String(artifact.forgeContract)}' is unsupported; expected '${FORGE_CONTRACT_VERSION}'.`,
+      `Artifact WASM-OJ contract '${String(artifact.wasmOjContract)}' is unsupported; expected '${WASM_OJ_CONTRACT_VERSION}'.`,
     );
   }
   requiredTrimmedString(artifact.id, "Artifact id");
@@ -264,8 +264,8 @@ function assertBundle(artifact: RuntimeBundleArtifact): RuntimeBundleManifestDat
   if (!Object.hasOwn(artifact.files, artifact.entry)) {
     throw new Error(`Runtime bundle entry '${artifact.entry}' is not present in its files.`);
   }
-  if (artifact.files["forge.manifest.json"] !== artifact.manifest) {
-    throw new Error("Runtime bundle must contain its exact manifest at 'forge.manifest.json'.");
+  if (artifact.files["wasm-oj.manifest.json"] !== artifact.manifest) {
+    throw new Error("Runtime bundle must contain its exact manifest at 'wasm-oj.manifest.json'.");
   }
   const manifest = parseRuntimeBundleManifest(artifact);
   if (
@@ -282,7 +282,7 @@ function assertBundle(artifact: RuntimeBundleArtifact): RuntimeBundleManifestDat
 
 /**
  * Fail-closed compatibility boundary for cache, compiler, and runner inputs.
- * Built-in languages are bound to Forge's exact artifact/runtime/toolchain
+ * Built-in languages are bound to WASM-OJ's exact artifact/runtime/toolchain
  * profile; downstream languages retain their own toolchain and runtime driver.
  */
 export function assertValidBuildArtifact(

@@ -114,7 +114,7 @@ export function npmDependencyFiles(project: Project): Record<string, string | Ui
     }
   }
   if (untyped.length > 0) {
-    files[".forge/npm-untyped-modules.d.ts"] = untyped.sort().flatMap((name) => [
+    files[".wasm-oj/npm-untyped-modules.d.ts"] = untyped.sort().flatMap((name) => [
       `declare module ${JSON.stringify(name)} { const value: any; export = value; }`,
       `declare module ${JSON.stringify(`${name}/*`)} { const value: any; export = value; }`,
     ]).join("\n");
@@ -127,7 +127,7 @@ export function cppDependencyInput(project: Project): CppDependencyInput {
   const includeDirectories: string[] = [];
   const sources: string[] = [];
   for (const [index, item] of projectDependencyPackages(project, "cpp").entries()) {
-    const root = `.forge/dependencies/cpp/${String(index).padStart(4, "0")}`;
+    const root = `.wasm-oj/dependencies/cpp/${String(index).padStart(4, "0")}`;
     includeDirectories.push(`/project/${root}`);
     if (Object.keys(item.files).some((path) => path.startsWith("include/"))) {
       includeDirectories.push(`/project/${root}/include`);
@@ -159,7 +159,7 @@ export function rustDependencyInput(project: Project): RustDependencyInput {
   const descriptorById = new Map<string, Omit<RustDependencyCrate, "externs">>();
   const files: ProjectFile[] = [];
   for (const [index, item] of ordered.entries()) {
-    const prefix = `.forge/dependencies/cargo/${String(index).padStart(4, "0")}`;
+    const prefix = `.wasm-oj/dependencies/cargo/${String(index).padStart(4, "0")}`;
     const manifestBytes = item.files["Cargo.toml"]!;
     const manifest = decodeDependencyText(manifestBytes, item.package.id, "Cargo.toml");
     if (/\bpackage\s*=\s*"/m.test(dependencySections(manifest))) {
@@ -214,7 +214,7 @@ export function goDependencyInput(project: Project): GoDependencyInput {
   const files: ProjectFile[] = [];
   const packages: GoDependencyPackage[] = [];
   for (const [moduleIndex, item] of projectDependencyPackages(project, "go").entries()) {
-    const moduleRoot = `.forge/dependencies/go/${String(moduleIndex).padStart(4, "0")}`;
+    const moduleRoot = `.wasm-oj/dependencies/go/${String(moduleIndex).padStart(4, "0")}`;
     const directories = new Map<string, Array<{ path: string; content: string }>>();
     for (const [path, bytes] of Object.entries(item.files)) {
       if (!path.endsWith(".go") || path.endsWith("_test.go") || path.split("/").includes("vendor")) continue;

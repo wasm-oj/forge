@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,8 +13,23 @@ const markdownFiles = [
   ...await markdownBelow("docs"),
   ...(await markdownBelow("experiments")).filter((file) => file.endsWith("/SPEC.md")),
 ].sort(compareCodePoints);
+const historicalGeneratedDocs = new Set([
+  "docs/architecture-report.md",
+  "docs/conformance-report.md",
+  "docs/problem-bank/independent-041-045.md",
+]);
+const currentProductDocs = markdownFiles.filter((relative) => (
+  relative === "README.md"
+  || relative === "SECURITY.md"
+  || relative === "THIRD_PARTY_NOTICES.md"
+  || relative === "public/toolchains/README.md"
+  || (relative.startsWith("docs/") && !historicalGeneratedDocs.has(relative))
+));
 const immutableCommandRecords = new Set([
 ]);
+// This is an external Cloudflare service identity, not a product name. Renaming it during the
+// architecture cutover would detach the deployed Worker from its existing secrets and callbacks.
+const preservedExternalServiceIdentifiers = ["wasm-oj-forge-production"];
 
 for (const relative of markdownFiles) {
   const source = await readFile(path.join(root, relative), "utf8");
@@ -45,14 +61,60 @@ for (const relative of markdownFiles) {
   }
 }
 
+for (const relative of currentProductDocs) {
+  const source = await readFile(path.join(root, relative), "utf8");
+  for (const [label, pattern] of [
+    ["retired npm package", /@wasm-oj\/forge\b/],
+    ["retired contract schema", /wasm-oj-forge-v1\b/],
+    ["retired binary magic", /\b(?:FORGEFS1|FORGJDG1|FORGRPL1)\b/],
+    ["retired collection CLI", /\bforge-collection\b/],
+    ["retired environment variable", /\bFORGE_[A-Z0-9_]+\b/],
+    ["retired HTTP header", /\bX-Forge-[A-Za-z0-9-]+\b/i],
+    ["retired cookie", /\bforge_(?:session|csrf)\b/],
+    ["retired global hook", /(?:forgeContract|__FORGE_[A-Z0-9_]+)/],
+    ["retired schema or executable", /\bforge-(?:managed|browser|cost|contract|judge|runtime|replay|compiler|runner)[a-z0-9-]*\b/i],
+    ["retired public API", /\b(?:create[A-Za-z0-9]*Forge|Forge(?:Engine|Compiler|Runner|Storage|Error)[A-Za-z0-9]*)\b/],
+    ["retired toolchain option", /\b(?:assetBaseUrl|toolchainDirectory)\b/],
+  ]) {
+    const match = source.match(pattern);
+    if (match) throw new Error(`${relative} contains ${label} '${match[0]}'.`);
+  }
+
+  const productScan = preservedExternalServiceIdentifiers.reduce(
+    (scan, identifier) => scan.replaceAll(identifier, ""),
+    source.replaceAll("wasm-oj/forge", ""),
+  );
+  const retiredProductName = productScan.match(/\bforge\b/i);
+  if (retiredProductName) {
+    throw new Error(`${relative} contains retired product name '${retiredProductName[0]}'.`);
+  }
+}
+
 const readme = await readFile(path.join(root, "README.md"), "utf8");
 for (const required of [
   "docs/integration-guide.md",
   "docs/releasing.md",
-  "createServerForge",
-  "runtimeDriverPlugins",
-  "prepareDependencies",
-  "ForgeError",
+  "@wasm-oj/contracts",
+  "@wasm-oj/core",
+  "@wasm-oj/browser",
+  "@wasm-oj/server",
+  "@wasm-oj/organizer",
+  "@wasm-oj/sdk",
+  "@wasm-oj/toolchain-clang",
+  "@wasm-oj/toolchain-rust",
+  "@wasm-oj/toolchain-go",
+  "@wasm-oj/toolchain-python",
+  "@wasm-oj/toolchain-javascript",
+  "createBrowserEngine",
+  "createServerEngine",
+  "browserSource",
+  "serverSource",
+  "WasmOjError",
+  "wasm-oj-collection",
+  "WOJRPL02",
+  "WOJJDG02",
+  "WOJFS002",
+  "WOJGO002",
   "pnpm install --frozen-lockfile",
 ]) {
   if (!readme.includes(required)) throw new Error(`README.md does not document '${required}'.`);
@@ -66,6 +128,9 @@ for (const required of [
   "problemBundleSha256",
   "completeDependencyHosts",
   "networkAccess:",
+  "runtimeDriverPlugins",
+  "prepareDependencies",
+  "WasmOjError",
 ]) {
   if (!integrationGuide.includes(required)) {
     throw new Error(`docs/integration-guide.md does not bind browser dependency resolution to '${required}'.`);
@@ -89,6 +154,46 @@ for (const required of [
 }
 if (libraryContract.includes("manager.resolve(manifest);")) {
   throw new Error("docs/library-contract.md resolves online dependencies without an explicit network scope.");
+}
+
+const toolchainDocs = await readFile(path.join(root, "public/toolchains/README.md"), "utf8");
+for (const required of [
+  "@wasm-oj/toolchain-clang",
+  "@wasm-oj/toolchain-rust",
+  "@wasm-oj/toolchain-go",
+  "@wasm-oj/toolchain-python",
+  "@wasm-oj/toolchain-javascript",
+  "browserSource(baseUrl)",
+  "serverSource()",
+  "there is no",
+  "WOJFS002",
+]) {
+  if (!toolchainDocs.includes(required)) {
+    throw new Error(`public/toolchains/README.md does not document '${required}'.`);
+  }
+}
+for (const entry of await readdir(path.join(root, "public/toolchains"), { withFileTypes: true })) {
+  if (!entry.isFile() || entry.name === "README.md") continue;
+  const bytes = await readFile(path.join(root, "public/toolchains", entry.name));
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const expectedLine = `${digest}  ${entry.name}`;
+  if (!toolchainDocs.includes(expectedLine)) {
+    throw new Error(`public/toolchains/README.md does not pin current asset '${expectedLine}'.`);
+  }
+}
+
+const problemCatalog = await readFile(path.join(root, "docs/problem-catalog.md"), "utf8");
+for (const required of [
+  "wasm-oj-collection",
+  ".github/actions/wasm-oj-collection/action.yml",
+  "@wasm-oj/organizer@0.2.0",
+  "wasm-oj-platform/managed-collection-source/v1",
+  "wasm-oj-platform/managed-collection/v2",
+  "WOJJDG02",
+]) {
+  if (!problemCatalog.includes(required)) {
+    throw new Error(`docs/problem-catalog.md does not document '${required}'.`);
+  }
 }
 
 const onlineJudgeDocs = [
@@ -118,10 +223,35 @@ for (const required of [
   "events?after=<cursor>",
   "formal_mutations_enabled",
   "SubmissionJudgeContainer",
-  "ValidationJudgeContainer",
+  "Catalog Workflow",
 ]) {
   if (!onlineJudge.includes(required)) {
     throw new Error(`docs/cloudflare-online-judge.md does not document '${required}'.`);
+  }
+}
+if (onlineJudge.includes("ValidationJudgeContainer")) {
+  throw new Error("docs/cloudflare-online-judge.md still documents the removed ValidationJudgeContainer.");
+}
+
+const deploymentPlan = await readFile(path.join(root, "docs/cloudflare-deployment-plan.md"), "utf8");
+for (const required of [
+  "/api/admin/formal-mutations/resume",
+  "Origin: $WASM_OJ_ORIGIN",
+  "Content-Type: application/json",
+  "X-WASM-OJ-CSRF: $WASM_OJ_CUTOVER_ADMIN_CSRF",
+  "wasm_oj_session=$WASM_OJ_CUTOVER_ADMIN_SESSION",
+  "wasm_oj_csrf=$WASM_OJ_CUTOVER_ADMIN_CSRF",
+  "X-WASM-OJ-Maintenance-Smoke-Token",
+  "WASM_OJ_ARCHITECTURE_RESET_TOKEN",
+  "WASM_OJ_PRODUCTION_RELEASE_REQUEST_BASE64",
+  "WASM_OJ_V2_ACTIVATION_REQUEST_BASE64",
+  "scripts/configure-production-release.mjs",
+  "wasm_oj_active_releases",
+  "architecture-v2-production-smoke-passed",
+  "enabled: true",
+]) {
+  if (!deploymentPlan.includes(required)) {
+    throw new Error(`docs/cloudflare-deployment-plan.md does not document the executable cutover contract '${required}'.`);
   }
 }
 
@@ -133,7 +263,9 @@ try {
   if (error?.code !== "ENOENT") throw error;
 }
 
-process.stdout.write(`Verified ${markdownFiles.length} documentation files and pnpm-only commands.\n`);
+process.stdout.write(
+  `Verified ${markdownFiles.length} documentation files, ${currentProductDocs.length} current WASM-OJ documents, and pnpm-only commands.\n`,
+);
 
 async function markdownBelow(relativeDirectory) {
   const directory = path.join(root, relativeDirectory);

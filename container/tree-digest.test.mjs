@@ -6,7 +6,7 @@ import test from "node:test";
 import { computeFileTreeIdentity } from "./tree-digest.mjs";
 
 test("binds a root-contained pnpm-style symlink and its physical target", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "forge-tree-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-tree-"));
   await mkdir(path.join(root, "node_modules", ".pnpm", "package", "node_modules", "package"), { recursive: true });
   await writeFile(path.join(root, "node_modules", ".pnpm", "package", "node_modules", "package", "index.js"), "export default 1;\n");
   await symlink(".pnpm/package/node_modules/package", path.join(root, "node_modules", "package"));
@@ -17,18 +17,18 @@ test("binds a root-contained pnpm-style symlink and its physical target", async 
 });
 
 test("rejects external and absolute symlinks even when internal symlinks are enabled", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "forge-tree-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-tree-"));
   await writeFile(path.join(root, "file"), "safe\n");
   await symlink("../outside", path.join(root, "escape"));
   await assert.rejects(computeFileTreeIdentity(root, { allowInternalSymlinks: true }), /escapes|ENOENT/);
-  const absoluteRoot = await mkdtemp(path.join(os.tmpdir(), "forge-tree-"));
+  const absoluteRoot = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-tree-"));
   await writeFile(path.join(absoluteRoot, "file"), "safe\n");
   await symlink("/tmp", path.join(absoluteRoot, "escape"));
   await assert.rejects(computeFileTreeIdentity(absoluteRoot, { allowInternalSymlinks: true }), /not canonical/);
 });
 
 test("retains the strict no-symlink default", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "forge-tree-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-tree-"));
   await writeFile(path.join(root, "physical"), "safe\n");
   await symlink("physical", path.join(root, "link"));
   await assert.rejects(computeFileTreeIdentity(root), /symlink or special/);

@@ -8,7 +8,7 @@ export interface ModuleWorkerBootstrap {
 }
 
 interface ModuleWorkerGlobal {
-  __wasmOjForgeModuleWorkerBaseUrl?: unknown;
+  __wasmOjModuleWorkerBaseUrl?: unknown;
 }
 
 /**
@@ -44,7 +44,7 @@ export function createModuleWorkerBootstrap(scriptUrl: string | URL): ModuleWork
       "const pendingMessages = [];\n",
       "const queueMessage = (event) => { event.stopImmediatePropagation(); pendingMessages.push(event.data); };\n",
       'globalThis.addEventListener("message", queueMessage);\n',
-      `Object.defineProperty(globalThis, "__wasmOjForgeModuleWorkerBaseUrl", { value: ${JSON.stringify(baseUrl.href)} });\n`,
+      `Object.defineProperty(globalThis, "__wasmOjModuleWorkerBaseUrl", { value: ${JSON.stringify(baseUrl.href)} });\n`,
       `try { await import(${JSON.stringify(absoluteScriptUrl)}); } finally { globalThis.removeEventListener("message", queueMessage); }\n`,
       'for (const data of pendingMessages) globalThis.dispatchEvent(new MessageEvent("message", { data }));\n',
     ],
@@ -72,7 +72,7 @@ export function moduleWorkerBaseUrl(): URL {
     }
   }
 
-  const injected = (globalThis as ModuleWorkerGlobal).__wasmOjForgeModuleWorkerBaseUrl;
+  const injected = (globalThis as ModuleWorkerGlobal).__wasmOjModuleWorkerBaseUrl;
   if (typeof injected !== "string") throw new Error("A module Worker requires a browser base URL.");
 
   const baseUrl = new URL(injected);

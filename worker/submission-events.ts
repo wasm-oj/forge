@@ -9,7 +9,7 @@ import {
   type SubmissionState,
 } from "../src/online-judge/contracts";
 import { sha256Hex } from "./crypto";
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 import { ApiError } from "./http";
 
 const TERMINAL_SQL = "'completed','compile-error','judge-error','infrastructure-error','cancelled'";
@@ -55,7 +55,7 @@ function validateEventKey(value: string): void {
 }
 
 async function existingEvent(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   submissionId: string,
   eventKey: string,
 ): Promise<SubmissionEventRow | null> {
@@ -65,7 +65,7 @@ async function existingEvent(
 }
 
 async function currentSubmissionState(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   submissionId: string,
 ): Promise<SubmissionState> {
   const row = await env.DB.prepare("SELECT state FROM submissions WHERE id=?")
@@ -82,7 +82,7 @@ export async function containerSubmissionEventKey(
 }
 
 export async function appendAuthorizedSubmissionEvent(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   input: AppendSubmissionEventInput,
 ): Promise<AppendedSubmissionEvent> {
   if (!Number.isSafeInteger(input.attempt) || input.attempt < 1 || !/^[0-9a-f]{64}$/.test(input.attemptTokenHash)) {
@@ -196,7 +196,7 @@ export function prepareSubmissionEventInsert(
 }
 
 export async function replaySubmissionEvents(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   submissionId: string,
   after: number,
   limit = 100,
@@ -211,7 +211,7 @@ export async function replaySubmissionEvents(
 }
 
 export async function latestSubmissionEventCursor(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   submissionId: string,
 ): Promise<number> {
   const row = await env.DB.prepare(
@@ -221,7 +221,7 @@ export async function latestSubmissionEventCursor(
 }
 
 export async function terminalizeSubmissionWithEvent(
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   input: {
     readonly submissionId: string;
     readonly state: SubmissionState;

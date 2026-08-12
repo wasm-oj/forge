@@ -8,22 +8,27 @@ import { createDependencyBuildBundle } from "../dependencies/build";
 import { createDependencyLock } from "../dependencies/lock";
 import type { DependencyEcosystem, LockedDependencyPackage } from "../dependencies/types";
 import type { CompileInput } from "../sdk/project";
-import type { ForgeEngine } from "../sdk/engine";
-import { createServerForge } from "./factory";
+import type { Engine } from "@wasm-oj/core";
+import { createServerEngine } from "./factory";
+import { testToolchains } from "./test-toolchains.test-helper";
 
-const enabled = process.env.FORGE_RUN_DEPENDENCY_INTEGRATION === "1";
+const enabled = process.env.WASM_OJ_RUN_DEPENDENCY_INTEGRATION === "1";
 const encoder = new TextEncoder();
 
 describe.skipIf(!enabled)("real server dependency compiler integration", () => {
-  let engine: ForgeEngine;
+  let engine: Engine;
   let cacheDirectory: string;
 
   beforeAll(async () => {
     execFileSync("cargo", [
       "build", "--locked", "--manifest-path", "crates/runtime-core/Cargo.toml", "--release", "--bins",
     ], { stdio: "pipe" });
-    cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-dependency-integration-"));
-    engine = await createServerForge({ cacheDirectory });
+    cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-dependency-integration-"));
+    engine = await createServerEngine({
+      runtimeDirectory: path.resolve("crates/runtime-core/target/release"),
+      toolchains: testToolchains(),
+      cacheDirectory,
+    });
   }, 300_000);
 
   afterAll(async () => {

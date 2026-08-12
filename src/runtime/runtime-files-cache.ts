@@ -9,7 +9,7 @@ interface RuntimeFilesCacheRequest {
 }
 
 const defaultIssueReporter: RuntimeFilesCacheIssueReporter = (message, error) => {
-  console.warn(`[ForgeRunner] ${message}`, error);
+  console.warn(`[Runner] ${message}`, error);
 };
 
 export async function openOptionalRuntimeFilesCache(
@@ -83,10 +83,10 @@ async function persistRuntimeFiles(
       request.cacheRequest,
       new Response(Uint8Array.from(archive).buffer, {
         headers: {
-          "Content-Type": "application/vnd.wasm-oj.forge.runtime-files",
-          "X-WASM-OJ-Forge-Cache-Key": request.cacheKey,
-          "X-WASM-OJ-Forge-Byte-Length": String(archive.byteLength),
-          "X-WASM-OJ-Forge-Cached-At": String(Date.now()),
+          "Content-Type": "application/vnd.wasm-oj.runtime-files",
+          "X-WASM-OJ-Cache-Key": request.cacheKey,
+          "X-WASM-OJ-Byte-Length": String(archive.byteLength),
+          "X-WASM-OJ-Cached-At": String(Date.now()),
         },
       }),
     );

@@ -15,7 +15,7 @@ export const RUST_BUILD_CONTROL_TIMEOUT_MS = RUST_COMPILE_TIMEOUT_MS + 10_000;
  */
 export function buildControlTimeoutMs(language: Language): number {
   if (!isBuiltinLanguage(language)) {
-    throw new Error(`The built-in Forge compiler does not support language '${language}'.`);
+    throw new Error(`The built-in WASM-OJ compiler does not support language '${language}'.`);
   }
   if (language === "c" || language === "cpp") return CLANG_BUILD_CONTROL_TIMEOUT_MS;
   if (language === "rust") return RUST_BUILD_CONTROL_TIMEOUT_MS;

@@ -2,7 +2,7 @@
 
 ## Supported releases
 
-Only the latest published `0.x` release receives security fixes while Forge is
+Only the latest published `0.x` release receives security fixes while WASM-OJ is
 experimental. A newer release replaces, rather than extends, an affected
 experimental release unless its public contract explicitly says otherwise.
 
@@ -17,7 +17,7 @@ vulnerability reporting flow for `wasm-oj/forge` and include:
 - whether untrusted source, dependency, runtime plug-in, or Wasm bytes are
   required to trigger the problem.
 
-Forge executes hostile programs and package contents by design. Resource-limit
+WASM-OJ executes hostile programs and package contents by design. Resource-limit
 termination, rejected unsigned assets, unavailable capabilities, and local test
 data visibility are expected behavior unless they violate the documented
 [host integration contract](docs/host-integration-contract.md).

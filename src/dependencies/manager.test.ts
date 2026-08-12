@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { sha256Hex } from "../core/hash.ts";
 import { dependencyManifestSha256 } from "./lock.ts";
 import { DEPENDENCY_RESOLUTION_LIMITS } from "./limits.ts";
-import { ForgeDependencyManager, MemoryDependencyCache } from "./manager.ts";
+import { DependencyManager, MemoryDependencyCache } from "./manager.ts";
 import { DependencyNetworkError, NpmLockDependencyResolver } from "./resolvers.ts";
-import type { ForgeDependencyResolver } from "./types.ts";
+import type { DependencyResolver } from "./types.ts";
 
-describe("ForgeDependencyManager", () => {
+describe("DependencyManager", () => {
   it("resolves, locks, exports, and imports one content-addressed graph", async () => {
     const payload = new TextEncoder().encode("serde archive");
     const digest = await sha256Hex(payload);
-    const resolver: ForgeDependencyResolver = {
+    const resolver: DependencyResolver = {
       ecosystem: "cargo",
       async resolve(_manifest, context) {
         expect(context.previousLock).toBeUndefined();
@@ -29,7 +29,7 @@ describe("ForgeDependencyManager", () => {
         };
       },
     };
-    const manager = new ForgeDependencyManager(new MemoryDependencyCache(), [resolver]);
+    const manager = new DependencyManager(new MemoryDependencyCache(), [resolver]);
     const manifest = {
       requirements: [{ ecosystem: "cargo" as const, name: "serde", requirement: "=1.0.228" }],
       sourceFiles: [{
@@ -43,14 +43,14 @@ describe("ForgeDependencyManager", () => {
     expect([...await manager.materialize(lock)]).toEqual([["cargo:serde@1.0.228", payload]]);
     expect(await manager.resolve(manifest, { offline: true, previousLock: lock })).toEqual(lock);
     const bundle = await manager.exportOffline(lock);
-    const offline = new ForgeDependencyManager(new MemoryDependencyCache());
+    const offline = new DependencyManager(new MemoryDependencyCache());
     const imported = await offline.importOffline(bundle);
     expect(imported).toEqual(lock);
     expect(await offline.resolve(manifest, { offline: true, previousLock: imported })).toEqual(lock);
   });
 
   it("fails closed before storing a corrupt resolver payload", async () => {
-    const resolver: ForgeDependencyResolver = {
+    const resolver: DependencyResolver = {
       ecosystem: "npm",
       async resolve() {
         return {
@@ -68,14 +68,14 @@ describe("ForgeDependencyManager", () => {
         };
       },
     };
-    const manager = new ForgeDependencyManager(new MemoryDependencyCache(), [resolver]);
+    const manager = new DependencyManager(new MemoryDependencyCache(), [resolver]);
     await expect(manager.resolve({ requirements: [{ ecosystem: "npm", name: "answer", requirement: "1.0.0" }] }))
       .rejects.toThrow("corrupt payload");
   });
 
   it("never invokes a resolver for offline resolution and binds locks to the canonical manifest", async () => {
-    const resolver: ForgeDependencyResolver = { ecosystem: "npm", resolve: async () => { throw new Error("network used"); } };
-    const manager = new ForgeDependencyManager(new MemoryDependencyCache(), [resolver]);
+    const resolver: DependencyResolver = { ecosystem: "npm", resolve: async () => { throw new Error("network used"); } };
+    const manager = new DependencyManager(new MemoryDependencyCache(), [resolver]);
     await expect(manager.resolve({
       requirements: [{ ecosystem: "npm", name: "@scope/package", requirement: "1.0.0" }],
     }, { offline: true })).rejects.toThrow("requires a previous lock");
@@ -97,7 +97,7 @@ describe("ForgeDependencyManager", () => {
       integritySha256: digest,
       dependencies: [],
     };
-    const priming = new ForgeDependencyManager(cache, [{
+    const priming = new DependencyManager(cache, [{
       ecosystem: "npm",
       resolve: async () => ({
         roots: [packageRecord.id],
@@ -111,7 +111,7 @@ describe("ForgeDependencyManager", () => {
       bundleDigest: "a".repeat(64),
       hosts: ["registry.npmjs.org"],
     };
-    const transportFailure = new ForgeDependencyManager(cache, [{
+    const transportFailure = new DependencyManager(cache, [{
       ecosystem: "npm",
       resolve: async () => { throw new DependencyNetworkError("registry.npmjs.org"); },
     }]);
@@ -135,7 +135,7 @@ describe("ForgeDependencyManager", () => {
     })).rejects.toBeInstanceOf(DependencyNetworkError);
 
     for (const failure of ["HTTP 503", "malformed registry metadata", "integrity mismatch"]) {
-      const protocolFailure = new ForgeDependencyManager(cache, [{
+      const protocolFailure = new DependencyManager(cache, [{
         ecosystem: "npm",
         resolve: async () => { throw new Error(failure); },
       }]);
@@ -146,7 +146,7 @@ describe("ForgeDependencyManager", () => {
       })).rejects.toThrow(failure);
     }
 
-    const emptyCacheFailure = new ForgeDependencyManager(new MemoryDependencyCache(), [{
+    const emptyCacheFailure = new DependencyManager(new MemoryDependencyCache(), [{
       ecosystem: "npm",
       resolve: async () => { throw new DependencyNetworkError("registry.npmjs.org"); },
     }]);
@@ -182,7 +182,7 @@ describe("ForgeDependencyManager", () => {
       }],
     };
     const cache = new MemoryDependencyCache();
-    const priming = new ForgeDependencyManager(cache, [{
+    const priming = new DependencyManager(cache, [{
       ecosystem: "npm",
       resolve: async () => ({
         roots: ["npm:answer@1.0.0"],
@@ -208,7 +208,7 @@ describe("ForgeDependencyManager", () => {
       status: 302,
       headers: { location: "https://packages.example.com/answer-1.0.0.tgz" },
     });
-    const manager = new ForgeDependencyManager(cache, [new NpmLockDependencyResolver({
+    const manager = new DependencyManager(cache, [new NpmLockDependencyResolver({
       fetch: fetcher,
       networkAuthorizer: { authorize: async () => undefined },
     })]);
@@ -224,11 +224,11 @@ describe("ForgeDependencyManager", () => {
   });
 
   it("rejects an oversized manifest before invoking a resolver", async () => {
-    const resolver: ForgeDependencyResolver = {
+    const resolver: DependencyResolver = {
       ecosystem: "npm",
       async resolve() { throw new Error("resolver must not run"); },
     };
-    const manager = new ForgeDependencyManager(new MemoryDependencyCache(), [resolver]);
+    const manager = new DependencyManager(new MemoryDependencyCache(), [resolver]);
     const requirements = Array.from(
       { length: DEPENDENCY_RESOLUTION_LIMITS.requirements + 1 },
       (_, index) => ({ ecosystem: "npm" as const, name: `package-${index}`, requirement: "1.0.0" }),

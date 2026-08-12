@@ -13,7 +13,7 @@ const problemVersionId = "018f0d8a-7110-7cc8-9f08-15b28df8307b";
 describe("online judge contracts", () => {
   it("accepts only source-based official submissions", () => {
     const request = parseOfficialSubmissionRequest({
-      managedProblemVersionId: problemVersionId,
+      problemVersionId,
       language: "c",
       target: "wasip1",
       optimization: "release",
@@ -28,7 +28,7 @@ describe("online judge contracts", () => {
 
   it("enforces source limits and normalized paths", () => {
     const base = {
-      managedProblemVersionId: problemVersionId,
+      problemVersionId,
       language: "c",
       target: "wasip1",
       optimization: "release",
@@ -73,17 +73,33 @@ describe("online judge contracts", () => {
       sequence: 2,
       timestamp: "2026-08-09T01:02:03.000Z",
     };
+    const summary = {
+      state: "running",
+      verdict: null,
+      score: null,
+      fullyPassedCases: null,
+      deterministicCost: null,
+      peakMemoryBytes: null,
+      updatedAt: "2026-08-09T01:02:03.000Z",
+      completedAt: null,
+    };
     expect(parseSequencedSubmissionEvent(event)).toEqual(event);
-    expect(parseSubmissionEventReplay({ events: [event], nextCursor: 2, state: "running" })).toEqual({
+    expect(parseSubmissionEventReplay({ events: [event], nextCursor: 2, summary })).toEqual({
       events: [event],
       nextCursor: 2,
-      state: "running",
+      summary,
     });
     expect(() => parseSequencedSubmissionEvent({ ...event, stdout: "hidden" })).toThrow("shape");
+    expect(() => parseSequencedSubmissionEvent({
+      kind: "state",
+      state: "waiting-capacity",
+      sequence: 3,
+      timestamp: event.timestamp,
+    })).toThrow("state");
     expect(() => parseSequencedSubmissionEvent({ ...event, timestamp: "2026-08-09 01:02:03Z" })).toThrow("timestamp");
-    expect(() => parseSubmissionEventReplay({ events: [{ ...event, sequence: 3 }, event], nextCursor: 3, state: "running" })).toThrow("ordered");
-    expect(() => parseSubmissionEventReplay({ events: [event], nextCursor: 1, state: "running" })).toThrow("next cursor");
-    expect(() => parseSubmissionEventReplay({ events: Array.from({ length: 101 }, () => event), nextCursor: 2, state: "running" })).toThrow("100 event");
+    expect(() => parseSubmissionEventReplay({ events: [{ ...event, sequence: 3 }, event], nextCursor: 3, summary })).toThrow("ordered");
+    expect(() => parseSubmissionEventReplay({ events: [event], nextCursor: 1, summary })).toThrow("next cursor");
+    expect(() => parseSubmissionEventReplay({ events: Array.from({ length: 101 }, () => event), nextCursor: 2, summary })).toThrow("100 event");
   });
 
   it("orders leaderboard entries by the published deterministic rules", () => {

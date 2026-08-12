@@ -6,17 +6,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { sourceTreeProvenance } from "../src/conformance/provenance.ts";
-import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "../src/core/contract.ts";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "../src/core/contract.ts";
 
-const EXPERIMENT_ID = `forge-contract-${FORGE_CONTRACT_VERSION}-conformance`;
+const EXPERIMENT_ID = `wasm-oj-contract-${WASM_OJ_CONTRACT_VERSION}-conformance`;
 const SPEC_PATH = path.resolve(`experiments/${EXPERIMENT_ID}/SPEC.md`);
 const RAW_DIRECTORY = path.resolve(`experiments/${EXPERIMENT_ID}/runs/raw/records`);
 const NETWORK_POLICY = "loopback-same-origin-http";
-const suite = process.env.FORGE_CONFORMANCE_SUITE === "full" ? "full" : "default";
-const requestedCases = process.env.FORGE_CONFORMANCE_CASES?.split(",").filter(Boolean) ?? [];
-const repetitions = Number(process.env.FORGE_CONFORMANCE_REPETITIONS ?? "3");
+const suite = process.env.WASM_OJ_CONFORMANCE_SUITE === "full" ? "full" : "default";
+const requestedCases = process.env.WASM_OJ_CONFORMANCE_CASES?.split(",").filter(Boolean) ?? [];
+const repetitions = Number(process.env.WASM_OJ_CONFORMANCE_REPETITIONS ?? "3");
 if (!Number.isInteger(repetitions) || repetitions < 2) {
-  throw new Error("FORGE_CONFORMANCE_REPETITIONS must be an integer of at least 2.");
+  throw new Error("WASM_OJ_CONFORMANCE_REPETITIONS must be an integer of at least 2.");
 }
 const urlArgument = process.argv[2];
 if (process.argv.length > 3) throw new Error("Usage: node scripts/run-browser-conformance.mjs [base-url]");
@@ -89,11 +89,11 @@ async function main() {
     if (requestedCases.length > 0) target.searchParams.set("cases", requestedCases.join(","));
     await page.goto(target.toString(), { waitUntil: "domcontentloaded", timeout: 120_000 });
     await page.waitForFunction(
-      () => Boolean(window.__FORGE_CONFORMANCE__) || Boolean(document.querySelector("[data-testid=conformance-error]")),
+      () => Boolean(window.__WASM_OJ_CONFORMANCE__) || Boolean(document.querySelector("[data-testid=conformance-error]")),
       undefined,
       { timeout: 1_800_000 },
     );
-    snapshot = await page.evaluate(() => window.__FORGE_CONFORMANCE__);
+    snapshot = await page.evaluate(() => window.__WASM_OJ_CONFORMANCE__);
     failure = await page.locator("[data-testid=conformance-error]").textContent().catch(() => undefined);
     browserEnvironment = await page.evaluate(() => ({
       userAgent: navigator.userAgent,
@@ -122,18 +122,18 @@ async function main() {
   }
 
   const record = {
-    schema: FORGE_SCHEMAS.conformanceEvidence,
+    schema: WASM_OJ_SCHEMAS.conformanceEvidence,
     experimentId: EXPERIMENT_ID,
     runId,
     collectedAt: new Date().toISOString(),
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     suite,
     specPath: path.relative(process.cwd(), SPEC_PATH),
     specSha256: sha256(spec),
     executionCommand: [
-      suite === "full" ? "FORGE_CONFORMANCE_SUITE=full" : "",
-      requestedCases.length > 0 ? `FORGE_CONFORMANCE_CASES=${requestedCases.join(",")}` : "",
-      repetitions === 3 ? "" : `FORGE_CONFORMANCE_REPETITIONS=${repetitions}`,
+      suite === "full" ? "WASM_OJ_CONFORMANCE_SUITE=full" : "",
+      requestedCases.length > 0 ? `WASM_OJ_CONFORMANCE_CASES=${requestedCases.join(",")}` : "",
+      repetitions === 3 ? "" : `WASM_OJ_CONFORMANCE_REPETITIONS=${repetitions}`,
       urlArgument ? `pnpm run conformance:browser ${urlArgument}` : "pnpm run conformance:browser",
     ].filter(Boolean).join(" "),
     gitHead: git("rev-parse", "HEAD"),
@@ -155,7 +155,7 @@ async function main() {
   await mkdir(RAW_DIRECTORY, { recursive: true });
   const output = path.join(RAW_DIRECTORY, `${runId}.json`);
   await writeFile(output, `${JSON.stringify(record, null, 2)}\n`, { flag: "wx" });
-  process.stdout.write(`FORGE_BROWSER_CONFORMANCE_EVIDENCE=${output}\n`);
+  process.stdout.write(`WASM_OJ_BROWSER_CONFORMANCE_EVIDENCE=${output}\n`);
 
   const invalid = failure
     || !networkProof.localBaseUrl
@@ -163,7 +163,7 @@ async function main() {
     || consoleErrors.length > 0
     || pageErrors.length > 0
     || !snapshot
-    || snapshot.schema !== FORGE_SCHEMAS.conformance
+    || snapshot.schema !== WASM_OJ_SCHEMAS.conformance
     || snapshot.samples?.some((sample) => !sample.success);
   if (invalid) {
     process.stderr.write(`${failure ?? "Browser conformance failed validation."}\n`);

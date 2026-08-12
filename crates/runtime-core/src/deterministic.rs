@@ -80,7 +80,7 @@ impl VirtualClockState {
         };
         origin
             .checked_add(self.elapsed_ns)
-            .ok_or_else(|| RuntimeError::new("Forge virtual clock overflowed"))
+            .ok_or_else(|| RuntimeError::new("WASM-OJ virtual clock overflowed"))
     }
 
     fn advance_to(&mut self, target_ns: u64) -> Result<(), RuntimeError> {
@@ -90,7 +90,7 @@ impl VirtualClockState {
         if target_ns > self.limit_ns {
             self.elapsed_ns = self.limit_ns;
             self.limit_exceeded = true;
-            return Err(RuntimeError::new("Forge logical time budget exhausted"));
+            return Err(RuntimeError::new("WASM-OJ logical time budget exhausted"));
         }
         self.elapsed_ns = target_ns;
         Ok(())
@@ -144,7 +144,7 @@ impl VirtualClock {
         let target = state
             .elapsed_ns
             .checked_add(state.step_ns)
-            .ok_or_else(|| RuntimeError::new("Forge virtual clock overflowed"))?;
+            .ok_or_else(|| RuntimeError::new("WASM-OJ virtual clock overflowed"))?;
         state.advance_to(target)?;
         Ok(value)
     }

@@ -2,9 +2,9 @@ import { projectCacheKeyForCompiler } from "../core/hash";
 import { assertValidBuildArtifact } from "../core/artifact-validation";
 import { assertValidProject } from "../core/project-validation";
 import type { BuildArtifact, BuildResult, Project } from "../core/types";
-import type { ForgeCompiler } from "./compiler";
+import type { Compiler } from "./compiler";
 
-export interface ForgeArtifactStore {
+export interface ArtifactStore {
   load(cacheKey: string): Promise<BuildArtifact | undefined>;
   save(artifact: BuildArtifact): Promise<void>;
   delete(cacheKey: string): Promise<void>;
@@ -43,8 +43,8 @@ export class CompileCoordinator {
   private readonly cacheMutationTails = new Map<string, Promise<void>>();
 
   constructor(
-    private readonly compiler: ForgeCompiler,
-    private readonly artifactStore?: ForgeArtifactStore,
+    private readonly compiler: Compiler,
+    private readonly artifactStore?: ArtifactStore,
   ) {}
 
   compile(project: Project, options: CoordinatorCompileOptions = {}): Promise<BuildResult> {
@@ -203,7 +203,7 @@ export class CompileCoordinator {
     const promise = this.compiler.build(project, cacheKey).then(async (result) => {
       if (state.superseded) throw new Error("Compilation was superseded.");
       if (result.success) {
-        if (!result.artifact) throw new Error("ForgeCompiler returned success without an artifact.");
+        if (!result.artifact) throw new Error("Compiler returned success without an artifact.");
         assertValidBuildArtifact(result.artifact, { project, cacheKey });
         const artifact = result.artifact;
         const artifactStore = this.artifactStore;
@@ -224,7 +224,7 @@ export class CompileCoordinator {
           });
         }
       } else if (result.artifact) {
-        throw new Error("ForgeCompiler returned an artifact for a failed build.");
+        throw new Error("Compiler returned an artifact for a failed build.");
       }
       if (state.superseded) throw new Error("Compilation was superseded.");
       return result;

@@ -3,10 +3,16 @@ import { assertValidBuildArtifact } from "../core/artifact-validation";
 import { canonicalFileEntries } from "../core/project-files";
 import {
   createDefaultCostBaselineRegistry,
+  resolveCostBudget,
   resolveArtifactCostBudget,
   type CostBaselineRegistry,
   type CostBudget,
 } from "../core/cost";
+import { costProfileId } from "../core/cost-profile";
+import {
+  validateTrustedJudgeWasm,
+  type TrustedJudgeProgram,
+} from "../online-judge/trusted-judge-wasm";
 import {
   PYTHON_PACKAGE,
   PYTHON_RUNTIME_FILES_ARCHIVE_SHA256,
@@ -194,8 +200,8 @@ const __input = ${JSON.stringify(stdin)};
 const __cache = Object.create(null);
 const __std = {
   in: { readAsString: () => __input },
-  out: { puts: (value) => __forge_write_stdout(String(value)) },
-  err: { puts: (value) => __forge_write_stderr(String(value)) },
+  out: { puts: (value) => __wasm_oj_write_stdout(String(value)) },
+  err: { puts: (value) => __wasm_oj_write_stderr(String(value)) },
 };
 function __resolve(request, parent) {
   if (request === "std") return request;
@@ -409,4 +415,44 @@ export async function prepareArtifactInteraction(
     );
   }
   return driver.prepare(artifact, config, resolver);
+}
+
+/** Prepare a statically admitted judge command without fabricating compiler artifact metadata. */
+export function prepareTrustedJudgeRun(
+  program: TrustedJudgeProgram,
+  config: RunConfig,
+  costBaselines = createDefaultCostBaselineRegistry(),
+): PreparedRunRequest {
+  if (!program || typeof program !== "object" || !(program.wasm instanceof Uint8Array)) {
+    throw new TypeError("Trusted judge program is invalid.");
+  }
+  validateTrustedJudgeWasm(program.wasm, { memoryLimitBytes: config.resources.memoryLimitBytes });
+  const [language, target, optimization] = program.runtimeProfile.split("-") as [string, "wasip1", "release"];
+  const cost = resolveCostBudget(
+    costProfileId(language, target, optimization),
+    config.resources.instructionBudget,
+    costBaselines,
+  );
+  const stdin = encoder.encode(config.stdin);
+  if (stdin.byteLength > RUN_INPUT_LIMITS.stdinBytes) throw new Error(`Run stdin exceeds ${RUN_INPUT_LIMITS.stdinBytes} bytes.`);
+  return {
+    wasm: program.wasm.slice(),
+    args: [...config.args],
+    env: deterministicEnvironment(config.env, config.determinism),
+    stdin,
+    files: validatedRunFiles(config.files ?? {}),
+    outputPaths: validatedOutputPaths(config.outputPaths ?? []),
+    ...(config.cwd === undefined ? {} : { cwd: validatedGuestDirectory(config.cwd, "Run cwd") }),
+    startupEntropyBytes: language === "go" ? GO_RUNTIME_STARTUP_ENTROPY_BYTES : 0,
+    cost,
+    determinism: { ...config.determinism },
+    resources: {
+      instructionBudget: cost.rawInstructionBudget,
+      logicalTimeLimitMs: config.resources.logicalTimeLimitMs,
+      memoryLimitBytes: config.resources.memoryLimitBytes,
+      outputLimitBytes: config.resources.outputLimitBytes,
+      filesystemWriteLimitBytes: config.resources.filesystemWriteLimitBytes,
+      filesystemEntryLimit: config.resources.filesystemEntryLimit,
+    },
+  };
 }

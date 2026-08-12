@@ -1,4 +1,4 @@
-import { FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 import {
   CLANG_CC1_PINS_SHA256,
@@ -7,7 +7,7 @@ import {
   CLANG_VERSION,
 } from "../core/toolchains.ts";
 
-export const FORGE_LIBCXX_PCH_HEADER = `#pragma once
+export const WASM_OJ_LIBCXX_PCH_HEADER = `#pragma once
 #include <algorithm>
 #include <array>
 #include <bitset>
@@ -67,11 +67,11 @@ export interface LibcxxPchAsset {
 }
 
 export interface LibcxxPchManifest {
-  schema: typeof FORGE_SCHEMAS.clangLibcxxPch;
+  schema: typeof WASM_OJ_SCHEMAS.clangLibcxxPch;
   version: typeof CLANG_VERSION;
   clangPackageSha256: typeof CLANG_PACKAGE_SHA256;
   clangPinsSha256: typeof CLANG_CC1_PINS_SHA256;
-  header: typeof FORGE_LIBCXX_PCH_HEADER;
+  header: typeof WASM_OJ_LIBCXX_PCH_HEADER;
   headerSha256: string;
   profiles: Readonly<Record<LibcxxPchProfile, LibcxxPchAsset>>;
 }
@@ -87,13 +87,13 @@ export async function decodeLibcxxPchManifest(bytes: Uint8Array): Promise<Libcxx
   try { value = JSON.parse(decoder.decode(bytes)); } catch (error) {
     throw new Error("Pinned libc++ PCH manifest is not valid JSON.", { cause: error });
   }
-  if (!isRecord(value) || value.schema !== FORGE_SCHEMAS.clangLibcxxPch
+  if (!isRecord(value) || value.schema !== WASM_OJ_SCHEMAS.clangLibcxxPch
     || value.version !== CLANG_VERSION || value.clangPackageSha256 !== CLANG_PACKAGE_SHA256
-    || value.clangPinsSha256 !== CLANG_CC1_PINS_SHA256 || value.header !== FORGE_LIBCXX_PCH_HEADER
+    || value.clangPinsSha256 !== CLANG_CC1_PINS_SHA256 || value.header !== WASM_OJ_LIBCXX_PCH_HEADER
     || !isRecord(value.profiles)) {
     throw new Error("Pinned libc++ PCH manifest is not admitted by the active Clang toolchain contract.");
   }
-  if (value.headerSha256 !== await sha256Hex(FORGE_LIBCXX_PCH_HEADER)) {
+  if (value.headerSha256 !== await sha256Hex(WASM_OJ_LIBCXX_PCH_HEADER)) {
     throw new Error("Pinned libc++ PCH header digest does not match its canonical source.");
   }
   const manifestProfiles = value.profiles;
@@ -116,18 +116,18 @@ export async function decodeLibcxxPchManifest(bytes: Uint8Array): Promise<Libcxx
     throw new Error("Pinned libc++ PCH manifest has an unexpected profile set.");
   }
   return {
-    schema: FORGE_SCHEMAS.clangLibcxxPch,
+    schema: WASM_OJ_SCHEMAS.clangLibcxxPch,
     version: CLANG_VERSION,
     clangPackageSha256: CLANG_PACKAGE_SHA256,
     clangPinsSha256: CLANG_CC1_PINS_SHA256,
-    header: FORGE_LIBCXX_PCH_HEADER,
+    header: WASM_OJ_LIBCXX_PCH_HEADER,
     headerSha256: value.headerSha256,
     profiles,
   };
 }
 
 export function isToolchainLibcxxPchHeader(contents: string): boolean {
-  return contents === FORGE_LIBCXX_PCH_HEADER;
+  return contents === WASM_OJ_LIBCXX_PCH_HEADER;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,12 +1,13 @@
 import handler from "vinext/server/app-router-entry";
 import { apiErrorResponse, jsonResponse } from "./http";
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 import { beginGithubLogin, completeGithubLogin, logout, sessionResponse } from "./auth";
 import {
   cancelSubmission,
   createSubmission,
   getSubmission,
   getSubmissionEvents,
+  getSubmissionPolicySummary,
   listOwnSubmissions,
   managedMatch,
   publicSubmissionSource,
@@ -15,17 +16,11 @@ import {
 import {
   beginGithubAppInstall,
   completeGithubAppInstall,
-  createCollectionImport,
-  getCollectionImport,
   githubWebhook,
-  listCollectionImports,
   listOrganizerRepositories,
   organizerStatus,
-  publishCollectionImport,
-  retryCollectionImport,
 } from "./organizer";
 import {
-  acknowledgeRepositoryPushNotice,
   contestLeaderboard,
   createContest,
   currentProfile,
@@ -33,11 +28,10 @@ import {
   getOrganizerContest,
   joinContest,
   listOrganizerContests,
-  listRepositoryPushNotices,
   listContests,
-  listOrganizerCollections,
   listProblems,
   managedProblemProjection,
+  problemPerformance,
   problemLeaderboard,
   publicProfile,
   publishContest,
@@ -45,9 +39,21 @@ import {
   updateOrganizerContest,
   updateProfile,
 } from "./product";
+import {
+  activateCatalogPublication,
+  createCatalogPublication,
+  createCatalogValidation,
+  createProblemCollection,
+  getCatalogPublication,
+  getCatalogValidation,
+  listCatalogPublications,
+  listProblemCollections,
+  publicProblemContent,
+} from "./catalog";
 import { reconcile } from "./reconciler";
 import {
   createOrganizerApplication,
+  activateProductionRelease,
   getFormalMutationControl,
   listOrganizerApplications,
   revokeOrganizerRole,
@@ -62,8 +68,9 @@ import { TURNSTILE_CHALLENGE_PATH, turnstileChallengeResponse } from "./turnstil
 
 export { withSecurityHeaders } from "./security-headers";
 
-export { SubmissionJudgeContainer, ValidationJudgeContainer } from "./judge-container";
-export { SubmissionWorkflow, ValidationWorkflow } from "./workflows";
+export { SubmissionJudgeContainer } from "./judge-container";
+export { SubmissionWorkflow } from "./workflows";
+export { CatalogWorkflow } from "./catalog-workflows";
 export { ContainerProxy } from "@cloudflare/containers";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
@@ -82,7 +89,7 @@ export function isBrowserAssetPath(pathname: string): boolean {
     || pathname === "/vinext-client-entry-manifest.json";
 }
 
-async function api(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const url = new URL(request.url);
   const { pathname } = url;
   if (request.method === "GET" && pathname === "/api/health/live") return jsonResponse({ ok: true });
@@ -99,6 +106,7 @@ async function api(request: Request, env: ForgeWorkerEnv): Promise<Response> {
   if (request.method === "POST" && pathname === "/api/organizer/applications") return createOrganizerApplication(request, env);
   if (request.method === "GET" && pathname === "/api/admin/organizer-applications") return listOrganizerApplications(request, env);
   if (request.method === "GET" && pathname === "/api/admin/formal-mutations") return getFormalMutationControl(request, env);
+  if (request.method === "POST" && pathname === "/api/admin/releases/activate") return activateProductionRelease(request, env);
   if (request.method === "POST" && pathname === "/api/admin/formal-mutations/pause") return updateFormalMutationControl(request, env, false);
   if (request.method === "POST" && pathname === "/api/admin/formal-mutations/resume") return updateFormalMutationControl(request, env, true);
   const applicationId = identifier(pathname, new RegExp(`^/api/admin/organizer-applications/(${UUID})/review$`));
@@ -110,18 +118,19 @@ async function api(request: Request, env: ForgeWorkerEnv): Promise<Response> {
   if (request.method === "GET" && pathname === "/api/organizer/github/install") return beginGithubAppInstall(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/github/callback") return completeGithubAppInstall(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/repositories") return listOrganizerRepositories(request, env);
-  if (request.method === "GET" && pathname === "/api/organizer/notices") return listRepositoryPushNotices(request, env);
-  const repositoryNoticeId = identifier(pathname, new RegExp(`^/api/organizer/notices/(${UUID})/acknowledge$`));
-  if (request.method === "POST" && repositoryNoticeId) return acknowledgeRepositoryPushNotice(request, env, repositoryNoticeId);
-  if (request.method === "GET" && pathname === "/api/organizer/imports") return listCollectionImports(request, env);
-  if (request.method === "GET" && pathname === "/api/organizer/collections") return listOrganizerCollections(request, env);
-  if (request.method === "POST" && pathname === "/api/organizer/imports") return createCollectionImport(request, env);
-  const importId = identifier(pathname, new RegExp(`^/api/organizer/imports/(${UUID})$`));
-  if (request.method === "GET" && importId) return getCollectionImport(request, env, importId);
-  const publishImportId = identifier(pathname, new RegExp(`^/api/organizer/imports/(${UUID})/publish$`));
-  if (request.method === "POST" && publishImportId) return publishCollectionImport(request, env, publishImportId);
-  const retryImportId = identifier(pathname, new RegExp(`^/api/organizer/imports/(${UUID})/retry$`));
-  if (request.method === "POST" && retryImportId) return retryCollectionImport(request, env, retryImportId);
+  if (request.method === "GET" && pathname === "/api/organizer/collections") return listProblemCollections(request, env);
+  if (request.method === "GET" && pathname === "/api/organizer/publications") return listCatalogPublications(request, env);
+  if (request.method === "POST" && pathname === "/api/organizer/collections") return createProblemCollection(request, env);
+  const validationCollectionId = identifier(pathname, new RegExp(`^/api/organizer/collections/(${UUID})/validations$`));
+  if (request.method === "POST" && validationCollectionId) return createCatalogValidation(request, env, validationCollectionId);
+  const validationId = identifier(pathname, new RegExp(`^/api/organizer/validations/(${UUID})$`));
+  if (request.method === "GET" && validationId) return getCatalogValidation(request, env, validationId);
+  const publicationRevisionId = identifier(pathname, new RegExp(`^/api/organizer/revisions/(${UUID})/publications$`));
+  if (request.method === "POST" && publicationRevisionId) return createCatalogPublication(request, env, publicationRevisionId);
+  const publicationJobId = identifier(pathname, new RegExp(`^/api/organizer/publications/(${UUID})$`));
+  if (request.method === "GET" && publicationJobId) return getCatalogPublication(request, env, publicationJobId);
+  const activatePublicationId = identifier(pathname, new RegExp(`^/api/organizer/publications/(${UUID})/activate$`));
+  if (request.method === "POST" && activatePublicationId) return activateCatalogPublication(request, env, activatePublicationId);
   if (request.method === "GET" && pathname === "/api/organizer/contests") return listOrganizerContests(request, env);
   const organizerContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})$`));
   if (request.method === "GET" && organizerContestId) return getOrganizerContest(request, env, organizerContestId);
@@ -147,6 +156,8 @@ async function api(request: Request, env: ForgeWorkerEnv): Promise<Response> {
   if (request.method === "POST" && cancelSubmissionId) return cancelSubmission(request, env, cancelSubmissionId);
   const sourceSubmissionId = identifier(pathname, new RegExp(`^/api/submissions/(${UUID})/source$`));
   if (request.method === "GET" && sourceSubmissionId) return publicSubmissionSource(request, env, sourceSubmissionId);
+  const policySummarySubmissionId = identifier(pathname, new RegExp(`^/api/submissions/(${UUID})/policy-summary$`));
+  if (request.method === "GET" && policySummarySubmissionId) return getSubmissionPolicySummary(request, env, policySummarySubmissionId);
   if (request.method === "GET" && pathname === "/api/collections/managed-match") return managedMatch(request, env);
 
   if (request.method === "GET" && pathname === "/api/profile") return currentProfile(request, env);
@@ -156,8 +167,12 @@ async function api(request: Request, env: ForgeWorkerEnv): Promise<Response> {
   if (request.method === "GET" && pathname === "/api/problems") return listProblems(request, env);
   const problemId = identifier(pathname, new RegExp(`^/api/problems/(${UUID})$`));
   if (request.method === "GET" && problemId) return managedProblemProjection(request, env, problemId);
+  const problemContentId = identifier(pathname, new RegExp(`^/api/problems/(${UUID})/content$`));
+  if (request.method === "GET" && problemContentId) return publicProblemContent(request, env, problemContentId);
   const problemLeaderboardId = identifier(pathname, new RegExp(`^/api/problems/(${UUID})/leaderboard$`));
   if (request.method === "GET" && problemLeaderboardId) return problemLeaderboard(request, env, problemLeaderboardId);
+  const problemPerformanceId = identifier(pathname, new RegExp(`^/api/problems/(${UUID})/performance$`));
+  if (request.method === "GET" && problemPerformanceId) return problemPerformance(request, env, problemPerformanceId);
   if (request.method === "GET" && pathname === "/api/contests") return listContests(request, env);
   if (request.method === "POST" && pathname === "/api/contests") return createContest(request, env);
   const contestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})$`));
@@ -173,7 +188,7 @@ async function api(request: Request, env: ForgeWorkerEnv): Promise<Response> {
 }
 
 const worker = {
-  async fetch(request: Request, env: ForgeWorkerEnv, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: WasmOjWorkerEnv, ctx: ExecutionContext): Promise<Response> {
     try {
       const pathname = new URL(request.url).pathname;
       if (pathname === TURNSTILE_CHALLENGE_PATH) return turnstileChallengeResponse(request, env);
@@ -189,7 +204,7 @@ const worker = {
     }
   },
 
-  async scheduled(_controller: ScheduledController, env: ForgeWorkerEnv, ctx: ExecutionContext): Promise<void> {
+  async scheduled(_controller: ScheduledController, env: WasmOjWorkerEnv, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(reconcile(env));
   },
 };

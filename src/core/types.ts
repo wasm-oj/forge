@@ -1,5 +1,4 @@
-import { FORGE_CONTRACT_VERSION, FORGE_SCHEMAS } from "./contract.ts";
-import type { DependencyBuildBundle } from "../dependencies/build.ts";
+import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "./contract.ts";
 
 export const LANGUAGES = Object.freeze([
   "c",
@@ -14,7 +13,7 @@ export type BuiltinLanguage = (typeof LANGUAGES)[number];
 /**
  * Stable language identity carried by projects and artifacts.
  *
- * Forge ships the values in `LANGUAGES`; downstream compiler implementations
+ * WASM-OJ ships the values in `LANGUAGES`; downstream compiler implementations
  * may use their own non-empty identifier without forking the contract.
  */
 export type Language = BuiltinLanguage | (string & {});
@@ -30,6 +29,67 @@ export function isBuiltinLanguage(language: string): language is BuiltinLanguage
 }
 export type TargetAbi = "wasip1" | "wasix";
 export type OptimizationLevel = "debug" | "release";
+
+export const DEPENDENCY_ECOSYSTEMS = Object.freeze([
+  "cargo",
+  "npm",
+  "pypi",
+  "go",
+  "cpp",
+] as const);
+
+export type DependencyEcosystem = (typeof DEPENDENCY_ECOSYSTEMS)[number];
+
+export interface DependencyRequirement {
+  ecosystem: DependencyEcosystem;
+  name: string;
+  requirement: string;
+  features?: readonly string[];
+}
+
+export interface DependencySourceFile {
+  ecosystem: DependencyEcosystem;
+  role: "manifest" | "lockfile" | "source";
+  path: string;
+  contents: string;
+}
+
+export interface DependencyManifest {
+  requirements: readonly DependencyRequirement[];
+  sourceFiles?: readonly DependencySourceFile[];
+}
+
+export interface LockedDependencyPackage {
+  id: string;
+  ecosystem: DependencyEcosystem;
+  name: string;
+  version: string;
+  source: string;
+  integritySha256: string;
+  dependencies: readonly string[];
+  features?: readonly string[];
+}
+
+export interface DependencyLock {
+  schema: typeof WASM_OJ_SCHEMAS.dependencyLock;
+  wasmOjContract: typeof WASM_OJ_CONTRACT_VERSION;
+  manifestSha256: string;
+  roots: readonly string[];
+  packages: readonly LockedDependencyPackage[];
+}
+
+export interface MaterializedDependencyPackage {
+  package: LockedDependencyPackage;
+  filesSha256: string;
+  files: Readonly<Record<string, Uint8Array>>;
+}
+
+/** Archive-independent, fully verified dependency input admitted by compilers. */
+export interface DependencyBuildBundle {
+  lock: DependencyLock;
+  lockSha256: string;
+  packages: readonly MaterializedDependencyPackage[];
+}
 
 export interface ProjectFile {
   path: string;
@@ -147,8 +207,8 @@ export interface Diagnostic {
 }
 
 export interface ArtifactMetadata {
-  /** Forge compatibility contract required to consume this artifact. */
-  forgeContract: typeof FORGE_CONTRACT_VERSION;
+  /** WASM-OJ compatibility contract required to consume this artifact. */
+  wasmOjContract: typeof WASM_OJ_CONTRACT_VERSION;
   id: string;
   projectId: string;
   cacheKey: string;
@@ -269,6 +329,45 @@ export interface BrowserRuntimeDriverPlugin {
   exportName?: string;
 }
 
+export interface ToolchainProfile {
+  language: Language;
+  target: TargetAbi;
+  optimization: OptimizationLevel;
+}
+
+export interface ToolchainAssetDescriptor {
+  /** Logical filename expected by the compiler/runtime implementation. */
+  path: string;
+  bytes: number;
+  sha256: string;
+  /** Exact package export used by deployment tooling. */
+  exportPath: string;
+}
+
+export interface ToolchainDescriptor {
+  schema: typeof WASM_OJ_SCHEMAS.toolchainPackage;
+  id: string;
+  version: string;
+  wasmOjContract: typeof WASM_OJ_CONTRACT_VERSION;
+  languages: readonly Language[];
+  profiles: readonly ToolchainProfile[];
+  assets: readonly ToolchainAssetDescriptor[];
+}
+
+export interface BrowserToolchainSource {
+  kind: "browser";
+  descriptor: ToolchainDescriptor;
+  baseUrl: string;
+}
+
+export interface ServerToolchainSource {
+  kind: "server";
+  descriptor: ToolchainDescriptor;
+  directory: URL;
+}
+
+export type ToolchainSource = BrowserToolchainSource | ServerToolchainSource;
+
 export type CompilerTraceOperation =
   | "workerInitialize"
   | "toolchainFetch"
@@ -293,14 +392,14 @@ export type CompilerTraceOperation =
 
 /** Host-observed compiler timing mark; excluded from deterministic contracts and cache keys. */
 export interface CompilerTraceEvent {
-  schema: typeof FORGE_SCHEMAS.compileTrace;
+  schema: typeof WASM_OJ_SCHEMAS.compileTrace;
   operation: CompilerTraceOperation;
   state: "start" | "end";
   monotonicMs: number;
 }
 
 export type CompilerRequest =
-  | { type: "initialize"; requestId: string; assetBaseUrl?: string }
+  | { type: "initialize"; requestId: string; toolchains: readonly BrowserToolchainSource[] }
   | { type: "build"; requestId: string; project: Project; cacheKey: string }
   | { type: "quiesce"; requestId: string };
 
@@ -308,7 +407,7 @@ export type RunnerRequest =
   | {
     type: "initialize";
     requestId: string;
-    assetBaseUrl?: string;
+    toolchains: readonly BrowserToolchainSource[];
     additionalCostBaselines?: Readonly<Record<string, number>>;
     runtimeDriverPlugins?: readonly BrowserRuntimeDriverPlugin[];
   }

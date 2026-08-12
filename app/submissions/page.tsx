@@ -1,4 +1,4 @@
-import { SubmissionList } from "@/src/components/student-records";
+import { SubmissionList } from "@/src/features/submissions/components/student-records";
 
 export default function SubmissionsPage() {
   return <SubmissionList />;

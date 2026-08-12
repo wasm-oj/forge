@@ -1,0 +1,61 @@
+name: Release one npm toolchain package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Toolchain package suffix
+        required: true
+        type: choice
+        options:
+          - toolchain-clang
+          - toolchain-rust
+          - toolchain-go
+          - toolchain-python
+          - toolchain-javascript
+      version:
+        description: Exact package version to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: npm
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          lfs: true
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.18.0
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run toolchain:verify
+      - run: pnpm --filter "@wasm-oj/${{ inputs.package }}" run build
+      - run: node scripts/verify-library.mjs --package "@wasm-oj/${{ inputs.package }}"
+      - name: Verify requested version
+        env:
+          PACKAGE_NAME: ${{ inputs.package }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node -e 'const p=require(`./packages/${process.env.PACKAGE_NAME}/package.json`); if(p.version!==process.env.RELEASE_VERSION) throw new Error(`manifest is ${p.version}`)'
+      - name: Pack verified toolchain package
+        env:
+          PACKAGE_NAME: ${{ inputs.package }}
+        run: node scripts/pack-library.mjs --package "@wasm-oj/${PACKAGE_NAME}" --destination release-tarballs
+      - name: Publish verified toolchain tarball
+        env:
+          PACKAGE_NAME: ${{ inputs.package }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: npm publish "release-tarballs/wasm-oj-${PACKAGE_NAME}-${RELEASE_VERSION}.tgz" --access public

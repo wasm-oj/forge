@@ -2,21 +2,22 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { costProfileId } from "../core/cost-profile";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { DEFAULT_RESOURCE_POLICY } from "../core/resources";
 import type { BuildArtifact, Project, RunConfig } from "../core/types";
-import { RuntimeDriverRegistry } from "../runner/artifact";
-import { ServerForgeCompiler } from "./server-compiler";
-import { ServerForgeRunner } from "./server-runner";
+import { RuntimeDriverRegistry } from "@wasm-oj/core";
+import { ServerCompiler } from "./server-compiler";
+import { ServerRunner } from "./server-runner";
+import { testToolchains } from "./test-toolchains.test-helper";
 
 const TEST_COST_PROFILE = costProfileId("zig", "wasip1", "release", "test-content");
 describe("server host lifecycle", () => {
   it("serializes compiler operations and releases cancelled builds synchronously", async () => {
-    const compiler = new ServerForgeCompiler({
+    const compiler = new ServerCompiler({
       compilerExecutable: process.execPath,
-      toolchainDirectory: path.resolve("public/toolchains"),
+      toolchains: testToolchains(),
     });
     const first = compiler.build(javascriptProject(), "first");
     const firstAssertion = expect(first).rejects.toThrow("superseded");
@@ -36,16 +37,16 @@ describe("server host lifecycle", () => {
   });
 
   it("cancels stalled custom preparation and reaches cache-safe quiescence", async () => {
-    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-runner-lifecycle-"));
+    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-runner-lifecycle-"));
     const runtimeDrivers = new RuntimeDriverRegistry();
     runtimeDrivers.register({
       id: "stalled-test-driver",
       supports: (artifact) => artifact.kind === "wasm",
       prepare: () => new Promise(() => undefined),
     });
-    const runner = new ServerForgeRunner({
+    const runner = new ServerRunner({
       runtimeExecutable: process.execPath,
-      toolchainDirectory: path.resolve("public/toolchains"),
+      toolchains: testToolchains(),
       cacheDirectory,
       runtimeDrivers,
     });
@@ -94,7 +95,7 @@ function javascriptProject(): Project {
 function wasmArtifact(): BuildArtifact {
   return {
     kind: "wasm",
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: "artifact",
     projectId: "project",
     cacheKey: "cache",

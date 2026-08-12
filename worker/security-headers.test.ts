@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 import { withSecurityHeaders } from "./security-headers";
 
 const env = {
   ENVIRONMENT: "production",
-} as ForgeWorkerEnv;
+} as WasmOjWorkerEnv;
 
 describe("HTML security headers", () => {
   it("nonce-binds every rendered script so client hydration works without unsafe-inline", async () => {

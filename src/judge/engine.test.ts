@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { FORGE_CONTRACT_VERSION } from "../core/contract";
+import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { sha256Hex } from "../core/hash";
 import { costProfileId } from "../core/cost-profile";
 import { DEFAULT_RESOURCE_POLICY, WEIGHTED_METER_MODEL } from "../core/resources";
 import type { BuildArtifact, InteractiveRunResult, RunResult } from "../core/types";
-import { createJudgeExecutor, JudgeEngine, type JudgeExecutor } from "./engine";
+import type { TrustedJudgeProgram } from "../online-judge/trusted-judge-wasm";
+import { createJudgeExecutor, JudgeEngine, type JudgeExecutor, type JudgeResolvedInput } from "./engine";
 import {
   fileMatcher,
   floatMatcher,
@@ -14,12 +15,23 @@ import {
   textMatcher,
   tokenMatcher,
   wasmCheckerMatcher,
+  type BatchJudgeCaseSpec,
   type JudgeSpec,
 } from "./spec";
 
+const trustedWasm = Uint8Array.from([
+  0, 97, 115, 109, 1, 0, 0, 0,
+  1, 4, 1, 96, 0, 0,
+  3, 2, 1, 0,
+  5, 3, 1, 0, 1,
+  7, 19, 2, 6, 109, 101, 109, 111, 114, 121, 2, 0, 6, 95, 115, 116, 97, 114, 116, 0, 0,
+  10, 4, 1, 2, 0, 11,
+]);
+const trustedProgram: TrustedJudgeProgram = { runtimeProfile: "c-wasip1-release", wasm: trustedWasm };
+
 const artifact: BuildArtifact = {
   kind: "wasm",
-  forgeContract: FORGE_CONTRACT_VERSION,
+  wasmOjContract: WASM_OJ_CONTRACT_VERSION,
   id: "artifact",
   projectId: "project",
   cacheKey: "cache",
@@ -29,10 +41,10 @@ const artifact: BuildArtifact = {
   optimization: "release",
   createdAt: 0,
   durationMs: 0,
-  size: 8,
+  size: trustedWasm.byteLength,
   toolchains: ["test-toolchain"],
   costProfile: costProfileId("test", "wasip1", "release", "test-toolchain"),
-  bytes: new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]),
+  bytes: trustedWasm,
 };
 
 function run(stdout: string, overrides: Partial<RunResult> = {}): RunResult {
@@ -66,6 +78,9 @@ function run(stdout: string, overrides: Partial<RunResult> = {}): RunResult {
 function judgeExecutor(runCase: JudgeExecutor["run"]): JudgeExecutor {
   return {
     run: runCase,
+    runTrusted: vi.fn(async () => {
+      throw new Error("Trusted judge execution was not expected by this test.");
+    }),
     interact: vi.fn(async () => {
       throw new Error("Interactive execution was not expected by this test.");
     }),
@@ -78,7 +93,7 @@ describe("JudgeEngine", () => {
     const executor = judgeExecutor(vi.fn().mockResolvedValue(run("42  \r\n")));
     const judge = new JudgeEngine(executor);
     const spec: JudgeSpec = {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       failFast: false,
       cases: [
         { kind: "batch", id: "text", input: { kind: "inline", value: "" }, matcher: textMatcher("42\n") },
@@ -101,7 +116,7 @@ describe("JudgeEngine", () => {
       inputProviders: [{ id: "fixtures", resolve: vi.fn().mockResolvedValue(input) }],
     });
     const result = await judge.judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "batch",
         id: "provider",
@@ -125,7 +140,7 @@ describe("JudgeEngine", () => {
       inputProviders: [{ id: "fixtures", resolve: vi.fn().mockResolvedValue("40 2\n") }],
     });
     const result = await judge.judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "batch",
         id: "file-io",
@@ -149,7 +164,7 @@ describe("JudgeEngine", () => {
     );
     const judge = new JudgeEngine(executor);
     const result = await judge.judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [
         { kind: "batch", id: "limited", input: { kind: "inline", value: "" }, matcher: textMatcher("") },
         { kind: "batch", id: "not-run", input: { kind: "inline", value: "" }, matcher: textMatcher("") },
@@ -166,7 +181,7 @@ describe("JudgeEngine", () => {
       .mockResolvedValueOnce(run("1234", { stderr: "56" }))
       .mockResolvedValueOnce(run("7890")));
     const result = await new JudgeEngine(executor).judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       failFast: false,
       cases: [
         { kind: "batch", id: "first", input: { kind: "inline", value: "" }, matcher: textMatcher("1234") },
@@ -192,7 +207,7 @@ describe("JudgeEngine", () => {
   it("validates aggregate judge options before executing", async () => {
     const executor = judgeExecutor(vi.fn());
     const spec: JudgeSpec = {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{ kind: "batch", id: "case", input: { kind: "inline", value: "" }, matcher: textMatcher("") }],
     };
     await expect(new JudgeEngine(executor).judge(artifact, spec, { aggregateOutputLimitBytes: 0 })).rejects.toThrow("positive safe integer");
@@ -211,7 +226,7 @@ describe("JudgeEngine", () => {
       }],
     });
     const spec: JudgeSpec = {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "batch",
         id: "bounded",
@@ -230,7 +245,7 @@ describe("JudgeEngine", () => {
       .mockResolvedValueOnce(run("large", { trapMessage: "SECRET_TRAP" }))
       .mockRejectedValueOnce(new Error("SECRET_JUDGE_FAILURE")));
     const result = await new JudgeEngine(executor).judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       failFast: false,
       cases: [
         { kind: "batch", id: "first", input: { kind: "inline", value: "" }, matcher: textMatcher("large") },
@@ -253,7 +268,7 @@ describe("JudgeEngine", () => {
       vi.fn().mockResolvedValue(run("", { code: 137, termination: "logical-time-limit" })),
     );
     const result = await new JudgeEngine(executor).judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [
         { kind: "batch", id: "logical-time", input: { kind: "inline", value: "" }, matcher: textMatcher("") },
       ],
@@ -274,7 +289,7 @@ describe("JudgeEngine", () => {
       },
     })));
     const result = await new JudgeEngine(executor).judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "batch",
         id: "filesystem-limited",
@@ -298,7 +313,7 @@ describe("JudgeEngine", () => {
       }],
     });
     const result = await judge.judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "batch",
         id: "custom",
@@ -316,7 +331,7 @@ describe("JudgeEngine", () => {
       .mockResolvedValueOnce(run("blue red blue\n"))
       .mockResolvedValueOnce(run("blue red blue\n")));
     const result = await new JudgeEngine(executor).judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       failFast: false,
       cases: [
         { kind: "batch", id: "tokens", input: { kind: "inline", value: "" }, matcher: tokenMatcher("42 answer") },
@@ -329,35 +344,38 @@ describe("JudgeEngine", () => {
   });
 
   it("executes a Wasm checker through the same sandbox executor", async () => {
-    const checker: BuildArtifact = {
-      ...artifact,
-      id: "checker",
-      cacheKey: "checker-cache",
-      name: "checker.wasm",
-      language: "checker",
-      toolchains: ["checker-test"],
-      costProfile: costProfileId("checker", "wasip1", "release", "checker-test"),
-    };
-    const runCase = vi.fn(async (selected: BuildArtifact, ...rest: unknown[]) => {
-      void rest;
-      return selected.id === "checker" ? run("accepted by checker\n") : run("candidate output\n");
+    const runCase = vi.fn(async () => run("candidate output\n"));
+    const runTrusted = vi.fn(async (
+      program: TrustedJudgeProgram,
+      caseSpec: BatchJudgeCaseSpec,
+      input: JudgeResolvedInput,
+    ) => {
+      void program;
+      void caseSpec;
+      void input;
+      return run("accepted by checker\n");
     });
-    const executor = judgeExecutor(runCase);
+    const executor: JudgeExecutor = {
+      run: runCase,
+      runTrusted,
+      interact: vi.fn(async () => { throw new Error("Interactive execution was not expected."); }),
+    };
     const result = await new JudgeEngine(executor).judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "batch",
         id: "custom-checker",
         input: { kind: "inline", value: "input\n" },
-        matcher: wasmCheckerMatcher(checker, "expected\n", ["--strict"], {
+        matcher: wasmCheckerMatcher(trustedProgram, "expected\n", ["--strict"], {
           "/checker/assets/policy.bin": new Uint8Array([0, 255, 1]),
         }),
       }],
     });
     expect(result.verdict).toBe("accepted");
-    expect(runCase).toHaveBeenCalledTimes(2);
-    expect(runCase.mock.calls[1]?.[0]).toBe(checker);
-    expect(runCase.mock.calls[1]?.[2]).toMatchObject({
+    expect(runCase).toHaveBeenCalledTimes(1);
+    expect(runTrusted).toHaveBeenCalledTimes(1);
+    expect(runTrusted.mock.calls[0]?.[0]).toEqual(trustedProgram);
+    expect(runTrusted.mock.calls[0]?.[2]).toMatchObject({
       files: {
         "/checker/input.txt": new TextEncoder().encode("input\n"),
         "/checker/expected.txt": new TextEncoder().encode("expected\n"),
@@ -368,15 +386,6 @@ describe("JudgeEngine", () => {
   });
 
   it("runs an interactive case through the shared runner contract without exposing secret input to the contestant", async () => {
-    const interactor: BuildArtifact = {
-      ...artifact,
-      id: "interactor",
-      cacheKey: "interactor-cache",
-      name: "interactor.wasm",
-      language: "interactor",
-      toolchains: ["interactor-test"],
-      costProfile: costProfileId("interactor", "wasip1", "release", "interactor-test"),
-    };
     const interaction: InteractiveRunResult = {
       contestant: {
         code: 0,
@@ -388,7 +397,7 @@ describe("JudgeEngine", () => {
         code: 0,
         stderr: "",
         termination: "exited",
-        metrics: { ...run("").metrics, costProfile: interactor.costProfile },
+        metrics: run("").metrics,
       },
       contestantToInteractor: "42\n",
       interactorToContestant: "41\n",
@@ -399,11 +408,13 @@ describe("JudgeEngine", () => {
     const executor = createJudgeExecutor({
       run: vi.fn(async () => run("")),
       interact,
+      runTrusted: vi.fn(async () => run("")),
+      interactTrusted: interact,
     });
     const result = await new JudgeEngine(executor, {
       inputProviders: [{ id: "fixtures", resolve: vi.fn().mockResolvedValue("secret file\n") }],
     }).judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "interactive",
         id: "dialogue",
@@ -414,7 +425,7 @@ describe("JudgeEngine", () => {
         },
         contestant: { args: ["--contestant"] },
         interactor: {
-          artifact: interactor,
+          program: trustedProgram,
           inputPath: "/judge/input.txt",
           args: ["/judge/input.txt"],
         },
@@ -426,7 +437,7 @@ describe("JudgeEngine", () => {
     expect(result.metrics.cost).toBe(interaction.contestant.metrics.cost);
     expect(interact).toHaveBeenCalledWith(
       artifact,
-      interactor,
+      trustedProgram,
       expect.objectContaining({
         contestant: expect.not.objectContaining({ files: expect.anything() }),
         interactor: expect.objectContaining({
@@ -453,15 +464,16 @@ describe("JudgeEngine", () => {
     };
     const executor: JudgeExecutor = {
       run: vi.fn(),
+      runTrusted: vi.fn(),
       interact: vi.fn().mockResolvedValue(interaction),
     };
     const spec: JudgeSpec = {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{
         kind: "interactive",
         id: "interactive-output",
         input: { kind: "inline", value: "" },
-        interactor: { artifact, inputPath: "/judge/input.txt" },
+        interactor: { program: trustedProgram, inputPath: "/judge/input.txt" },
       }],
     };
     const accepted = await new JudgeEngine(executor).judge(artifact, spec, {
@@ -485,7 +497,7 @@ describe("JudgeEngine", () => {
     const executor = judgeExecutor(vi.fn().mockResolvedValue(run("ok")));
     const judge = new JudgeEngine(executor);
     const invalid: JudgeSpec = {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [
         { kind: "batch", id: "valid", input: { kind: "inline", value: "" }, matcher: textMatcher("ok") },
         { kind: "batch", id: " padded", input: { kind: "inline", value: "" }, matcher: textMatcher("ok") },
@@ -501,15 +513,15 @@ describe("JudgeEngine", () => {
     const baseCase = { kind: "batch" as const, id: "case", input: { kind: "inline" as const, value: "" }, matcher: textMatcher("") };
 
     await expect(judge.judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{ ...baseCase, matcher: { id: "text", config: null as never } }],
     })).rejects.toThrow("matcher config");
     await expect(judge.judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{ ...baseCase, args: [1] as never }],
     })).rejects.toThrow("array of strings");
     await expect(judge.judge(artifact, {
-      version: FORGE_CONTRACT_VERSION,
+      version: WASM_OJ_CONTRACT_VERSION,
       cases: [{ ...baseCase, env: { KEY: "bad\0value" } }],
     })).rejects.toThrow("NUL-free");
   });

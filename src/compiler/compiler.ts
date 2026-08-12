@@ -1,10 +1,10 @@
 import type { BuildResult, Project, WorkerProgress } from "../core/types";
 
 /** Environment-neutral compiler contract implemented by browser and server hosts. */
-export interface ForgeCompiler {
+export interface Compiler {
   /**
    * Stable, content-addressed identity for the compiler inputs used by this
-   * project. Forge incorporates it into artifact cache keys before building.
+   * project. WASM-OJ incorporates it into artifact cache keys before building.
    */
   cacheIdentity(project: Project): string;
   ready(): Promise<void>;

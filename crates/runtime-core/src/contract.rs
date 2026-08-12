@@ -1,4 +1,5 @@
-pub const FORGE_CONTRACT_VERSION: u32 = 1;
-pub const FORGE_COMPILE_BATCH_SCHEMA: &str = "wasm-oj-forge-v1/compile-batch";
-pub const FORGE_INTERACTIVE_REQUEST_SCHEMA: &str = "wasm-oj-forge-v1/interactive-request";
-pub const FORGE_RUN_REQUEST_SCHEMA: &str = "wasm-oj-forge-v1/run-request";
+pub const WASM_OJ_CONTRACT_VERSION: u32 = 2;
+pub const WASM_OJ_CONTRACT_ID: &str = "wasm-oj-v2";
+pub const WASM_OJ_COMPILE_BATCH_SCHEMA: &str = "wasm-oj-v2/compile-batch";
+pub const WASM_OJ_INTERACTIVE_REQUEST_SCHEMA: &str = "wasm-oj-v2/interactive-request";
+pub const WASM_OJ_RUN_REQUEST_SCHEMA: &str = "wasm-oj-v2/run-request";

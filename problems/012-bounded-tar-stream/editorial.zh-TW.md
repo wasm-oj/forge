@@ -20,7 +20,7 @@
 
 ## 複雜度
 
-令所有 name 長度總和為 `S`、完整輸入文字 bytes 為 `T`，時間 `O(N+S)`。C、C++、Rust、Go、Python 逐行讀取，solver 額外空間為 `O(S_max)`，此處 `S_max <= 200`。Forge 的 JavaScript／TypeScript 輸入 API 只提供 immutable 完整字串 `readAsString()`，因此這兩語言必須保留 `O(T)` 的 host-provided input string；實作以 cursor 掃描而不建立全量 token array，額外狀態仍為 `O(S_max)`。256 MiB memory limit 包含這項 runtime/input contract 成本。
+令所有 name 長度總和為 `S`、完整輸入文字 bytes 為 `T`，時間 `O(N+S)`。C、C++、Rust、Go、Python 逐行讀取，solver 額外空間為 `O(S_max)`，此處 `S_max <= 200`。WASM-OJ 的 JavaScript／TypeScript 輸入 API 只提供 immutable 完整字串 `readAsString()`，因此這兩語言必須保留 `O(T)` 的 host-provided input string；實作以 cursor 掃描而不建立全量 token array，額外狀態仍為 `O(S_max)`。256 MiB memory limit 包含這項 runtime/input contract 成本。
 
 ## 常見錯誤
 

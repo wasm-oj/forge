@@ -1,4 +1,4 @@
-import type { ForgeWorkerEnv } from "./env";
+import type { WasmOjWorkerEnv } from "./env";
 import { ApiError, readBoundedResponseJson } from "./http";
 import {
   FORMAL_RISK_ALLOWANCE_MS,
@@ -21,7 +21,7 @@ export function parseGithubUserAllowlist(source: string): ReadonlySet<number> {
   return new Set(parsed);
 }
 
-export async function requireStagingFormalAccess(env: ForgeWorkerEnv, userId: string): Promise<void> {
+export async function requireStagingFormalAccess(env: WasmOjWorkerEnv, userId: string): Promise<void> {
   if (env.ENVIRONMENT !== "staging") return;
   const allowlist = parseGithubUserAllowlist(env.STAGING_ALLOWED_GITHUB_USER_IDS);
   if (allowlist.size === 0) throw new ApiError(503, "staging-allowlist-empty", "Formal staging access has not been enabled.");
@@ -41,8 +41,8 @@ interface TurnstileResponse {
   readonly "error-codes"?: unknown;
 }
 
-async function verifyTurnstile(request: Request, env: ForgeWorkerEnv, action: TurnstileAction): Promise<void> {
-  const token = request.headers.get("x-forge-turnstile-token");
+async function verifyTurnstile(request: Request, env: WasmOjWorkerEnv, action: TurnstileAction): Promise<void> {
+  const token = request.headers.get("x-wasm-oj-turnstile-token");
   if (!token || token.length > 2_048 || /[\u0000-\u0020\u007f]/.test(token)) {
     throw new ApiError(403, "turnstile-required", "A fresh Turnstile verification is required.");
   }
@@ -84,14 +84,14 @@ function safeRiskCount(value: unknown, label: string): number {
 
 export async function requireOfficialSubmissionRiskTurnstile(
   request: Request,
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   userId: string,
   requestKey: string,
 ): Promise<void> {
   if (env.ENVIRONMENT === "development") return;
   const windowStart = new Date(Date.now() - 60 * 60 * 1_000).toISOString();
   const row = await env.DB.prepare(
-    "SELECT CASE WHEN COUNT(*)=0 THEN 0 ELSE 1 END AS prior_submission_count, MIN(COALESCE(SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END),0),?) AS recent_submission_count, MIN(COALESCE(SUM(CASE WHEN completed_at>=? AND state IN ('compile-error','judge-error','infrastructure-error') THEN 1 ELSE 0 END),0),?) AS recent_failure_count, MIN(COALESCE(SUM(CASE WHEN completed_at>=? THEN COALESCE(deterministic_cost,0) ELSE 0 END),0),?) AS recent_deterministic_cost FROM submissions WHERE user_id=? AND rejudge_batch_id IS NULL",
+    "SELECT CASE WHEN COUNT(*)=0 THEN 0 ELSE 1 END AS prior_submission_count, MIN(COALESCE(SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END),0),?) AS recent_submission_count, MIN(COALESCE(SUM(CASE WHEN completed_at>=? AND state IN ('compile-error','judge-error','infrastructure-error') THEN 1 ELSE 0 END),0),?) AS recent_failure_count, MIN(COALESCE(SUM(CASE WHEN completed_at>=? THEN COALESCE(deterministic_cost,0) ELSE 0 END),0),?) AS recent_deterministic_cost FROM submissions WHERE user_id=? AND origin_submission_id=id",
   ).bind(windowStart, FORMAL_RISK_VELOCITY_THRESHOLD, windowStart, FORMAL_RISK_FAILURE_THRESHOLD, windowStart, FORMAL_RISK_COST_THRESHOLD, userId).first<SubmissionRiskRow>();
   if (!row) throw new ApiError(503, "formal-risk-state-unavailable", "Formal admission risk state is unavailable.");
   const now = new Date();
@@ -105,7 +105,7 @@ export async function requireOfficialSubmissionRiskTurnstile(
     recentFailureCount: safeRiskCount(row.recent_failure_count, "Recent failure count"),
     recentDeterministicCost: safeRiskCount(row.recent_deterministic_cost, "Recent deterministic cost"),
   };
-  const token = request.headers.get("x-forge-turnstile-token");
+  const token = request.headers.get("x-wasm-oj-turnstile-token");
   if (!formalRiskRequiresTurnstile(signals) && token === null) return;
   await verifyTurnstile(request, env, "official-submit");
   const expiresAt = new Date(now.getTime() + FORMAL_RISK_ALLOWANCE_MS).toISOString();
@@ -114,7 +114,7 @@ export async function requireOfficialSubmissionRiskTurnstile(
   ).bind(userId, requestKey, expiresAt, now.toISOString()).run();
 }
 
-export async function cleanupExpiredFormalRiskAllowances(env: ForgeWorkerEnv): Promise<number> {
+export async function cleanupExpiredFormalRiskAllowances(env: WasmOjWorkerEnv): Promise<number> {
   const result = await env.DB.prepare("DELETE FROM formal_risk_allowances WHERE expires_at<=?")
     .bind(new Date().toISOString()).run();
   return result.meta.changes;
@@ -122,7 +122,7 @@ export async function cleanupExpiredFormalRiskAllowances(env: ForgeWorkerEnv): P
 
 export async function requireFirstOrganizerApplicationTurnstile(
   request: Request,
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   userId: string,
 ): Promise<void> {
   if (env.ENVIRONMENT === "development") return;

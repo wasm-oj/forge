@@ -1,7 +1,7 @@
 import type { Project } from "./types.ts";
 import { toolchainCacheIdentity } from "./toolchains.ts";
 import { canonicalProjectFiles } from "./project-files.ts";
-import { verifyDependencyBuildBundle } from "../dependencies/build.ts";
+import { verifyDependencyBuildBundle } from "./dependencies.ts";
 import { sha256Hex } from "./sha256.ts";
 
 export { sha256Hex } from "./sha256.ts";

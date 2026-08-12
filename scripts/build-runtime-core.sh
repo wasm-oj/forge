@@ -3,23 +3,24 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CRATE="$ROOT/crates/runtime-core/Cargo.toml"
-TARGET="$ROOT/crates/runtime-core/target/wasm32-unknown-unknown/release/wasm_oj_forge_runtime_core.wasm"
+TARGET="$ROOT/crates/runtime-core/target/wasm32-unknown-unknown/release/wasm_oj_runtime_core.wasm"
 OUTPUT="$ROOT/src/runner/generated"
 STAGED="$(mktemp -d "$ROOT/src/runner/.runtime-core.XXXXXX")"
 BACKUP="$ROOT/src/runner/.runtime-core.backup.$$"
+WASM_OJ_WASM_BINDGEN_BIN="${WASM_OJ_WASM_BINDGEN_BIN:-wasm-bindgen}"
 
 cleanup() {
   rm -rf "$STAGED" "$BACKUP"
 }
 trap cleanup EXIT
 
-if [[ "$(wasm-bindgen --version)" != "wasm-bindgen 0.2.126" ]]; then
-  echo "wasm-bindgen-cli 0.2.126 is required" >&2
+if [[ "$("$WASM_OJ_WASM_BINDGEN_BIN" --version)" != "wasm-bindgen 0.2.127" ]]; then
+  echo "wasm-bindgen-cli 0.2.127 is required" >&2
   exit 1
 fi
 
 cargo build --locked --manifest-path "$CRATE" --release --target wasm32-unknown-unknown --no-default-features --features web
-wasm-bindgen --target web --out-dir "$STAGED" --out-name runtime-core "$TARGET"
+"$WASM_OJ_WASM_BINDGEN_BIN" --target web --out-dir "$STAGED" --out-name runtime-core "$TARGET"
 
 if [[ -e "$OUTPUT" ]]; then
   mv "$OUTPUT" "$BACKUP"

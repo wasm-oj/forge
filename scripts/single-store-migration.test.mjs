@@ -21,7 +21,7 @@ function columns(database, table) {
 test("single-store migration preserves product resources and resets derived judging state", () => {
   const database = new DatabaseSync(":memory:");
   const migrations = coreMigrations();
-  for (const migration of migrations.filter((filename) => filename !== "0016_single_store.sql")) apply(database, migration);
+  for (const migration of migrations.filter((filename) => filename < "0016_single_store.sql")) apply(database, migration);
 
   const now = "2026-08-11T00:00:00.000Z";
   database.prepare("INSERT INTO users (id, created_at, updated_at, status) VALUES ('user-1', ?, ?, 'active')").run(now, now);

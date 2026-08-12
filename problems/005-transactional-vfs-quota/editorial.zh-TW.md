@@ -16,7 +16,7 @@
 
 ## 複雜度
 
-初始化陣列 `O(P)`，每個操作 `O(1)`，總時間 `O(P+N)`，檔案狀態的核心輔助空間為 `O(P)`。C、C++、Go reference 串流讀寫；Rust、Python 會保留完整輸入與輸出，JavaScript、TypeScript 保留單一 Forge 輸入字串並以固定 64 KiB 分塊輸出。每筆操作與答案的文字長度皆為常數，因此依實際 resident allocations 計算，七語言 reference 的共同最壞空間上界為 `O(P+N)`；初始化與讀取操作也給出 `Ω(P+N)` 時間下界。
+初始化陣列 `O(P)`，每個操作 `O(1)`，總時間 `O(P+N)`，檔案狀態的核心輔助空間為 `O(P)`。C、C++、Go reference 串流讀寫；Rust、Python 會保留完整輸入與輸出，JavaScript、TypeScript 保留單一 WASM-OJ 輸入字串並以固定 64 KiB 分塊輸出。每筆操作與答案的文字長度皆為常數，因此依實際 resident allocations 計算，七語言 reference 的共同最壞空間上界為 `O(P+N)`；初始化與讀取操作也給出 `Ω(P+N)` 時間下界。
 
 ## 常見錯誤
 

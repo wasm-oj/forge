@@ -9,7 +9,6 @@ export const SUBMISSION_SOURCE_LIMITS = Object.freeze({
 export const SUBMISSION_STATES = [
   "admitting",
   "queued",
-  "waiting-capacity",
   "preparing",
   "compiling",
   "running",
@@ -49,11 +48,10 @@ const TERMINAL_STATES = new Set<SubmissionState>([
 
 const STATE_TRANSITIONS: Readonly<Record<SubmissionState, ReadonlySet<SubmissionState>>> = {
   admitting: new Set(["queued", "cancelled", "infrastructure-error"]),
-  queued: new Set(["waiting-capacity", "preparing", "cancelled", "infrastructure-error"]),
-  "waiting-capacity": new Set(["preparing", "cancelled", "infrastructure-error"]),
-  preparing: new Set(["waiting-capacity", "compiling", "cancelled", "judge-error", "infrastructure-error"]),
-  compiling: new Set(["waiting-capacity", "running", "compile-error", "cancelled", "judge-error", "infrastructure-error"]),
-  running: new Set(["waiting-capacity", "finalizing", "cancelled", "judge-error", "infrastructure-error"]),
+  queued: new Set(["preparing", "cancelled", "infrastructure-error"]),
+  preparing: new Set(["compiling", "cancelled", "judge-error", "infrastructure-error"]),
+  compiling: new Set(["running", "compile-error", "cancelled", "judge-error", "infrastructure-error"]),
+  running: new Set(["finalizing", "cancelled", "judge-error", "infrastructure-error"]),
   finalizing: new Set(["completed", "judge-error", "infrastructure-error"]),
   completed: new Set(),
   "compile-error": new Set(),
@@ -74,7 +72,7 @@ export interface OfficialSourceFile {
 }
 
 export interface OfficialSubmissionRequest {
-  readonly managedProblemVersionId: string;
+  readonly problemVersionId: string;
   readonly contestId?: string;
   readonly language: BuiltinLanguage;
   readonly target: TargetAbi;
@@ -113,7 +111,18 @@ export interface SequencedSubmissionEvent extends SubmissionEventPayload {
 export interface SubmissionEventReplay {
   readonly events: readonly SequencedSubmissionEvent[];
   readonly nextCursor: number;
+  readonly summary: SubmissionEventSummary;
+}
+
+export interface SubmissionEventSummary {
   readonly state: SubmissionState;
+  readonly verdict: SubmissionVerdict | null;
+  readonly score: number | null;
+  readonly fullyPassedCases: number | null;
+  readonly deterministicCost: number | null;
+  readonly peakMemoryBytes: number | null;
+  readonly updatedAt: string;
+  readonly completedAt: string | null;
 }
 
 export interface LeaderboardEntry {
@@ -167,7 +176,7 @@ function decodedSourceBytes(file: OfficialSourceFile): number {
 export function parseOfficialSubmissionRequest(value: unknown): OfficialSubmissionRequest {
   if (!isRecord(value)) throw new TypeError("Submission request must be an object.");
   exactKeys(value, [
-    "managedProblemVersionId",
+    "problemVersionId",
     "language",
     "target",
     "optimization",
@@ -175,7 +184,7 @@ export function parseOfficialSubmissionRequest(value: unknown): OfficialSubmissi
     "sourceFiles",
     "idempotencyKey",
   ], ["contestId"], "Submission request");
-  const managedProblemVersionId = uuid(value.managedProblemVersionId, "managedProblemVersionId");
+  const problemVersionId = uuid(value.problemVersionId, "problemVersionId");
   const contestId = value.contestId === undefined ? undefined : uuid(value.contestId, "contestId");
   assertLanguageIdentifier(value.language);
   if (!isBuiltinLanguage(value.language)) throw new TypeError("language is unsupported for official judging.");
@@ -208,7 +217,7 @@ export function parseOfficialSubmissionRequest(value: unknown): OfficialSubmissi
     throw new TypeError("idempotencyKey is invalid.");
   }
   return {
-    managedProblemVersionId,
+    problemVersionId,
     ...(contestId ? { contestId } : {}),
     language,
     target: value.target,
@@ -287,7 +296,7 @@ export function parseSequencedSubmissionEvent(value: unknown): SequencedSubmissi
 
 export function parseSubmissionEventReplay(value: unknown): SubmissionEventReplay {
   if (!isRecord(value)) throw new TypeError("Submission event replay must be an object.");
-  exactKeys(value, ["events", "nextCursor", "state"], [], "Submission event replay");
+  exactKeys(value, ["events", "nextCursor", "summary"], [], "Submission event replay");
   if (!Array.isArray(value.events)) throw new TypeError("Submission event replay events are invalid.");
   if (value.events.length > 100) throw new TypeError("Submission event replay exceeds the 100 event page limit.");
   if (!Number.isSafeInteger(value.nextCursor) || (value.nextCursor as number) < 0) {
@@ -302,10 +311,55 @@ export function parseSubmissionEventReplay(value: unknown): SubmissionEventRepla
   if (events.some((event) => event.sequence > (value.nextCursor as number))) {
     throw new TypeError("Submission replay exceeds its next cursor.");
   }
+  if (!isRecord(value.summary)) throw new TypeError("Submission event summary must be an object.");
+  exactKeys(value.summary, [
+    "completedAt",
+    "deterministicCost",
+    "fullyPassedCases",
+    "peakMemoryBytes",
+    "score",
+    "state",
+    "updatedAt",
+    "verdict",
+  ], [], "Submission event summary");
+  const nullableSafeInteger = (candidate: unknown, label: string): number | null => {
+    if (candidate === null) return null;
+    if (!Number.isSafeInteger(candidate) || (candidate as number) < 0) {
+      throw new TypeError(`Submission event summary ${label} is invalid.`);
+    }
+    return candidate as number;
+  };
+  const nullableTimestamp = (candidate: unknown, label: string): string | null => {
+    if (candidate === null) return null;
+    if (typeof candidate !== "string" || Number.isNaN(Date.parse(candidate)) || new Date(candidate).toISOString() !== candidate) {
+      throw new TypeError(`Submission event summary ${label} is invalid.`);
+    }
+    return candidate;
+  };
+  if (value.summary.verdict !== null && !SUBMISSION_VERDICTS.includes(value.summary.verdict as SubmissionVerdict)) {
+    throw new TypeError("Submission event summary verdict is invalid.");
+  }
+  if (value.summary.score !== null && (
+    typeof value.summary.score !== "number"
+    || !Number.isFinite(value.summary.score)
+    || value.summary.score < 0
+    || value.summary.score > 100
+  )) throw new TypeError("Submission event summary score is invalid.");
+  const updatedAt = nullableTimestamp(value.summary.updatedAt, "updatedAt");
+  if (updatedAt === null) throw new TypeError("Submission event summary updatedAt is invalid.");
   return {
     events,
     nextCursor: value.nextCursor as number,
-    state: parseSubmissionState(value.state),
+    summary: {
+      state: parseSubmissionState(value.summary.state),
+      verdict: value.summary.verdict as SubmissionVerdict | null,
+      score: value.summary.score as number | null,
+      fullyPassedCases: nullableSafeInteger(value.summary.fullyPassedCases, "fullyPassedCases"),
+      deterministicCost: nullableSafeInteger(value.summary.deterministicCost, "deterministicCost"),
+      peakMemoryBytes: nullableSafeInteger(value.summary.peakMemoryBytes, "peakMemoryBytes"),
+      updatedAt,
+      completedAt: nullableTimestamp(value.summary.completedAt, "completedAt"),
+    },
   };
 }
 

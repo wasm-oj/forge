@@ -19,7 +19,7 @@ if [[ "$("$CARGO_ABOUT" --version)" != "$EXPECTED_ABOUT_VERSION" ]]; then
   exit 1
 fi
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/forge-wasmer-sdk-licenses.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/wasm-oj-wasmer-sdk-licenses.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 git clone --filter=blob:none --no-checkout "$SOURCE_REPOSITORY" "$WORK/source"
 git -C "$WORK/source" checkout --detach "$SOURCE_REVISION"

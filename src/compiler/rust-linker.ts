@@ -3,9 +3,9 @@ import type { OptimizationLevel } from "../core/types.ts";
 export const RUST_LINKER_COMMAND = "wasm-ld";
 export const RUST_OBJECT_PATH = "/work/build/main.o";
 export const RUST_FINAL_OUTPUT_PATH = "/work/build/main.wasm";
-export const RUST_OBJECT_PLACEHOLDER = "__FORGE_RUST_OBJECT__";
-export const RUST_ALLOCATOR_PLACEHOLDER = "__FORGE_RUST_ALLOCATOR_BITCODE__";
-export const RUST_OUTPUT_PLACEHOLDER = "__FORGE_RUST_OUTPUT__";
+export const RUST_OBJECT_PLACEHOLDER = "__WASM_OJ_RUST_OBJECT__";
+export const RUST_ALLOCATOR_PLACEHOLDER = "__WASM_OJ_RUST_ALLOCATOR_BITCODE__";
+export const RUST_OUTPUT_PLACEHOLDER = "__WASM_OJ_RUST_OUTPUT__";
 
 export interface RustLinkerArgumentContract {
   readonly objectPlaceholder: typeof RUST_OBJECT_PLACEHOLDER;

@@ -1,28 +1,44 @@
 /* tslint:disable */
 /* eslint-disable */
 
-export function compile_pipeline_forge(request: any): Promise<any>;
+/**
+ * Process-local browser Go compiler session. Construction transfers and
+ * hydrates the immutable package/stdlib exactly once; later calls carry only
+ * monotonic source deltas and pipeline requests.
+ */
+export class GoCompilerSession {
+    free(): void;
+    [Symbol.dispose](): void;
+    compilePipeline(request: any): Promise<any>;
+    constructor(config: any);
+    readonly digest: string;
+    readonly generation: number;
+}
 
-export function interact_forge(request: any): Promise<any>;
+export function interact_wasm_oj(request: any): Promise<any>;
 
-export function run_forge(request: any): any;
+export function run_wasm_oj(request: any): any;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly compile_pipeline_forge: (a: any) => any;
-    readonly interact_forge: (a: any) => any;
-    readonly run_forge: (a: any) => [number, number, number];
+    readonly __wbg_gocompilersession_free: (a: number, b: number) => void;
+    readonly gocompilersession_compilePipeline: (a: number, b: any) => any;
+    readonly gocompilersession_digest: (a: number) => [number, number];
+    readonly gocompilersession_generation: (a: number) => [number, number, number];
+    readonly gocompilersession_new: (a: any) => [number, number, number];
+    readonly interact_wasm_oj: (a: any) => any;
+    readonly run_wasm_oj: (a: any) => [number, number, number];
     readonly canonical_abi_free: (a: number, b: number, c: number) => void;
     readonly canonical_abi_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbg_trap_free: (a: number, b: number) => void;
     readonly trap___wbg_wasmer_trap: () => void;
-    readonly wasm_bindgen_168d549d119b7916___convert__closures_____invoke___wasm_bindgen_168d549d119b7916___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_168d549d119b7916___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_168d549d119b7916___convert__closures________invoke___js_sys_ebfc9f1583139cfd___Array__core_9b3796e30d99ddb7___result__Result_js_sys_ebfc9f1583139cfd___Array__wasm_bindgen_168d549d119b7916___JsValue___true_: (a: number, b: number, c: any) => [number, number, number];
-    readonly wasm_bindgen_168d549d119b7916___convert__closures________invoke___js_sys_ebfc9f1583139cfd___Array__core_9b3796e30d99ddb7___result__Result_js_sys_ebfc9f1583139cfd___Array__wasm_bindgen_168d549d119b7916___JsValue___true__2: (a: number, b: number, c: any) => [number, number, number];
-    readonly wasm_bindgen_168d549d119b7916___convert__closures________invoke___js_sys_ebfc9f1583139cfd___Array__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_168d549d119b7916___JsValue___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_168d549d119b7916___convert__closures_____invoke___js_sys_ebfc9f1583139cfd___Function_fn_wasm_bindgen_168d549d119b7916___JsValue_____wasm_bindgen_168d549d119b7916___sys__Undefined___js_sys_ebfc9f1583139cfd___Function_fn_wasm_bindgen_168d549d119b7916___JsValue_____wasm_bindgen_168d549d119b7916___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen_68458880a41dd4bb___convert__closures_____invoke___wasm_bindgen_68458880a41dd4bb___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_68458880a41dd4bb___JsError___true_: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_68458880a41dd4bb___convert__closures________invoke___js_sys_c11fba41208799d1___Array__core_9b3796e30d99ddb7___result__Result_js_sys_c11fba41208799d1___Array__wasm_bindgen_68458880a41dd4bb___JsValue___true_: (a: number, b: number, c: any) => [number, number, number];
+    readonly wasm_bindgen_68458880a41dd4bb___convert__closures________invoke___js_sys_c11fba41208799d1___Array__core_9b3796e30d99ddb7___result__Result_js_sys_c11fba41208799d1___Array__wasm_bindgen_68458880a41dd4bb___JsValue___true__2: (a: number, b: number, c: any) => [number, number, number];
+    readonly wasm_bindgen_68458880a41dd4bb___convert__closures________invoke___js_sys_c11fba41208799d1___Array__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_68458880a41dd4bb___JsValue___true_: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_68458880a41dd4bb___convert__closures_____invoke___js_sys_c11fba41208799d1___Function_fn_wasm_bindgen_68458880a41dd4bb___JsValue_____wasm_bindgen_68458880a41dd4bb___sys__Undefined___js_sys_c11fba41208799d1___Function_fn_wasm_bindgen_68458880a41dd4bb___JsValue_____wasm_bindgen_68458880a41dd4bb___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_export: WebAssembly.Table;

@@ -3,7 +3,10 @@ use crate::filesystem_quota::{VfsMetrics, VfsQuota};
 use crate::{DeterminismConfig, ResourcePolicy, RunError};
 use std::path::Path;
 use std::sync::Arc;
-use virtual_fs::{AsyncReadExt, AsyncWriteExt, FileSystem, FsError, TmpFileSystem, create_dir_all};
+use virtual_fs::{
+    AsyncReadExt, AsyncWriteExt, FileSystem, FsError, OverlayFileSystem, TmpFileSystem,
+    create_dir_all,
+};
 
 const NANOSECONDS_PER_MILLISECOND: u64 = 1_000_000;
 const COMPILER_FILESYSTEM_WRITE_LIMIT_BYTES: usize = 512 * 1024 * 1024;
@@ -50,7 +53,7 @@ impl RuntimeProjectFilesystem {
     }
 }
 
-/// Mount compiler inputs at Forge's contract-fixed build epoch.
+/// Mount compiler inputs at WASM-OJ's contract-fixed build epoch.
 ///
 /// Execution determinism is deliberately absent from the build identity. Input
 /// metadata must therefore remain invariant when callers change run seeds or
@@ -69,6 +72,49 @@ pub fn compiler_project_files(
         COMPILER_FILESYSTEM_WRITE_LIMIT_BYTES,
         COMPILER_FILESYSTEM_ENTRY_LIMIT,
     )
+}
+
+/// Hydrate content-verified immutable compiler files once for a persistent
+/// compiler session.
+///
+/// Per-build filesystems overlay this base instead of remounting or copying
+/// the immutable distribution for every source edit.
+pub fn immutable_compiler_files(
+    files: std::collections::BTreeMap<String, serde_bytes::ByteBuf>,
+) -> Result<Arc<dyn FileSystem + Send + Sync>, RunError> {
+    let fs = TmpFileSystem::with_fixed_timestamp(
+        COMPILER_DETERMINISM
+            .realtime_epoch_ms
+            .saturating_mul(NANOSECONDS_PER_MILLISECOND),
+    );
+    mount_project_files(&fs, &files)?;
+    Ok(Arc::new(fs))
+}
+
+/// Build an isolated mutable compiler filesystem over one hydrated immutable
+/// distribution. Reads share base bytes; attempted writes use copy-on-write
+/// storage and therefore cannot mutate later builds.
+pub fn compiler_project_files_with_base(
+    files: &std::collections::BTreeMap<String, serde_bytes::ByteBuf>,
+    output_paths: &[String],
+    immutable: Arc<dyn FileSystem + Send + Sync>,
+) -> Result<RuntimeProjectFilesystem, RunError> {
+    let quota = VfsQuota::new();
+    let primary = TmpFileSystem::with_fixed_timestamp(
+        COMPILER_DETERMINISM
+            .realtime_epoch_ms
+            .saturating_mul(NANOSECONDS_PER_MILLISECOND),
+    );
+    primary.set_memory_limiter(quota.clone());
+    mount_project_files(&primary, files)?;
+    let filesystem: Arc<dyn FileSystem + Send + Sync> =
+        Arc::new(OverlayFileSystem::new(primary, [immutable]));
+    create_output_parent_directories(&filesystem, output_paths)?;
+    quota.seal(
+        COMPILER_FILESYSTEM_WRITE_LIMIT_BYTES,
+        COMPILER_FILESYSTEM_ENTRY_LIMIT,
+    )?;
+    Ok(RuntimeProjectFilesystem { filesystem, quota })
 }
 
 fn quota_project_files_at_timestamp(
@@ -237,8 +283,8 @@ pub fn is_normalized_guest_path(path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        NANOSECONDS_PER_MILLISECOND, compiler_project_files, is_normalized_guest_path,
-        runtime_project_files,
+        NANOSECONDS_PER_MILLISECOND, compiler_project_files, compiler_project_files_with_base,
+        immutable_compiler_files, is_normalized_guest_path, runtime_project_files,
     };
     use crate::deterministic::COMPILER_DETERMINISM;
     use crate::{DeterminismConfig, ResourcePolicy};
@@ -246,6 +292,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::io::SeekFrom;
     use std::path::Path;
+    use std::sync::Arc;
     use virtual_fs::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, FileSystem};
 
     #[test]
@@ -431,6 +478,52 @@ mod tests {
                 assert_eq!(metadata.modified(), expected);
             }
         }
+    }
+
+    #[test]
+    fn compiler_builds_share_one_immutable_base_without_cross_build_mutation() {
+        let immutable = immutable_compiler_files(BTreeMap::from([(
+            "/go/pkg/fmt.a".to_string(),
+            ByteBuf::from(b"immutable-archive".to_vec()),
+        )]))
+        .unwrap();
+        let sources = BTreeMap::from([(
+            "/work/main.go".to_string(),
+            ByteBuf::from(b"package main".to_vec()),
+        )]);
+        let first = compiler_project_files_with_base(&sources, &[], immutable.clone())
+            .unwrap()
+            .filesystem();
+        let mut mutable_view = first
+            .new_open_options()
+            .read(true)
+            .write(true)
+            .open(Path::new("/go/pkg/fmt.a"))
+            .unwrap();
+        futures::executor::block_on(mutable_view.write_all(b"build-local")).unwrap();
+        mutable_view.set_len(b"build-local".len() as u64).unwrap();
+        drop(mutable_view);
+
+        assert_eq!(read_all(&first, "/go/pkg/fmt.a"), b"build-local");
+        assert_eq!(read_all(&immutable, "/go/pkg/fmt.a"), b"immutable-archive");
+
+        let second = compiler_project_files_with_base(&sources, &[], immutable)
+            .unwrap()
+            .filesystem();
+        assert_eq!(read_all(&second, "/go/pkg/fmt.a"), b"immutable-archive");
+    }
+
+    fn read_all(fs: &Arc<dyn FileSystem + Send + Sync>, path: &str) -> Vec<u8> {
+        let mut file = fs
+            .new_open_options()
+            .read(true)
+            .open(Path::new(path))
+            .unwrap();
+        futures::executor::block_on(async {
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes).await.unwrap();
+            bytes
+        })
     }
 
     fn determinism() -> DeterminismConfig {

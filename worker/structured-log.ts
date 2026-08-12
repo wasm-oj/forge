@@ -13,7 +13,7 @@ export interface OperationalLogFields {
   readonly code?: string;
   readonly releaseId?: string;
   readonly environment?: "development" | "staging" | "production";
-  readonly aggregateType?: "submission" | "import" | "release";
+  readonly aggregateType?: "submission" | "catalog" | "release";
   readonly aggregateId?: string;
   readonly count?: number;
 }
@@ -22,7 +22,7 @@ const SAFE_VALUE = /^[A-Za-z0-9_.:@/-]{1,128}$/;
 
 export function operationalLogRecord(fields: OperationalLogFields, timestamp = new Date()): Readonly<Record<string, string | number>> {
   const record: Record<string, string | number> = {
-    schema: "forge-operations-log-v1",
+    schema: "wasm-oj-platform/operations-log/v1",
     timestamp: timestamp.toISOString(),
     event: fields.event,
     outcome: fields.outcome,

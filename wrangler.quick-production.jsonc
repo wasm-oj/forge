@@ -30,8 +30,8 @@
   "vars": {
     "ENVIRONMENT": "production",
     "PUBLIC_ORIGIN": "https://wasm-oj-forge-production.jacob.workers.dev",
-    "FORGE_RELEASE_ID": "6cbb0973-32af-4f3d-8ef4-168cccec1d2a",
-    "FORGE_RELEASE_MANIFEST_SHA256": "1386b2fd68589fdbc746ed991b9dd466ef50267bc59fbcfc3b1c879d8071062c",
+    "WASM_OJ_RELEASE_ID": "__WASM_OJ_RELEASE_ID__",
+    "WASM_OJ_RELEASE_MANIFEST_SHA256": "__WASM_OJ_RELEASE_MANIFEST_SHA256__",
     "GITHUB_OAUTH_CLIENT_ID": "Ov23limRaIiQdRQ3xoyd",
     "GITHUB_APP_ID": "4536310",
     "GITHUB_APP_SLUG": "wasm-oj-forge-production-import",
@@ -52,8 +52,7 @@
   ],
   "durable_objects": {
     "bindings": [
-      { "name": "SUBMISSION_CONTAINER", "class_name": "SubmissionJudgeContainer" },
-      { "name": "VALIDATION_CONTAINER", "class_name": "ValidationJudgeContainer" }
+      { "name": "SUBMISSION_CONTAINER", "class_name": "SubmissionJudgeContainer" }
     ]
   },
   "migrations": [
@@ -78,6 +77,10 @@
         "UserQuotaDO",
         "AdmissionControlDO"
       ]
+    },
+    {
+      "tag": "v3",
+      "deleted_classes": ["ValidationJudgeContainer"]
     }
   ],
   "workflows": [
@@ -87,26 +90,18 @@
       "class_name": "SubmissionWorkflow"
     },
     {
-      "name": "wasm-oj-validation-production",
-      "binding": "VALIDATION_WORKFLOW",
-      "class_name": "ValidationWorkflow"
+      "name": "wasm-oj-catalog-production",
+      "binding": "CATALOG_WORKFLOW",
+      "class_name": "CatalogWorkflow"
     }
   ],
   "containers": [
     {
       "name": "wasm-oj-submission-production",
       "class_name": "SubmissionJudgeContainer",
-      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/forge-judge-production:6cbb0973-32af-4f3d-8ef4-168cccec1d2a",
+      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-judge-production:__WASM_OJ_RELEASE_ID__",
       "instance_type": "standard-2",
       "max_instances": 50,
-      "ssh": { "enabled": false }
-    },
-    {
-      "name": "wasm-oj-validation-production",
-      "class_name": "ValidationJudgeContainer",
-      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/forge-judge-production:6cbb0973-32af-4f3d-8ef4-168cccec1d2a",
-      "instance_type": "standard-2",
-      "max_instances": 5,
       "ssh": { "enabled": false }
     }
   ],

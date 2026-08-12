@@ -1,4 +1,4 @@
-name: Release npm package
+name: Release synchronized npm packages
 
 on:
   push:
@@ -9,9 +9,9 @@ permissions:
   id-token: write
 
 jobs:
-  publish:
+  publish-code:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     environment: npm
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -26,10 +26,28 @@ jobs:
         with:
           node-version: 24.18.0
           registry-url: https://registry.npmjs.org/
-          cache: pnpm
+          package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci:verify
-      - run: pnpm publish --access public --no-git-checks
+      - run: pnpm run library:build
+      - run: pnpm run library:verify
+      - name: Require synchronized code-package version
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: node scripts/release-library.mjs verify-code-version "${RELEASE_VERSION#v}"
+      - name: Pack verified code packages
+        run: node scripts/pack-library.mjs --group code --destination release-tarballs
+      - name: Publish contracts
+        run: npm publish release-tarballs/wasm-oj-contracts-${GITHUB_REF_NAME#v}.tgz --access public
+      - name: Publish core
+        run: npm publish release-tarballs/wasm-oj-core-${GITHUB_REF_NAME#v}.tgz --access public
+      - name: Publish hosts and Organizer
+        run: |
+          npm publish release-tarballs/wasm-oj-browser-${GITHUB_REF_NAME#v}.tgz --access public
+          npm publish release-tarballs/wasm-oj-server-${GITHUB_REF_NAME#v}.tgz --access public
+          npm publish release-tarballs/wasm-oj-organizer-${GITHUB_REF_NAME#v}.tgz --access public
+      - name: Publish umbrella SDK
+        run: npm publish release-tarballs/wasm-oj-sdk-${GITHUB_REF_NAME#v}.tgz --access public
       - env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${GITHUB_REF_NAME}" --verify-tag --generate-notes --latest

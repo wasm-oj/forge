@@ -11,7 +11,7 @@ describe("browser runtime-files cache", () => {
     const corrupt = canonical.slice();
     corrupt[corrupt.byteLength - 1] ^= 1;
     const expectedSha256 = digest(canonical);
-    const cacheRequest = new Request("https://forge.test/runtime-files");
+    const cacheRequest = new Request("https://wasm-oj.test/runtime-files");
     const exportArchive = vi.fn(async () => canonical);
     const reportIssue = vi.fn();
     const cache = fakeCache({
@@ -40,7 +40,7 @@ describe("browser runtime-files cache", () => {
 
   it("returns verified files when optional cache persistence fails", async () => {
     const canonical = runtimeArchive([["/runtime.txt", "verified"]]);
-    const cacheRequest = new Request("https://forge.test/runtime-files");
+    const cacheRequest = new Request("https://wasm-oj.test/runtime-files");
     const reportIssue = vi.fn();
     const cache = fakeCache({
       put: vi.fn(async () => {
@@ -73,7 +73,7 @@ describe("browser runtime-files cache", () => {
     await expect(restoreOrExportRuntimeFiles(
       cache,
       {
-        cacheRequest: new Request("https://forge.test/runtime-files"),
+        cacheRequest: new Request("https://wasm-oj.test/runtime-files"),
         cacheKey: "runtime-test",
         expectedSha256: digest(canonical),
       },
@@ -110,7 +110,7 @@ function digest(bytes: Uint8Array): string {
 
 function runtimeArchive(entries: Array<[string, string]>): Uint8Array {
   const encoder = new TextEncoder();
-  const chunks: Uint8Array[] = [encoder.encode("FORGEFS1")];
+  const chunks: Uint8Array[] = [encoder.encode("WOJFS002")];
   for (const [filePath, value] of entries) {
     const encodedPath = encoder.encode(filePath);
     const data = encoder.encode(value);

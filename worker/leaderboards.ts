@@ -15,12 +15,6 @@ export interface LeaderboardEntryRow {
   readonly submissionId?: string;
 }
 
-export interface ContestProblemSelection {
-  readonly originalProblemVersionId: string;
-  readonly effectiveProblemVersionId: string;
-  readonly rejudgeBatchId?: string;
-}
-
 interface ProblemLeaderboardRow {
   readonly user_id: string;
   readonly language: string;
@@ -37,12 +31,13 @@ interface ContestLeaderboardRow extends Omit<ProblemLeaderboardRow, "submission_
   readonly problem_results_json: string;
 }
 
-const COMPLETE_METRICS = `submissions.state='completed'
-  AND submissions.score IS NOT NULL
-  AND submissions.fully_passed_cases IS NOT NULL
-  AND submissions.deterministic_cost IS NOT NULL
-  AND submissions.peak_memory_bytes IS NOT NULL
-  AND submissions.completed_at IS NOT NULL`;
+const COMPLETE_RESULT_METRICS = `result.state='completed'
+  AND result.score IS NOT NULL
+  AND result.fully_passed_cases IS NOT NULL
+  AND result.deterministic_cost IS NOT NULL
+  AND result.peak_memory_bytes IS NOT NULL
+  AND result.completed_at IS NOT NULL
+  AND origin.completed_at IS NOT NULL`;
 
 function entry(row: ProblemLeaderboardRow): LeaderboardEntryRow {
   return {
@@ -57,38 +52,37 @@ function entry(row: ProblemLeaderboardRow): LeaderboardEntryRow {
   };
 }
 
+/**
+ * Reads only the canonical effective-result view. Direct submissions and every
+ * rejudge generation therefore share one ranking path.
+ */
 export async function queryProblemLeaderboard(
   database: D1Database,
   input: {
-    readonly effectiveProblemVersionId: string;
-    readonly rejudgeBatchId?: string;
+    readonly problemVersionId: string;
     readonly language?: string;
     readonly limit: number;
   },
 ): Promise<readonly LeaderboardEntryRow[]> {
-  const batchPredicate = input.rejudgeBatchId
-    ? "(submissions.rejudge_batch_id IS NULL OR submissions.rejudge_batch_id=?)"
-    : "submissions.rejudge_batch_id IS NULL";
-  const bindings: unknown[] = [input.effectiveProblemVersionId];
-  if (input.rejudgeBatchId) bindings.push(input.rejudgeBatchId);
+  const bindings: unknown[] = [input.problemVersionId];
   if (input.language) bindings.push(input.language);
   bindings.push(input.limit);
   const rows = await database.prepare(`WITH candidates AS (
-      SELECT submissions.id AS submission_id,
-        submissions.user_id,
-        submissions.language,
-        submissions.score,
-        submissions.fully_passed_cases,
-        submissions.deterministic_cost,
-        submissions.peak_memory_bytes,
-        COALESCE(original.completed_at, submissions.completed_at) AS achieved_at
-      FROM submissions
-      LEFT JOIN submissions AS original ON original.id=submissions.rejudge_of_submission_id
-      WHERE submissions.managed_problem_version_id=?
-        AND submissions.contest_id IS NULL
-        AND ${COMPLETE_METRICS}
-        AND ${batchPredicate}
-        ${input.language ? "AND submissions.language=?" : ""}
+      SELECT result.id AS submission_id,
+        origin.user_id,
+        result.language,
+        result.score,
+        result.fully_passed_cases,
+        result.deterministic_cost,
+        result.peak_memory_bytes,
+        origin.completed_at AS achieved_at
+      FROM effective_submission_results AS effective
+      JOIN submissions AS origin ON origin.id=effective.origin_submission_id
+      JOIN submissions AS result ON result.id=effective.effective_submission_id
+      WHERE effective.effective_problem_version_id=?
+        AND origin.contest_id IS NULL
+        AND ${COMPLETE_RESULT_METRICS}
+        ${input.language ? "AND result.language=?" : ""}
     ), ranked AS (
       SELECT candidates.*,
         ROW_NUMBER() OVER (
@@ -109,47 +103,39 @@ export async function queryProblemLeaderboard(
   return rows.results.map(entry);
 }
 
+/**
+ * Aggregates contest results by the versions captured in contest_problems.
+ * The view may point at a later rejudge child, but the public breakdown keeps
+ * the contest's immutable version IDs. Freeze eligibility is bound to the
+ * immutable origin submission time, never delayed judge completion.
+ */
 export async function queryContestLeaderboard(
   database: D1Database,
   input: {
     readonly contestId: string;
-    readonly problems: readonly ContestProblemSelection[];
-    readonly completedAtOrBefore?: string;
+    readonly submittedAtOrBefore?: string;
     readonly limit: number;
   },
 ): Promise<readonly LeaderboardEntryRow[]> {
-  if (input.problems.length === 0) return [];
-  const selectionJson = JSON.stringify(input.problems);
-  const rows = await database.prepare(`WITH problem_selection AS (
-      SELECT
-        CAST(key AS INTEGER) AS ordinal,
-        json_extract(value, '$.originalProblemVersionId') AS original_problem_version_id,
-        json_extract(value, '$.effectiveProblemVersionId') AS effective_problem_version_id,
-        json_extract(value, '$.rejudgeBatchId') AS rejudge_batch_id
-      FROM json_each(?)
-    ), candidates AS (
-      SELECT submissions.id AS submission_id,
-        submissions.user_id,
-        problem_selection.ordinal,
-        problem_selection.original_problem_version_id AS problem_version_id,
-        submissions.score,
-        submissions.fully_passed_cases,
-        submissions.deterministic_cost,
-        submissions.peak_memory_bytes,
-        COALESCE(original.completed_at, submissions.completed_at) AS achieved_at
-      FROM problem_selection
-      JOIN submissions ON submissions.managed_problem_version_id=problem_selection.effective_problem_version_id
-      LEFT JOIN submissions AS original ON original.id=submissions.rejudge_of_submission_id
-      WHERE submissions.contest_id=?
-        AND ${COMPLETE_METRICS}
-        AND (
-          (problem_selection.rejudge_batch_id IS NULL AND submissions.rejudge_batch_id IS NULL)
-          OR (
-            problem_selection.rejudge_batch_id IS NOT NULL
-            AND (submissions.rejudge_batch_id IS NULL OR submissions.rejudge_batch_id=problem_selection.rejudge_batch_id)
-          )
-        )
-        ${input.completedAtOrBefore ? "AND COALESCE(original.completed_at, submissions.completed_at)<=?" : ""}
+  const rows = await database.prepare(`WITH candidates AS (
+      SELECT result.id AS submission_id,
+        origin.user_id,
+        contest_problem.ordinal,
+        contest_problem.problem_version_id,
+        result.score,
+        result.fully_passed_cases,
+        result.deterministic_cost,
+        result.peak_memory_bytes,
+        origin.completed_at AS achieved_at
+      FROM effective_submission_results AS effective
+      JOIN submissions AS origin ON origin.id=effective.origin_submission_id
+      JOIN submissions AS result ON result.id=effective.effective_submission_id
+      JOIN contest_problems AS contest_problem
+        ON contest_problem.contest_id=origin.contest_id
+       AND contest_problem.problem_series_id=origin.problem_series_id
+      WHERE origin.contest_id=?
+        AND ${COMPLETE_RESULT_METRICS}
+        ${input.submittedAtOrBefore ? "AND origin.origin_submitted_at<=?" : ""}
     ), ranked AS (
       SELECT candidates.*,
         ROW_NUMBER() OVER (
@@ -188,7 +174,7 @@ export async function queryContestLeaderboard(
     ORDER BY aggregates.score DESC, aggregates.fully_passed_cases DESC, aggregates.deterministic_cost ASC,
       aggregates.peak_memory_bytes ASC, aggregates.achieved_at ASC, aggregates.user_id ASC
     LIMIT ?`)
-    .bind(selectionJson, input.contestId, ...(input.completedAtOrBefore ? [input.completedAtOrBefore] : []), input.limit)
+    .bind(input.contestId, ...(input.submittedAtOrBefore ? [input.submittedAtOrBefore] : []), input.limit)
     .all<ContestLeaderboardRow>();
   return rows.results.map((row) => {
     const problemResults = JSON.parse(row.problem_results_json) as Array<Record<string, unknown>>;

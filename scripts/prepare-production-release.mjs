@@ -4,10 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { sourceTreeProvenanceAtCommit } from "../src/conformance/provenance.ts";
-import { parseCanonicalJsonBytes } from "../src/core/canonical-json.ts";
+import { canonicalJsonBytes, parseCanonicalJsonBytes } from "../src/core/canonical-json.ts";
 import {
-  forgeReleaseManifestBytes,
-  parseForgeReleaseManifest,
+  parseReleaseManifest,
+  releaseManifestBytes,
 } from "../src/release-manifest.ts";
 
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -55,9 +55,9 @@ function parseContainerIdentity(bytes, expectedReleaseId, expectedGitCommit) {
   const identity = requireObject(parseCanonicalJsonBytes(bytes, "container identity"), "container identity");
   requireExactKeys(identity, IDENTITY_KEYS, "container identity");
   if (
-    identity.schema !== "forge-container-identity-v1"
-    || identity.contract !== 1
-    || identity.protocol !== "forge-container-v1"
+    identity.schema !== "wasm-oj-platform/container-identity/v2"
+    || identity.contract !== 2
+    || identity.protocol !== "wasm-oj-container-v2"
     || identity.releaseId !== expectedReleaseId
     || identity.gitCommit !== expectedGitCommit
   ) {
@@ -82,26 +82,8 @@ function parseArtifact(value, label) {
   return { bytes: artifact.bytes, sha256: requireDigest(artifact.sha256, `${label}.sha256`) };
 }
 
-function sqlString(value) {
-  return `'${String(value).replaceAll("'", "''")}'`;
-}
-
-function activationSql({ releaseId, version, manifestKey, manifestSha256, gitCommit, createdAt, activatedBy }) {
-  const id = sqlString(releaseId);
-  const timestamp = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
-  return [
-    "-- One-way production activation after migrations/core/0016_single_store.sql.",
-    "-- Execute in order; on interruption, inspect these two release rows and roll forward.",
-    `INSERT INTO forge_releases (id, version, manifest_r2_key, manifest_sha256, source_git_commit, status, created_at) VALUES (${id}, ${sqlString(version)}, ${sqlString(manifestKey)}, ${sqlString(manifestSha256)}, ${sqlString(gitCommit)}, 'candidate', ${sqlString(createdAt)});`,
-    `UPDATE forge_releases SET status='retired', retired_at=${timestamp} WHERE id=(SELECT forge_release_id FROM forge_active_releases WHERE environment='production') AND id<>${id} AND status='active';`,
-    `UPDATE forge_releases SET status='active', activated_at=${timestamp}, retired_at=NULL WHERE id=${id} AND status='candidate';`,
-    `INSERT INTO forge_active_releases (environment, forge_release_id, activated_by, activated_at) VALUES ('production', ${id}, ${sqlString(activatedBy)}, ${timestamp}) ON CONFLICT(environment) DO UPDATE SET forge_release_id=excluded.forge_release_id, activated_by=excluded.activated_by, activated_at=excluded.activated_at;`,
-    "",
-  ].join("\n");
-}
-
 /**
- * Prepare immutable release bytes and the one-way activation statements.
+ * Prepare immutable release bytes and an authenticated atomic activation request.
  * This is deliberately offline: callers decide when and how to upload/execute.
  */
 export function prepareProductionRelease({
@@ -114,12 +96,15 @@ export function prepareProductionRelease({
   containerImageDigest,
   databaseSha256,
   createdAt,
-  activatedBy = "manual-production-release",
+  expectedCurrentReleaseId = null,
   sourceTag,
   workerBundleArtifact,
   staticAssetsArtifact,
 }) {
   if (!UUID.test(releaseId)) throw new TypeError("releaseId must be a UUID.");
+  if (expectedCurrentReleaseId !== null && !UUID.test(expectedCurrentReleaseId)) {
+    throw new TypeError("expectedCurrentReleaseId must be null or a UUID.");
+  }
   if (!GIT_COMMIT.test(gitCommit)) throw new TypeError("gitCommit must be a full lowercase Git commit SHA.");
   if (!OCI_DIGEST.test(containerImageDigest)) {
     throw new TypeError("containerImageDigest must be an immutable sha256 OCI digest.");
@@ -132,7 +117,7 @@ export function prepareProductionRelease({
   const runtime = requireObject(template.runtime, "release template.runtime");
   const toolchains = requireObject(template.toolchains, "release template.toolchains");
 
-  const manifest = parseForgeReleaseManifest({
+  const manifest = parseReleaseManifest({
     ...template,
     releaseId,
     version,
@@ -171,23 +156,15 @@ export function prepareProductionRelease({
     },
     migrations: { databaseSha256 },
   });
-  const manifestBytes = forgeReleaseManifestBytes(manifest);
+  const manifestBytes = releaseManifestBytes(manifest);
   const manifestSha256 = sha256(manifestBytes);
-  const manifestKey = `releases/${releaseId}/manifest-${manifestSha256}.json`;
+  const activationRequest = { expectedCurrentReleaseId, manifest };
   return {
     manifest,
     manifestBytes,
     manifestSha256,
-    manifestKey,
-    activationSql: activationSql({
-      releaseId,
-      version,
-      manifestKey,
-      manifestSha256,
-      gitCommit,
-      createdAt,
-      activatedBy,
-    }),
+    activationRequest,
+    activationRequestBytes: canonicalJsonBytes(activationRequest),
   };
 }
 
@@ -208,7 +185,8 @@ function usage() {
   --container-identity <container-identity.json> \\
   --container-image-digest <sha256:...> --database-sha256 <sha256> \\
   --output-dir <directory> [--created-at <ISO timestamp>] \\
-  [--activated-by <identity>] [--source-tag <tag>] \\
+  (--expected-current-release-id <uuid> | --expect-no-active-release) \\
+  [--source-tag <tag>] \\
   [--worker-bundle-artifact <artifact.json>] \\
   [--static-assets-artifact <artifact.json>]
 
@@ -229,7 +207,8 @@ async function main() {
       "database-sha256": { type: "string" },
       "output-dir": { type: "string" },
       "created-at": { type: "string" },
-      "activated-by": { type: "string" },
+      "expected-current-release-id": { type: "string" },
+      "expect-no-active-release": { type: "boolean" },
       "source-tag": { type: "string" },
       "worker-bundle-artifact": { type: "string" },
       "static-assets-artifact": { type: "string" },
@@ -254,6 +233,9 @@ async function main() {
   for (const key of required) {
     if (!values[key]) throw new TypeError(`--${key} is required.\n\n${usage()}`);
   }
+  if (Boolean(values["expected-current-release-id"]) === Boolean(values["expect-no-active-release"])) {
+    throw new TypeError(`Exactly one release activation precondition is required.\n\n${usage()}`);
+  }
 
   const [templateBytes, containerIdentityBytes, sourceTree, workerBundleArtifact, staticAssetsArtifact] = await Promise.all([
     readFile(values.template),
@@ -277,7 +259,7 @@ async function main() {
     containerImageDigest: values["container-image-digest"],
     databaseSha256: values["database-sha256"],
     createdAt: values["created-at"] ?? new Date().toISOString(),
-    activatedBy: values["activated-by"],
+    expectedCurrentReleaseId: values["expected-current-release-id"] ?? null,
     sourceTag: values["source-tag"],
     workerBundleArtifact,
     staticAssetsArtifact,
@@ -285,17 +267,16 @@ async function main() {
 
   await mkdir(values["output-dir"], { recursive: true });
   const manifestPath = path.join(values["output-dir"], "manifest.json");
-  const activationPath = path.join(values["output-dir"], "activation.sql");
+  const activationRequestPath = path.join(values["output-dir"], "activation-request.json");
   await Promise.all([
     writeFile(manifestPath, prepared.manifestBytes, { flag: "wx" }),
-    writeFile(activationPath, prepared.activationSql, { flag: "wx" }),
+    writeFile(activationRequestPath, prepared.activationRequestBytes, { flag: "wx" }),
   ]);
   process.stdout.write(`${JSON.stringify({
     releaseId: prepared.manifest.releaseId,
     manifestSha256: prepared.manifestSha256,
-    manifestKey: prepared.manifestKey,
     manifestPath,
-    activationPath,
+    activationRequestPath,
   }, null, 2)}\n`);
 }
 

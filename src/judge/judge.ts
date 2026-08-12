@@ -1,4 +1,4 @@
-import { FORGE_CONTRACT_ID } from "../core/contract";
+import { WASM_OJ_CONTRACT_ID } from "../core/contract";
 import type { ObservedCaseMetrics, PolicyEvaluation } from "./problem-scoring";
 
 export type CaseVerdict = "accepted" | "wrong-answer" | "runtime-error" | "time-limit" | "judge-error";
@@ -35,7 +35,7 @@ export interface JudgeUiSession {
   };
 }
 
-export const JUDGE_PROGRESS_KEY = `${FORGE_CONTRACT_ID}:judge-progress`;
+export const JUDGE_PROGRESS_KEY = `${WASM_OJ_CONTRACT_ID}:judge-progress`;
 
 export function judgeProgressKey(collectionKey: string): string {
   return `${JUDGE_PROGRESS_KEY}:${encodeURIComponent(collectionKey)}`;

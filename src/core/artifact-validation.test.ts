@@ -4,7 +4,7 @@ import {
   canonicalRuntimeBundleFiles,
   createRuntimeBundleManifest,
 } from "./artifact-validation";
-import { FORGE_CONTRACT_VERSION } from "./contract";
+import { WASM_OJ_CONTRACT_VERSION } from "./contract";
 import { costProfileId } from "./cost-profile";
 import { DEFAULT_DETERMINISM } from "./determinism";
 import { DEFAULT_RESOURCE_POLICY } from "./resources";
@@ -34,7 +34,7 @@ function project(files: Project["files"]): Project {
 
 function artifactBase(language: BuildArtifact["language"], target: BuildArtifact["target"]) {
   return {
-    forgeContract: FORGE_CONTRACT_VERSION,
+    wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: "artifact",
     projectId: "project",
     cacheKey: "cache-key",
@@ -85,7 +85,7 @@ describe("BuildArtifact validation boundary", () => {
     const files = {
       "../escape.pyc": new Uint8Array([9]),
       "build/src/main.pyc": new Uint8Array([7]),
-      "forge.manifest.json": manifest,
+      "wasm-oj.manifest.json": manifest,
     };
     const artifact: RuntimeBundleArtifact = {
       ...artifactBase("python", "wasip1"),
@@ -114,7 +114,7 @@ describe("BuildArtifact validation boundary", () => {
     expect(Object.keys(canonicalRuntimeBundleFiles({
       "z.js": "z",
       "a.js": "a",
-      "forge.manifest.json": "manifest",
-    }))).toEqual(["a.js", "forge.manifest.json", "z.js"]);
+      "wasm-oj.manifest.json": "manifest",
+    }))).toEqual(["a.js", "wasm-oj.manifest.json", "z.js"]);
   });
 });

@@ -4,34 +4,34 @@ import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { CostBaselineRegistry } from "../core/cost";
+import { CostBaselineRegistry, createDefaultRuntimeDrivers } from "@wasm-oj/core";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { DEFAULT_RESOURCE_POLICY } from "../core/resources";
 import {
   PYTHON_PACKAGE,
   PYTHON_RUNTIME_FILES_ARCHIVE_SHA256,
 } from "../core/toolchains";
-import { createDefaultRuntimeDrivers } from "../runner/artifact";
 import { PYTHON_RUNTIME_FILES_CACHE_KEY } from "../runner/runtime-files";
 import { createSdkProject } from "../sdk/project";
-import { ServerForgeCompiler } from "./server-compiler";
-import { ServerForgeRunner } from "./server-runner";
+import { ServerCompiler } from "./server-compiler";
+import { ServerRunner } from "./server-runner";
+import { testToolchains } from "./test-toolchains.test-helper";
 
 describe("server CPython compiler", () => {
   it("byte-compiles, executes, and safely rebuilds a corrupt runtime-files cache", { timeout: 300_000 }, async () => {
-    const compiler = new ServerForgeCompiler({
+    const compiler = new ServerCompiler({
       compilerExecutable: process.execPath,
-      toolchainDirectory: path.resolve("public/toolchains"),
+      toolchains: testToolchains(),
     });
-    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-python-runtime-test-"));
-    const runtimeExecutable = path.resolve("crates/runtime-core/target/debug/forge-runner");
+    const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-python-runtime-test-"));
+    const runtimeExecutable = path.resolve("crates/runtime-core/target/debug/wasm-oj-runner");
     execFileSync("cargo", [
       "build",
       "--locked",
       "--manifest-path",
       "crates/runtime-core/Cargo.toml",
       "--bin",
-      "forge-runner",
+      "wasm-oj-runner",
     ], { stdio: "pipe" });
     try {
       const valid = await compiler.build(createSdkProject({
@@ -64,9 +64,9 @@ describe("server CPython compiler", () => {
         determinism: { ...DEFAULT_DETERMINISM },
         resources: { ...DEFAULT_RESOURCE_POLICY },
       };
-      const createRunner = () => new ServerForgeRunner({
+      const createRunner = () => new ServerRunner({
         runtimeExecutable,
-        toolchainDirectory: path.resolve("public/toolchains"),
+        toolchains: testToolchains(),
         cacheDirectory,
         runtimeDrivers: createDefaultRuntimeDrivers(new CostBaselineRegistry({
           [artifact.costProfile]: 0,
@@ -99,7 +99,7 @@ describe("server CPython compiler", () => {
       ].join("\n");
       const cachePath = path.join(
         cacheDirectory,
-        `${createHash("sha256").update(cacheIdentity).digest("hex")}.forgefs`,
+        `${createHash("sha256").update(cacheIdentity).digest("hex")}.wasmojfs`,
       );
       await access(cachePath);
       await writeFile(cachePath, new Uint8Array([0, 1, 2, 3]));

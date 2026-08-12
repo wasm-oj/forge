@@ -9,7 +9,7 @@ fn native_cli_uses_the_library_wire_contract() {
     )
     .unwrap();
     let request = serde_json::json!({
-        "schema": wasm_oj_forge_runtime_core::FORGE_RUN_REQUEST_SCHEMA,
+        "schema": wasm_oj_runtime_core::WASM_OJ_RUN_REQUEST_SCHEMA,
         "wasmBase64": STANDARD.encode(wasm),
         "args": [],
         "env": {},
@@ -31,7 +31,7 @@ fn native_cli_uses_the_library_wire_contract() {
             "filesystemEntryLimit": 4_096,
         },
     });
-    let mut child = Command::new(env!("CARGO_BIN_EXE_forge-runner"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_wasm-oj-runner"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -46,9 +46,30 @@ fn native_cli_uses_the_library_wire_contract() {
 }
 
 #[test]
+fn native_cli_rejects_the_retired_contract_schema() {
+    let retired_brand = ["for", "ge"].concat();
+    let request = serde_json::json!({
+        "schema": format!("wasm-oj-{retired_brand}-v1/run-request"),
+    });
+    let mut child = Command::new(env!("CARGO_BIN_EXE_wasm-oj-runner"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    serde_json::to_writer(child.stdin.as_mut().unwrap(), &request).unwrap();
+    child.stdin.take().unwrap().flush().unwrap();
+    let output = child.wait_with_output().unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("unsupported request schema"), "{stderr}");
+}
+
+#[test]
 fn compiler_cli_rejects_removed_request_determinism() {
     let request = serde_json::json!({
-        "schema": wasm_oj_forge_runtime_core::FORGE_COMPILE_BATCH_SCHEMA,
+        "schema": wasm_oj_runtime_core::WASM_OJ_COMPILE_BATCH_SCHEMA,
         "packageBase64": "",
         "memoryLimitBytes": 65_536,
         "requests": [{
@@ -67,7 +88,7 @@ fn compiler_cli_rejects_removed_request_determinism() {
             },
         }],
     });
-    let mut child = Command::new(env!("CARGO_BIN_EXE_forge-compiler"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_wasm-oj-compiler"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

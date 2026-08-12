@@ -19,19 +19,30 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { deserialize } from "node:v8";
 import { gunzipSync } from "node:zlib";
-import { FORGE_SCHEMAS } from "../core/contract";
+import { WASM_OJ_SCHEMAS } from "@wasm-oj/contracts";
 import {
   PYTHON_PACKAGE,
+  PYTHON_PACKAGE_ASSET_PATH,
   QUICKJS_ASSET_PATH,
   QUICKJS_ASSET_SHA256,
 } from "../core/toolchains";
-import { WEIGHTED_METER_MODEL } from "../core/resources";
 import {
   createExtendedCostBaselineRegistry,
+  createDefaultRuntimeDrivers,
   normalizeExecutionMetrics,
+  prepareArtifactInteraction,
+  prepareArtifactRun,
+  prepareTrustedJudgeRun,
+  RuntimeDriverRegistry,
   unavailableExecutionMetrics,
+  WEIGHTED_METER_MODEL,
+  type PackageFileSystemRequest,
+  type PreparedRunRequest,
   type RawExecutionMetrics,
-} from "../core/cost";
+  type Runner,
+  type RuntimeResolver,
+  type TrustedJudgeProgram,
+} from "@wasm-oj/core";
 import type {
   BuildArtifact,
   ExecutionTermination,
@@ -40,33 +51,36 @@ import type {
   InteractiveRunResult,
   RunConfig,
   RunResult,
+  ServerToolchainSource,
   WorkerProgress,
-} from "../core/types";
-import type { ForgeRunner } from "../runner/runner";
-import {
-  createDefaultRuntimeDrivers,
-  prepareArtifactInteraction,
-  prepareArtifactRun,
-  type PackageFileSystemRequest,
-  type PreparedRunRequest,
-  type RuntimeDriverRegistry,
-  type RuntimeResolver,
-} from "../runner/artifact";
+} from "@wasm-oj/contracts";
 import { verifyAndDecodeRuntimeFiles } from "../runner/runtime-files";
 import { BoundedByteCollector, readBoundedRegularFile } from "./bounded-transport.ts";
-import { runtimePreparationTimeoutMs } from "../runner/preparation-timeout-policy.ts";
+import { DEFAULT_RUNTIME_PREPARATION_TIMEOUT_MS, runtimePreparationTimeoutMs } from "../runner/preparation-timeout-policy.ts";
+import {
+  assertVerifiedToolchainDistribution,
+  type VerifiedServerDistribution,
+} from "./verified-distribution.ts";
+import {
+  assertServerToolchainProfile,
+  serverToolchainAssetFile,
+  serverToolchainDirectories,
+  snapshotServerToolchainSources,
+} from "./toolchain-sources.ts";
 
-export interface ServerForgeRunnerOptions {
-  /** Native `forge-runner` executable built from `crates/runtime-core`. */
+export interface ServerRunnerOptions {
+  /** Native `wasm-oj-runner` executable built from `crates/runtime-core`. */
   runtimeExecutable: string;
-  /** Directory containing the pinned files from `public/toolchains`. */
-  toolchainDirectory: string;
+  /** Explicit package-owned toolchain sources. */
+  toolchains: readonly ServerToolchainSource[];
   /** Writable directory for deterministic runtime filesystem archives. */
   cacheDirectory: string;
   /** Optional runtime-driver registry, used by calibration and embedders. */
   runtimeDrivers?: RuntimeDriverRegistry;
   /** Calibrated profiles for downstream languages using the built-in runtime drivers. */
   additionalCostBaselines?: Readonly<Record<string, number>>;
+  /** @internal Verified immutable-container capability. */
+  verifiedDistribution?: VerifiedServerDistribution;
 }
 
 interface NativeCoreResult {
@@ -150,9 +164,9 @@ interface RunnerStageResult {
   bytes: Uint8Array;
 }
 
-const FORGE_RUNTIME_CACHE_FILE = /^[0-9a-f]{64}\.forgefs$/;
-const FORGE_RUNTIME_CACHE_TEMPORARY_FILE =
-  /^[0-9a-f]{64}\.forgefs\.[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/;
+const WASM_OJ_RUNTIME_CACHE_FILE = /^[0-9a-f]{64}\.wasmojfs$/;
+const WASM_OJ_RUNTIME_CACHE_TEMPORARY_FILE =
+  /^[0-9a-f]{64}\.wasmojfs\.[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/;
 const SERVER_RUNNER_STAGE_SCRIPT = "server-runner-stage.mjs";
 const MAX_RUNNER_STAGE_RESPONSE_BYTES = 256 * 1024 * 1024;
 const MAX_RUNNER_STAGE_DIAGNOSTIC_BYTES = 1024 * 1024;
@@ -160,10 +174,11 @@ const MAX_RUNTIME_CACHE_ARCHIVE_BYTES = 64 * 1024 * 1024;
 const MAX_NATIVE_CORE_DIAGNOSTIC_BYTES = 1024 * 1024;
 const NATIVE_CORE_RESPONSE_OVERHEAD_BYTES = 2 * 1024 * 1024;
 
-export class ServerForgeRunner implements ForgeRunner {
+export class ServerRunner implements Runner {
   private readonly runtimeExecutable: string;
-  private readonly toolchainDirectory: string;
+  private readonly toolchains: readonly ServerToolchainSource[];
   private readonly cacheDirectory: string;
+  private readonly verifiedToolchain: boolean;
   private resolvedCacheDirectory: string | undefined;
   private readonly runtimeDrivers: RuntimeDriverRegistry;
   private readonly packageCommands = new Map<string, Promise<Uint8Array>>();
@@ -179,9 +194,13 @@ export class ServerForgeRunner implements ForgeRunner {
   private generation = 0;
   private disposed = false;
 
-  constructor(options: ServerForgeRunnerOptions) {
+  constructor(options: ServerRunnerOptions) {
     this.runtimeExecutable = path.resolve(options.runtimeExecutable);
-    this.toolchainDirectory = path.resolve(options.toolchainDirectory);
+    this.toolchains = snapshotServerToolchainSources(options.toolchains);
+    if (options.verifiedDistribution) {
+      assertVerifiedToolchainDistribution(options.verifiedDistribution, this.toolchains);
+    }
+    this.verifiedToolchain = options.verifiedDistribution !== undefined;
     this.cacheDirectory = path.resolve(options.cacheDirectory);
     assertCacheDirectoryIsNotFilesystemRoot(this.cacheDirectory);
     if (options.runtimeDrivers && options.additionalCostBaselines) {
@@ -210,8 +229,9 @@ export class ServerForgeRunner implements ForgeRunner {
 
   async run(artifact: BuildArtifact, config: RunConfig): Promise<RunResult> {
     this.assertActive();
+    this.assertArtifactToolchain(artifact);
     if (this.activeOperation || this.cacheClearActive) {
-      throw new Error("ServerForgeRunner accepts one active operation at a time.");
+      throw new Error("ServerRunner accepts one active operation at a time.");
     }
     const operation = createServerRunOperation(this.generation);
     this.activeOperation = operation;
@@ -245,14 +265,41 @@ export class ServerForgeRunner implements ForgeRunner {
     }
   }
 
+  async runTrusted(program: TrustedJudgeProgram, config: RunConfig): Promise<RunResult> {
+    this.assertActive();
+    if (this.activeOperation || this.cacheClearActive) {
+      throw new Error("ServerRunner accepts one active operation at a time.");
+    }
+    const operation = createServerRunOperation(this.generation);
+    this.activeOperation = operation;
+    this.inFlightRuns.add(operation);
+    try {
+      await this.ready();
+      this.assertCurrent(operation, "Trusted judge execution was cancelled before preparation completed.");
+      const started = performance.now();
+      const prepared = await this.prepareTrustedWithDeadline(operation, program, config);
+      this.assertCurrent(operation, "Trusted judge execution was cancelled during preparation.");
+      const result = await this.runNativeCore(prepared, config, started);
+      this.assertCurrent(operation, "Trusted judge execution was cancelled before its result was delivered.");
+      return result;
+    } finally {
+      await operation.quiesce();
+      if (this.activeOperation === operation) this.activeOperation = undefined;
+      this.inFlightRuns.delete(operation);
+      operation.complete();
+    }
+  }
+
   async interact(
     contestantArtifact: BuildArtifact,
     interactorArtifact: BuildArtifact,
     config: InteractiveRunConfig,
   ): Promise<InteractiveRunResult> {
     this.assertActive();
+    this.assertArtifactToolchain(contestantArtifact);
+    this.assertArtifactToolchain(interactorArtifact);
     if (this.activeOperation || this.cacheClearActive) {
-      throw new Error("ServerForgeRunner accepts one active operation at a time.");
+      throw new Error("ServerRunner accepts one active operation at a time.");
     }
     if (interactorArtifact.kind !== "wasm") {
       throw new Error("Interactive judge artifacts must be standalone Wasm modules.");
@@ -290,6 +337,45 @@ export class ServerForgeRunner implements ForgeRunner {
     }
   }
 
+  async interactTrusted(
+    contestantArtifact: BuildArtifact,
+    interactorProgram: TrustedJudgeProgram,
+    config: InteractiveRunConfig,
+  ): Promise<InteractiveRunResult> {
+    this.assertActive();
+    this.assertArtifactToolchain(contestantArtifact);
+    if (this.activeOperation || this.cacheClearActive) {
+      throw new Error("ServerRunner accepts one active operation at a time.");
+    }
+    const operation = createServerRunOperation(this.generation);
+    this.activeOperation = operation;
+    this.inFlightRuns.add(operation);
+    try {
+      await this.ready();
+      this.assertCurrent(operation, "Trusted interaction was cancelled before preparation completed.");
+      const started = performance.now();
+      const [contestant, interactor] = await Promise.all([
+        this.prepareInteractiveWithDeadline(
+          operation,
+          contestantArtifact,
+          interactiveRunConfig(config.contestant, config.determinism),
+        ),
+        this.prepareTrustedWithDeadline(
+          operation,
+          interactorProgram,
+          interactiveRunConfig(config.interactor, config.determinism),
+        ),
+      ]);
+      this.assertCurrent(operation, "Trusted interaction was cancelled during preparation.");
+      return await this.runNativeInteractive(contestant, interactor, config, started);
+    } finally {
+      await operation.quiesce();
+      if (this.activeOperation === operation) this.activeOperation = undefined;
+      this.inFlightRuns.delete(operation);
+      operation.complete();
+    }
+  }
+
   onProgress(listener: (progress: WorkerProgress) => void): () => void {
     this.assertActive();
     this.progressListeners.add(listener);
@@ -315,7 +401,7 @@ export class ServerForgeRunner implements ForgeRunner {
       if (generation !== this.generation) throw new Error("Server runtime cache clearing was superseded.");
       this.packageCommands.clear();
       this.packageFileSystems.clear();
-      await removeForgeRuntimeCacheFiles(this.runtimeCacheDirectory());
+      await removeWasmOjRuntimeCacheFiles(this.runtimeCacheDirectory());
       this.assertActive();
       if (generation !== this.generation) throw new Error("Server runtime cache clearing was superseded.");
     } finally {
@@ -344,7 +430,7 @@ export class ServerForgeRunner implements ForgeRunner {
 
   restart(): void {
     this.assertActive();
-    if (this.cacheClearActive) throw new Error("Cannot restart ServerForgeRunner while clearing its cache.");
+    if (this.cacheClearActive) throw new Error("Cannot restart ServerRunner while clearing its cache.");
     this.cancel();
     this.packageCommands.clear();
     this.packageFileSystems.clear();
@@ -373,12 +459,14 @@ export class ServerForgeRunner implements ForgeRunner {
     const resolvedCacheDirectory = await realpath(this.cacheDirectory);
     assertCacheDirectoryIsNotFilesystemRoot(resolvedCacheDirectory);
     this.resolvedCacheDirectory = resolvedCacheDirectory;
-    await access(this.toolchainDirectory, fsConstants.R_OK);
+    await Promise.all(
+      serverToolchainDirectories(this.toolchains).map((directory) => access(directory, fsConstants.R_OK)),
+    );
   }
 
   private runtimeCacheDirectory(): string {
     if (!this.resolvedCacheDirectory) {
-      throw new Error("ServerForgeRunner runtime cache is not initialized.");
+      throw new Error("ServerRunner runtime cache is not initialized.");
     }
     return this.resolvedCacheDirectory;
   }
@@ -448,6 +536,31 @@ export class ServerForgeRunner implements ForgeRunner {
     }
   }
 
+  private async prepareTrustedWithDeadline(
+    operation: ServerRunOperation,
+    program: TrustedJudgeProgram,
+    config: RunConfig,
+  ): Promise<PreparedRunRequest> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        const error = new Error(`Trusted judge runtime preparation exceeded ${DEFAULT_RUNTIME_PREPARATION_TIMEOUT_MS} ms.`);
+        operation.superseded = true;
+        this.abortPreparationStages(error, operation);
+        reject(error);
+      }, DEFAULT_RUNTIME_PREPARATION_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([
+        Promise.resolve().then(() => prepareTrustedJudgeRun(program, config)),
+        operation.cancellation,
+        deadline,
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   private async loadQuickJsForOperation(operation: ServerRunOperation): Promise<Uint8Array> {
     this.assertCurrent(operation, "Server execution was cancelled before QuickJS was loaded.");
     const bytes = await this.loadQuickJs();
@@ -497,7 +610,7 @@ export class ServerForgeRunner implements ForgeRunner {
   private assertPinnedPackageCommand(packageSpecifier: string, command: string): void {
     if (packageSpecifier !== PYTHON_PACKAGE || command !== "python") {
       throw new Error(
-        `No pinned Forge runtime command is declared for '${packageSpecifier}:${command}'.`,
+        `No pinned WASM-OJ runtime command is declared for '${packageSpecifier}:${command}'.`,
       );
     }
   }
@@ -507,15 +620,16 @@ export class ServerForgeRunner implements ForgeRunner {
     compressedSha256: string,
     expandedSha256?: string,
   ): Promise<Uint8Array> {
-    const file = path.resolve(this.toolchainDirectory, path.basename(assetPath));
-    const relative = path.relative(this.toolchainDirectory, file);
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
-      throw new Error(`Toolchain asset escapes the configured directory: '${assetPath}'.`);
-    }
+    const file = serverToolchainAssetFile(this.toolchains, assetPath);
     const compressed = await readFile(file);
-    this.verifyDigest(file, compressed, compressedSha256);
-    const expanded = new Uint8Array(gunzipSync(compressed));
-    if (expandedSha256) this.verifyDigest(file, expanded, expandedSha256);
+    if (!this.verifiedToolchain) this.verifyDigest(file, compressed, compressedSha256);
+    const expandedBuffer = gunzipSync(compressed);
+    const expanded = new Uint8Array(
+      expandedBuffer.buffer,
+      expandedBuffer.byteOffset,
+      expandedBuffer.byteLength,
+    );
+    if (expandedSha256 && !this.verifiedToolchain) this.verifyDigest(file, expanded, expandedSha256);
     return expanded;
   }
 
@@ -552,7 +666,7 @@ export class ServerForgeRunner implements ForgeRunner {
   ): Promise<Record<string, Uint8Array>> {
     this.assertCurrent(operation, "Server execution was cancelled before its runtime cache was read.");
     const digest = createHash("sha256").update(identity).digest("hex");
-    const cachePath = path.join(this.runtimeCacheDirectory(), `${digest}.forgefs`);
+    const cachePath = path.join(this.runtimeCacheDirectory(), `${digest}.wasmojfs`);
     const cachedArchive = await this.readRuntimeCacheArchive(cachePath);
     this.assertCurrent(operation, "Server execution was cancelled while its runtime cache was read.");
     if (cachedArchive) {
@@ -588,7 +702,7 @@ export class ServerForgeRunner implements ForgeRunner {
     request: RunnerStageRequest,
   ): Promise<RunnerStageResult> {
     this.assertCurrent(operation, "Server execution was cancelled before its runtime stage started.");
-    const transportDirectory = await mkdtemp(path.join(os.tmpdir(), "forge-runner-response-"));
+    const transportDirectory = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-runner-response-"));
     const responsePath = path.join(transportDirectory, "response.v8");
     try {
       this.assertCurrent(operation, "Server execution was cancelled before its runtime stage spawned.");
@@ -599,7 +713,7 @@ export class ServerForgeRunner implements ForgeRunner {
           ["--experimental-strip-types", "--disable-warning=ExperimentalWarning", script],
           {
             stdio: ["pipe", "pipe", "pipe"],
-            env: { ...process.env, FORGE_RUNNER_STAGE_RESPONSE: responsePath },
+            env: { ...process.env, WASM_OJ_RUNNER_STAGE_RESPONSE: responsePath },
           },
         );
         const stdout: Buffer[] = [];
@@ -700,7 +814,11 @@ export class ServerForgeRunner implements ForgeRunner {
         child.on("error", onChildError);
         child.stdin.on("error", onStdinError);
         child.on("close", onClose);
-        child.stdin.end(JSON.stringify({ toolchainDirectory: this.toolchainDirectory, request }));
+        child.stdin.end(JSON.stringify({
+          toolchainAsset: serverToolchainAssetFile(this.toolchains, PYTHON_PACKAGE_ASSET_PATH),
+          verifiedToolchain: this.verifiedToolchain,
+          request,
+        }));
       });
     } finally {
       await rm(transportDirectory, { recursive: true, force: true });
@@ -1022,7 +1140,16 @@ export class ServerForgeRunner implements ForgeRunner {
   }
 
   private assertActive(): void {
-    if (this.disposed) throw new Error("ServerForgeRunner is disposed.");
+    if (this.disposed) throw new Error("ServerRunner is disposed.");
+  }
+
+  private assertArtifactToolchain(artifact: BuildArtifact): void {
+    assertServerToolchainProfile(
+      this.toolchains,
+      artifact.language,
+      artifact.target,
+      artifact.optimization,
+    );
   }
 }
 
@@ -1121,7 +1248,7 @@ function resolveRunnerStageScript(): string {
   if (moduleFilename === "server.js") {
     return path.join(moduleDirectory, SERVER_RUNNER_STAGE_SCRIPT);
   }
-  throw new Error(`Unsupported ServerForgeRunner module layout '${modulePath}'.`);
+  throw new Error(`Unsupported ServerRunner module layout '${modulePath}'.`);
 }
 
 function cloneRuntimeFiles(files: Record<string, Uint8Array>): Record<string, Uint8Array> {
@@ -1136,7 +1263,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function encodeNativeRequest(request: PreparedRunRequest) {
   return {
-    schema: FORGE_SCHEMAS.runRequest,
+    schema: WASM_OJ_SCHEMAS.runRequest,
     wasmBase64: Buffer.from(request.wasm).toString("base64"),
     args: request.args,
     env: request.env,
@@ -1180,7 +1307,7 @@ function encodeNativeInteractiveRequest(
   config: InteractiveRunConfig,
 ) {
   return {
-    schema: FORGE_SCHEMAS.interactiveRequest,
+    schema: WASM_OJ_SCHEMAS.interactiveRequest,
     contestant: encodeNativeInteractiveProgram(contestant),
     interactor: encodeNativeInteractiveProgram(interactor),
     determinism: config.determinism,
@@ -1241,19 +1368,19 @@ function decodeNativeOutputFiles(value: unknown): Record<string, Uint8Array> {
 
 function assertCacheDirectoryIsNotFilesystemRoot(directory: string): void {
   if (directory === path.parse(directory).root) {
-    throw new Error("ServerForgeRunner cacheDirectory must not be a filesystem root.");
+    throw new Error("ServerRunner cacheDirectory must not be a filesystem root.");
   }
 }
 
-function isForgeRuntimeCacheFile(name: string): boolean {
-  return FORGE_RUNTIME_CACHE_FILE.test(name) || FORGE_RUNTIME_CACHE_TEMPORARY_FILE.test(name);
+function isWasmOjRuntimeCacheFile(name: string): boolean {
+  return WASM_OJ_RUNTIME_CACHE_FILE.test(name) || WASM_OJ_RUNTIME_CACHE_TEMPORARY_FILE.test(name);
 }
 
-async function removeForgeRuntimeCacheFiles(directory: string): Promise<void> {
+async function removeWasmOjRuntimeCacheFiles(directory: string): Promise<void> {
   const entries = await readdir(directory, { withFileTypes: true });
   entries.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
   for (const entry of entries) {
-    if (!entry.isFile() || !isForgeRuntimeCacheFile(entry.name)) continue;
+    if (!entry.isFile() || !isWasmOjRuntimeCacheFile(entry.name)) continue;
     const file = path.join(directory, entry.name);
     try {
       if (!(await lstat(file)).isFile()) continue;

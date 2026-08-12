@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { FORGE_SCHEMAS } from "../core/contract";
+import { WASM_OJ_SCHEMAS } from "../core/contract";
 import { ClangObjectCache, parseClangDependencyFile } from "./clang-object-cache";
 import type { ClangPins } from "./clang-pins";
 
 const pins: ClangPins = {
-  schema: FORGE_SCHEMAS.clangPins,
+  schema: WASM_OJ_SCHEMAS.clangPins,
   version: "test",
   source: "clang-test.webc",
   sourceSha256: "a".repeat(64),

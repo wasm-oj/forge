@@ -84,13 +84,13 @@ describe("remote problem collection", () => {
   it("round-trips a credential-free collection share URL and discards unrelated query data", () => {
     const shared = problemCollectionShareUrl(
       DEFAULT_PROBLEM_COLLECTION_SOURCE,
-      "https://forge.example/judge?session=secret#editor",
+      "https://wasm-oj.example/judge?session=secret#editor",
     );
     expect(shared).not.toContain("secret");
     expect(problemCollectionSourceFromShareUrl(shared)).toEqual(DEFAULT_PROBLEM_COLLECTION_SOURCE);
-    expect(problemCollectionSourceFromShareUrl("https://forge.example/judge")).toBeUndefined();
+    expect(problemCollectionSourceFromShareUrl("https://wasm-oj.example/judge")).toBeUndefined();
     expect(() => problemCollectionSourceFromShareUrl(
-      "https://forge.example/judge?collection-provider=github",
+      "https://wasm-oj.example/judge?collection-provider=github",
     )).toThrow("incomplete");
   });
 

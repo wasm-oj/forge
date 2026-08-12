@@ -1,6 +1,6 @@
 import { zipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
-import { FORGE_SCHEMAS } from "../core/contract.ts";
+import { WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
 import { createDependencyDownloadBudget, DEPENDENCY_RESOLUTION_LIMITS } from "./limits.ts";
 import {
@@ -142,7 +142,7 @@ checksum = "${digest}"
     expect(graph.packages[0]?.integritySha256).toBe(await sha256Hex(payload));
   });
 
-  it("resolves the explicit Forge C/C++ lock without inventing a package solver", async () => {
+  it("resolves the explicit WASM-OJ C/C++ lock without inventing a package solver", async () => {
     const payload = encoder.encode("header-only archive");
     const digest = await sha256Hex(payload);
     const url = "https://packages.wasm-oj.dev/cpp/answer-1.0.0.tar.gz";
@@ -155,9 +155,9 @@ checksum = "${digest}"
       sourceFiles: [{
         ecosystem: "cpp",
         role: "lockfile",
-        path: "forge-cpp.lock.json",
+        path: "wasm-oj-cpp.lock.json",
         contents: JSON.stringify({
-          schema: FORGE_SCHEMAS.cppDependencyLock,
+          schema: WASM_OJ_SCHEMAS.cppDependencyLock,
           roots: ["answer@1.0.0"],
           packages: [{ name: "answer", version: "1.0.0", url, sha256: digest, dependencies: [] }],
         }),
@@ -407,7 +407,7 @@ checksum = "${digest}"
           release() {},
         },
       },
-    )).rejects.toThrow("must be issued by Forge");
+    )).rejects.toThrow("must be issued by WASM-OJ");
     expect(fetcher).not.toHaveBeenCalled();
   });
 

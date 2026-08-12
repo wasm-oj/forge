@@ -1,4 +1,4 @@
-import { ManagedProblemWorkspace } from "@/src/components/managed-problem-workspace";
+import { ManagedProblemWorkspace } from "@/src/features/judge/components/managed-problem-workspace";
 
 export default async function ContestProblemPage({
   params,

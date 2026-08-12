@@ -16,7 +16,7 @@ const EXPECTED_SOURCE_REVISION = "93b8b738ebd3ee57e118da0f0eb795b97d5b999e";
 const EXPECTED_CARGO_LOCK_SHA256 = "d352926f3f05e3d4308c4e261711d07db568e5c2b4387067180f920da074791f";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const forgePackage = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+const rootPackage = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const lock = await readPnpmLock(root);
 const sdkPackagePath = fileURLToPath(import.meta.resolve("@wasmer/sdk/package.json"));
 const sdkRoot = path.dirname(sdkPackagePath);
@@ -29,8 +29,8 @@ const [licenseInventoryBytes, licenseReportBytes] = await Promise.all([
 ]);
 const licenseInventory = JSON.parse(licenseInventoryBytes.toString("utf8"));
 
-if (forgePackage.dependencies?.["@wasmer/sdk"] !== EXPECTED_VERSION) {
-  throw new Error(`Forge must pin @wasmer/sdk exactly to ${EXPECTED_VERSION}.`);
+if (rootPackage.dependencies?.["@wasmer/sdk"] !== EXPECTED_VERSION) {
+  throw new Error(`WASM-OJ must pin @wasmer/sdk exactly to ${EXPECTED_VERSION}.`);
 }
 if (sdkPackage.name !== "@wasmer/sdk" || sdkPackage.version !== EXPECTED_VERSION) {
   throw new Error(
@@ -57,7 +57,7 @@ for (const [relative, expected] of Object.entries(EXPECTED_FILES)) {
 }
 
 if (
-  licenseInventory.schema !== "wasm-oj-forge-v1/wasmer-sdk-licenses"
+  licenseInventory.schema !== "wasm-oj-v2/wasmer-sdk-licenses"
   || licenseInventory.generator?.name !== "cargo-about"
   || licenseInventory.generator?.version !== "0.9.1"
   || licenseInventory.graph?.package !== `@wasmer/sdk@${EXPECTED_VERSION}`

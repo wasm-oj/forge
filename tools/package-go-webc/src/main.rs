@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let compressed = fs::read(&compressed_path)?;
     let compressed_standard_library = fs::read(&standard_library_path)?;
     let manifest = serde_json::json!({
-        "schema": "wasm-oj-forge-v1/go-toolchain",
+        "schema": "wasm-oj-v2/go-toolchain",
         "version": VERSION,
         "target": TARGET,
         "source": {
@@ -108,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "compressedSha256": sha256(&compressed_standard_library),
             "compressedBytes": compressed_standard_library.len(),
             "uncompressedBytes": standard_library.len(),
-            "format": "FORGEGO1",
+            "format": "WOJGO002",
         }
     });
     let manifest_path = output.join(format!("go-{VERSION}-wasip1.manifest.json"));
@@ -169,7 +169,7 @@ fn instrument_host_inputs(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::E
         .id();
     let memory_contract = module.memories.get_mut(memory);
     if memory_contract.initial > MAX_MEMORY_PAGES {
-        return Err("Go tool initial memory exceeds the Forge compiler limit".into());
+        return Err("Go tool initial memory exceeds the WASM-OJ compiler limit".into());
     }
     memory_contract.maximum = Some(MAX_MEMORY_PAGES);
     if let Ok(import) = module
@@ -266,7 +266,7 @@ fn build_standard_library(
     let index = serde_json::to_vec(&index)?;
     let index_length = u32::try_from(index.len())?;
     let mut archive = Vec::with_capacity(12 + index.len() + contents.len());
-    archive.extend_from_slice(b"FORGEGO1");
+    archive.extend_from_slice(b"WOJGO002");
     archive.extend_from_slice(&index_length.to_le_bytes());
     archive.extend_from_slice(&index);
     archive.extend_from_slice(&contents);

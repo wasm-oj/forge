@@ -7,7 +7,7 @@ import {
   observedOutputReadyClangStages,
   usesOutputReadyClang,
 } from "./browser-clang-policy";
-import { FORGE_LIBCXX_PCH_HEADER } from "./libcxx-pch";
+import { WASM_OJ_LIBCXX_PCH_HEADER } from "./libcxx-pch";
 
 describe("browser Clang policy", () => {
   it("selects C and C++ projects for both supported runtime targets", () => {
@@ -60,7 +60,7 @@ describe("browser Clang policy", () => {
       language: "cpp",
       entry: "src/main.cpp",
       files: {
-        "src/forge.pch.hpp": "#include <array>\n",
+        "src/wasm-oj.pch.hpp": "#include <array>\n",
         "src/main.cpp": "int main(){}",
       },
     });
@@ -70,7 +70,7 @@ describe("browser Clang policy", () => {
       language: "cpp",
       entry: "src/main.cpp",
       files: {
-        "src/forge.pch.hpp": FORGE_LIBCXX_PCH_HEADER,
+        "src/wasm-oj.pch.hpp": WASM_OJ_LIBCXX_PCH_HEADER,
         "src/main.cpp": "int main(){}",
       },
     });

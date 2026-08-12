@@ -7,9 +7,12 @@ export default defineConfig([
   ...nextTypescript,
   globalIgnores([
     ".next/**",
+    "architecture-report/.next/**",
+    "architecture-report/dist/**",
     ".vinext/**",
     ".playwright-cli/**",
     "dist/**",
+    "packages/*/dist/**",
     "lib/**",
     "public/toolchains/**",
     "problems/**",

@@ -1,34 +1,9 @@
 import type { DependencyDownloadBudget } from "./types.ts";
-
-const MIB = 1024 * 1024;
+import {
+  DEPENDENCY_RESOLUTION_LIMITS,
+} from "../core/dependencies.ts";
+export { DEPENDENCY_RESOLUTION_LIMITS, assertBoundedCount } from "../core/dependencies.ts";
 const issuedDownloadBudgets = new WeakSet<object>();
-
-/** Hard browser-side admission limits shared by resolution, cache, and build paths. */
-export const DEPENDENCY_RESOLUTION_LIMITS = Object.freeze({
-  requirements: 128,
-  sourceFiles: 128,
-  sourceTextBytes: 8 * MIB,
-  hosts: 32,
-  roots: 512,
-  packages: 512,
-  referencesPerPackage: 512,
-  concurrency: 16,
-  metadataBytes: 8 * MIB,
-  packageBytes: 256 * MIB,
-  totalDownloadBytes: 512 * MIB,
-  archiveFiles: 16_384,
-  unpackedBytes: 512 * MIB,
-});
-
-export function assertBoundedCount(
-  count: number,
-  maximum: number,
-  label: string,
-): void {
-  if (!Number.isSafeInteger(count) || count < 0 || count > maximum) {
-    throw new RangeError(`${label} exceeds the ${maximum}-item limit.`);
-  }
-}
 
 export function createDependencyDownloadBudget(
   limitBytes = DEPENDENCY_RESOLUTION_LIMITS.totalDownloadBytes,
@@ -63,7 +38,7 @@ export function createDependencyDownloadBudget(
 /** Rejects caller-forged budgets whose methods could silently bypass the hard aggregate cap. */
 export function assertDependencyDownloadBudget(value: unknown): asserts value is DependencyDownloadBudget {
   if (!value || typeof value !== "object" || !issuedDownloadBudgets.has(value)) {
-    throw new TypeError("Dependency download budget must be issued by Forge.");
+    throw new TypeError("Dependency download budget must be issued by WASM-OJ.");
   }
   const budget = value as DependencyDownloadBudget;
   if (

@@ -142,20 +142,20 @@
     }
   ],
   "output": {
-    "compressedBytes": 5188705,
-    "compressedSha256": "f8ada27da0b9bbe8a4e06736f320d71f6aca33876e8a0fd8894c5733972ba3c5",
+    "compressedBytes": 5188678,
+    "compressedSha256": "218cd20ac4abb443e0700816010a615a345a43eae623a0232da2227135a6c7a6",
     "path": "python-3.14.6-wasip1.webc.gz.bin",
-    "sha256": "67ffc49c3df1c874ff8407bc7972b3ae951b0ba564687e9eb1ea2cb82f77cf86",
-    "uncompressedBytes": 21065948
+    "sha256": "454ffc53936aa13a0d7f4afbb5bd50ada339c8ebd04bbf27ea19e4104cf43207",
+    "uncompressedBytes": 21065942
   },
   "runtimeFiles": {
-    "archiveBytes": 10652546,
-    "archiveSha256": "8aeae854650b5cc5af015dcfacb79f974d5a6997110c98b083cf4d618e20e4ba",
-    "cacheKey": "wasm-oj-forge-v1:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip",
-    "format": "FORGEFS1",
+    "archiveBytes": 10652540,
+    "archiveSha256": "44d894f91487f20c2bb04fe496a9343db37d8720fb706472c2b4a7f3300db039",
+    "cacheKey": "wasm-oj-v2:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip",
+    "format": "WOJFS002",
     "guestPath": "/cpython/lib/python314.zip"
   },
-  "schema": "wasm-oj-forge-v1/python-toolchain",
+  "schema": "wasm-oj-v2/python-toolchain",
   "source": {
     "archiveSha256": "143b1dddefaec3bd2e21e3b839b34a2b7fb9842272883c576420d605e9f30c63",
     "spdx": {

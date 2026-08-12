@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "wasm-oj-forge-development",
+  "name": "wasm-oj-development",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-08-09",
   "compatibility_flags": ["nodejs_compat"],
@@ -15,8 +15,8 @@
   "vars": {
     "ENVIRONMENT": "development",
     "PUBLIC_ORIGIN": "http://localhost:3000",
-    "FORGE_RELEASE_ID": "01988dc1-5c00-7000-8000-000000000000",
-    "FORGE_RELEASE_MANIFEST_SHA256": "875b9380866e9d56e7110b0ee310962c16d9d4ae103f829d62bdffd2cbe7c61d",
+    "WASM_OJ_RELEASE_ID": "01988dc1-5c00-7000-8000-000000000000",
+    "WASM_OJ_RELEASE_MANIFEST_SHA256": "875b9380866e9d56e7110b0ee310962c16d9d4ae103f829d62bdffd2cbe7c61d",
     "GITHUB_OAUTH_CLIENT_ID": "development-only",
     "GITHUB_APP_ID": "development-only",
     "GITHUB_APP_SLUG": "development-only",
@@ -25,28 +25,27 @@
     "OFFICIAL_GITHUB_REPOSITORY_ID": "1328710736"
   },
   "d1_databases": [
-    { "binding": "DB", "database_name": "wasm-oj-core-development", "database_id": "local-forge-core", "migrations_dir": "migrations/core" }
+    { "binding": "DB", "database_name": "wasm-oj-core-development", "database_id": "local-wasm-oj-core", "migrations_dir": "migrations/core" }
   ],
   "r2_buckets": [
     { "binding": "JUDGE_BUCKET", "bucket_name": "wasm-oj-judge-development" }
   ],
   "durable_objects": {
     "bindings": [
-      { "name": "SUBMISSION_CONTAINER", "class_name": "SubmissionJudgeContainer" },
-      { "name": "VALIDATION_CONTAINER", "class_name": "ValidationJudgeContainer" }
+      { "name": "SUBMISSION_CONTAINER", "class_name": "SubmissionJudgeContainer" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["SubmissionDO", "ProblemLeaderboardDO", "ContestDO", "UserQuotaDO", "AdmissionControlDO", "SubmissionJudgeContainer", "ValidationJudgeContainer"] },
-    { "tag": "v2", "deleted_classes": ["SubmissionDO", "ProblemLeaderboardDO", "ContestDO", "UserQuotaDO", "AdmissionControlDO"] }
+    { "tag": "v2", "deleted_classes": ["SubmissionDO", "ProblemLeaderboardDO", "ContestDO", "UserQuotaDO", "AdmissionControlDO"] },
+    { "tag": "v3", "deleted_classes": ["ValidationJudgeContainer"] }
   ],
   "workflows": [
     { "name": "wasm-oj-submission-development", "binding": "SUBMISSION_WORKFLOW", "class_name": "SubmissionWorkflow" },
-    { "name": "wasm-oj-validation-development", "binding": "VALIDATION_WORKFLOW", "class_name": "ValidationWorkflow" }
+    { "name": "wasm-oj-catalog-development", "binding": "CATALOG_WORKFLOW", "class_name": "CatalogWorkflow" }
   ],
   "containers": [
-    { "name": "wasm-oj-submission-development", "class_name": "SubmissionJudgeContainer", "image": "./Dockerfile", "instance_type": "standard-2", "max_instances": 50, "ssh": { "enabled": false } },
-    { "name": "wasm-oj-validation-development", "class_name": "ValidationJudgeContainer", "image": "./Dockerfile", "instance_type": "standard-2", "max_instances": 5, "ssh": { "enabled": false } }
+    { "name": "wasm-oj-submission-development", "class_name": "SubmissionJudgeContainer", "image": "./Dockerfile", "instance_type": "standard-2", "max_instances": 50, "ssh": { "enabled": false } }
   ],
   "triggers": { "crons": ["* * * * *"] }
 }

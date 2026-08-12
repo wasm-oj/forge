@@ -1,54 +1,43 @@
-const SHA256 = /^[0-9a-f]{64}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const MAX_CONTAINER_RESULT_BYTES = 2 * 1024 * 1024;
+const MAX_CONTAINER_RESULT_BYTES = 64 * 1024;
 const VERDICTS = new Set([
   "accepted", "wrong-answer", "runtime-error", "instruction-limit", "memory-limit",
   "output-limit", "filesystem-limit", "logical-time-limit", "wall-time-limit", "judge-error",
 ]);
-const TERMINATIONS = new Set([
-  "exited", "instruction-limit", "logical-time-limit", "memory-limit", "output-limit",
-  "filesystem-limit", "wall-time-limit", "trap",
-]);
+const POLICY_IDS = ["baseline", "efficient", "optimal"] as const;
+const MAX_POLICY_SUMMARY_CASES = 10_000;
 
-export interface ContainerResultExpectation {
-  readonly submissionId: string;
-  readonly attempt: number;
-  readonly expectedReleaseId: string;
-  readonly expectedManifestSha256: string;
-  readonly expectedContainerIdentitySha256: string;
-  readonly expectedJudgeProjectionSha256: string;
-  readonly expectedProblemBundleDigest: string;
+export interface VerifiedPolicyAggregate {
+  readonly id: (typeof POLICY_IDS)[number];
+  readonly earnedCases: number;
+  readonly costExceededCases: number;
+  readonly memoryExceededCases: number;
+  readonly logicalTimeExceededCases: number;
 }
 
-export interface VerifiedContainerAudit {
-  readonly schema: "forge-submission-audit-v1";
-  readonly submissionId: string;
-  readonly attempt: number;
-  readonly sourceDigest: string;
-  readonly forgeReleaseId: string;
-  readonly expectedManifestSha256: string;
-  readonly expectedContainerIdentitySha256: string;
-  readonly actualContainerIdentitySha256: string;
-  readonly judgeProjectionSha256: string;
-  readonly problemBundleDigest: string;
-  readonly cases: readonly {
-    readonly verdict: string;
-    readonly termination: string | null;
-    readonly cost: number | null;
-    readonly memoryBytes: number | null;
-  }[];
+export interface VerifiedSubmissionPolicySummary {
+  readonly totalCases: number;
+  readonly outputAcceptedCases: number;
+  readonly policies: readonly VerifiedPolicyAggregate[];
 }
 
 export type VerifiedContainerSubmissionResult =
   | { readonly state: "compile-error"; readonly score: 0; readonly fullyPassedCases: 0 }
   | {
-    readonly state: "completed" | "judge-error";
+    readonly state: "judge-error";
+    readonly verdict: "judge-error";
+    readonly score: 0;
+    readonly fullyPassedCases: 0;
+    readonly deterministicCost: number;
+    readonly peakMemoryBytes: number;
+  }
+  | {
+    readonly state: "completed";
     readonly verdict: string;
     readonly score: number;
     readonly fullyPassedCases: number;
     readonly deterministicCost: number;
     readonly peakMemoryBytes: number;
-    readonly audit: VerifiedContainerAudit;
+    readonly policySummary: VerifiedSubmissionPolicySummary;
   };
 
 function record(value: unknown, label: string): Record<string, unknown> {
@@ -74,78 +63,47 @@ function finiteNumber(value: unknown, label: string): number {
   return value;
 }
 
-function digest(value: unknown, label: string): string {
-  if (typeof value !== "string" || !SHA256.test(value)) throw new TypeError(`${label} must be a lowercase SHA-256 digest.`);
-  return value;
-}
-
-function equal(value: unknown, expected: string | number, label: string): void {
-  if (value !== expected) throw new TypeError(`${label} does not match the immutable job.`);
-}
-
-function parseAudit(value: unknown, expected: ContainerResultExpectation): VerifiedContainerAudit {
-  const audit = record(value, "Container audit");
-  exact(audit, [
-    "schema", "submissionId", "attempt", "sourceDigest", "forgeReleaseId",
-    "expectedManifestSha256", "expectedContainerIdentitySha256", "actualContainerIdentitySha256",
-    "judgeProjectionSha256", "problemBundleDigest", "cases",
-  ], "Container audit");
-  if (audit.schema !== "forge-submission-audit-v1") throw new TypeError("Container audit schema is unsupported.");
-  equal(audit.submissionId, expected.submissionId, "Container audit submission");
-  equal(audit.attempt, expected.attempt, "Container audit attempt");
-  equal(audit.forgeReleaseId, expected.expectedReleaseId, "Container audit release");
-  equal(audit.expectedManifestSha256, expected.expectedManifestSha256, "Container audit manifest");
-  equal(audit.expectedContainerIdentitySha256, expected.expectedContainerIdentitySha256, "Container audit expected identity");
-  equal(audit.judgeProjectionSha256, expected.expectedJudgeProjectionSha256, "Container audit judge projection");
-  equal(audit.problemBundleDigest, expected.expectedProblemBundleDigest, "Container audit problem bundle");
-  const sourceDigest = digest(audit.sourceDigest, "Container audit source");
-  const actualIdentity = digest(audit.actualContainerIdentitySha256, "Container audit actual identity");
-  if (actualIdentity !== expected.expectedContainerIdentitySha256) {
-    throw new TypeError("Container audit actual identity does not match the immutable job.");
+function parsePolicySummary(value: unknown, fullyPassedCases: number): VerifiedSubmissionPolicySummary {
+  const summary = record(value, "Container policy summary");
+  exact(summary, ["totalCases", "outputAcceptedCases", "policies"], "Container policy summary");
+  const totalCases = safeInteger(summary.totalCases, "Policy summary total cases");
+  const outputAcceptedCases = safeInteger(summary.outputAcceptedCases, "Policy summary output-accepted cases");
+  if (totalCases < 1 || totalCases > MAX_POLICY_SUMMARY_CASES) {
+    throw new TypeError("Policy summary total cases are outside the judge contract.");
   }
-  if (!Array.isArray(audit.cases) || audit.cases.length > 10_000) throw new TypeError("Container audit cases are invalid.");
-  const cases = audit.cases.map((value, index) => {
-    const item = record(value, `Container audit case ${index}`);
-    exact(item, ["verdict", "termination", "cost", "memoryBytes"], `Container audit case ${index}`);
-    if (typeof item.verdict !== "string" || !VERDICTS.has(item.verdict)) throw new TypeError(`Container audit case ${index} verdict is invalid.`);
-    if (item.termination !== null && (typeof item.termination !== "string" || !TERMINATIONS.has(item.termination))) {
-      throw new TypeError(`Container audit case ${index} termination is invalid.`);
+  if (outputAcceptedCases > totalCases || outputAcceptedCases !== fullyPassedCases) {
+    throw new TypeError("Policy summary output-accepted cases disagree with the terminal result.");
+  }
+  if (!Array.isArray(summary.policies) || summary.policies.length !== POLICY_IDS.length) {
+    throw new TypeError("Policy summary must contain exactly three policies.");
+  }
+  const policies = summary.policies.map((value, index): VerifiedPolicyAggregate => {
+    const policy = record(value, `Policy summary '${POLICY_IDS[index]}'`);
+    exact(policy, [
+      "id", "earnedCases", "costExceededCases", "memoryExceededCases",
+      "logicalTimeExceededCases",
+    ], `Policy summary '${POLICY_IDS[index]}'`);
+    const id = POLICY_IDS[index];
+    if (policy.id !== id) throw new TypeError("Policy summary order is invalid.");
+    const earnedCases = safeInteger(policy.earnedCases, `Policy summary '${id}' earned cases`);
+    const costExceededCases = safeInteger(policy.costExceededCases, `Policy summary '${id}' cost failures`);
+    const memoryExceededCases = safeInteger(policy.memoryExceededCases, `Policy summary '${id}' memory failures`);
+    const logicalTimeExceededCases = safeInteger(policy.logicalTimeExceededCases, `Policy summary '${id}' logical-time failures`);
+    const counts = [earnedCases, costExceededCases, memoryExceededCases, logicalTimeExceededCases];
+    if (counts.some((count) => count > outputAcceptedCases)) {
+      throw new TypeError(`Policy summary '${id}' count exceeds output-accepted cases.`);
     }
-    return {
-      verdict: item.verdict,
-      termination: item.termination as string | null,
-      cost: item.cost === null ? null : safeInteger(item.cost, `Container audit case ${index} cost`),
-      memoryBytes: item.memoryBytes === null ? null : safeInteger(item.memoryBytes, `Container audit case ${index} memory`),
-    };
+    for (const failedCases of counts.slice(1)) {
+      if (earnedCases + failedCases > outputAcceptedCases) {
+        throw new TypeError(`Policy summary '${id}' contradicts its earned cases.`);
+      }
+    }
+    return { id, earnedCases, costExceededCases, memoryExceededCases, logicalTimeExceededCases };
   });
-  return {
-    schema: "forge-submission-audit-v1",
-    submissionId: expected.submissionId,
-    attempt: expected.attempt,
-    sourceDigest,
-    forgeReleaseId: expected.expectedReleaseId,
-    expectedManifestSha256: expected.expectedManifestSha256,
-    expectedContainerIdentitySha256: expected.expectedContainerIdentitySha256,
-    actualContainerIdentitySha256: actualIdentity,
-    judgeProjectionSha256: expected.expectedJudgeProjectionSha256,
-    problemBundleDigest: expected.expectedProblemBundleDigest,
-    cases,
-  };
+  return { totalCases, outputAcceptedCases, policies };
 }
 
-export function parseContainerSubmissionResult(
-  value: unknown,
-  expected: ContainerResultExpectation,
-): VerifiedContainerSubmissionResult {
-  if (!UUID.test(expected.expectedReleaseId) || !Number.isSafeInteger(expected.attempt) || expected.attempt < 1) {
-    throw new TypeError("Container result expectation is invalid.");
-  }
-  for (const [label, value] of Object.entries({
-    manifest: expected.expectedManifestSha256,
-    identity: expected.expectedContainerIdentitySha256,
-    projection: expected.expectedJudgeProjectionSha256,
-    bundle: expected.expectedProblemBundleDigest,
-  })) digest(value, `Expected ${label}`);
+export function parseContainerSubmissionResult(value: unknown): VerifiedContainerSubmissionResult {
   const result = record(value, "Container submission result");
   if (result.state === "compile-error") {
     exact(result, ["state", "score", "fullyPassedCases"], "Compile-error container result");
@@ -153,7 +111,9 @@ export function parseContainerSubmissionResult(
     return { state: "compile-error", score: 0, fullyPassedCases: 0 };
   }
   if (result.state !== "completed" && result.state !== "judge-error") throw new TypeError("Container submission terminal state is invalid.");
-  exact(result, ["state", "verdict", "score", "fullyPassedCases", "deterministicCost", "peakMemoryBytes", "audit"], "Container submission result");
+  exact(result, result.state === "completed"
+    ? ["state", "verdict", "score", "fullyPassedCases", "deterministicCost", "peakMemoryBytes", "policySummary"]
+    : ["state", "verdict", "score", "fullyPassedCases", "deterministicCost", "peakMemoryBytes"], "Container submission result");
   if (typeof result.verdict !== "string" || !VERDICTS.has(result.verdict)) throw new TypeError("Container result verdict is invalid.");
   if (result.state === "judge-error" && result.verdict !== "judge-error") throw new TypeError("Judge-error state and verdict disagree.");
   if (result.state === "completed" && result.verdict === "judge-error") throw new TypeError("Completed state may not carry judge-error.");
@@ -161,23 +121,30 @@ export function parseContainerSubmissionResult(
   const fullyPassedCases = safeInteger(result.fullyPassedCases, "Container result passed cases");
   if (score > 100) throw new TypeError("Container result score exceeds the public scoring contract.");
   if (result.state === "judge-error" && (score !== 0 || fullyPassedCases !== 0)) throw new TypeError("Judge-error result must have zero score and passed cases.");
-  const audit = parseAudit(result.audit, expected);
-  if (fullyPassedCases > audit.cases.length) throw new TypeError("Container result passed cases exceed its bounded audit inventory.");
+  const deterministicCost = safeInteger(result.deterministicCost, "Container result deterministic cost");
+  const peakMemoryBytes = safeInteger(result.peakMemoryBytes, "Container result peak memory");
+  if (result.state === "judge-error") {
+    return {
+      state: "judge-error",
+      verdict: "judge-error",
+      score: 0,
+      fullyPassedCases: 0,
+      deterministicCost,
+      peakMemoryBytes,
+    };
+  }
   return {
-    state: result.state,
+    state: "completed",
     verdict: result.verdict,
     score,
     fullyPassedCases,
-    deterministicCost: safeInteger(result.deterministicCost, "Container result deterministic cost"),
-    peakMemoryBytes: safeInteger(result.peakMemoryBytes, "Container result peak memory"),
-    audit,
+    deterministicCost,
+    peakMemoryBytes,
+    policySummary: parsePolicySummary(result.policySummary, fullyPassedCases),
   };
 }
 
-export async function readContainerSubmissionResult(
-  response: Response,
-  expected: ContainerResultExpectation,
-): Promise<VerifiedContainerSubmissionResult> {
+export async function readContainerSubmissionResult(response: Response): Promise<VerifiedContainerSubmissionResult> {
   const declared = response.headers.get("content-length");
   if (declared !== null && (!Number.isSafeInteger(Number(declared)) || Number(declared) < 1 || Number(declared) > MAX_CONTAINER_RESULT_BYTES)) {
     throw new TypeError("Container result exceeds its bounded response contract.");
@@ -203,13 +170,12 @@ export async function readContainerSubmissionResult(
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-  } catch {
+    return parseContainerSubmissionResult(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown);
+  } catch (error) {
+    if (error instanceof TypeError) throw error;
     throw new TypeError("Container result is not valid UTF-8 JSON.");
   } finally {
     bytes.fill(0);
   }
-  return parseContainerSubmissionResult(parsed, expected);
 }

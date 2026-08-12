@@ -1,57 +1,57 @@
 import { clangBuildGraphStorageParticipant } from "../compiler/indexeddb-build-graph-cache.ts";
-import { FORGE_STORAGE } from "../core/contract.ts";
+import { WASM_OJ_STORAGE } from "../core/contract.ts";
 import { IndexedDbDependencyCache } from "../dependencies/indexeddb-cache.ts";
 import { artifactStorageParticipant } from "./database.ts";
 import type {
-  ForgeStorageEntry,
-  ForgeStorageMaintenanceResult,
-  ForgeStorageParticipant,
-  ForgeStorageParticipantReport,
-  ForgeStorageReport,
+  StorageEntry,
+  StorageMaintenanceResult,
+  StorageParticipant,
+  StorageParticipantReport,
+  StorageReport,
 } from "./types.ts";
 
 const DEFAULT_MAX_CACHE_BYTES = 2 * 1024 * 1024 * 1024;
 const DEFAULT_MINIMUM_FREE_BYTES = 256 * 1024 * 1024;
 const DEFAULT_QUOTA_FRACTION = 0.7;
-const BYTE_LENGTH_HEADER = "X-WASM-OJ-Forge-Byte-Length";
-const CACHED_AT_HEADER = "X-WASM-OJ-Forge-Cached-At";
+const BYTE_LENGTH_HEADER = "X-WASM-OJ-Byte-Length";
+const CACHED_AT_HEADER = "X-WASM-OJ-Cached-At";
 
-export interface ForgeStorageCoordinatorOptions {
+export interface StorageCoordinatorOptions {
   storageManager?: StorageManager;
   lockManager?: LockManager;
   cacheStorage?: CacheStorage;
-  participants?: readonly ForgeStorageParticipant[];
+  participants?: readonly StorageParticipant[];
   maxCacheBytes?: number;
   minimumFreeBytes?: number;
   quotaFraction?: number;
 }
 
 interface ParticipantSnapshot {
-  participant: ForgeStorageParticipant;
-  entries: readonly ForgeStorageEntry[];
+  participant: StorageParticipant;
+  entries: readonly StorageEntry[];
 }
 
 /**
- * One browser-wide admission and LRU eviction policy for Forge's independent
+ * One browser-wide admission and LRU eviction policy for WASM-OJ's independent
  * IndexedDB and Cache Storage backends. Web Locks serialize policy decisions
  * across tabs; cache payload integrity remains the responsibility of each store.
  */
-export class ForgeStorageCoordinator {
+export class StorageCoordinator {
   private readonly storageManager: StorageManager;
   private readonly lockManager: LockManager;
-  private readonly participants: readonly ForgeStorageParticipant[];
+  private readonly participants: readonly StorageParticipant[];
   private readonly maxCacheBytes: number;
   private readonly minimumFreeBytes: number;
   private readonly quotaFraction: number;
 
-  constructor(options: ForgeStorageCoordinatorOptions = {}) {
+  constructor(options: StorageCoordinatorOptions = {}) {
     const storageManager = options.storageManager ?? navigator.storage;
     const lockManager = options.lockManager ?? navigator.locks;
     if (!storageManager || typeof storageManager.estimate !== "function" || typeof storageManager.persist !== "function") {
-      throw new Error("Forge storage coordination requires the StorageManager API.");
+      throw new Error("WASM-OJ storage coordination requires the StorageManager API.");
     }
     if (!lockManager || typeof lockManager.request !== "function") {
-      throw new Error("Forge storage coordination requires the Web Locks API for cross-tab safety.");
+      throw new Error("WASM-OJ storage coordination requires the Web Locks API for cross-tab safety.");
     }
     this.storageManager = storageManager;
     this.lockManager = lockManager;
@@ -61,7 +61,7 @@ export class ForgeStorageCoordinator {
     this.quotaFraction = fraction(options.quotaFraction ?? DEFAULT_QUOTA_FRACTION);
   }
 
-  async estimate(): Promise<ForgeStorageReport> {
+  async estimate(): Promise<StorageReport> {
     const [estimate, snapshots] = await Promise.all([
       this.storageManager.estimate(),
       this.snapshotParticipants(),
@@ -71,9 +71,9 @@ export class ForgeStorageCoordinator {
 
   /**
    * Evicts the least valuable, least recently used entries until both the
-   * logical Forge budget and the browser quota headroom admit `incomingBytes`.
+   * logical WASM-OJ budget and the browser quota headroom admit `incomingBytes`.
    */
-  async maintain(incomingBytes = 0): Promise<ForgeStorageMaintenanceResult> {
+  async maintain(incomingBytes = 0): Promise<StorageMaintenanceResult> {
     incomingBytes = nonNegativeInteger(incomingBytes, "incoming bytes");
     return this.exclusive(async () => {
       const [estimate, snapshots] = await Promise.all([
@@ -105,11 +105,11 @@ export class ForgeStorageCoordinator {
   }
 
   /** Fails before a write when all coordinated caches cannot free enough room. */
-  async admit(incomingBytes: number): Promise<ForgeStorageMaintenanceResult> {
+  async admit(incomingBytes: number): Promise<StorageMaintenanceResult> {
     const result = await this.maintain(incomingBytes);
     const released = result.evicted.reduce((total, item) => total + item.byteLength, 0);
     if (released < requiredEviction(result.before, incomingBytes)) {
-      throw new DOMException("Forge browser storage cannot admit the requested payload within its configured budget.", "QuotaExceededError");
+      throw new DOMException("WASM-OJ browser storage cannot admit the requested payload within its configured budget.", "QuotaExceededError");
     }
     return result;
   }
@@ -124,7 +124,7 @@ export class ForgeStorageCoordinator {
     return this.storageManager.persist();
   }
 
-  private async estimateUnlocked(): Promise<ForgeStorageReport> {
+  private async estimateUnlocked(): Promise<StorageReport> {
     const [estimate, snapshots] = await Promise.all([
       this.storageManager.estimate(),
       this.snapshotParticipants(),
@@ -143,7 +143,7 @@ export class ForgeStorageCoordinator {
 
   private async exclusive<T>(operation: () => Promise<T>): Promise<T> {
     return await this.lockManager.request(
-      `${FORGE_STORAGE.database}:coordinator`,
+      `${WASM_OJ_STORAGE.database}:coordinator`,
       { mode: "exclusive" },
       async () => await operation(),
     );
@@ -151,19 +151,19 @@ export class ForgeStorageCoordinator {
 }
 
 export function createDefaultBrowserStorageCoordinator(
-  options: Omit<ForgeStorageCoordinatorOptions, "participants"> = {},
-): ForgeStorageCoordinator {
+  options: Omit<StorageCoordinatorOptions, "participants"> = {},
+): StorageCoordinator {
   const cacheStorage = options.cacheStorage ?? caches;
   const dependencyCache = new IndexedDbDependencyCache();
-  return new ForgeStorageCoordinator({
+  return new StorageCoordinator({
     ...options,
     cacheStorage,
     participants: [
       clangBuildGraphStorageParticipant(),
       artifactStorageParticipant(),
       dependencyCache.storageParticipant(),
-      cacheStorageParticipant(cacheStorage, FORGE_STORAGE.runtimeFilesCache, "runtime-files", 50),
-      cacheStorageParticipant(cacheStorage, FORGE_STORAGE.toolchainCache, "toolchains", 100),
+      cacheStorageParticipant(cacheStorage, WASM_OJ_STORAGE.runtimeFilesCache, "runtime-files", 50),
+      cacheStorageParticipant(cacheStorage, WASM_OJ_STORAGE.toolchainCache, "toolchains", 100),
     ],
   });
 }
@@ -173,7 +173,7 @@ export function cacheStorageParticipant(
   cacheName: string,
   id: string,
   retentionPriority: number,
-): ForgeStorageParticipant {
+): StorageParticipant {
   requireParticipantIdentity(id, retentionPriority);
   return {
     id,
@@ -181,7 +181,7 @@ export function cacheStorageParticipant(
     async list() {
       const cache = await storage.open(cacheName);
       const requests = await cache.keys();
-      const entries: ForgeStorageEntry[] = [];
+      const entries: StorageEntry[] = [];
       for (const request of requests) {
         const response = await cache.match(request);
         if (!response) continue;
@@ -211,10 +211,10 @@ function report(
   maximum: number,
   minimumFreeBytes: number,
   quotaFraction: number,
-): ForgeStorageReport {
+): StorageReport {
   const usage = nonNegativeInteger(estimate.usage ?? 0, "browser storage usage");
   const quota = nonNegativeInteger(estimate.quota ?? 0, "browser storage quota");
-  const participants: ForgeStorageParticipantReport[] = snapshots.map(({ participant, entries }) => ({
+  const participants: StorageParticipantReport[] = snapshots.map(({ participant, entries }) => ({
     id: participant.id,
     byteLength: entries.reduce(addEntryBytes, 0),
     entryCount: entries.length,
@@ -231,7 +231,7 @@ function report(
   };
 }
 
-function requiredEviction(reportValue: ForgeStorageReport, incomingBytes: number): number {
+function requiredEviction(reportValue: StorageReport, incomingBytes: number): number {
   const logical = Math.max(0, reportValue.logicalCacheBytes + incomingBytes - reportValue.logicalCacheBudget);
   const quota = reportValue.quota > 0
     ? Math.max(0, reportValue.usage + incomingBytes + reportValue.minimumFreeBytes - reportValue.quota)
@@ -239,7 +239,7 @@ function requiredEviction(reportValue: ForgeStorageReport, incomingBytes: number
   return Math.max(logical, quota);
 }
 
-function canonicalParticipants(participants: readonly ForgeStorageParticipant[]): ForgeStorageParticipant[] {
+function canonicalParticipants(participants: readonly StorageParticipant[]): StorageParticipant[] {
   const result = participants.map((participant) => {
     if (!participant || typeof participant.list !== "function" || typeof participant.delete !== "function"
       || typeof participant.clear !== "function") {
@@ -258,7 +258,7 @@ function requireParticipantIdentity(id: string, priority: number): void {
   nonNegativeInteger(priority, `storage participant '${id}' retention priority`);
 }
 
-function validateEntry(value: ForgeStorageEntry): ForgeStorageEntry {
+function validateEntry(value: StorageEntry): StorageEntry {
   if (!value || typeof value.key !== "string" || !value.key || value.key !== value.key.trim() || value.key.includes("\0")) {
     throw new Error("Storage entry keys must be non-empty and canonical.");
   }
@@ -269,7 +269,7 @@ function validateEntry(value: ForgeStorageEntry): ForgeStorageEntry {
   };
 }
 
-function addEntryBytes(total: number, entry: ForgeStorageEntry): number {
+function addEntryBytes(total: number, entry: StorageEntry): number {
   const next = total + entry.byteLength;
   if (!Number.isSafeInteger(next)) throw new Error("Coordinated storage size exceeds the safe integer range.");
   return next;

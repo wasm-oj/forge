@@ -1,0 +1,30 @@
+name: Verify WASM-OJ problem collection
+description: Validate schema, byte lengths, SHA-256 digests, revision, and canonical publication output.
+inputs:
+  version:
+    description: Exact @wasm-oj/organizer release containing the collection contract.
+    required: false
+    default: 0.2.0
+  root:
+    description: Repository root containing collection/index.json.
+    required: false
+    default: .
+  managed:
+    description: Optional managed contract path; use collection/managed.json for publishable collections.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Verify WASM-OJ collection
+      shell: bash
+      env:
+        WASM_OJ_ACTION_PACKAGE: "@wasm-oj/organizer@${{ inputs.version }}"
+        WASM_OJ_ACTION_ROOT: "${{ inputs.root }}"
+        WASM_OJ_ACTION_MANAGED: "${{ inputs.managed }}"
+      run: |
+        arguments=(verify "$WASM_OJ_ACTION_ROOT")
+        if [[ -n "$WASM_OJ_ACTION_MANAGED" ]]; then
+          arguments+=(--managed "$WASM_OJ_ACTION_MANAGED")
+        fi
+        npx --yes "$WASM_OJ_ACTION_PACKAGE" "${arguments[@]}"

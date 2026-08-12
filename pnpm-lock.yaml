@@ -18,6 +18,39 @@ importers:
       '@cloudflare/containers':
         specifier: 0.3.7
         version: 0.3.7
+      '@wasm-oj/browser':
+        specifier: workspace:0.2.0
+        version: link:packages/browser
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:packages/contracts
+      '@wasm-oj/core':
+        specifier: workspace:0.2.0
+        version: link:packages/core
+      '@wasm-oj/organizer':
+        specifier: workspace:0.2.0
+        version: link:packages/organizer
+      '@wasm-oj/sdk':
+        specifier: workspace:0.2.0
+        version: link:packages/sdk
+      '@wasm-oj/server':
+        specifier: workspace:0.2.0
+        version: link:packages/server
+      '@wasm-oj/toolchain-clang':
+        specifier: workspace:0.1.0
+        version: link:packages/toolchain-clang
+      '@wasm-oj/toolchain-go':
+        specifier: workspace:0.1.0
+        version: link:packages/toolchain-go
+      '@wasm-oj/toolchain-javascript':
+        specifier: workspace:0.1.0
+        version: link:packages/toolchain-javascript
+      '@wasm-oj/toolchain-python':
+        specifier: workspace:0.1.0
+        version: link:packages/toolchain-python
+      '@wasm-oj/toolchain-rust':
+        specifier: workspace:0.1.0
+        version: link:packages/toolchain-rust
       '@wasmer/sdk':
         specifier: 0.10.0
         version: 0.10.0
@@ -112,6 +145,104 @@ importers:
       wrangler:
         specifier: 4.120.0
         version: 4.120.0(@cloudflare/workers-types@5.20260808.1)
+
+  packages/browser:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+      '@wasm-oj/core':
+        specifier: workspace:0.2.0
+        version: link:../core
+      '@wasmer/sdk':
+        specifier: 0.10.0
+        version: 0.10.0
+      es-module-lexer:
+        specifier: 2.3.1
+        version: 2.3.1
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
+
+  packages/contracts: {}
+
+  packages/core:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
+
+  packages/organizer:
+    dependencies:
+      '@wasm-oj/core':
+        specifier: workspace:0.2.0
+        version: link:../core
+
+  packages/sdk:
+    dependencies:
+      '@wasm-oj/browser':
+        specifier: workspace:0.2.0
+        version: link:../browser
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+      '@wasm-oj/core':
+        specifier: workspace:0.2.0
+        version: link:../core
+      '@wasm-oj/organizer':
+        specifier: workspace:0.2.0
+        version: link:../organizer
+      '@wasm-oj/server':
+        specifier: workspace:0.2.0
+        version: link:../server
+
+  packages/server:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+      '@wasm-oj/core':
+        specifier: workspace:0.2.0
+        version: link:../core
+      '@wasmer/sdk':
+        specifier: 0.10.0
+        version: 0.10.0
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
+
+  packages/toolchain-clang:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+
+  packages/toolchain-go:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+
+  packages/toolchain-javascript:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+
+  packages/toolchain-python:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+
+  packages/toolchain-rust:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
 
 packages:
 

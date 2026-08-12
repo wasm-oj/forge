@@ -1,8 +1,11 @@
 import { requireMutationSession, requireSession } from "./auth";
-import type { AuthenticatedSession, ForgeWorkerEnv } from "./env";
+import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { ApiError, jsonResponse, readJsonBody } from "./http";
 import { requireFirstOrganizerApplicationTurnstile, requireStagingFormalAccess } from "./formal-access";
 import { formalMutationStatus, setFormalMutationsEnabled } from "./formal-mutations";
+import { parseReleaseManifest, releaseManifestBytes } from "../src/release-manifest";
+import { sha256Hex } from "./crypto";
+import { activateRelease, assertActiveRelease } from "./release";
 
 function requireAdmin(session: AuthenticatedSession): void {
   if (!session.roles.includes("admin")) throw new ApiError(403, "admin-required", "An Admin role is required.");
@@ -13,7 +16,7 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-export async function createOrganizerApplication(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function createOrganizerApplication(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await requireMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   if (session.roles.includes("organizer") || session.roles.includes("admin")) {
@@ -37,7 +40,7 @@ export async function createOrganizerApplication(request: Request, env: ForgeWor
   return jsonResponse({ application: { id, status: "pending" }, replayed: false }, 201);
 }
 
-export async function listOrganizerApplications(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function listOrganizerApplications(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await requireSession(request, env);
   requireAdmin(session);
   const status = new URL(request.url).searchParams.get("status") ?? "pending";
@@ -58,7 +61,7 @@ export async function listOrganizerApplications(request: Request, env: ForgeWork
 
 export async function reviewOrganizerApplication(
   request: Request,
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   applicationId: string,
 ): Promise<Response> {
   const session = await requireMutationSession(request, env);
@@ -93,7 +96,7 @@ export async function reviewOrganizerApplication(
 
 export async function revokeOrganizerRole(
   request: Request,
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   userId: string,
 ): Promise<Response> {
   const session = await requireMutationSession(request, env);
@@ -113,7 +116,7 @@ export async function revokeOrganizerRole(
   });
 }
 
-export async function getFormalMutationControl(request: Request, env: ForgeWorkerEnv): Promise<Response> {
+export async function getFormalMutationControl(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await requireSession(request, env);
   requireAdmin(session);
   return jsonResponse(await formalMutationStatus(env));
@@ -121,7 +124,7 @@ export async function getFormalMutationControl(request: Request, env: ForgeWorke
 
 export async function updateFormalMutationControl(
   request: Request,
-  env: ForgeWorkerEnv,
+  env: WasmOjWorkerEnv,
   enabled: boolean,
 ): Promise<Response> {
   const session = await requireMutationSession(request, env);
@@ -131,4 +134,43 @@ export async function updateFormalMutationControl(
     throw new ApiError(400, "formal-mutation-control-invalid", "A reason is required.");
   }
   return jsonResponse(await setFormalMutationsEnabled(env, enabled, body.reason));
+}
+
+export async function activateProductionRelease(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
+  const session = await requireMutationSession(request, env);
+  requireAdmin(session);
+  const body = record(await readJsonBody(request, 300 * 1024));
+  if (
+    Object.keys(body).sort().join("\0") !== ["expectedCurrentReleaseId", "manifest"].sort().join("\0")
+    || (body.expectedCurrentReleaseId !== null && typeof body.expectedCurrentReleaseId !== "string")
+  ) throw new ApiError(400, "release-activation-invalid", "Release activation payload has an invalid shape.");
+  const manifest = parseReleaseManifest(body.manifest);
+  const manifestBytes = releaseManifestBytes(manifest);
+  const manifestSha256 = await sha256Hex(manifestBytes);
+  if (
+    manifest.releaseId !== env.WASM_OJ_RELEASE_ID
+    || manifestSha256 !== env.WASM_OJ_RELEASE_MANIFEST_SHA256
+  ) throw new ApiError(409, "release-worker-mismatch", "Release manifest does not identify the deployed Worker and Container release.");
+  const manifestJson = new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes);
+  await activateRelease(env.DB, {
+    releaseId: manifest.releaseId,
+    version: manifest.version,
+    manifestJson,
+    manifestBytes: manifestBytes.byteLength,
+    manifestSha256,
+    sourceGitCommit: manifest.source.commit,
+    createdAt: manifest.createdAt,
+    activatedBy: session.userId,
+    environment: env.ENVIRONMENT,
+    expectedCurrentReleaseId: body.expectedCurrentReleaseId as string | null,
+  });
+  const active = await assertActiveRelease(env.DB, env.ENVIRONMENT, manifest.releaseId, manifestSha256);
+  return jsonResponse({
+    release: {
+      id: active.releaseId,
+      manifestSha256: active.manifestSha256,
+      environment: env.ENVIRONMENT,
+      status: "active",
+    },
+  });
 }

@@ -14,7 +14,7 @@ const { values } = parseArgs({
 const port = parsePort(values.port ?? process.env.PORT ?? "3000");
 const host = values.hostname ?? "0.0.0.0";
 
-console.log(`\n  Forge production server  (port ${port})\n`);
+console.log(`\n  WASM-OJ production server  (port ${port})\n`);
 const { server } = await startProdServer({
   port,
   host,
@@ -42,7 +42,7 @@ function installProductionResponsePolicy(server) {
     if (!isWasmAssetRequest(request.url)) return;
 
     const writeHead = response.writeHead;
-    response.writeHead = function forgeWriteHead(statusCode, statusMessageOrHeaders, headers) {
+    response.writeHead = function wasmOjWriteHead(statusCode, statusMessageOrHeaders, headers) {
       if (typeof statusMessageOrHeaders === "string") {
         return writeHead.call(
           this,
@@ -59,7 +59,7 @@ function installProductionResponsePolicy(server) {
 function isWasmAssetRequest(requestUrl) {
   if (!requestUrl) return false;
   try {
-    return new URL(requestUrl, "http://forge.invalid").pathname.toLowerCase().endsWith(".wasm");
+    return new URL(requestUrl, "http://wasm-oj.invalid").pathname.toLowerCase().endsWith(".wasm");
   } catch {
     return false;
   }

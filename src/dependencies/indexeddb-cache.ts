@@ -1,7 +1,7 @@
-import { FORGE_STORAGE } from "../core/contract.ts";
+import { WASM_OJ_STORAGE } from "../core/contract.ts";
 import { sha256Hex } from "../core/hash.ts";
-import type { ForgeDependencyCache } from "./types.ts";
-import type { ForgeStorageEntry, ForgeStorageParticipant } from "../storage/types.ts";
+import type { DependencyCache } from "./types.ts";
+import type { StorageEntry, StorageParticipant } from "../storage/types.ts";
 
 const STORE = "payloads";
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -14,7 +14,7 @@ interface DependencyPayloadRecord {
 }
 
 /** Persistent browser content-addressed dependency cache. */
-export class IndexedDbDependencyCache implements ForgeDependencyCache {
+export class IndexedDbDependencyCache implements DependencyCache {
   private database: Promise<IDBDatabase> | undefined;
 
   async load(integritySha256: string): Promise<Uint8Array | undefined> {
@@ -64,7 +64,7 @@ export class IndexedDbDependencyCache implements ForgeDependencyCache {
     await transactionDone(transaction);
   }
 
-  async listStorageEntries(): Promise<ForgeStorageEntry[]> {
+  async listStorageEntries(): Promise<StorageEntry[]> {
     const database = await this.open();
     const transaction = database.transaction(STORE, "readonly");
     const values = await requestResult(transaction.objectStore(STORE).getAll() as IDBRequest<unknown[]>);
@@ -75,7 +75,7 @@ export class IndexedDbDependencyCache implements ForgeDependencyCache {
     });
   }
 
-  storageParticipant(): ForgeStorageParticipant {
+  storageParticipant(): StorageParticipant {
     return {
       id: "dependencies",
       retentionPriority: 40,
@@ -93,7 +93,7 @@ export class IndexedDbDependencyCache implements ForgeDependencyCache {
 
   private open(): Promise<IDBDatabase> {
     this.database ??= new Promise((resolve, reject) => {
-      const request = indexedDB.open(FORGE_STORAGE.dependencyCache, 1);
+      const request = indexedDB.open(WASM_OJ_STORAGE.dependencyCache, 1);
       request.addEventListener("upgradeneeded", () => {
         if (!request.result.objectStoreNames.contains(STORE)) {
           request.result.createObjectStore(STORE, { keyPath: "digest" });

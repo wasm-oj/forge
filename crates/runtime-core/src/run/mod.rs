@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn removes_native_and_javascript_runtime_wrappers_from_traps() {
-        let root = "Forge denied nondeterministic capability wasix_32v1.thread_spawn";
+        let root = "WASM-OJ denied nondeterministic capability wasix_32v1.thread_spawn";
         assert_eq!(
             canonical_trap_message(&format!("RuntimeError: {root}")),
             format!("RuntimeError: {root}")

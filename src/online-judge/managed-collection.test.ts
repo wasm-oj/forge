@@ -1,114 +1,67 @@
 import { describe, expect, it } from "vitest";
-import { parseManagedCollectionContract } from "./managed-collection";
+import { canonicalJsonBytes } from "../core/canonical-json";
+import {
+  MANAGED_COLLECTION_SCHEMA,
+  parseManagedCollectionContract,
+  parseManagedCollectionV2,
+} from "./managed-collection";
 
 function contract() {
   return {
-    schema: "forge-managed-collection-v1",
+    schema: MANAGED_COLLECTION_SCHEMA,
     collectionRevision: "a".repeat(64),
     problems: [{
-      id: "sum-two",
-      allowedLanguages: ["c", "rust"],
-      references: ["c", "rust"].map((language) => ({
-        language,
-        target: "wasip1",
-        optimization: "release",
-        entry: language === "c" ? "main.c" : "main.rs",
-        files: [{
-          path: language === "c" ? "main.c" : "main.rs",
-          repositoryPath: `problems/sum-two/solutions/${language}/${language === "c" ? "main.c" : "main.rs"}`,
-          bytes: 100,
-          sha256: "b".repeat(64),
-        }],
-      })),
-      judge: { kind: "text" },
+      slug: "sum-two",
+      allowedProfiles: { c: { target: "wasip1", optimization: "release" } },
+      contestPublic: { repositoryPath: `managed/sum-two.${"b".repeat(64)}.contest.json`, bytes: 120, sha256: "b".repeat(64) },
+      judgePackage: { repositoryPath: `managed/sum-two.${"c".repeat(64)}.wasmojjudge`, bytes: 4096, sha256: "c".repeat(64) },
     }],
   };
 }
 
-describe("managed collection contract", () => {
-  it("accepts one integrity-addressed reference per allowed language", () => {
-    expect(parseManagedCollectionContract(contract()).problems[0]?.references).toHaveLength(2);
+describe("managed collection v2 contract", () => {
+  it("accepts only the generated digest-addressed publication shape", () => {
+    const bytes = canonicalJsonBytes(contract());
+    const parsed = parseManagedCollectionV2(bytes);
+    expect(parsed.problems[0]).toEqual(contract().problems[0]);
+    expect(parseManagedCollectionContract(contract())).toEqual(parsed);
   });
 
-  it("rejects missing references and repository path traversal", () => {
+  it("rejects noncanonical bytes at the platform boundary", () => {
+    const bytes = new TextEncoder().encode(`${JSON.stringify(contract(), null, 2)}\n`);
+    expect(() => parseManagedCollectionV2(bytes)).toThrow("WASM-OJ canonical JSON");
+  });
+
+  it("does not accept v1 or author-only managed-source documents", () => {
+    expect(() => parseManagedCollectionContract({ ...contract(), schema: "unsupported-managed-collection/v1" })).toThrow("wasm-oj-platform/managed-collection/v2");
+    expect(() => parseManagedCollectionContract({
+      schema: "wasm-oj-platform/managed-collection-source/v1",
+      problems: [],
+    })).toThrow("must contain exactly");
+  });
+
+  it("rejects traversal and duplicate publication paths", () => {
+    const traversed = structuredClone(contract());
+    traversed.problems[0]!.judgePackage.repositoryPath = "../secret.wasmojjudge";
+    expect(() => parseManagedCollectionContract(traversed)).toThrow("normalized relative POSIX path");
+
+    const duplicated = structuredClone(contract());
+    duplicated.problems[0]!.judgePackage.repositoryPath = duplicated.problems[0]!.contestPublic.repositoryPath;
+    expect(() => parseManagedCollectionContract(duplicated)).toThrow("declared more than once");
+  });
+
+  it("rejects undeclared fields instead of guessing compatibility", () => {
     expect(() => parseManagedCollectionContract({
       ...contract(),
-      problems: [{ ...contract().problems[0], references: contract().problems[0]?.references.slice(0, 1) }],
-    })).toThrow("exactly one reference");
-    const traversed = contract();
-    const file = traversed.problems[0]?.references[0]?.files[0];
-    if (!file) throw new Error("fixture is missing");
-    file.repositoryPath = "../secret";
-    expect(() => parseManagedCollectionContract(traversed)).toThrow("normalized relative");
+      problems: [{ ...contract().problems[0], references: [] }],
+    })).toThrow("must contain exactly");
   });
 
-  it("rejects undeclared judge implementations instead of guessing a fallback", () => {
-    expect(() => parseManagedCollectionContract({
-      ...contract(),
-      problems: [{ ...contract().problems[0], judge: { kind: "shell" } }],
-    })).toThrow("unsupported judge kind");
-  });
-
-  it.each(["checker", "interactive"] as const)("accepts an integrity-addressed %s program and runtime assets", (kind) => {
-    const value = contract();
-    value.problems[0]!.judge = {
-      kind,
-      ...(kind === "interactive" ? { inputPath: "/interactor/input/case.txt" } : {}),
-      program: {
-        language: "c",
-        target: "wasip1",
-        optimization: "release",
-        entry: "judge.c",
-        files: [{
-          path: "judge.c",
-          repositoryPath: `problems/sum-two/${kind}/judge.c`,
-          bytes: 101,
-          sha256: "c".repeat(64),
-        }],
-        assets: [{
-          path: kind === "checker" ? "/checker/assets/policy.dat" : "/interactor/assets/policy.dat",
-          repositoryPath: `problems/sum-two/${kind}/policy.dat`,
-          bytes: 17,
-          sha256: "d".repeat(64),
-        }],
-        args: [kind === "checker" ? "/checker/assets/policy.dat" : "/interactor/assets/policy.dat"],
-      },
-    } as never;
-    const parsed = parseManagedCollectionContract(value);
-    expect(parsed.problems[0]?.judge.kind).toBe(kind);
-  });
-
-  it("rejects prebuilt and runtime-bundle judge programs at the schema boundary", () => {
-    const value = contract();
-    value.problems[0]!.judge = {
-      kind: "checker",
-      program: {
-        language: "python",
-        target: "wasip1",
-        optimization: "release",
-        entry: "checker.py",
-        files: [{ path: "checker.py", repositoryPath: "checker.py", bytes: 10, sha256: "c".repeat(64) }],
-        assets: [],
-        args: [],
-      },
-    } as never;
-    expect(() => parseManagedCollectionContract(value)).toThrow("standalone Wasm");
-  });
-
-  it("keeps trusted assets in role-specific guest namespaces", () => {
-    const value = contract();
-    value.problems[0]!.judge = {
-      kind: "checker",
-      program: {
-        language: "c",
-        target: "wasip1",
-        optimization: "release",
-        entry: "checker.c",
-        files: [{ path: "checker.c", repositoryPath: "checker.c", bytes: 10, sha256: "c".repeat(64) }],
-        assets: [{ path: "/interactor/assets/leak", repositoryPath: "secret", bytes: 10, sha256: "d".repeat(64) }],
-        args: [],
-      },
-    } as never;
-    expect(() => parseManagedCollectionContract(value)).toThrow("/checker/assets/");
+  it("applies the 8 MiB public and 32 MiB judge publication limits independently", () => {
+    const value = structuredClone(contract());
+    value.problems[0]!.judgePackage.bytes = 9 * 1024 * 1024;
+    expect(parseManagedCollectionContract(value).problems[0]!.judgePackage.bytes).toBe(9 * 1024 * 1024);
+    value.problems[0]!.contestPublic.bytes = 8 * 1024 * 1024 + 1;
+    expect(() => parseManagedCollectionContract(value)).toThrow("outside its publication limit");
   });
 });

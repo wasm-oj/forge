@@ -1,107 +1,134 @@
 import { describe, expect, it, vi } from "vitest";
+import { BROWSER_PROBLEM_SCHEMA } from "../judge/problem-catalog-loader";
 import { PROBLEMS } from "../judge/problems";
 import {
   ManagedProblemCollectionError,
   createOfficialSubmissionRequest,
   loadManagedProblemCollection,
-  managedCollectionAllowsFullLocalJudge,
-  managedProblemProjectionApiPath,
+  managedProblemContentApiPath,
+  managedProblemMetadataApiPath,
   managedProblemWorkspacePath,
   normalizeManagedProblemContext,
 } from "./managed-problem-collection";
 
 const PROBLEM_VERSION_ID = "11111111-1111-4111-8111-111111111111";
-const CONTEST_ID = "22222222-2222-4222-8222-222222222222";
-const DIGEST = "a".repeat(64);
-const problem = PROBLEMS[0]!;
-const contestProblem = {
-  ...problem,
-  editorial: { "zh-TW": "", en: "" },
-  judgeCases: problem.judgeCases.filter((testCase) => testCase.kind === "sample"),
+const SERIES_ID = "22222222-2222-4222-8222-222222222222";
+const PUBLICATION_ID = "33333333-3333-4333-8333-333333333333";
+const CONTEST_ID = "44444444-4444-4444-8444-444444444444";
+const PRACTICE_DIGEST = "d".repeat(64);
+const authoredProblem = PROBLEMS[0]!;
+const practiceProblem = {
+  ...authoredProblem,
+  judgeCases: authoredProblem.judgeCases.filter((testCase) => testCase.kind === "sample"),
 };
+const contestProblem = {
+  ...practiceProblem,
+  editorial: { "zh-TW": "", en: "" },
+};
+const allowedProfiles = Object.fromEntries(Object.keys(practiceProblem.starterTemplates).map((language) => [
+  language,
+  { target: "wasip1", optimization: "release" },
+]));
 
-function projectionResponse(value: unknown, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(value), {
-    status: 200,
-    headers: { "content-type": "application/json", "x-forge-problem-status": "current", ...headers },
-  });
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-describe("managed problem collection adapter", () => {
-  it("loads the exact contest-public projection into a real managed one-problem collection", async () => {
-    const fetchMock = vi.fn(async () => projectionResponse({
-      schema: "forge-contest-public-problem-projection-v1",
-      problem: contestProblem,
-      digest: DIGEST,
-    })) as unknown as typeof fetch;
+async function managedResponses(options: {
+  readonly contest?: boolean;
+  readonly contentValue?: unknown;
+  readonly metadataPatch?: Record<string, unknown>;
+  readonly contentPatch?: Record<string, unknown>;
+}) {
+  const contest = options.contest ?? false;
+  const context = contest
+    ? { problemVersionId: PROBLEM_VERSION_ID, contestId: CONTEST_ID }
+    : { problemVersionId: PROBLEM_VERSION_ID };
+  const contentValue = options.contentValue ?? (contest
+    ? { schema: "wasm-oj-platform/contest-public-problem-projection/v1", problem: contestProblem, digest: PRACTICE_DIGEST }
+    : { schema: BROWSER_PROBLEM_SCHEMA, problem: practiceProblem });
+  const contentText = JSON.stringify(contentValue);
+  const contentUrl = managedProblemContentApiPath(context);
+  const metadata = {
+    schema: "wasm-oj-platform/problem-content-pointer/v2",
+    problemVersionId: PROBLEM_VERSION_ID,
+    problemSeriesId: SERIES_ID,
+    catalogPublicationId: PUBLICATION_ID,
+    mode: contest ? "contest" : "official-practice",
+    problemSlug: practiceProblem.id,
+    problemNumber: practiceProblem.number,
+    title: practiceProblem.title,
+    difficulty: practiceProblem.difficulty,
+    tags: practiceProblem.tags,
+    trackId: practiceProblem.trackId,
+    track: practiceProblem.track,
+    allowedProfiles,
+    maximumScore: 100,
+    executionSemanticDigest: "e".repeat(64),
+    content: {
+      role: contest ? "contest-public" : "practice",
+      bytes: new TextEncoder().encode(contentText).byteLength,
+      sha256: await sha256Hex(contentText),
+      url: contentUrl,
+      ...options.contentPatch,
+    },
+    ...options.metadataPatch,
+  };
+  return {
+    context,
+    contentUrl,
+    metadataUrl: managedProblemMetadataApiPath(context),
+    metadataResponse: new Response(JSON.stringify(metadata), { headers: { "content-type": "application/json" } }),
+    contentResponse: new Response(contentText, { headers: { "content-type": "application/json" } }),
+  };
+}
 
-    const collection = await loadManagedProblemCollection({
-      problemVersionId: PROBLEM_VERSION_ID,
-      contestId: CONTEST_ID,
-    }, { fetch: fetchMock });
+describe("managed problem v2 content adapter", () => {
+  it("loads D1 contest metadata, then its authorized exact-commit redacted content", async () => {
+    const responses = await managedResponses({ contest: true });
+    const fetchMock = vi.fn(async (url: string | URL | Request) => (
+      String(url) === responses.metadataUrl ? responses.metadataResponse : responses.contentResponse
+    )) as unknown as typeof fetch;
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith(
-      `/api/problems/${PROBLEM_VERSION_ID}?contestId=${CONTEST_ID}`,
-      expect.objectContaining({
-        method: "GET",
-        credentials: "same-origin",
-        redirect: "error",
-        headers: { accept: "application/json" },
-      }),
-    );
-    expect(collection.source).toEqual({
+    const collection = await loadManagedProblemCollection(responses.context, { fetch: fetchMock });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, responses.metadataUrl, expect.objectContaining({
+      method: "GET", credentials: "same-origin", redirect: "error", headers: { accept: "application/json" },
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, responses.contentUrl, expect.objectContaining({
+      method: "GET", credentials: "same-origin", redirect: "error", headers: { accept: "application/json" },
+    }));
+    expect(collection.source).toMatchObject({
       provider: "managed",
       mode: "contest",
       problemVersionId: PROBLEM_VERSION_ID,
       contestId: CONTEST_ID,
-      projectionUrl: `/api/problems/${PROBLEM_VERSION_ID}?contestId=${CONTEST_ID}`,
+      metadataUrl: responses.metadataUrl,
+      contentUrl: responses.contentUrl,
     });
-    expect(collection.source).not.toHaveProperty("owner");
-    expect(collection.source).not.toHaveProperty("repository");
-    expect(collection.sourceKey).toBe(`managed:contest:${CONTEST_ID}:${PROBLEM_VERSION_ID}:${DIGEST}`);
-    expect(collection.index.problems).toHaveLength(1);
-    expect(collection.index.problems[0]).not.toHaveProperty("statementPaths");
-    expect(await collection.loadProblem(problem.id)).toEqual(contestProblem);
-    expect((await collection.loadProblem(problem.id)).judgeCases.every((testCase) => testCase.kind === "sample")).toBe(true);
-    const hiddenCase = problem.judgeCases.find((testCase) => testCase.kind !== "sample");
-    if (!hiddenCase) throw new Error("The generated problem fixture must include a non-sample case.");
-    expect(JSON.stringify(await collection.loadProblem(problem.id))).not.toContain(hiddenCase.input);
+    expect(collection.origin).toBe("managed-content");
+    expect(collection.index.problems[0]?.bundle.kind).toBe("managed-content");
+    expect(await collection.loadProblem(practiceProblem.id)).toEqual(contestProblem);
+    expect(JSON.stringify(await collection.loadProblem(practiceProblem.id))).not.toContain(
+      authoredProblem.judgeCases.find((testCase) => testCase.kind !== "sample")?.input,
+    );
+  });
+
+  it("loads a practice standalone bundle only after its pointer digest and identity match", async () => {
+    const responses = await managedResponses({
+      metadataPatch: { allowedProfiles: { c: { target: "wasip1", optimization: "release" } } },
+    });
+    const fetchMock = vi.fn(async (url: string | URL | Request) => (
+      String(url) === responses.metadataUrl ? responses.metadataResponse : responses.contentResponse
+    )) as unknown as typeof fetch;
+    const collection = await loadManagedProblemCollection(responses.context, { fetch: fetchMock });
+    expect(collection.source.mode).toBe("official-practice");
+    expect(collection.source.allowedProfiles).toEqual({ c: { target: "wasip1", optimization: "release" } });
+    expect(collection.source.contentUrl).toBe(`/api/problems/${PROBLEM_VERSION_ID}/content?role=practice`);
+    expect(await collection.loadProblem(practiceProblem.id)).toEqual(practiceProblem);
     await expect(collection.loadProblem("wrong-problem")).rejects.toThrow("Unknown managed problem");
-  });
-
-  it("loads official practice without inventing a contest or GitHub identity", async () => {
-    const collection = await loadManagedProblemCollection({ problemVersionId: PROBLEM_VERSION_ID }, {
-      fetch: async () => projectionResponse({
-        schema: "forge-practice-problem-projection-v1",
-        problem,
-        digest: DIGEST,
-      }),
-    });
-    expect(collection.source).toEqual({
-      provider: "managed",
-      mode: "official-practice",
-      problemVersionId: PROBLEM_VERSION_ID,
-      projectionUrl: `/api/problems/${PROBLEM_VERSION_ID}`,
-    });
-    expect(collection.sourceKey).toBe(`managed:official-practice:${PROBLEM_VERSION_ID}:${DIGEST}`);
-    expect(collection.publication).toEqual({ status: "current" });
-    expect(await collection.loadProblem(problem.id)).toEqual(problem);
-  });
-
-  it("exposes an archived practice only with an exact current-version link", async () => {
-    const currentProblemVersionId = "33333333-3333-4333-8333-333333333333";
-    const collection = await loadManagedProblemCollection({ problemVersionId: PROBLEM_VERSION_ID }, {
-      fetch: async () => projectionResponse({
-        schema: "forge-practice-problem-projection-v1",
-        problem,
-        digest: DIGEST,
-      }, {
-        "x-forge-problem-status": "archived",
-        "x-forge-current-problem-version": currentProblemVersionId,
-      }),
-    });
-    expect(collection.publication).toEqual({ status: "archived", currentProblemVersionId });
   });
 
   it("rejects wrong identifiers before network access", async () => {
@@ -109,75 +136,59 @@ describe("managed problem collection adapter", () => {
     await expect(loadManagedProblemCollection({ problemVersionId: "not-a-uuid" }, {
       fetch: fetchMock as unknown as typeof fetch,
     })).rejects.toMatchObject({ kind: "configuration" });
-    await expect(loadManagedProblemCollection({
-      problemVersionId: PROBLEM_VERSION_ID,
-      contestId: "not-a-uuid",
-    }, { fetch: fetchMock as unknown as typeof fetch })).rejects.toMatchObject({ kind: "configuration" });
+    await expect(loadManagedProblemCollection({ problemVersionId: PROBLEM_VERSION_ID, contestId: "not-a-uuid" }, {
+      fetch: fetchMock as unknown as typeof fetch,
+    })).rejects.toMatchObject({ kind: "configuration" });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(() => normalizeManagedProblemContext({
-      problemVersionId: PROBLEM_VERSION_ID,
-      repository: "fake/repo",
-    })).toThrow("invalid shape");
+    expect(() => normalizeManagedProblemContext({ problemVersionId: PROBLEM_VERSION_ID, repository: "fake/repo" }))
+      .toThrow("invalid shape");
   });
 
-  it("rejects a projection with the wrong semantic role or any hidden case", async () => {
-    await expect(loadManagedProblemCollection({
-      problemVersionId: PROBLEM_VERSION_ID,
-      contestId: CONTEST_ID,
-    }, {
-      fetch: async () => projectionResponse({
-        schema: "forge-practice-problem-projection-v1",
-        problem,
-        digest: DIGEST,
-      }),
-    })).rejects.toThrow("wrong semantic role");
+  it("fails closed on a mismatched content URL, digest, or hidden case", async () => {
+    const wrongUrl = await managedResponses({ contentPatch: { url: "https://attacker.invalid/problem.json" } });
+    await expect(loadManagedProblemCollection(wrongUrl.context, {
+      fetch: (async () => wrongUrl.metadataResponse) as typeof fetch,
+    })).rejects.toMatchObject({ kind: "schema" } satisfies Partial<ManagedProblemCollectionError>);
 
-    await expect(loadManagedProblemCollection({
-      problemVersionId: PROBLEM_VERSION_ID,
-      contestId: CONTEST_ID,
-    }, {
-      fetch: async () => projectionResponse({
-        schema: "forge-contest-public-problem-projection-v1",
-        problem: { ...contestProblem, judgeCases: problem.judgeCases },
-        digest: DIGEST,
-      }),
-    })).rejects.toThrow("non-public");
+    const wrongDigest = await managedResponses({ contentPatch: { sha256: "0".repeat(64) } });
+    await expect(loadManagedProblemCollection(wrongDigest.context, {
+      fetch: (async (url) => String(url) === wrongDigest.metadataUrl ? wrongDigest.metadataResponse : wrongDigest.contentResponse) as typeof fetch,
+    })).rejects.toThrow("SHA-256");
+
+    const hidden = await managedResponses({ contentValue: { schema: BROWSER_PROBLEM_SCHEMA, problem: authoredProblem } });
+    await expect(loadManagedProblemCollection(hidden.context, {
+      fetch: (async (url) => String(url) === hidden.metadataUrl ? hidden.metadataResponse : hidden.contentResponse) as typeof fetch,
+    })).rejects.toThrow("hidden judge cases");
   });
 
-  it("fails closed on HTTP, media-type, and byte-integrity errors", async () => {
+  it("fails closed on HTTP, media-type, and declared-byte errors", async () => {
     await expect(loadManagedProblemCollection({ problemVersionId: PROBLEM_VERSION_ID }, {
       fetch: async () => new Response("missing", { status: 404 }),
     })).rejects.toMatchObject({ kind: "unavailable" } satisfies Partial<ManagedProblemCollectionError>);
     await expect(loadManagedProblemCollection({ problemVersionId: PROBLEM_VERSION_ID }, {
-      fetch: async () => new Response("{}", { status: 200, headers: { "content-type": "text/plain" } }),
+      fetch: async () => new Response("{}", { headers: { "content-type": "text/plain" } }),
     })).rejects.toMatchObject({ kind: "schema" } satisfies Partial<ManagedProblemCollectionError>);
-    await expect(loadManagedProblemCollection({ problemVersionId: PROBLEM_VERSION_ID }, {
-      fetch: async () => new Response("{}", {
-        status: 200,
-        headers: { "content-type": "application/json", "content-length": String(32 * 1024 * 1024 + 1) },
-      }),
-    })).rejects.toMatchObject({ kind: "integrity" } satisfies Partial<ManagedProblemCollectionError>);
+    const oversized = await managedResponses({ contentPatch: { bytes: 8 * 1024 * 1024 + 1 } });
+    await expect(loadManagedProblemCollection(oversized.context, {
+      fetch: (async () => oversized.metadataResponse) as typeof fetch,
+    })).rejects.toMatchObject({ kind: "schema" } satisfies Partial<ManagedProblemCollectionError>);
   });
 });
 
 describe("managed workspace and Official Submit context", () => {
-  it("builds the exact API and page routes", () => {
-    expect(managedProblemProjectionApiPath({ problemVersionId: PROBLEM_VERSION_ID }))
+  it("builds metadata, content, and page routes with an explicit contest context", () => {
+    expect(managedProblemMetadataApiPath({ problemVersionId: PROBLEM_VERSION_ID }))
       .toBe(`/api/problems/${PROBLEM_VERSION_ID}`);
-    expect(managedProblemProjectionApiPath({ problemVersionId: PROBLEM_VERSION_ID, contestId: CONTEST_ID }))
+    expect(managedProblemMetadataApiPath({ problemVersionId: PROBLEM_VERSION_ID, contestId: CONTEST_ID }))
       .toBe(`/api/problems/${PROBLEM_VERSION_ID}?contestId=${CONTEST_ID}`);
+    expect(managedProblemContentApiPath({ problemVersionId: PROBLEM_VERSION_ID }))
+      .toBe(`/api/problems/${PROBLEM_VERSION_ID}/content?role=practice`);
+    expect(managedProblemContentApiPath({ problemVersionId: PROBLEM_VERSION_ID, contestId: CONTEST_ID }))
+      .toBe(`/api/problems/${PROBLEM_VERSION_ID}/content?role=contest-public&contestId=${CONTEST_ID}`);
     expect(managedProblemWorkspacePath({ problemVersionId: PROBLEM_VERSION_ID }))
       .toBe(`/problems/${PROBLEM_VERSION_ID}`);
     expect(managedProblemWorkspacePath({ problemVersionId: PROBLEM_VERSION_ID, contestId: CONTEST_ID }))
       .toBe(`/contests/${CONTEST_ID}/problems/${PROBLEM_VERSION_ID}`);
-  });
-
-  it("allows a full local judge only for a full official-practice projection", () => {
-    expect(managedCollectionAllowsFullLocalJudge({ problemVersionId: PROBLEM_VERSION_ID })).toBe(true);
-    expect(managedCollectionAllowsFullLocalJudge({
-      problemVersionId: PROBLEM_VERSION_ID,
-      contestId: CONTEST_ID,
-    })).toBe(false);
   });
 
   it("includes contestId in the exact formal request and omits it for official practice", () => {
@@ -187,16 +198,10 @@ describe("managed workspace and Official Submit context", () => {
       optimization: "release" as const,
       entry: "main.c",
       sourceFiles: [{ path: "main.c", encoding: "utf8" as const, content: "int main(void) { return 0; }" }],
-      idempotencyKey: "browser:33333333-3333-4333-8333-333333333333",
+      idempotencyKey: "browser:55555555-5555-4555-8555-555555555555",
     };
-    expect(createOfficialSubmissionRequest({
-      problemVersionId: PROBLEM_VERSION_ID,
-      contestId: CONTEST_ID,
-    }, source)).toEqual({
-      managedProblemVersionId: PROBLEM_VERSION_ID,
-      contestId: CONTEST_ID,
-      ...source,
-    });
+    expect(createOfficialSubmissionRequest({ problemVersionId: PROBLEM_VERSION_ID, contestId: CONTEST_ID }, source))
+      .toEqual({ problemVersionId: PROBLEM_VERSION_ID, contestId: CONTEST_ID, ...source });
     expect(createOfficialSubmissionRequest({ problemVersionId: PROBLEM_VERSION_ID }, source))
       .not.toHaveProperty("contestId");
   });

@@ -1,0 +1,8 @@
+/dist/
+/crates/
+/vendor/
+/testdata/
+/licenses/
+/LICENSE
+/THIRD_PARTY_NOTICES.md
+/rust-toolchain.toml

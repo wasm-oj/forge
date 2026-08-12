@@ -1,6 +1,6 @@
-import { FORGE_CONTRACT_ID } from "../core/contract";
+import { WASM_OJ_CONTRACT_ID } from "../core/contract";
 
-export const LOCAL_SAMPLES_PASSED_KEY = `${FORGE_CONTRACT_ID}:local-samples-passed`;
+export const LOCAL_SAMPLES_PASSED_KEY = `${WASM_OJ_CONTRACT_ID}:local-samples-passed`;
 
 export interface LocalSamplesPassedRecord {
   readonly bundleDigest: string;

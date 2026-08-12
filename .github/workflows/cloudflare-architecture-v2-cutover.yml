@@ -1,0 +1,172 @@
+name: One-time Cloudflare architecture v2 cutover
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type RESET-PRODUCTION-ARCHITECTURE-V2
+        required: true
+        type: string
+      workflows_drained:
+        description: Leave false to only enable maintenance; rerun with true after all pre-v2 Workflows are terminal
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  reset-deploy-activate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - name: Require destructive cutover acknowledgement
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: >-
+          node -e "if(process.env.CONFIRMATION!=='RESET-PRODUCTION-ARCHITECTURE-V2')
+          throw new Error('Architecture v2 reset acknowledgement is missing')"
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          lfs: true
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate the candidate and bind its release coordinates before maintenance
+        env:
+          RELEASE_REQUEST_BASE64: ${{ secrets.WASM_OJ_V2_ACTIVATION_REQUEST_BASE64 }}
+        run: >-
+          node scripts/configure-production-release.mjs
+          --activation-request-base64-env RELEASE_REQUEST_BASE64
+          --activation-request-output cutover-evidence/activation-request.json
+          --config wrangler.quick-production.jsonc
+          --expected-git-commit "$GITHUB_SHA"
+          --expect-no-active-release
+      - run: pnpm run typecheck
+      - run: pnpm run build
+      - name: Require a bounded maintenance smoke token before pausing production
+        env:
+          MAINTENANCE_SMOKE_TOKEN: ${{ secrets.WASM_OJ_MAINTENANCE_SMOKE_TOKEN }}
+        run: >-
+          node -e "const value=process.env.MAINTENANCE_SMOKE_TOKEN;
+          if(!value||!(/^[\\x21-\\x7e]{32,256}$/).test(value))
+          throw new Error('WASM_OJ_MAINTENANCE_SMOKE_TOKEN must contain 32-256 printable ASCII characters')"
+      - name: Enable the maintenance gate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          pnpm exec wrangler d1 execute DB --remote --config wrangler.quick-production.jsonc --yes
+          --command "UPDATE formal_mutation_controls SET formal_mutations_enabled=0,
+          reason='architecture-v2-cutover', updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE environment='production'"
+      - name: Require the post-maintenance external Workflow drain confirmation
+        env:
+          WORKFLOWS_DRAINED: ${{ inputs.workflows_drained }}
+        run: >-
+          node -e "if(process.env.WORKFLOWS_DRAINED!=='true')
+          throw new Error('Maintenance is enabled; wait for every pre-v2 Workflow to finish, then rerun with workflows_drained=true')"
+      - name: Prove D1 and external Workflows are quiescent before any R2 write
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WASM_OJ_ARCHITECTURE_RESET_TOKEN: ${{ secrets.WASM_OJ_ARCHITECTURE_RESET_TOKEN }}
+          WASM_OJ_ARCHITECTURE_RESET_TOKEN_PROVIDED: ${{ secrets.WASM_OJ_ARCHITECTURE_RESET_TOKEN }}
+        run: >-
+          node scripts/architecture-reset-preflight.mjs
+          --database DB
+          --config wrangler.quick-production.jsonc
+          --remote
+          --confirm-workflows-drained
+          --quiescence-only
+      - name: Create exact legacy R2 inventory
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p cutover-evidence
+          node scripts/architecture-reset-r2.mjs inventory \
+            --database DB \
+            --bucket wasm-oj-judge-production \
+            --config wrangler.quick-production.jsonc \
+            --output cutover-evidence/r2-cleanup-manifest.json
+      - name: Fence every legacy submission source with a constant tombstone
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WASM_OJ_ARCHITECTURE_RESET_TOKEN: ${{ secrets.WASM_OJ_ARCHITECTURE_RESET_TOKEN }}
+          WASM_OJ_ARCHITECTURE_RESET_TOKEN_PROVIDED: ${{ secrets.WASM_OJ_ARCHITECTURE_RESET_TOKEN }}
+        run: >-
+          node scripts/architecture-reset-r2.mjs tombstone
+          --bucket wasm-oj-judge-production
+          --config wrangler.quick-production.jsonc
+          --manifest cutover-evidence/r2-cleanup-manifest.json
+          --receipt cutover-evidence/source-tombstone-receipt.json
+      - name: Apply the guarded architecture reset
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WASM_OJ_ARCHITECTURE_RESET_TOKEN: ${{ secrets.WASM_OJ_ARCHITECTURE_RESET_TOKEN }}
+          WASM_OJ_ARCHITECTURE_RESET_TOKEN_PROVIDED: ${{ secrets.WASM_OJ_ARCHITECTURE_RESET_TOKEN }}
+        run: >-
+          node scripts/production-migrations.mjs architecture-reset
+          --database DB
+          --config wrangler.quick-production.jsonc
+          --inventory cutover-evidence/r2-cleanup-manifest.json
+          --tombstone-receipt cutover-evidence/source-tombstone-receipt.json
+          --confirm-workflows-drained
+      - name: Configure the maintenance-only production smoke lane
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          MAINTENANCE_SMOKE_TOKEN: ${{ secrets.WASM_OJ_MAINTENANCE_SMOKE_TOKEN }}
+        run: |
+          printf '%s' "$MAINTENANCE_SMOKE_TOKEN" | pnpm exec wrangler secret put MAINTENANCE_SMOKE_TOKEN --config wrangler.quick-production.jsonc
+      - name: Deploy v2 application, Workflows, and Submission Container
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy --config wrangler.quick-production.jsonc
+      - name: Atomically activate the deployed release through the Admin API
+        env:
+          WASM_OJ_ADMIN_SESSION: ${{ secrets.WASM_OJ_CUTOVER_ADMIN_SESSION }}
+          WASM_OJ_ADMIN_CSRF: ${{ secrets.WASM_OJ_CUTOVER_ADMIN_CSRF }}
+        run: |
+          test -n "$WASM_OJ_ADMIN_SESSION"
+          test -n "$WASM_OJ_ADMIN_CSRF"
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "origin: https://wasm-oj-forge-production.jacob.workers.dev" \
+            --header "content-type: application/json" \
+            --header "x-wasm-oj-csrf: $WASM_OJ_ADMIN_CSRF" \
+            --header "cookie: wasm_oj_session=$WASM_OJ_ADMIN_SESSION; wasm_oj_csrf=$WASM_OJ_ADMIN_CSRF" \
+            --data-binary @cutover-evidence/activation-request.json \
+            --output cutover-evidence/activation-response.json \
+            https://wasm-oj-forge-production.jacob.workers.dev/api/admin/releases/activate
+      - name: Verify v2 health while maintenance remains enabled
+        run: |
+          curl --fail --retry 6 --retry-all-errors --retry-delay 5 \
+            https://wasm-oj-forge-production.jacob.workers.dev/api/health/live
+          curl --fail --retry 6 --retry-all-errors --retry-delay 5 \
+            https://wasm-oj-forge-production.jacob.workers.dev/api/health/ready
+      - name: Preserve reset evidence for the 24-hour cleanup fence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: architecture-v2-cutover-${{ github.run_id }}
+          path: cutover-evidence/
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,5 +1,5 @@
 import type { ConformanceCase } from "./matrix.ts";
-import { FORGE_LIBCXX_PCH_HEADER } from "../compiler/libcxx-pch.ts";
+import { WASM_OJ_LIBCXX_PCH_HEADER } from "../compiler/libcxx-pch.ts";
 
 export const DEFAULT_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze([
   {
@@ -29,10 +29,10 @@ export const DEFAULT_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze(
           "__attribute__((import_module(\"wasi_snapshot_preview1\"), import_name(\"path_filestat_get\")))",
           "extern int wasi_path_filestat_get(int, int, const char *, unsigned, void *);",
           "int main(void){",
-          "  FILE *file=fopen(\"/forge-meta\",\"wb\"); if(!file)return 2;",
+          "  FILE *file=fopen(\"/wasm-oj-meta\",\"wb\"); if(!file)return 2;",
           "  if(fputs(\"x\",file)<0 || fclose(file))return 3;",
           "  unsigned char stat[64]={0};",
-          "  if(wasi_path_filestat_get(3,0,\"forge-meta\",10,stat))return 4;",
+          "  if(wasi_path_filestat_get(3,0,\"wasm-oj-meta\",10,stat))return 4;",
           "  uint64_t atime,mtime,ctime;",
           "  memcpy(&atime,stat+40,8); memcpy(&mtime,stat+48,8); memcpy(&ctime,stat+56,8);",
           "  printf(\"%llu %llu %llu\\n\",(unsigned long long)atime,(unsigned long long)mtime,(unsigned long long)ctime);",
@@ -156,7 +156,7 @@ export const DEFAULT_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze(
       stdout: "",
       stderr: "",
       termination: "trap",
-      trapMessageIncludes: "Forge denied nondeterministic capability wasix_32v1.thread_spawn",
+      trapMessageIncludes: "WASM-OJ denied nondeterministic capability wasix_32v1.thread_spawn",
     },
   },
   {
@@ -420,7 +420,7 @@ export const CPP_STDLIB_CONFORMANCE_CASE: ConformanceCase = deepFreeze({
     target: "wasip1",
     entry: "src/main.cpp",
     files: {
-      "src/forge.pch.hpp": FORGE_LIBCXX_PCH_HEADER,
+      "src/wasm-oj.pch.hpp": WASM_OJ_LIBCXX_PCH_HEADER,
       "src/main.cpp": "int main(){ constexpr std::array<int,3> v{10,20,12}; int s=0; for(int x:v)s+=x; std::printf(\"%d\\n\",s); }\n",
     },
   },
