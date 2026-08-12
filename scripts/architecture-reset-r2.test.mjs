@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import test from "node:test";
 import {
-  LEGACY_R2_INVENTORY_SQL,
+  LEGACY_R2_INVENTORY_QUERIES,
   MINIMUM_CLEANUP_DELAY_MS,
   SOURCE_TOMBSTONE,
   assertCleanupDelayElapsed,
@@ -13,6 +13,7 @@ import {
   assertTombstoneReceipt,
   buildLegacyR2Inventory,
   buildTombstoneReceipt,
+  collectLegacyR2InventoryRows,
   listRemoteR2Objects,
   parseLegacyR2Inventory,
   r2ObjectApiUrl,
@@ -33,11 +34,34 @@ test("legacy inventory SQL executes against the immutable production schema", ()
   ) VALUES ('release-1', 'v1', 'releases/v1.json', ?, ?, 'active', ?)`)
     .run("a".repeat(64), "b".repeat(40), generatedAt);
 
+  assert.equal(LEGACY_R2_INVENTORY_QUERIES.length, 12);
+  assert.equal(LEGACY_R2_INVENTORY_QUERIES.some((query) => /\bUNION\b/u.test(query)), false);
+  const rows = LEGACY_R2_INVENTORY_QUERIES.flatMap((query) => (
+    database.prepare(query).all().map((row) => ({ ...row }))
+  ));
   assert.deepEqual(
-    database.prepare(LEGACY_R2_INVENTORY_SQL).all()
-      .filter((row) => row.role === "legacy-release-manifest")
-      .map((row) => ({ ...row })),
+    rows.filter((row) => row.role === "legacy-release-manifest"),
     [{ role: "legacy-release-manifest", object_key: "releases/v1.json" }],
+  );
+});
+
+test("legacy inventory executes every bounded query and rejects a partial result", () => {
+  const calls = [];
+  const rows = collectLegacyR2InventoryRows((query, index) => {
+    calls.push(query);
+    return JSON.stringify([{
+      results: [{ role: "legacy-release-manifest", object_key: `releases/${index}.json` }],
+      success: true,
+    }]);
+  });
+  assert.equal(calls.length, 12);
+  assert.equal(rows.length, 12);
+  assert.throws(
+    () => collectLegacyR2InventoryRows((_query, index) => {
+      if (index === 4) throw new Error("D1 query failed");
+      return JSON.stringify([{ results: [], success: true }]);
+    }),
+    /D1 query failed/,
   );
 });
 
