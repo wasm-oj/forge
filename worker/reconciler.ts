@@ -12,6 +12,7 @@ import {
 import { operationalLog } from "./structured-log";
 import { prepareSubmissionEventInsert } from "./submission-events";
 import { reconcileAdmittingSubmission, tombstoneSubmissionSource } from "./submissions";
+import { workflowStatusOrUnknown } from "./workflow-instance-status";
 
 const HOUR_MS = 60 * 60 * 1_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -144,14 +145,11 @@ async function workflowAlreadyExists(
   row: PendingOutboxRow,
 ): Promise<boolean> {
   const kind = pendingOutboxKind(row);
-  const workflow = kind === "submission"
-    ? await env.SUBMISSION_WORKFLOW.get(row.submission_id!)
-    : await env.CATALOG_WORKFLOW.get(
-      `catalog-${kind}-${
-        row.catalog_validation_job_id ?? row.catalog_publish_job_id
-      }`,
-    );
-  const status = await workflow.status();
+  const namespace = kind === "submission" ? env.SUBMISSION_WORKFLOW : env.CATALOG_WORKFLOW;
+  const workflowId = kind === "submission"
+    ? row.submission_id!
+    : `catalog-${kind}-${row.catalog_validation_job_id ?? row.catalog_publish_job_id}`;
+  const status = await workflowStatusOrUnknown(namespace, workflowId);
   return status.status !== "unknown";
 }
 
@@ -303,7 +301,7 @@ async function reconcileTerminalWorkflowFailures(env: WasmOjWorkerEnv, now: Date
   let repaired = 0;
   for (const row of rows.results) {
     try {
-      const status = await (await env.SUBMISSION_WORKFLOW.get(row.id)).status();
+      const status = await workflowStatusOrUnknown(env.SUBMISSION_WORKFLOW, row.id);
       if (!TERMINAL_WORKFLOW_STATES.has(status.status)) {
         if (status.status !== "unknown" || Date.parse(row.updated_at) > now.getTime() - 10 * 60 * 1_000) continue;
       }

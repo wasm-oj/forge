@@ -6,6 +6,7 @@ import { githubAppJwt } from "./github";
 import { cookieHeader, jsonResponse } from "./http";
 import { requireFormalMutationsEnabled } from "./formal-mutations";
 import { tombstoneSubmissionSource } from "./submissions";
+import { workflowInstanceNotFound, workflowStatusOrUnknown } from "./workflow-instance-status";
 
 interface ErasureJobRow {
   readonly id: string;
@@ -150,11 +151,15 @@ async function ownedSubmissionIds(env: WasmOjWorkerEnv, job: ErasureJobRow): Pro
 
 async function stopSubmissionWorkflows(env: WasmOjWorkerEnv, submissionIds: readonly string[]): Promise<void> {
   for (const submissionId of submissionIds) {
-    const workflow = await env.SUBMISSION_WORKFLOW.get(submissionId);
-    let status = await workflow.status();
+    let status = await workflowStatusOrUnknown(env.SUBMISSION_WORKFLOW, submissionId);
     if (TERMINAL_WORKFLOW_STATES.has(status.status)) continue;
-    await workflow.terminate();
-    status = await workflow.status();
+    try {
+      await (await env.SUBMISSION_WORKFLOW.get(submissionId)).terminate();
+    } catch (error) {
+      if (workflowInstanceNotFound(error)) continue;
+      throw error;
+    }
+    status = await workflowStatusOrUnknown(env.SUBMISSION_WORKFLOW, submissionId);
     if (!TERMINAL_WORKFLOW_STATES.has(status.status)) {
       throw new Error("Submission Workflow did not terminate before account erasure.");
     }

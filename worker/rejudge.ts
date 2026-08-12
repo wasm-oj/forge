@@ -13,6 +13,7 @@ import { MAX_QUEUED_SUBMISSIONS, MAX_QUEUED_SUBMISSIONS_PER_USER } from "./submi
 import { prepareSubmissionEventInsert } from "./submission-events";
 import { deriveSubmissionAttemptToken } from "./submission-workflow-identity";
 import { operationalLog } from "./structured-log";
+import { workflowStatusOrUnknown } from "./workflow-instance-status";
 
 const MATERIALIZATION_PAGE_SIZE = 20;
 const TERMINAL_WORKFLOW_STATES = new Set(["complete", "errored", "terminated", "unknown"]);
@@ -732,8 +733,7 @@ export async function repairDispatchedRejudgeJobs(env: WasmOjWorkerEnv): Promise
   let repaired = 0;
   const now = new Date();
   for (const row of rows.results) {
-    const workflow = await env.SUBMISSION_WORKFLOW.get(row.new_submission_id);
-    const status = await workflow.status();
+    const status = await workflowStatusOrUnknown(env.SUBMISSION_WORKFLOW, row.new_submission_id);
     if (!rejudgeWorkflowNeedsInfrastructureRepair({
       status: status.status,
       submissionUpdatedAt: row.updated_at,

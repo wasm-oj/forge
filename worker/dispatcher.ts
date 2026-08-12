@@ -3,6 +3,7 @@ import type { WasmOjWorkerEnv } from "./env";
 import { prepareSubmissionEventInsert } from "./submission-events";
 import type { SubmissionWorkflowParameters } from "./submission-workflow-identity";
 import { operationalLog } from "./structured-log";
+import { workflowStatusOrUnknown } from "./workflow-instance-status";
 
 interface ClaimedSubmission {
   readonly id: string;
@@ -91,7 +92,7 @@ async function deliverClaimedSubmission(env: WasmOjWorkerEnv, claimed: ClaimedSu
 
   let status: { readonly status: string };
   try {
-    status = await (await env.SUBMISSION_WORKFLOW.get(claimed.id)).status();
+    status = await workflowStatusOrUnknown(env.SUBMISSION_WORKFLOW, claimed.id);
   } catch (error) {
     await recordDeferred(error, false);
     return;
@@ -106,7 +107,7 @@ async function deliverClaimedSubmission(env: WasmOjWorkerEnv, claimed: ClaimedSu
     await markDelivered(true);
   } catch (createError) {
     try {
-      const observed = await (await env.SUBMISSION_WORKFLOW.get(claimed.id)).status();
+      const observed = await workflowStatusOrUnknown(env.SUBMISSION_WORKFLOW, claimed.id);
       if (observed.status !== "unknown") {
         await markDelivered(true);
         return;

@@ -167,6 +167,27 @@ describe("catalog FIFO dispatcher", () => {
     });
   });
 
+  it("creates the deterministic Workflow when Cloudflare reports instance.not_found", async () => {
+    const create = vi.fn(async () => undefined);
+    const status = vi.fn().mockRejectedValueOnce(new Error("(instance.not_found) Instance not found"));
+    const { database, env } = fixture(create, status);
+    collection(database, "collection-a", "alice");
+    validation(database, { id: "job-a", collection: "collection-a", state: "queued", created: "2026-08-12T00:00:00.000Z" });
+
+    await expect(dispatchCatalogJobs(env, 1)).resolves.toBe(1);
+    expect(create).toHaveBeenCalledWith({
+      id: "catalog-validation-job-a",
+      params: { kind: "validation", jobId: "job-a" },
+    });
+    expect(database.prepare(`SELECT state, attempts, last_error, settled_at IS NOT NULL AS settled
+      FROM workflow_outbox WHERE catalog_validation_job_id='job-a'`).get()).toEqual({
+      state: "delivered",
+      attempts: 1,
+      last_error: null,
+      settled: 1,
+    });
+  });
+
   it("settles an already-existing Workflow without consuming a create attempt", async () => {
     const create = vi.fn(async () => undefined);
     const status = vi.fn().mockResolvedValue({ status: "running" });
