@@ -35,7 +35,6 @@ import {
 const SOURCE_SCHEMA = "wasm-oj-browser-collection-source-v1";
 const DEFAULT_INDEX_PATH = "collection/index.json";
 const DEFAULT_SOURCE_PATH = "collection/source.json";
-const encoder = new TextEncoder();
 
 interface CliOptions {
   readonly command: "build" | "validate" | "verify";
@@ -169,16 +168,6 @@ function parseAuthoredCollection(value: unknown): AuthoredCollection {
   };
 }
 
-function canonicalValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalValue);
-  if (!isRecord(value)) return value;
-  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalValue(value[key])]));
-}
-
-function canonicalJson(value: unknown): Uint8Array {
-  return encoder.encode(`${JSON.stringify(canonicalValue(value), null, 2)}\n`);
-}
-
 function parseJson(bytes: Uint8Array, label: string): unknown {
   let text: string;
   try {
@@ -204,7 +193,7 @@ async function validatePublishedCollection(options: CliOptions, strict: boolean)
   if (indexBytes.byteLength > 512 * 1024) fail("collection index exceeds 512 KiB.");
   const index = parseProblemCollectionIndex(parseJson(indexBytes, options.indexPath));
   await verifyProblemCollectionRevision(index);
-  if (strict && !Buffer.from(indexBytes).equals(Buffer.from(canonicalJson(index)))) {
+  if (strict && !Buffer.from(indexBytes).equals(Buffer.from(canonicalJsonBytes(index)))) {
     fail(`${options.indexPath} is not canonical; run wasm-oj-collection build.`);
   }
   const indexDirectory = path.posix.dirname(options.indexPath);
@@ -218,7 +207,7 @@ async function validatePublishedCollection(options: CliOptions, strict: boolean)
     const repositoryPath = path.posix.join(indexDirectory, entry.bundle.path);
     const bytes = new Uint8Array(await readFile(resolveInside(options.root, repositoryPath, `problem '${entry.id}' bundle`)));
     const problem = await verifyProblemBundleBytes(bytes, entry);
-    if (strict && !Buffer.from(bytes).equals(Buffer.from(canonicalJson({ schema: BROWSER_PROBLEM_SCHEMA, problem })))) {
+    if (strict && !Buffer.from(bytes).equals(Buffer.from(canonicalJsonBytes({ schema: BROWSER_PROBLEM_SCHEMA, problem })))) {
       fail(`${repositoryPath} is not canonical; run wasm-oj-collection build.`);
     }
   }
@@ -317,7 +306,7 @@ async function buildCollection(options: CliOptions): Promise<BuiltCollection> {
     }
     authoredProblems.push(problem);
     const practice = derivePracticePublic(problem);
-    const bundleBytes = canonicalJson({ schema: BROWSER_PROBLEM_SCHEMA, problem: practice });
+    const bundleBytes = canonicalJsonBytes({ schema: BROWSER_PROBLEM_SCHEMA, problem: practice });
     const digest = await sha256Hex(bundleBytes);
     const bundleName = `${String(problem.number).padStart(3, "0")}-${problem.id}.${digest}.json`;
     await writeFile(path.join(outputDirectory, bundleName), bundleBytes);
@@ -346,7 +335,7 @@ async function buildCollection(options: CliOptions): Promise<BuiltCollection> {
   });
   const indexFile = resolveInside(options.root, options.indexPath, "index path");
   await mkdir(path.dirname(indexFile), { recursive: true });
-  await writeFile(indexFile, canonicalJson(index));
+  await writeFile(indexFile, canonicalJsonBytes(index));
   return { index, authoredProblems };
 }
 
