@@ -5,9 +5,11 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { parseCanonicalJsonBytes } from "../src/core/canonical-json.ts";
 import { parseReleaseManifest, releaseManifestBytes } from "../src/release-manifest.ts";
+import { verifyOciTagVerificationFile } from "./oci-release-image.mjs";
 
 const RELEASE_ID_PLACEHOLDER = "__WASM_OJ_RELEASE_ID__";
 const MANIFEST_SHA256_PLACEHOLDER = "__WASM_OJ_RELEASE_MANIFEST_SHA256__";
+const CONTAINER_DIGEST_PLACEHOLDER = "__WASM_OJ_CONTAINER_IMAGE_DIGEST__";
 const GIT_COMMIT = /^[0-9a-f]{40}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const STANDARD_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
@@ -80,11 +82,15 @@ export function productionReleaseCoordinates(
       throw new TypeError("Release manifest source commit does not match the checked-out Git commit.");
     }
   }
+  const containerTag = `${manifest.artifacts.containerImage.registry}:${manifest.releaseId}`;
+  const containerDigest = manifest.artifacts.containerImage.digest;
   return {
     releaseId: manifest.releaseId,
     manifestSha256: sha256(releaseManifestBytes(manifest)),
     sourceGitCommit: manifest.source.commit,
-    containerImage: `${manifest.artifacts.containerImage.registry}:${manifest.releaseId}`,
+    containerDigest,
+    containerImage: `${containerTag}@${containerDigest}`,
+    containerTag,
   };
 }
 
@@ -97,10 +103,18 @@ export function renderProductionReleaseConfig(template, coordinates) {
   if (occurrences(template, MANIFEST_SHA256_PLACEHOLDER) !== 1) {
     throw new TypeError(`Production Worker config must contain exactly one ${MANIFEST_SHA256_PLACEHOLDER} placeholder.`);
   }
+  if (occurrences(template, CONTAINER_DIGEST_PLACEHOLDER) !== 1) {
+    throw new TypeError(`Production Worker config must contain exactly one ${CONTAINER_DIGEST_PLACEHOLDER} placeholder.`);
+  }
   const rendered = template
     .replaceAll(RELEASE_ID_PLACEHOLDER, coordinates.releaseId)
-    .replace(MANIFEST_SHA256_PLACEHOLDER, coordinates.manifestSha256);
-  if (rendered.includes(RELEASE_ID_PLACEHOLDER) || rendered.includes(MANIFEST_SHA256_PLACEHOLDER)) {
+    .replace(MANIFEST_SHA256_PLACEHOLDER, coordinates.manifestSha256)
+    .replace(CONTAINER_DIGEST_PLACEHOLDER, coordinates.containerDigest);
+  if (
+    rendered.includes(RELEASE_ID_PLACEHOLDER)
+    || rendered.includes(MANIFEST_SHA256_PLACEHOLDER)
+    || rendered.includes(CONTAINER_DIGEST_PLACEHOLDER)
+  ) {
     throw new TypeError("Production Worker config still contains release placeholders.");
   }
 
@@ -141,6 +155,7 @@ function usage() {
   return `Usage: node scripts/configure-production-release.mjs \\
   (--activation-request <canonical-request.json> | --activation-request-base64-env <environment-variable>) \\
   --config <wrangler.quick-production.jsonc> --expected-git-commit <sha> \\
+  --oci-evidence <oci-verification/evidence.json> \\
   [--activation-request-output <path>] [--expect-no-active-release]
 
 The config must contain the committed WASM-OJ release placeholders. Base64 input must use
@@ -159,6 +174,7 @@ async function main() {
       config: { type: "string" },
       "expected-git-commit": { type: "string" },
       "expect-no-active-release": { type: "boolean" },
+      "oci-evidence": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
     strict: true,
@@ -170,8 +186,8 @@ async function main() {
   if (Boolean(values["activation-request"]) === Boolean(values["activation-request-base64-env"])) {
     throw new TypeError(`Exactly one activation request source is required.\n\n${usage()}`);
   }
-  if (!values.config || !values["expected-git-commit"]) {
-    throw new TypeError(`--config and --expected-git-commit are required.\n\n${usage()}`);
+  if (!values.config || !values["expected-git-commit"] || !values["oci-evidence"]) {
+    throw new TypeError(`--config, --expected-git-commit, and --oci-evidence are required.\n\n${usage()}`);
   }
 
   let activationRequestBytes;
@@ -187,6 +203,10 @@ async function main() {
   const coordinates = productionReleaseCoordinates(activationRequestBytes, {
     expectedGitCommit: values["expected-git-commit"],
     expectNoActiveRelease: values["expect-no-active-release"],
+  });
+  await verifyOciTagVerificationFile(values["oci-evidence"], {
+    reference: coordinates.containerTag,
+    digest: coordinates.containerDigest,
   });
   const rendered = renderProductionReleaseConfig(
     await readFile(values.config, "utf8"),

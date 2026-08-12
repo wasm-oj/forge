@@ -19,13 +19,51 @@ The protected GitHub `production` Environment requires Owner approval and provid
   already-active release used by a normal deploy;
 - `WASM_OJ_ARCHITECTURE_RESET_TOKEN`, a random value of at least 32 bytes used only by the cutover;
 - `WASM_OJ_V2_ACTIVATION_REQUEST_BASE64`, the canonical request produced by
-  `scripts/prepare-production-release.mjs` with `--expect-no-active-release`; and
+  `scripts/prepare-production-release.mjs` from a generated input bundle whose
+  `expectedCurrentReleaseId` is null; and
 - short-lived `WASM_OJ_CUTOVER_ADMIN_SESSION` and `WASM_OJ_CUTOVER_ADMIN_CSRF` values used only for
   authenticated cutover Admin calls: release activation, maintenance smoke, and reopening formal
   mutations. Remove these two values after cutover.
 
 Cloudflare stores the application OAuth, GitHub App, webhook, Turnstile, account-erasure, and
 invite-code secrets directly on the Worker.
+
+## Preparing a release request
+
+Release preparation has no digest template. Build and push the `linux/amd64` Container under the
+release UUID tag, retain the digest reported by the registry, and extract
+`/app/release/container-identity.json` from that exact image. Resolve the tag again through the
+registry and preserve its exact OCI bytes:
+
+```sh
+node scripts/verify-oci-release-image.mjs \
+  --reference "registry.cloudflare.com/ACCOUNT/wasm-oj-judge-production:$RELEASE_ID" \
+  --expected-digest "$CONTAINER_DIGEST" \
+  --config wrangler.quick-production.jsonc \
+  --output-dir release-oci
+```
+
+Create a self-contained input bundle from the actual package, Worker/static trees, Container
+identity, OCI evidence, SBOM, audit, test evidence, runtime bytes, toolchains, licenses, lockfile,
+and migrations; then derive the manifest/request from that bundle:
+
+```sh
+node scripts/generate-production-release-inputs.mjs \
+  --release-id "$RELEASE_ID" --version "$VERSION" --git-commit "$GIT_COMMIT" \
+  --created-at "$CREATED_AT" --container-registry "registry.cloudflare.com/ACCOUNT/wasm-oj-judge-production" \
+  --container-identity container-identity.json --oci-evidence release-oci/evidence.json \
+  --npm-package release-package.tgz --sbom sbom.json --audit audit.json --tests-evidence tests.json \
+  --provenance-issuer owner-manual-release --provenance-subject wasm-oj-production \
+  --expect-no-active-release --output-dir release-inputs
+node scripts/prepare-production-release.mjs \
+  --inputs release-inputs/release-inputs.json --output-dir prepared-release
+```
+
+The generator copies every byte under `release-inputs/`, records fixed file/tree roles, and hashes
+the copied bytes again before writing its canonical index. Prepare repeats the full verification;
+changing any saved byte fails closed. If conformance or cost calibration was intentionally not run,
+the generator writes canonical `status: "not-run"` evidence. It never substitutes a stale passing
+digest. SBOM, audit, and tests remain required explicit evidence files.
 
 ## Normal deployment
 
@@ -36,11 +74,14 @@ non-reset migrations, deploys, and verifies
 
 The committed production config contains release placeholders, never a previous release ID or
 manifest digest. Before any build or Cloudflare mutation,
-`scripts/configure-production-release.mjs` decodes `WASM_OJ_PRODUCTION_RELEASE_REQUEST_BASE64` as
+`scripts/verify-oci-release-image.mjs` first resolves the UUID tag, checks the registry digest and
+`linux/amd64` platform, and preserves the tag manifest, platform manifest, and config bytes.
+`scripts/configure-production-release.mjs` then decodes `WASM_OJ_PRODUCTION_RELEASE_REQUEST_BASE64` as
 canonical standard Base64, validates the request's exact shape and v2 release manifest, recomputes
 the canonical manifest SHA-256, requires `manifest.source.commit` to equal the checked-out
-`GITHUB_SHA`, and binds the Worker ID, manifest digest, and Submission Container image tag as one
-identity. A missing, malformed, stale, or cross-commit request stops the workflow. For normal
+`GITHUB_SHA`, re-hashes the saved OCI evidence, and binds the Worker ID, manifest digest, and
+Submission Container as `registry:releaseId@sha256:...`. A missing, malformed, stale, cross-commit,
+or tag/digest-mismatched request stops the workflow. For normal
 redeployment, configure this secret from the immutable request for the release that is already
 active in production; normal deployment does not activate a new release or open a maintenance
 window. Before applying even a non-reset migration, the production migration preflight joins
@@ -64,7 +105,8 @@ timeout plus the safety margin, verify every pre-v2 Workflow is terminal, and re
 The workflow validates `WASM_OJ_V2_ACTIVATION_REQUEST_BASE64` and renders all three deployment
 coordinates before typechecking, building, or enabling maintenance. The same exact validated bytes
 must carry a null expected-current release because the reset creates an empty v2 release authority,
-and are retained at `cutover-evidence/activation-request.json` for the later Admin call. The workflow
+and are retained at `cutover-evidence/activation-request.json` for the later Admin call. Exact OCI
+manifest/config bytes are retained under `cutover-evidence/oci/`. The workflow
 then executes this fail-closed sequence:
 
 1. Set the production `formal_mutations_enabled` control to zero. Formal mutation APIs return 503;
@@ -80,7 +122,7 @@ then executes this fail-closed sequence:
 5. Recheck D1 quiescence, the external Workflow assertion, inventory, receipt, protected reset
    token, and that 0017 is the only pending migration. Only then apply the reset.
 6. Deploy the v2 Worker, Submission Workflow, Catalog Workflow, and Submission Container using the
-   release ID, canonical manifest digest, and Container registry from that request.
+   release ID, canonical manifest digest, and digest-pinned Container reference from that request.
 7. Submit the already-validated canonical activation request to
    `POST /api/admin/releases/activate`. D1 inserts or verifies the immutable release manifest and
    performs an expected-current environment-pointer CAS in one batch; the endpoint also requires

@@ -28,8 +28,11 @@ requireText(sources.production, "environment: production", "Production deploymen
 requireText(sources.production, "workflow_dispatch:", "Production deployment");
 forbidText(sources.production, "branches: [main]", "Production deployment");
 requireText(sources.production, "WASM_OJ_PRODUCTION_RELEASE_REQUEST_BASE64", "Production deployment");
+requireText(sources.production, "verify-oci-release-image.mjs", "Production deployment");
 requireText(sources.production, "configure-production-release.mjs", "Production deployment");
 requireText(sources.production, '--expected-git-commit "$GITHUB_SHA"', "Production deployment");
+requireText(sources.production, "--oci-evidence release-evidence/oci/evidence.json", "Production deployment");
+requireText(sources.production, "production-release-oci-${{ github.run_id }}", "Production deployment");
 requireText(sources.production, "production-migrations.mjs normal", "Production deployment");
 requireText(sources.production, "wrangler deploy --config wrangler.quick-production.jsonc", "Production deployment");
 requireText(sources.production, "/api/health/live", "Production deployment");
@@ -42,6 +45,7 @@ forbidText(sources.production, "SUBMISSIONS_DB", "Production deployment");
 forbidText(sources.production, "formal_mutations_enabled", "Production deployment");
 
 const orderedProductionSteps = [
+  "verify-oci-release-image.mjs",
   "configure-production-release.mjs",
   "production-migrations.mjs normal",
   "wrangler deploy --config wrangler.quick-production.jsonc",
@@ -67,6 +71,7 @@ for (const [source, label] of [
 }
 
 const orderedCutoverSteps = [
+  "verify-oci-release-image.mjs",
   "configure-production-release.mjs",
   "formal_mutations_enabled=0",
   "--quiescence-only",
@@ -88,6 +93,7 @@ for (const step of orderedCutoverSteps) {
 requireText(sources.cutover, "RESET-PRODUCTION-ARCHITECTURE-V2", "Architecture v2 cutover");
 requireText(sources.cutover, "WASM_OJ_V2_ACTIVATION_REQUEST_BASE64", "Architecture v2 cutover");
 requireText(sources.cutover, "--activation-request-output cutover-evidence/activation-request.json", "Architecture v2 cutover");
+requireText(sources.cutover, "--oci-evidence cutover-evidence/oci/evidence.json", "Architecture v2 cutover");
 requireText(sources.cutover, '--expected-git-commit "$GITHUB_SHA"', "Architecture v2 cutover");
 requireText(sources.cutover, "--expect-no-active-release", "Architecture v2 cutover");
 requireText(sources.cutover, "--confirm-workflows-drained", "Architecture v2 cutover");
@@ -121,18 +127,22 @@ for (const [name, source] of Object.entries(sources)) {
 const productionTemplate = await readFile("wrangler.quick-production.jsonc", "utf8");
 const productionReleaseIdPlaceholder = "__WASM_OJ_RELEASE_ID__";
 const productionManifestPlaceholder = "__WASM_OJ_RELEASE_MANIFEST_SHA256__";
+const productionContainerDigestPlaceholder = "__WASM_OJ_CONTAINER_IMAGE_DIGEST__";
 if (productionTemplate.split(productionReleaseIdPlaceholder).length - 1 !== 2) {
   throw new Error("Production Worker config must commit exactly two release-ID placeholders.");
 }
 if (productionTemplate.split(productionManifestPlaceholder).length - 1 !== 1) {
   throw new Error("Production Worker config must commit exactly one release-manifest placeholder.");
 }
+if (productionTemplate.split(productionContainerDigestPlaceholder).length - 1 !== 1) {
+  throw new Error("Production Worker config must commit exactly one Container digest placeholder.");
+}
 if (
   workerConfigs.production.vars?.WASM_OJ_RELEASE_ID !== productionReleaseIdPlaceholder
   || workerConfigs.production.vars?.WASM_OJ_RELEASE_MANIFEST_SHA256 !== productionManifestPlaceholder
   || workerConfigs.production.containers?.find(
     (container) => container.class_name === "SubmissionJudgeContainer",
-  )?.image !== `registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-judge-production:${productionReleaseIdPlaceholder}`
+  )?.image !== `registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-judge-production:${productionReleaseIdPlaceholder}@${productionContainerDigestPlaceholder}`
 ) {
   throw new Error("Production Worker config must retain only the explicit release-coordinate template.");
 }

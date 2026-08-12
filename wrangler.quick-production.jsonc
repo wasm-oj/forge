@@ -99,7 +99,7 @@
     {
       "name": "wasm-oj-submission-production",
       "class_name": "SubmissionJudgeContainer",
-      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-judge-production:__WASM_OJ_RELEASE_ID__",
+      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-judge-production:__WASM_OJ_RELEASE_ID__@__WASM_OJ_CONTAINER_IMAGE_DIGEST__",
       "instance_type": "standard-2",
       "max_instances": 50,
       "ssh": { "enabled": false }

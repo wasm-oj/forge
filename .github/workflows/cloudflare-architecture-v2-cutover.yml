@@ -45,6 +45,17 @@ jobs:
           node-version: 24.18.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify the candidate Container tag against immutable OCI bytes
+        env:
+          RELEASE_REQUEST_BASE64: ${{ secrets.WASM_OJ_V2_ACTIVATION_REQUEST_BASE64 }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          node scripts/verify-oci-release-image.mjs
+          --activation-request-base64-env RELEASE_REQUEST_BASE64
+          --config wrangler.quick-production.jsonc
+          --expected-git-commit "$GITHUB_SHA"
+          --output-dir cutover-evidence/oci
       - name: Validate the candidate and bind its release coordinates before maintenance
         env:
           RELEASE_REQUEST_BASE64: ${{ secrets.WASM_OJ_V2_ACTIVATION_REQUEST_BASE64 }}
@@ -54,6 +65,7 @@ jobs:
           --activation-request-output cutover-evidence/activation-request.json
           --config wrangler.quick-production.jsonc
           --expected-git-commit "$GITHUB_SHA"
+          --oci-evidence cutover-evidence/oci/evidence.json
           --expect-no-active-release
       - run: pnpm run typecheck
       - run: pnpm run build

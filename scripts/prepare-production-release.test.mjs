@@ -1,181 +1,101 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
 import test from "node:test";
 import { parseCanonicalJsonBytes } from "../src/core/canonical-json.ts";
-import { WASM_OJ_RUNTIME_IDENTITY_SHA256 } from "../src/core/runtime-identity.ts";
 import { verifyReleaseManifestBytes } from "../src/release-manifest.ts";
 import { prepareProductionRelease } from "./prepare-production-release.mjs";
+import {
+  createProductionReleaseFixture,
+  TEST_GIT_COMMIT,
+  TEST_RELEASE_ID,
+} from "./production-release-test-fixture.mjs";
 
-const digest = (character) => character.repeat(64);
-const releaseId = "018f0f2e-7b3c-7f51-8b36-df6ec12f8d31";
-const gitCommit = "a".repeat(40);
+const run = promisify(execFile);
 
-function canonical(value) {
-  const sorted = (item) => {
-    if (Array.isArray(item)) return item.map(sorted);
-    if (item && typeof item === "object") {
-      return Object.fromEntries(Object.keys(item).sort().map((key) => [key, sorted(item[key])]));
+test("derives every release digest from the generated input bundle", async () => {
+  const fixture = await createProductionReleaseFixture();
+  try {
+    const { prepared, inputs } = fixture;
+    const manifest = await verifyReleaseManifestBytes(prepared.manifestBytes, prepared.manifestSha256);
+    assert.equal(manifest.releaseId, TEST_RELEASE_ID);
+    assert.equal(manifest.source.commit, TEST_GIT_COMMIT);
+    assert.equal(manifest.build.auditSha256, inputs.records.audit.sha256);
+    assert.deepEqual(manifest.artifacts.workerBundle, {
+      bytes: inputs.records.workerBundle.bytes,
+      sha256: inputs.records.workerBundle.sha256,
+    });
+    assert.equal(manifest.artifacts.containerImage.digest, inputs.container.digest);
+    assert.equal(manifest.artifacts.containerImage.identitySha256, inputs.records.containerIdentity.sha256);
+    assert.equal(manifest.runtime.runtimeCoreSha256, inputs.records.runtimeCore.sha256);
+    assert.equal(manifest.runtime.wasmerSha256, inputs.records.wasmer.sha256);
+    assert.equal(manifest.toolchains.rootSha256, inputs.records.toolchains.sha256);
+    assert.equal(manifest.evidence.testsSha256, inputs.records.tests.sha256);
+    assert.deepEqual(parseCanonicalJsonBytes(prepared.activationRequestBytes, "activation request"), {
+      expectedCurrentReleaseId: null,
+      manifest,
+    });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+test("fails closed when any preserved artifact/evidence bytes change", async () => {
+  const fixture = await createProductionReleaseFixture();
+  try {
+    const audit = path.join(fixture.bundle, ...fixture.inputs.records.audit.path.split("/"));
+    await writeFile(audit, '{"status":"tampered"}\n');
+    await assert.rejects(prepareProductionRelease(fixture.inputPath), /audit.*does not match its saved bytes/u);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+test("represents omitted conformance and cost checks as canonical not-run evidence", async () => {
+  const fixture = await createProductionReleaseFixture();
+  try {
+    for (const [role, check] of [
+      ["conformance", "conformance"],
+      ["costBaseline", "cost-baseline"],
+      ["costCalibration", "cost-calibration"],
+      ["costProfiles", "cost-profiles"],
+    ]) {
+      const record = fixture.inputs.records[role];
+      const bytes = await readFile(path.join(fixture.bundle, ...record.path.split("/")));
+      assert.deepEqual(parseCanonicalJsonBytes(bytes, `${role} evidence`), {
+        check,
+        schema: "wasm-oj-v2/release-check-evidence",
+        status: "not-run",
+      });
     }
-    return item;
-  };
-  return Buffer.from(`${JSON.stringify(sorted(value))}\n`);
-}
-
-function identityBytes(overrides = {}) {
-  return canonical({
-    compilerSha256: digest("a"),
-    contract: 2,
-    executionRootSha256: digest("b"),
-    gitCommit,
-    protocol: "wasm-oj-container-v2",
-    releaseId,
-    runnerSha256: digest("c"),
-    runtimeRootSha256: digest("d"),
-    schema: "wasm-oj-platform/container-identity/v2",
-    toolchainRootSha256: digest("e"),
-    ...overrides,
-  });
-}
-
-function template() {
-  return {
-    schema: "wasm-oj-v2/release-manifest",
-    releaseId: "01988dc1-5c00-7000-8000-000000000000",
-    version: "0.2.0-production.1",
-    wasmOjContract: 2,
-    createdAt: "2026-08-01T00:00:00.000Z",
-    source: {
-      repository: "https://github.com/wasm-oj/forge",
-      commit: "f".repeat(40),
-      sourceTreeSha256: digest("f"),
-      tag: "old-tag",
-    },
-    build: {
-      nodeVersion: "24.18.0",
-      pnpmVersion: "10.34.5",
-      rustVersion: "1.97.1",
-      lockSha256: digest("1"),
-      sbomSha256: digest("2"),
-      licensesSha256: digest("3"),
-      auditSha256: digest("4"),
-    },
-    artifacts: {
-      npmPackage: { bytes: 1, sha256: digest("5") },
-      workerBundle: { bytes: 2, sha256: digest("6") },
-      staticAssets: { bytes: 3, sha256: digest("7") },
-      containerImage: {
-        registry: "registry.cloudflare.com/wasm-oj/forge",
-        digest: `sha256:${digest("8")}`,
-        identitySha256: digest("8"),
-        platform: "linux/amd64",
-        dockerfileSha256: digest("9"),
-        baseImages: [
-          { stage: "node-build", image: "node:24.18.0-bookworm", digest: `sha256:${digest("a")}` },
-          { stage: "rust-build", image: "rust:1.97.1-bookworm", digest: `sha256:${digest("b")}` },
-          { stage: "judge", image: "node:24.18.0-bookworm-slim", digest: `sha256:${digest("c")}` },
-        ],
-      },
-    },
-    runtime: {
-      protocolVersion: "wasm-oj-container-v2",
-      executionRootSha256: digest("8"),
-      rootSha256: digest("9"),
-      runtimeIdentitySha256: WASM_OJ_RUNTIME_IDENTITY_SHA256,
-      runtimeCoreSha256: digest("0"),
-      wasmerVersion: "7.2.1",
-      wasmerSha256: digest("1"),
-      compilerSha256: digest("2"),
-      runnerSha256: digest("3"),
-    },
-    toolchains: { rootSha256: digest("4"), manifestSha256: digest("5") },
-    cost: { model: "weighted", profileRootSha256: digest("6"), baselineSha256: digest("7") },
-    evidence: {
-      conformanceSha256: digest("8"),
-      testsSha256: digest("9"),
-      costCalibrationSha256: digest("0"),
-    },
-    migrations: { databaseSha256: digest("1") },
-    provenance: { issuer: "owner-fast-hotfix", subject: "wasm-oj-production" },
-  };
-}
-
-function prepare(overrides = {}) {
-  return prepareProductionRelease({
-    template: template(),
-    releaseId,
-    version: "0.2.0-production.2",
-    gitCommit,
-    sourceTreeSha256: digest("2"),
-    containerIdentityBytes: identityBytes(),
-    containerImageDigest: `sha256:${digest("3")}`,
-    databaseSha256: digest("4"),
-    createdAt: "2026-08-12T00:00:00.000Z",
-    ...overrides,
-  });
-}
-
-test("prepares one canonical manifest from actual release coordinates and Container identity", async () => {
-  const prepared = prepare();
-  const manifest = await verifyReleaseManifestBytes(prepared.manifestBytes, prepared.manifestSha256);
-  assert.equal(manifest.releaseId, releaseId);
-  assert.equal(manifest.version, "0.2.0-production.2");
-  assert.deepEqual(manifest.source, {
-    repository: "https://github.com/wasm-oj/forge",
-    commit: gitCommit,
-    sourceTreeSha256: digest("2"),
-  });
-  assert.equal(manifest.artifacts.containerImage.digest, `sha256:${digest("3")}`);
-  assert.equal(
-    manifest.artifacts.containerImage.identitySha256,
-    createHash("sha256").update(identityBytes()).digest("hex"),
-  );
-  assert.equal(manifest.runtime.executionRootSha256, digest("b"));
-  assert.equal(manifest.runtime.rootSha256, digest("d"));
-  assert.equal(manifest.runtime.compilerSha256, digest("a"));
-  assert.equal(manifest.runtime.runnerSha256, digest("c"));
-  assert.equal(manifest.toolchains.rootSha256, digest("e"));
-  assert.deepEqual(manifest.migrations, { databaseSha256: digest("4") });
-  assert.deepEqual(manifest.cost, template().cost);
-  assert.deepEqual(manifest.evidence, template().evidence);
-  assert.deepEqual(manifest.artifacts.workerBundle, template().artifacts.workerBundle);
-  assert.deepEqual(manifest.artifacts.staticAssets, template().artifacts.staticAssets);
-  assert.deepEqual(parseCanonicalJsonBytes(prepared.activationRequestBytes, "activation request"), {
-    expectedCurrentReleaseId: null,
-    manifest,
-  });
+  } finally {
+    await fixture.cleanup();
+  }
 });
 
-test("updates only explicitly supplied Worker and static artifact records", () => {
-  const prepared = prepare({
-    workerBundleArtifact: { bytes: 101, sha256: digest("a") },
-    staticAssetsArtifact: { bytes: 202, sha256: digest("b") },
-  });
-  assert.deepEqual(prepared.manifest.artifacts.workerBundle, { bytes: 101, sha256: digest("a") });
-  assert.deepEqual(prepared.manifest.artifacts.staticAssets, { bytes: 202, sha256: digest("b") });
-  assert.deepEqual(prepared.manifest.evidence, template().evidence);
-});
-
-test("emits a canonical activation request with an explicit current-release precondition", () => {
-  const expectedCurrentReleaseId = "01988dc1-5c00-7000-8000-000000000000";
-  const prepared = prepare({ expectedCurrentReleaseId });
-  assert.deepEqual(prepared.activationRequest, {
-    expectedCurrentReleaseId,
-    manifest: prepared.manifest,
-  });
-  assert.deepEqual(
-    parseCanonicalJsonBytes(prepared.activationRequestBytes, "activation request"),
-    prepared.activationRequest,
-  );
-  assert.equal("activationSql" in prepared, false);
-});
-
-test("rejects a Container identity from another release or noncanonical bytes", () => {
-  assert.throws(
-    () => prepare({ containerIdentityBytes: identityBytes({ releaseId: "01988dc1-5c00-7000-8000-000000000000" }) }),
-    /does not match the requested release coordinates/,
-  );
-  assert.throws(
-    () => prepare({ containerIdentityBytes: Buffer.from(JSON.stringify(JSON.parse(identityBytes()))) }),
-    /canonical JSON/,
-  );
+test("CLI re-verifies the bundle and writes only canonical manifest/request bytes", async () => {
+  const fixture = await createProductionReleaseFixture();
+  const output = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-prepared-release-parent-"));
+  const destination = path.join(output, "prepared");
+  try {
+    const { stdout } = await run(process.execPath, [
+      new URL("./prepare-production-release.mjs", import.meta.url).pathname,
+      "--inputs", fixture.inputPath,
+      "--output-dir", destination,
+    ], { maxBuffer: 1024 * 1024 });
+    const result = JSON.parse(stdout);
+    assert.equal(result.releaseId, TEST_RELEASE_ID);
+    const manifestBytes = await readFile(path.join(destination, "manifest.json"));
+    const manifest = await verifyReleaseManifestBytes(manifestBytes, result.manifestSha256);
+    assert.equal(manifest.releaseId, TEST_RELEASE_ID);
+    assert.deepEqual(
+      parseCanonicalJsonBytes(await readFile(path.join(destination, "activation-request.json")), "activation request"),
+      fixture.prepared.activationRequest,
+    );
+  } finally {
+    await Promise.all([fixture.cleanup(), rm(output, { recursive: true, force: true })]);
+  }
 });
