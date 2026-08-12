@@ -13,7 +13,7 @@ import { Drawer } from "../../../components/ui/drawer";
 import { IconButton } from "../../../components/ui/icon-button";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { JUDGE_UI_LOCALE_STORAGE_KEY } from "../../judge/model/judge-ui-i18n";
-import { wasmOjJson, wasmOjMutation } from "../api/online-api";
+import { configureWasmOjMaintenanceSmokeToken, wasmOjJson, wasmOjMutation } from "../api/online-api";
 
 export type ProductLocale = "en" | "zh-TW";
 type ProductTheme = "light" | "dark";
@@ -46,7 +46,7 @@ const LABELS = {
   en: {
     home: "Home", problems: "Problems", contests: "Contests", submissions: "Submissions", profile: "Profile",
     advanced: "Advanced", collections: "Custom collections", organizer: "Organizer", repositories: "Repositories",
-    collectionsAdmin: "Collections", contestAdmin: "Contests", rejudges: "Rejudges", applications: "Organizer applications",
+    collectionsAdmin: "Collections", contestAdmin: "Contests", rejudges: "Rejudges", applications: "Organizer applications", operations: "Production operations",
     applyOrganizer: "Apply for Organizer", primaryNavigation: "Primary navigation", skip: "Skip to main content",
     openMenu: "Open navigation", closeMenu: "Close navigation", collapseMenu: "Collapse navigation", expandMenu: "Expand navigation",
     signIn: "Sign in with GitHub", signOut: "Sign out", loadingSession: "Checking account…", sessionError: "Could not verify your account.", retry: "Retry",
@@ -55,7 +55,7 @@ const LABELS = {
   "zh-TW": {
     home: "首頁", problems: "題庫", contests: "競賽", submissions: "提交紀錄", profile: "個人檔案",
     advanced: "進階", collections: "自訂題庫", organizer: "Organizer", repositories: "Repositories",
-    collectionsAdmin: "Collections", contestAdmin: "Contests", rejudges: "Rejudges", applications: "Organizer 申請",
+    collectionsAdmin: "Collections", contestAdmin: "Contests", rejudges: "Rejudges", applications: "Organizer 申請", operations: "正式環境操作",
     applyOrganizer: "申請成為 Organizer", primaryNavigation: "主要導覽", skip: "跳至主要內容",
     openMenu: "開啟導覽", closeMenu: "關閉導覽", collapseMenu: "收合導覽", expandMenu: "展開導覽",
     signIn: "使用 GitHub 登入", signOut: "登出", loadingSession: "正在確認帳號…", sessionError: "無法確認帳號狀態。", retry: "重試",
@@ -200,6 +200,7 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
   async function signOut() {
     try {
       await wasmOjMutation("/api/auth/logout", {});
+      configureWasmOjMaintenanceSmokeToken();
       await refreshSession();
       router.push("/");
       router.refresh();
@@ -239,7 +240,7 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
             <NavItem href="/organizer/rejudges" icon={<ListChecks aria-hidden="true" size={15} />} label={text.rejudges} current={isCurrent("/organizer/rejudges")} close={close} collapsed={collapsed} />
           </div>}
         </>}
-        {admin && <><div className="app-nav-divider" /><NavItem href="/admin/organizers" icon={<ShieldCheck aria-hidden="true" size={17} />} label={text.applications} current={isCurrent("/admin/organizers")} close={close} collapsed={collapsed} /></>}
+        {admin && <><div className="app-nav-divider" /><NavItem href="/admin/organizers" icon={<ShieldCheck aria-hidden="true" size={17} />} label={text.applications} current={isCurrent("/admin/organizers")} close={close} collapsed={collapsed} /><NavItem href="/admin/operations" icon={<Settings2 aria-hidden="true" size={17} />} label={text.operations} current={isCurrent("/admin/operations")} close={close} collapsed={collapsed} /></>}
       </nav>
       <div className="app-sidebar-footer">
         <div className="app-preference-row">

@@ -133,6 +133,22 @@ export async function updateFormalMutationControl(
   if (Object.keys(body).length !== 1 || typeof body.reason !== "string") {
     throw new ApiError(400, "formal-mutation-control-invalid", "A reason is required.");
   }
+  if (enabled) {
+    try {
+      await assertActiveRelease(
+        env.DB,
+        env.ENVIRONMENT,
+        env.WASM_OJ_RELEASE_ID,
+        env.WASM_OJ_RELEASE_MANIFEST_SHA256,
+      );
+    } catch {
+      throw new ApiError(
+        503,
+        "active-release-mismatch",
+        "Formal mutations cannot resume until the deployed release is the exact active release.",
+      );
+    }
+  }
   return jsonResponse(await setFormalMutationsEnabled(env, enabled, body.reason));
 }
 

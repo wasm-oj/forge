@@ -107,6 +107,14 @@ cutover reasons, and only when the token matches in constant time. Normal users 
 exact production `Origin`, the Admin's `wasm_oj_session` and `wasm_oj_csrf` cookies, an
 `X-WASM-OJ-CSRF` header equal to the CSRF cookie, and the endpoint's normal content type and body.
 
+The built-in `/admin/operations` page is the preferred browser client. Paste the short-lived smoke
+token into **Maintenance smoke lane** once; it remains only in the current JavaScript process and is
+never written to local storage, session storage, a URL, or an API body. Client-side navigation then
+adds the header to Organizer mutations and Official Submit, including a fresh Turnstile challenge.
+Reloading, signing out, explicitly clearing the token, or successfully reopening formal mutations
+removes it. The same page accepts the bounded canonical activation-request JSON in memory and calls
+the existing Admin activation endpoint without introducing another credential path.
+
 Through that bounded maintenance lane:
 
 1. validate the official collection from its exact commit;
@@ -138,6 +146,12 @@ needs `X-WASM-OJ-Maintenance-Smoke-Token`, and delete or rotate the `MAINTENANCE
 Worker/GitHub secrets. The maintenance window is complete only then. The old fixed 45-problem
 catalog check is intentionally gone because an exact publication, not a hard-coded item count, is
 the v2 authority.
+
+Alternatively, on `/admin/operations`, type the exact reason
+`architecture-v2-production-smoke-passed` and choose **Resume formal mutations**. The control stays
+disabled until `/api/health/ready` succeeds. The server independently verifies that D1's active
+release ID and manifest digest exactly match the deployed Worker before it reopens the gate; the UI
+is not the authority for this check.
 
 ## Exact-key R2 cleanup after 24 hours
 
