@@ -14,6 +14,31 @@ describe("catalog v2 architecture boundary", () => {
       .toContain("validateJudgePackage");
   });
 
+  it("streams each judge package into R2 with its declared fixed length", async () => {
+    const source = await readFile(new URL("./catalog-workflows.ts", import.meta.url), "utf8");
+    const materialization = source.slice(
+      source.indexOf("async function materializeJudgePackage"),
+      source.indexOf("async function publishContext"),
+    );
+    const streamDeclaration = materialization.match(
+      /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*new FixedLengthStream\(\s*problem\.judge_package_bytes\s*\)\s*;/,
+    );
+    expect(streamDeclaration).not.toBeNull();
+    const streamName = streamDeclaration![1]!;
+    const transferDeclaration = materialization.match(new RegExp(
+      `\\bconst\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*response\\.body\\.pipeTo\\(\\s*${streamName}\\.writable\\s*,`,
+    ));
+    expect(transferDeclaration).not.toBeNull();
+    const transferName = transferDeclaration![1]!;
+    const upload = materialization.match(new RegExp(
+      `await\\s+env\\.JUDGE_BUCKET\\.put\\(\\s*key\\s*,\\s*${streamName}\\.readable\\s*,`,
+    ));
+    expect(upload).not.toBeNull();
+    expect(materialization.indexOf(transferDeclaration![0])).toBeLessThan(materialization.indexOf(upload![0]));
+    expect(materialization).toContain(`await ${transferName};`);
+    expect(materialization.match(new RegExp(`await\\s+${transferName}\\.catch`, "g"))).toHaveLength(2);
+  });
+
   it("does not retain the removed validation execution modules", async () => {
     const [worker, container] = await Promise.all([
       readFile(new URL("./index.ts", import.meta.url), "utf8"),
