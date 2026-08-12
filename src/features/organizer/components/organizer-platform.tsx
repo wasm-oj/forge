@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Drawer } from "../../../components/ui/drawer";
 import { IconButton } from "../../../components/ui/icon-button";
-import { wasmOjCsrfToken, wasmOjJson } from "../../platform/api/online-api";
+import { wasmOjCsrfToken, wasmOjJson, wasmOjMutation } from "../../platform/api/online-api";
 import { useProduct } from "../../platform/components/app-shell";
 import { usePageTitle } from "../../platform/hooks/page-title";
 import { requestWasmOjTurnstileToken } from "../../../turnstile/client";
@@ -160,15 +160,11 @@ function initialSearchParameter(name: string, fallback = ""): string {
 }
 
 function post<T>(path: string, body: unknown): Promise<T> {
-  const csrf = wasmOjCsrfToken();
-  if (!csrf) return Promise.reject(new Error("Sign in again: the CSRF token is missing."));
-  return wasmOjJson<T>(path, { method: "POST", headers: { "content-type": "application/json", "x-wasm-oj-csrf": csrf }, body: JSON.stringify(body) });
+  return wasmOjMutation<T>(path, body);
 }
 
 function put<T>(path: string, body: unknown): Promise<T> {
-  const csrf = wasmOjCsrfToken();
-  if (!csrf) return Promise.reject(new Error("Sign in again: the CSRF token is missing."));
-  return wasmOjJson<T>(path, { method: "PUT", headers: { "content-type": "application/json", "x-wasm-oj-csrf": csrf }, body: JSON.stringify(body) });
+  return wasmOjMutation<T>(path, body, "PUT");
 }
 
 function useOrganizer() {

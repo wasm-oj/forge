@@ -53,7 +53,7 @@ export async function wasmOjJson<T>(input: RequestInfo | URL, init?: RequestInit
   return value;
 }
 
-export async function wasmOjMutation<T>(input: RequestInfo | URL, body: unknown, method: "POST" | "PATCH" | "DELETE" = "POST"): Promise<T> {
+export async function wasmOjMutation<T>(input: RequestInfo | URL, body: unknown, method: "POST" | "PUT" | "PATCH" | "DELETE" = "POST"): Promise<T> {
   const token = wasmOjCsrfToken();
   if (!token) throw new Error("Sign in again: the CSRF token is missing.");
   return wasmOjJson<T>(input, {
