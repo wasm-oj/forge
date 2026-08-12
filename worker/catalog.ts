@@ -45,6 +45,12 @@ interface ValidationRow {
   readonly validation_summary_json: string | null;
 }
 
+interface ExistingRevisionRow {
+  readonly id: string;
+  readonly validation_job_id: string;
+  readonly validation_summary_json: string;
+}
+
 interface PublicationRow {
   readonly id: string;
   readonly state: string;
@@ -203,11 +209,20 @@ export async function createCatalogValidation(
   const repository = await authorizedCatalogRepository(env, session, collection.github_repository_id);
   const commitSha = await resolveExactCommit(repository, ref);
   if (!COMMIT.test(commitSha)) throw new ApiError(502, "github-commit-invalid", "GitHub returned an invalid exact commit.");
-  const existingRevision = await env.DB.prepare(
-    "SELECT id FROM collection_revisions WHERE collection_id=? AND commit_sha=?",
-  ).bind(collection.id, commitSha).first<{ readonly id: string }>();
+  const existingRevision = await env.DB.prepare(`SELECT id, validation_job_id, validation_summary_json
+      FROM collection_revisions WHERE collection_id=? AND commit_sha=?`)
+    .bind(collection.id, commitSha).first<ExistingRevisionRow>();
   if (existingRevision) {
-    throw new ApiError(409, "revision-already-valid", "This exact commit is already a valid revision.", { revisionId: existingRevision.id });
+    return jsonResponse({ validation: {
+      id: existingRevision.validation_job_id,
+      collectionId: collection.id,
+      requestedRef: ref,
+      commitSha,
+      state: "valid",
+      errorCode: null,
+      revisionId: existingRevision.id,
+      summary: JSON.parse(existingRevision.validation_summary_json),
+    } });
   }
   const jobId = crypto.randomUUID();
   const outboxId = crypto.randomUUID();
@@ -235,7 +250,16 @@ export async function createCatalogValidation(
   ]);
   if (job?.meta.changes !== 1) throw new ApiError(429, "catalog-capacity-exhausted", "Catalog validation capacity is full.");
   await dispatchCatalogJobs(env);
-  return jsonResponse({ validation: { id: jobId, collectionId: collection.id, commitSha, state: "queued" } }, 202);
+  return jsonResponse({ validation: {
+    id: jobId,
+    collectionId: collection.id,
+    requestedRef: ref,
+    commitSha,
+    state: "queued",
+    errorCode: null,
+    revisionId: null,
+    summary: null,
+  } }, 202);
 }
 
 export async function getCatalogValidation(request: Request, env: WasmOjWorkerEnv, validationId: string): Promise<Response> {

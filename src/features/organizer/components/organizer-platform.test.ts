@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   CATALOG_POLL_DELAYS_MS,
@@ -32,6 +33,14 @@ describe("Organizer catalog v2 polling", () => {
     expect(catalogIssueMessage("catalog-contract-invalid")).toContain("validate a new exact commit");
     expect(catalogIssueMessage("catalog-validation-failed")).toContain("Static validation failed");
     expect(catalogIssueMessage("unknown-code")).toBe("unknown-code");
+  });
+
+  it("uses the complete validation returned by creation without rebuilding a partial client projection", async () => {
+    const source = await readFile(new URL("./organizer-platform.tsx", import.meta.url), "utf8");
+    const createValidation = source.slice(source.indexOf("async function createValidation"), source.indexOf("async function publish"));
+    expect(createValidation).toContain("setValidation(result.validation)");
+    expect(createValidation).not.toMatch(/setValidation\(\{[\s\S]*requestedRef:/);
+    expect(createValidation).toContain('result.validation.state === "valid"');
   });
 });
 
