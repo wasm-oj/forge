@@ -15,6 +15,16 @@ const MIGRATION_NAME = /^\d{4}_[a-z0-9_]+\.sql$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
+export const RETIRED_PRODUCTION_MIGRATIONS = Object.freeze([
+  "0007_staging_acceptance.sql",
+  "0008_staging_acceptance_controls.sql",
+  "0009_release_drain_evidence.sql",
+  "0011_release_transition_drain_nonce.sql",
+  "0014_release_package_active_root.sql",
+  "0015_release_package_mutation_lease.sql",
+  "0016_staging_acceptance_fixture.sql",
+]);
+
 export function pendingMigrationNames(localNames, appliedNames) {
   const applied = new Set(appliedNames);
   return localNames.filter((name) => !applied.has(name));
@@ -22,7 +32,8 @@ export function pendingMigrationNames(localNames, appliedNames) {
 
 export function assertNoUnknownAppliedMigrations(localNames, appliedNames) {
   const local = new Set(localNames);
-  const unknown = appliedNames.filter((name) => !local.has(name));
+  const retired = new Set(RETIRED_PRODUCTION_MIGRATIONS);
+  const unknown = appliedNames.filter((name) => !local.has(name) && !retired.has(name));
   if (unknown.length !== 0) {
     throw new Error(`Production D1 contains migrations absent from this checkout: ${JSON.stringify(unknown)}.`);
   }
