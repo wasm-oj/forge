@@ -2,6 +2,7 @@ import capacity from "../config/capacity.json";
 import type { WasmOjWorkerEnv } from "./env";
 import type { CatalogWorkflowParameters } from "./catalog-workflow-identity";
 import { operationalLog } from "./structured-log";
+import { workflowInstanceNotFound } from "./workflow-instance-status";
 
 interface CatalogCandidate {
   readonly kind: "validation" | "publish";
@@ -94,8 +95,11 @@ async function deliverCatalogWorkflow(env: WasmOjWorkerEnv, parameters: CatalogW
   try {
     status = await (await env.CATALOG_WORKFLOW.get(workflowId)).status();
   } catch (error) {
-    await recordDeferred(error instanceof Error ? error.message : "workflow-status-failed", false);
-    return;
+    if (workflowInstanceNotFound(error)) status = { status: "unknown" };
+    else {
+      await recordDeferred(error instanceof Error ? error.message : "workflow-status-failed", false);
+      return;
+    }
   }
   if (status.status !== "unknown") {
     await markDelivered(false);
@@ -113,8 +117,10 @@ async function deliverCatalogWorkflow(env: WasmOjWorkerEnv, parameters: CatalogW
         return;
       }
     } catch (statusError) {
-      await recordDeferred(statusError instanceof Error ? statusError.message : "workflow-status-failed", false);
-      return;
+      if (!workflowInstanceNotFound(statusError)) {
+        await recordDeferred(statusError instanceof Error ? statusError.message : "workflow-status-failed", false);
+        return;
+      }
     }
     await recordDeferred(createError instanceof Error ? createError.message : "workflow-create-failed", true);
   }

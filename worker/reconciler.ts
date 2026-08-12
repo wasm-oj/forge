@@ -12,6 +12,7 @@ import {
 import { operationalLog } from "./structured-log";
 import { prepareSubmissionEventInsert } from "./submission-events";
 import { reconcileAdmittingSubmission, tombstoneSubmissionSource } from "./submissions";
+import { workflowInstanceNotFound } from "./workflow-instance-status";
 
 const HOUR_MS = 60 * 60 * 1_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -151,8 +152,13 @@ async function workflowAlreadyExists(
         row.catalog_validation_job_id ?? row.catalog_publish_job_id
       }`,
     );
-  const status = await workflow.status();
-  return status.status !== "unknown";
+  try {
+    const status = await workflow.status();
+    return status.status !== "unknown";
+  } catch (error) {
+    if (workflowInstanceNotFound(error)) return false;
+    throw error;
+  }
 }
 
 async function markOutboxDelivered(env: WasmOjWorkerEnv, id: string, now: string): Promise<void> {

@@ -3,6 +3,7 @@ import type { WasmOjWorkerEnv } from "./env";
 import { prepareSubmissionEventInsert } from "./submission-events";
 import type { SubmissionWorkflowParameters } from "./submission-workflow-identity";
 import { operationalLog } from "./structured-log";
+import { workflowInstanceNotFound } from "./workflow-instance-status";
 
 interface ClaimedSubmission {
   readonly id: string;
@@ -93,8 +94,11 @@ async function deliverClaimedSubmission(env: WasmOjWorkerEnv, claimed: ClaimedSu
   try {
     status = await (await env.SUBMISSION_WORKFLOW.get(claimed.id)).status();
   } catch (error) {
-    await recordDeferred(error, false);
-    return;
+    if (workflowInstanceNotFound(error)) status = { status: "unknown" };
+    else {
+      await recordDeferred(error, false);
+      return;
+    }
   }
   if (status.status !== "unknown") {
     await markDelivered(false);
@@ -112,8 +116,10 @@ async function deliverClaimedSubmission(env: WasmOjWorkerEnv, claimed: ClaimedSu
         return;
       }
     } catch (statusError) {
-      await recordDeferred(statusError, false);
-      return;
+      if (!workflowInstanceNotFound(statusError)) {
+        await recordDeferred(statusError, false);
+        return;
+      }
     }
     await recordDeferred(createError, true);
   }
