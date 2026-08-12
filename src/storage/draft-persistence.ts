@@ -46,8 +46,14 @@ export class DraftPersistenceController {
   ) {
     this.persist = persist;
     this.debounceMs = nonNegativeInteger(options.debounceMs ?? 350, "draft debounce");
-    this.setTimer = options.setTimer ?? setTimeout;
-    this.clearTimer = options.clearTimer ?? clearTimeout;
+    const setTimer = options.setTimer;
+    const clearTimer = options.clearTimer;
+    this.setTimer = setTimer
+      ? (callback, milliseconds) => setTimer(callback, milliseconds)
+      : (callback, milliseconds) => globalThis.setTimeout(callback, milliseconds);
+    this.clearTimer = clearTimer
+      ? (timer) => clearTimer(timer)
+      : (timer) => globalThis.clearTimeout(timer);
   }
 
   snapshot(): DraftPersistenceState {

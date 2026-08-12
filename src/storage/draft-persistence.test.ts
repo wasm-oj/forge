@@ -32,6 +32,35 @@ function project(updatedAt: number, content = `revision ${updatedAt}`): Project 
 }
 
 describe("DraftPersistenceController", () => {
+  it("preserves the browser receiver when using global timer functions", () => {
+    const timer = { id: "draft-debounce" } as unknown as ReturnType<typeof setTimeout>;
+    let scheduled = 0;
+    let cleared = 0;
+
+    vi.stubGlobal("setTimeout", function browserSetTimeout(this: unknown) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      scheduled += 1;
+      return timer;
+    });
+    vi.stubGlobal("clearTimeout", function browserClearTimeout(this: unknown, value: unknown) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      expect(value).toBe(timer);
+      cleared += 1;
+    });
+
+    try {
+      const controller = new DraftPersistenceController(async () => undefined);
+      controller.update(project(2));
+      controller.update(project(3));
+
+      expect(scheduled).toBe(2);
+      expect(cleared).toBe(1);
+      expect(controller.snapshot()).toMatchObject({ phase: "dirty", revision: 2, persistedRevision: 0 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("debounces edits and persists an immutable snapshot", async () => {
     vi.useFakeTimers();
     try {
