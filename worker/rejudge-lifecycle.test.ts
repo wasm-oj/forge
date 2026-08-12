@@ -52,7 +52,9 @@ class SqliteD1 {
 
 class WorkflowNamespace {
   status = "complete";
+  missing = false;
   async get(): Promise<{ status(): Promise<{ readonly status: string }> }> {
+    if (this.missing) throw new Error("(instance.not_found) Instance not found");
     return { status: async () => ({ status: this.status }) };
   }
 }
@@ -143,6 +145,16 @@ describe("rejudge v2 lifecycle", () => {
     expect(rejudgeWorkflowNeedsInfrastructureRepair({ status: "unknown", submissionUpdatedAt: "2026-08-09T07:55:00.000Z", now })).toBe(false);
     expect(rejudgeWorkflowNeedsInfrastructureRepair({ status: "unknown", submissionUpdatedAt: "2026-08-09T07:50:00.000Z", now })).toBe(true);
     expect(rejudgeWorkflowNeedsInfrastructureRepair({ status: "complete", submissionUpdatedAt: NOW, now })).toBe(true);
+  });
+
+  it("applies the unknown grace policy when the Workflow namespace reports instance.not_found", async () => {
+    const { database, env, workflow } = recoveryFixture("2026-08-09T07:40:00.000Z");
+    workflow.missing = true;
+    await expect(repairDispatchedRejudgeJobs(env)).resolves.toBe(1);
+    expect(database.prepare("SELECT state FROM submissions WHERE id=?").get(CHILD_ID))
+      .toEqual({ state: "infrastructure-error" });
+    expect(database.prepare("SELECT state, result_state FROM rejudge_jobs WHERE id=?").get(JOB_ID))
+      .toEqual({ state: "failed", result_state: "infrastructure-error" });
   });
 
   it("materializes A(same digest)→B→C from physical A while preserving the origin and source ID", () => {

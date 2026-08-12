@@ -43,7 +43,10 @@ class SqliteD1 {
   }
 }
 
-function fixture(status: () => Promise<{ readonly status: string }>) {
+function fixture(
+  status: () => Promise<{ readonly status: string }>,
+  get = vi.fn(async () => ({ status })),
+) {
   const database = new DatabaseSync(":memory:");
   database.exec(`CREATE TABLE submissions (
       id TEXT PRIMARY KEY, state TEXT NOT NULL, verdict TEXT, score REAL,
@@ -72,7 +75,7 @@ function fixture(status: () => Promise<{ readonly status: string }>) {
     database,
     env: {
       DB: new SqliteD1(database) as unknown as D1Database,
-      SUBMISSION_WORKFLOW: { get: vi.fn(async () => ({ status })) },
+      SUBMISSION_WORKFLOW: { get },
     } as unknown as WasmOjWorkerEnv,
   };
 }
@@ -99,6 +102,16 @@ describe("workflow outbox lost-ack reconciliation", () => {
     await expect(reconcilePendingOutbox(env)).resolves.toBe(1);
     expect(database.prepare("SELECT state, attempts, last_error, settled_at IS NOT NULL AS settled FROM workflow_outbox").get())
       .toEqual({ state: "failed", attempts: 20, last_error: "workflow-delivery-exhausted", settled: 1 });
+    expect(database.prepare("SELECT state, verdict FROM submissions").get())
+      .toEqual({ state: "infrastructure-error", verdict: "judge-error" });
+  });
+
+  it("treats get instance.not_found as explicit unknown before exhausting attempts", async () => {
+    const get = vi.fn(async () => { throw new Error("(instance.not_found) Instance not found"); });
+    const { database, env } = fixture(async () => ({ status: "running" }), get);
+    await expect(reconcilePendingOutbox(env)).resolves.toBe(1);
+    expect(database.prepare("SELECT state, attempts, last_error FROM workflow_outbox").get())
+      .toEqual({ state: "failed", attempts: 20, last_error: "workflow-delivery-exhausted" });
     expect(database.prepare("SELECT state, verdict FROM submissions").get())
       .toEqual({ state: "infrastructure-error", verdict: "judge-error" });
   });

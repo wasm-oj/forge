@@ -2,7 +2,7 @@ import capacity from "../config/capacity.json";
 import type { WasmOjWorkerEnv } from "./env";
 import type { CatalogWorkflowParameters } from "./catalog-workflow-identity";
 import { operationalLog } from "./structured-log";
-import { workflowInstanceNotFound } from "./workflow-instance-status";
+import { workflowStatusOrUnknown } from "./workflow-instance-status";
 
 interface CatalogCandidate {
   readonly kind: "validation" | "publish";
@@ -93,13 +93,10 @@ async function deliverCatalogWorkflow(env: WasmOjWorkerEnv, parameters: CatalogW
 
   let status: { readonly status: string };
   try {
-    status = await (await env.CATALOG_WORKFLOW.get(workflowId)).status();
+    status = await workflowStatusOrUnknown(env.CATALOG_WORKFLOW, workflowId);
   } catch (error) {
-    if (workflowInstanceNotFound(error)) status = { status: "unknown" };
-    else {
-      await recordDeferred(error instanceof Error ? error.message : "workflow-status-failed", false);
-      return;
-    }
+    await recordDeferred(error instanceof Error ? error.message : "workflow-status-failed", false);
+    return;
   }
   if (status.status !== "unknown") {
     await markDelivered(false);
@@ -111,16 +108,14 @@ async function deliverCatalogWorkflow(env: WasmOjWorkerEnv, parameters: CatalogW
     await markDelivered(true);
   } catch (createError) {
     try {
-      const observed = await (await env.CATALOG_WORKFLOW.get(workflowId)).status();
+      const observed = await workflowStatusOrUnknown(env.CATALOG_WORKFLOW, workflowId);
       if (observed.status !== "unknown") {
         await markDelivered(true);
         return;
       }
     } catch (statusError) {
-      if (!workflowInstanceNotFound(statusError)) {
-        await recordDeferred(statusError instanceof Error ? statusError.message : "workflow-status-failed", false);
-        return;
-      }
+      await recordDeferred(statusError instanceof Error ? statusError.message : "workflow-status-failed", false);
+      return;
     }
     await recordDeferred(createError instanceof Error ? createError.message : "workflow-create-failed", true);
   }
