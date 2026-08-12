@@ -47,20 +47,32 @@ const OBSERVED_LEGACY_PREFIX_ROLES = Object.freeze([
 ]);
 const CONDITIONAL_JUDGE_PACKAGE_PREFIX = "judge-packages/v1/";
 
-export const LEGACY_R2_INVENTORY_SQL = `SELECT role, object_key FROM (
-  SELECT 'legacy-release-manifest' AS role, manifest_r2_key AS object_key FROM forge_releases
-  UNION ALL SELECT 'legacy-import-archive', archive_r2_key FROM collection_imports
-  UNION ALL SELECT 'legacy-validation-report', validation_report_r2_key FROM collection_imports
-  UNION ALL SELECT 'legacy-canonical-source', canonical_source_r2_key FROM collection_imports
-  UNION ALL SELECT 'legacy-canonical-object', object_key FROM collection_import_objects
-  UNION ALL SELECT 'legacy-canonical-object', object_key FROM canonical_object_gc
-  UNION ALL SELECT 'legacy-public-projection', public_projection_r2_key FROM managed_problem_versions
-  UNION ALL SELECT 'legacy-judge-projection', judge_projection_r2_key FROM managed_problem_versions
-  UNION ALL SELECT 'legacy-submission-source', source_r2_key FROM submissions
-  UNION ALL SELECT 'legacy-attempt-audit', audit_r2_key FROM submission_attempts
-  UNION ALL SELECT 'legacy-erasure-receipt', deletion_receipt_r2_key FROM account_erasure_jobs
-  UNION ALL SELECT 'legacy-erasure-receipt', deletion_receipt_r2_key FROM erased_user_tombstones
-) WHERE object_key IS NOT NULL ORDER BY object_key, role`;
+export const LEGACY_R2_INVENTORY_QUERIES = Object.freeze([
+  `SELECT 'legacy-release-manifest' AS role, manifest_r2_key AS object_key
+    FROM forge_releases WHERE manifest_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-import-archive' AS role, archive_r2_key AS object_key
+    FROM collection_imports WHERE archive_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-validation-report' AS role, validation_report_r2_key AS object_key
+    FROM collection_imports WHERE validation_report_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-canonical-source' AS role, canonical_source_r2_key AS object_key
+    FROM collection_imports WHERE canonical_source_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-canonical-object' AS role, object_key
+    FROM collection_import_objects WHERE object_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-canonical-object' AS role, object_key
+    FROM canonical_object_gc WHERE object_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-public-projection' AS role, public_projection_r2_key AS object_key
+    FROM managed_problem_versions WHERE public_projection_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-judge-projection' AS role, judge_projection_r2_key AS object_key
+    FROM managed_problem_versions WHERE judge_projection_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-submission-source' AS role, source_r2_key AS object_key
+    FROM submissions WHERE source_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-attempt-audit' AS role, audit_r2_key AS object_key
+    FROM submission_attempts WHERE audit_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-erasure-receipt' AS role, deletion_receipt_r2_key AS object_key
+    FROM account_erasure_jobs WHERE deletion_receipt_r2_key IS NOT NULL ORDER BY object_key, role`,
+  `SELECT 'legacy-erasure-receipt' AS role, deletion_receipt_r2_key AS object_key
+    FROM erased_user_tombstones WHERE deletion_receipt_r2_key IS NOT NULL ORDER BY object_key, role`,
+]);
 
 export const CURRENT_ERASURE_RECEIPTS_SQL = `SELECT record_kind, record_id, receipt_json, receipt_sha256 FROM (
   SELECT 'job' AS record_kind, id AS record_id, receipt_json, receipt_sha256
@@ -422,17 +434,26 @@ function requireResetToken() {
   );
 }
 
+export function collectLegacyR2InventoryRows(executeQuery) {
+  if (typeof executeQuery !== "function") throw new TypeError("R2 inventory query executor is required.");
+  return LEGACY_R2_INVENTORY_QUERIES.flatMap((query, index) => (
+    rowsFromWranglerJson(executeQuery(query, index), `R2 inventory query ${index + 1}`)
+  ));
+}
+
 async function inventory(values) {
-  const stdout = runWrangler([
-    "d1", "execute", values.database, "--remote", "--config", values.config,
-    "--json", "--command", LEGACY_R2_INVENTORY_SQL,
-  ]);
+  const rows = collectLegacyR2InventoryRows((query) => (
+    runWrangler([
+      "d1", "execute", values.database, "--remote", "--config", values.config,
+      "--json", "--command", query,
+    ])
+  ));
   const observedObjects = await listRemoteR2Objects({
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     bucket: values.bucket,
     apiToken: process.env.CLOUDFLARE_API_TOKEN,
   });
-  const manifest = buildLegacyR2Inventory(rowsFromWranglerJson(stdout, "R2 inventory query"), {
+  const manifest = buildLegacyR2Inventory(rows, {
     bucket: values.bucket,
     generatedAt: new Date().toISOString(),
     observedObjects,
