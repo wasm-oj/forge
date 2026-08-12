@@ -112,7 +112,7 @@ test("selects exactly one linux/amd64 child from an OCI index", async () => {
   }
 });
 
-test("rejects a stale expected digest and malformed Wrangler credentials", async () => {
+test("rejects a stale expected digest and validates current Wrangler credential metadata", async () => {
   const parent = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-oci-mismatch-test-"));
   const { manifest } = imageDocuments();
   try {
@@ -123,8 +123,29 @@ test("rejects a stale expected digest and malformed Wrangler credentials", async
       outputDirectory: path.join(parent, "evidence"),
       fetchImpl: async () => response(manifest, "application/vnd.oci.image.manifest.v1+json"),
     }), /resolved to .* expected/u);
-    assert.deepEqual(parseRegistryCredentials('{"password":"p","username":"v1"}\n'), { password: "p", username: "v1" });
-    assert.throws(() => parseRegistryCredentials('{"password":"p"}'), /incomplete/u);
+    const accountId = "1".repeat(32);
+    const credentials = JSON.stringify({
+      account_id: accountId,
+      password: "p",
+      registry_host: "registry.cloudflare.com",
+      username: "v1",
+    });
+    assert.deepEqual(
+      parseRegistryCredentials(credentials, "registry.cloudflare.com"),
+      { password: "p", username: "v1" },
+    );
+    assert.throws(
+      () => parseRegistryCredentials(credentials, "another.registry.example"),
+      /invalid registry credential metadata/u,
+    );
+    assert.throws(
+      () => parseRegistryCredentials(credentials.replace(accountId, "A".repeat(32)), "registry.cloudflare.com"),
+      /invalid registry credential metadata/u,
+    );
+    assert.throws(
+      () => parseRegistryCredentials('{"password":"p","username":"v1"}', "registry.cloudflare.com"),
+      /invalid registry credential metadata/u,
+    );
   } finally {
     await rm(parent, { recursive: true, force: true });
   }

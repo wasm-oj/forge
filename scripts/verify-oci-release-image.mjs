@@ -12,7 +12,7 @@ import { resolveOciTag } from "./oci-release-image.mjs";
 
 const run = promisify(execFile);
 
-export function parseRegistryCredentials(bytes) {
+export function parseRegistryCredentials(bytes, expectedRegistryHost) {
   let value;
   try {
     value = JSON.parse(Buffer.from(bytes).toString("utf8"));
@@ -23,13 +23,20 @@ export function parseRegistryCredentials(bytes) {
     !value
     || typeof value !== "object"
     || Array.isArray(value)
-    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(["password", "username"])
+    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([
+      "account_id", "password", "registry_host", "username",
+    ])
+    || typeof expectedRegistryHost !== "string"
+    || expectedRegistryHost.length < 1
+    || typeof value.account_id !== "string"
+    || !/^[0-9a-f]{32}$/u.test(value.account_id)
+    || value.registry_host !== expectedRegistryHost
     || typeof value.username !== "string"
     || value.username.length < 1
     || typeof value.password !== "string"
     || value.password.length < 1
-  ) throw new TypeError("Wrangler returned incomplete registry credentials.");
-  return value;
+  ) throw new TypeError("Wrangler returned invalid registry credential metadata.");
+  return { password: value.password, username: value.username };
 }
 
 async function cloudflareRegistryCredentials(config, registry) {
@@ -42,7 +49,7 @@ async function cloudflareRegistryCredentials(config, registry) {
     env: { ...process.env, NO_COLOR: "1" },
     maxBuffer: 1024 * 1024,
   });
-  return parseRegistryCredentials(stdout);
+  return parseRegistryCredentials(stdout, registry);
 }
 
 function usage() {
