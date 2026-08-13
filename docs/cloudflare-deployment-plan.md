@@ -69,7 +69,7 @@ digest. SBOM, audit, and tests remain required explicit evidence files.
 
 An Owner starts **Deploy Cloudflare production** manually. The workflow installs the pinned Node
 and pnpm versions, validates and binds the release coordinates, typechecks, builds, applies
-non-reset migrations, deploys, and verifies
+non-reset migrations, deploys, waits for the exact Submission Container rollout, and verifies
 `/api/health/live` and `/api/health/ready`.
 
 The committed production config contains release placeholders, never a previous release ID or
@@ -88,6 +88,15 @@ window. Before applying even a non-reset migration, the production migration pre
 `wasm_oj_active_releases` to the non-revoked immutable manifest in `wasm_oj_releases` and requires
 that D1 ID/digest pair to exactly match the rendered config. A candidate that has not already been
 activated therefore fails before the first Cloudflare mutation.
+
+`scripts/wait-container-rollout.mjs` runs immediately after `wrangler deploy` and before health
+checks. It reads the digest-pinned image from the rendered Worker config, then polls the pinned
+Wrangler JSON interface for at most 15 minutes. Two consecutive observations must agree on the
+application ID, exact image and generated application version; report `ready`; have every reported
+application instance healthy with zero active, assigned, stopped, failed, scheduling, or starting
+instances; and have no live Durable Object placement on an older version. Lookup or status errors
+remain pending only within that bound, then fail closed. The successful receipt is retained with
+the release OCI evidence.
 
 `scripts/production-migrations.mjs normal` first proves that `0017_architecture_reset.sql` is
 already present in D1's migration ledger. Before the one-time cutover it fails closed. It never
@@ -123,13 +132,16 @@ then executes this fail-closed sequence:
    token, and that 0017 is the only pending migration. Only then apply the reset.
 6. Deploy the v2 Worker, Submission Workflow, Catalog Workflow, and Submission Container using the
    release ID, canonical manifest digest, and digest-pinned Container reference from that request.
-7. Submit the already-validated canonical activation request to
+7. Before activation, require `scripts/wait-container-rollout.mjs` to prove the digest-pinned
+   Container application is terminal, fully healthy, and free of a live older application version.
+   Preserve its receipt in the cutover evidence.
+8. Submit the already-validated canonical activation request to
    `POST /api/admin/releases/activate`. D1 inserts or verifies the immutable release manifest and
    performs an expected-current environment-pointer CAS in one batch; the endpoint also requires
    the manifest identity to match the deployed Worker. The environment pointer is the sole active
    release authority.
-8. Verify liveness and readiness while formal mutations remain paused.
-9. Preserve the inventory, tombstone receipt, activation request, and response as a 30-day GitHub
+9. Verify liveness and readiness while formal mutations remain paused.
+10. Preserve the inventory, tombstone receipt, rollout receipt, activation request, and response as a 30-day GitHub
    artifact named with the cutover run ID.
 
 If any step fails, the maintenance gate remains closed. Correct the cause and deploy forward; do not
