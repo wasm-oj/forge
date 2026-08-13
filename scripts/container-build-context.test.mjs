@@ -41,3 +41,31 @@ test("judge Dockerfile fails closed if generated state still enters the context"
   assert.match(audit, /-name '\.wasm-oj-build-\*'/u);
   assert.match(audit, /-lname '\*\/tmp\/\*'/u);
 });
+
+test("judge image exposes its immutable runtime graph to wasmoj before committing the image", async () => {
+  const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
+  const grantReadIndex = dockerfile.indexOf("chmod -R a+rX /app");
+  const removeWriteIndex = dockerfile.indexOf("chmod -R a-w /app");
+  const runtimeSmokeIndex = dockerfile.indexOf("runuser -u wasmoj -- node --input-type=module");
+  const finalUserIndex = dockerfile.indexOf("USER wasmoj");
+
+  assert.ok(grantReadIndex >= 0, "the copied runtime tree must be readable and traversable by wasmoj");
+  assert.ok(removeWriteIndex > grantReadIndex, "read/traverse repair must happen before the immutable write fence");
+  assert.ok(runtimeSmokeIndex > removeWriteIndex, "runtime imports must execute after permission hardening");
+  assert.ok(finalUserIndex > runtimeSmokeIndex, "runtime imports must execute during the image build");
+
+  const runtimeSmoke = dockerfile.slice(runtimeSmokeIndex, finalUserIndex);
+  for (const packageName of [
+    "@wasm-oj/core",
+    "@wasm-oj/server",
+    "@wasm-oj/toolchain-clang",
+    "@wasm-oj/toolchain-go",
+    "@wasm-oj/toolchain-javascript",
+    "@wasm-oj/toolchain-python",
+    "@wasm-oj/toolchain-rust",
+  ]) {
+    assert.ok(runtimeSmoke.includes(`'${packageName}'`), `${packageName} must be imported as wasmoj`);
+  }
+  assert.match(runtimeSmoke, /loadEmbeddedContainerIdentity\(\)/u);
+  assert.doesNotMatch(runtimeSmoke, /container\/server\.mjs/u);
+});
