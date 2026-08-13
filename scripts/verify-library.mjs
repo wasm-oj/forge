@@ -253,6 +253,13 @@ async function verifyCode(definition, packedRoot, packedFiles, manifest) {
   }
   if (definition.server) {
     for (const required of [
+      "dist/server-build-stage.mjs",
+      "dist/server-runner-stage.mjs",
+      "dist/python-stage.mjs",
+      "dist/rustc-stage.mjs",
+      "dist/go-stage.mjs",
+    ]) requireFile(packedFiles, definition.name, required);
+    for (const required of [
       "crates/runtime-core/Cargo.lock",
       "crates/runtime-core/Cargo.toml",
       "crates/runtime-core/src/bin/wasm-oj-compiler.rs",

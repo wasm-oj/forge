@@ -16,7 +16,6 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
 import { deserialize } from "node:v8";
 import { gunzipSync } from "node:zlib";
 import { WASM_OJ_SCHEMAS } from "@wasm-oj/contracts";
@@ -67,6 +66,7 @@ import {
   serverToolchainDirectories,
   snapshotServerToolchainSources,
 } from "./toolchain-sources.ts";
+import { resolveServerStageDirectory, serverStageScript } from "./stage-scripts.ts";
 
 export interface ServerRunnerOptions {
   /** Native `wasm-oj-runner` executable built from `crates/runtime-core`. */
@@ -179,6 +179,7 @@ export class ServerRunner implements Runner {
   private readonly toolchains: readonly ServerToolchainSource[];
   private readonly cacheDirectory: string;
   private readonly verifiedToolchain: boolean;
+  private readonly stageDirectory: string;
   private resolvedCacheDirectory: string | undefined;
   private readonly runtimeDrivers: RuntimeDriverRegistry;
   private readonly packageCommands = new Map<string, Promise<Uint8Array>>();
@@ -201,6 +202,7 @@ export class ServerRunner implements Runner {
       assertVerifiedToolchainDistribution(options.verifiedDistribution, this.toolchains);
     }
     this.verifiedToolchain = options.verifiedDistribution !== undefined;
+    this.stageDirectory = resolveServerStageDirectory();
     this.cacheDirectory = path.resolve(options.cacheDirectory);
     assertCacheDirectoryIsNotFilesystemRoot(this.cacheDirectory);
     if (options.runtimeDrivers && options.additionalCostBaselines) {
@@ -707,7 +709,7 @@ export class ServerRunner implements Runner {
     try {
       this.assertCurrent(operation, "Server execution was cancelled before its runtime stage spawned.");
       return await new Promise<RunnerStageResult>((resolve, reject) => {
-        const script = resolveRunnerStageScript();
+        const script = serverStageScript(this.stageDirectory, SERVER_RUNNER_STAGE_SCRIPT);
         const child = spawn(
           process.execPath,
           ["--experimental-strip-types", "--disable-warning=ExperimentalWarning", script],
@@ -1233,22 +1235,6 @@ function runnerStageDiagnostic(stdout: Buffer[], stderr: Buffer[], summary: stri
   const stageDiagnostic = Buffer.concat(stderr).toString("utf8").trim()
     || Buffer.concat(stdout).toString("utf8").trim();
   return stageDiagnostic ? `${summary}\n${stageDiagnostic}` : summary;
-}
-
-function resolveRunnerStageScript(): string {
-  const modulePath = fileURLToPath(import.meta.url);
-  const moduleDirectory = path.dirname(modulePath);
-  const moduleFilename = path.basename(modulePath);
-  if (moduleFilename === "server-runner.ts" && path.basename(moduleDirectory) === "server") {
-    return path.join(moduleDirectory, SERVER_RUNNER_STAGE_SCRIPT);
-  }
-  if (moduleFilename.endsWith(".js") && path.basename(moduleDirectory) === "chunks") {
-    return path.join(path.dirname(moduleDirectory), SERVER_RUNNER_STAGE_SCRIPT);
-  }
-  if (moduleFilename === "server.js") {
-    return path.join(moduleDirectory, SERVER_RUNNER_STAGE_SCRIPT);
-  }
-  throw new Error(`Unsupported ServerRunner module layout '${modulePath}'.`);
 }
 
 function cloneRuntimeFiles(files: Record<string, Uint8Array>): Record<string, Uint8Array> {

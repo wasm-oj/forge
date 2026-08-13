@@ -16,6 +16,7 @@ try {
   const result = await withProcessKeepalive(buildServerProjectInProcess(
     {
       compilerExecutable: encoded.compilerExecutable,
+      stageDirectory: encoded.stageDirectory,
       toolchains: deserializeServerToolchainSources(encoded.toolchains),
       verifiedToolchain: encoded.verifiedToolchain === true,
     },

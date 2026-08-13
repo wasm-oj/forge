@@ -56,10 +56,11 @@ COPY --from=build /src/container/generate-identity.mjs ./container/generate-iden
 COPY --from=build /src/container/tree-digest.mjs ./container/tree-digest.mjs
 COPY --from=build /src/container/submission-result.mjs ./container/submission-result.mjs
 COPY --from=build /src/container/progress.mjs ./container/progress.mjs
+COPY --from=build /src/container/runtime-smoke.mjs ./container/runtime-smoke.mjs
 
 RUN mkdir -p /app/release \
   && chmod 0555 /app/runtime/wasm-oj-compiler /app/runtime/wasm-oj-runner \
-  && chmod 0444 /app/container/server.mjs /app/container/identity.mjs /app/container/generate-identity.mjs /app/container/tree-digest.mjs /app/container/submission-result.mjs /app/container/progress.mjs \
+  && chmod 0444 /app/container/server.mjs /app/container/identity.mjs /app/container/generate-identity.mjs /app/container/tree-digest.mjs /app/container/submission-result.mjs /app/container/progress.mjs /app/container/runtime-smoke.mjs \
   && chmod -R a+rX /app \
   && chmod -R a-w /app \
   && chmod u+w /app/release \
@@ -67,8 +68,9 @@ RUN mkdir -p /app/release \
     WASM_OJ_GIT_COMMIT="$WASM_OJ_GIT_COMMIT" \
     node /app/container/generate-identity.mjs \
   && chmod a-w /app/release /app/release/container-identity.json \
-  && runuser -u wasmoj -- node --input-type=module -e "const dependencies = ['@wasm-oj/core', '@wasm-oj/server', '@wasm-oj/toolchain-clang', '@wasm-oj/toolchain-go', '@wasm-oj/toolchain-javascript', '@wasm-oj/toolchain-python', '@wasm-oj/toolchain-rust']; await Promise.all(dependencies.map((dependency) => import(dependency))); const { loadEmbeddedContainerIdentity } = await import('/app/container/identity.mjs'); await loadEmbeddedContainerIdentity();" \
-  && runuser -u wasmoj -- node -e "const fs=require('node:fs/promises');const targets=['/app/release/container-identity.json','/app/runtime/wasm-oj-compiler','/app/runtime/wasm-oj-runner'];Promise.all(targets.flatMap((p)=>[fs.access(p,2).then(()=>{throw new Error('wasmoj can write '+p)},()=>{}),fs.unlink(p).then(()=>{throw new Error('wasmoj can delete '+p)},(error)=>{if(!['EACCES','EPERM'].includes(error.code))throw error})])).catch((error)=>{console.error(error);process.exit(1)})"
+  && runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node --input-type=module -e "const dependencies = ['@wasm-oj/core', '@wasm-oj/server', '@wasm-oj/toolchain-clang', '@wasm-oj/toolchain-go', '@wasm-oj/toolchain-javascript', '@wasm-oj/toolchain-python', '@wasm-oj/toolchain-rust']; await Promise.all(dependencies.map((dependency) => import(dependency))); const { loadEmbeddedContainerIdentity } = await import('/app/container/identity.mjs'); await loadEmbeddedContainerIdentity();" \
+  && runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node /app/container/runtime-smoke.mjs \
+  && runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node -e "const fs=require('node:fs/promises');const targets=['/app/release/container-identity.json','/app/runtime/wasm-oj-compiler','/app/runtime/wasm-oj-runner'];Promise.all(targets.flatMap((p)=>[fs.access(p,2).then(()=>{throw new Error('wasmoj can write '+p)},()=>{}),fs.unlink(p).then(()=>{throw new Error('wasmoj can delete '+p)},(error)=>{if(!['EACCES','EPERM'].includes(error.code))throw error})])).catch((error)=>{console.error(error);process.exit(1)})"
 USER wasmoj
 ENV NODE_ENV=production
 ENV HOME=/tmp
