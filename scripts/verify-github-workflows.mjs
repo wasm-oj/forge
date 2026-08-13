@@ -35,6 +35,8 @@ requireText(sources.production, "--oci-evidence release-evidence/oci/evidence.js
 requireText(sources.production, "production-release-oci-${{ github.run_id }}", "Production deployment");
 requireText(sources.production, "production-migrations.mjs normal", "Production deployment");
 requireText(sources.production, "wrangler deploy --config wrangler.quick-production.jsonc", "Production deployment");
+requireText(sources.production, "wait-container-rollout.mjs", "Production deployment");
+requireText(sources.production, "release-evidence/container-rollout.json", "Production deployment");
 requireText(sources.production, "/api/health/live", "Production deployment");
 requireText(sources.production, "/api/health/ready", "Production deployment");
 forbidText(sources.production, "wrangler d1 migrations apply", "Production deployment");
@@ -49,6 +51,7 @@ const orderedProductionSteps = [
   "configure-production-release.mjs",
   "production-migrations.mjs normal",
   "wrangler deploy --config wrangler.quick-production.jsonc",
+  "wait-container-rollout.mjs",
   "/api/health/live",
   "/api/health/ready",
 ];
@@ -80,6 +83,7 @@ const orderedCutoverSteps = [
   "production-migrations.mjs architecture-reset",
   "wrangler secret put MAINTENANCE_SMOKE_TOKEN",
   "wrangler deploy --config wrangler.quick-production.jsonc",
+  "wait-container-rollout.mjs",
   "/api/admin/releases/activate",
   "/api/health/live",
   "/api/health/ready",
@@ -100,6 +104,7 @@ requireText(sources.cutover, "--confirm-workflows-drained", "Architecture v2 cut
 requireText(sources.cutover, "architecture-reset-preflight.mjs", "Architecture v2 cutover");
 requireText(sources.cutover, "source-tombstone-receipt.json", "Architecture v2 cutover");
 requireText(sources.cutover, "wrangler secret put MAINTENANCE_SMOKE_TOKEN", "Architecture v2 cutover");
+requireText(sources.cutover, "cutover-evidence/container-rollout.json", "Architecture v2 cutover");
 forbidText(sources.cutover, "architecture-reset-r2.mjs cleanup", "Architecture v2 cutover");
 
 requireText(sources.cleanup, "actions/download-artifact@", "Architecture v2 cleanup");

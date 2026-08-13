@@ -249,6 +249,7 @@ for (const required of [
   "scripts/prepare-production-release.mjs",
   "scripts/verify-oci-release-image.mjs",
   "scripts/configure-production-release.mjs",
+  "scripts/wait-container-rollout.mjs",
   "wasm_oj_active_releases",
   "architecture-v2-production-smoke-passed",
   "enabled: true",

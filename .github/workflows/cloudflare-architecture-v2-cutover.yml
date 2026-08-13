@@ -152,6 +152,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm exec wrangler deploy --config wrangler.quick-production.jsonc
+      - name: Wait for the exact Submission Container rollout before activation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          node scripts/wait-container-rollout.mjs
+          --config wrangler.quick-production.jsonc
+          --output cutover-evidence/container-rollout.json
       - name: Atomically activate the deployed release through the Admin API
         env:
           WASM_OJ_ADMIN_SESSION: ${{ secrets.WASM_OJ_CUTOVER_ADMIN_SESSION }}
