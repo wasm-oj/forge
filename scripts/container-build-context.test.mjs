@@ -46,13 +46,15 @@ test("judge image exposes its immutable runtime graph to wasmoj before committin
   const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
   const grantReadIndex = dockerfile.indexOf("chmod -R a+rX /app");
   const removeWriteIndex = dockerfile.indexOf("chmod -R a-w /app");
-  const runtimeSmokeIndex = dockerfile.indexOf("runuser -u wasmoj -- node --input-type=module");
+  const runtimeSmokeIndex = dockerfile.indexOf("runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node --input-type=module");
+  const executionSmokeIndex = dockerfile.indexOf("runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node /app/container/runtime-smoke.mjs");
   const finalUserIndex = dockerfile.indexOf("USER wasmoj");
 
   assert.ok(grantReadIndex >= 0, "the copied runtime tree must be readable and traversable by wasmoj");
   assert.ok(removeWriteIndex > grantReadIndex, "read/traverse repair must happen before the immutable write fence");
   assert.ok(runtimeSmokeIndex > removeWriteIndex, "runtime imports must execute after permission hardening");
-  assert.ok(finalUserIndex > runtimeSmokeIndex, "runtime imports must execute during the image build");
+  assert.ok(executionSmokeIndex > runtimeSmokeIndex, "the real runtime smoke must follow immutable identity verification");
+  assert.ok(finalUserIndex > executionSmokeIndex, "the real runtime smoke must execute during the image build");
 
   const runtimeSmoke = dockerfile.slice(runtimeSmokeIndex, finalUserIndex);
   for (const packageName of [
@@ -68,4 +70,23 @@ test("judge image exposes its immutable runtime graph to wasmoj before committin
   }
   assert.match(runtimeSmoke, /loadEmbeddedContainerIdentity\(\)/u);
   assert.doesNotMatch(runtimeSmoke, /container\/server\.mjs/u);
+});
+
+test("judge image compiles and runs Python through packaged server stages as wasmoj", async () => {
+  const [dockerfile, smoke] = await Promise.all([
+    readFile(new URL("../Dockerfile", import.meta.url), "utf8"),
+    readFile(new URL("../container/runtime-smoke.mjs", import.meta.url), "utf8"),
+  ]);
+  assert.match(dockerfile, /COPY --from=build \/src\/container\/runtime-smoke\.mjs \.\/container\/runtime-smoke\.mjs/u);
+  assert.match(dockerfile, /runuser -u wasmoj -- env HOME=\/tmp NODE_ENV=production node \/app\/container\/runtime-smoke\.mjs/u);
+  assert.match(smoke, /language: "python"/u);
+  assert.match(smoke, /createServerEngine/u);
+  assert.match(smoke, /engine\.execute/u);
+  assert.match(smoke, /execution\.build\.success/u);
+  assert.match(smoke, /execution\.build\.artifact/u);
+  assert.match(smoke, /execution\.run\.code !== 0/u);
+  assert.match(smoke, /execution\.run\.termination !== "exited"/u);
+  assert.match(smoke, /execution\.run\.stdout !== EXPECTED_STDOUT/u);
+  assert.match(smoke, /engine\.dispose\(\)/u);
+  assert.match(smoke, /rm\(CACHE_DIRECTORY, \{ recursive: true, force: true \}\)/u);
 });

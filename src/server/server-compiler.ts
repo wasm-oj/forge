@@ -4,7 +4,6 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { deserialize, serialize } from "node:v8";
 import { gunzipSync } from "node:zlib";
 import { Runtime } from "@wasmer/sdk/node";
@@ -56,6 +55,11 @@ import {
   serverToolchainDirectories,
   snapshotServerToolchainSources,
 } from "./toolchain-sources.ts";
+import {
+  resolveServerStageDirectory,
+  serverStageScript,
+  type ServerStageScript,
+} from "./stage-scripts.ts";
 
 export interface ServerCompilerOptions {
   /** Native `wasm-oj-compiler` executable built from `crates/runtime-core`. */
@@ -74,12 +78,10 @@ const SERVER_STAGE_PROGRESS_LINE_LIMIT_BYTES = 1024 * 1024;
 const SERVER_BUILD_RESPONSE_LIMIT_BYTES = 256 * 1024 * 1024;
 const SERVER_BUILD_REQUEST_LIMIT_BYTES = 768 * 1024 * 1024;
 const SERVER_COMPILER_STAGE_RESPONSE_LIMIT_BYTES = 256 * 1024 * 1024;
-const SERVER_STAGE_SCRIPTS = new Set([
-  "server-build-stage.mjs",
-  "python-stage.mjs",
-  "rustc-stage.mjs",
-  "go-stage.mjs",
-]);
+interface ServerCompilerStageOptions extends ServerCompilerOptions {
+  /** @internal Canonical stage root inherited from the package entry process. */
+  stageDirectory: string;
+}
 
 interface ServerCompilerOperation {
   kind: "build" | "cache-clear";
@@ -100,13 +102,14 @@ export class ServerCompiler implements Compiler {
   private disposed = false;
   private readonly inProcess: boolean;
   private readonly verifiedToolchain: boolean;
+  private readonly stageDirectory: string;
   private readonly activeChildren = new Set<ReturnType<typeof spawn>>();
   private activeOperation: ServerCompilerOperation | undefined;
 
   constructor(options: ServerCompilerOptions);
   /** @internal */
-  constructor(options: ServerCompilerOptions, stage: typeof IN_PROCESS_STAGE);
-  constructor(options: ServerCompilerOptions, stage?: typeof IN_PROCESS_STAGE) {
+  constructor(options: ServerCompilerStageOptions, stage: typeof IN_PROCESS_STAGE);
+  constructor(options: ServerCompilerOptions | ServerCompilerStageOptions, stage?: typeof IN_PROCESS_STAGE) {
     this.compilerExecutable = path.resolve(options.compilerExecutable);
     this.toolchains = snapshotServerToolchainSources(options.toolchains);
     if (options.verifiedDistribution) {
@@ -117,6 +120,15 @@ export class ServerCompiler implements Compiler {
     }
     this.verifiedToolchain = options.verifiedDistribution !== undefined || options.verifiedToolchain === true;
     this.inProcess = stage === IN_PROCESS_STAGE;
+    if (stage === IN_PROCESS_STAGE) {
+      const inheritedStageDirectory = (options as ServerCompilerStageOptions).stageDirectory;
+      if (typeof inheritedStageDirectory !== "string" || !path.isAbsolute(inheritedStageDirectory)) {
+        throw new Error("The inherited @wasm-oj/server stage directory must be absolute.");
+      }
+      this.stageDirectory = inheritedStageDirectory;
+    } else {
+      this.stageDirectory = resolveServerStageDirectory();
+    }
   }
 
   cacheIdentity(project: Project): string {
@@ -256,6 +268,7 @@ export class ServerCompiler implements Compiler {
       this.assertCurrent(operation, "Server compilation was cancelled before its isolated stage started.");
       const encodedRequest = serialize({
         compilerExecutable: this.compilerExecutable,
+        stageDirectory: this.stageDirectory,
         toolchains: serializeServerToolchainSources(this.toolchains),
         verifiedToolchain: this.verifiedToolchain,
         project,
@@ -266,7 +279,7 @@ export class ServerCompiler implements Compiler {
       }
       await writeFile(requestPath, encodedRequest, { flag: "wx", mode: 0o600 });
       return await new Promise((resolve, reject) => {
-        const script = resolveStageScript("server-build-stage.mjs");
+        const script = serverStageScript(this.stageDirectory, "server-build-stage.mjs");
         const child = spawn(process.execPath, [
           "--experimental-strip-types",
           "--disable-warning=ExperimentalWarning",
@@ -426,7 +439,7 @@ export class ServerCompiler implements Compiler {
   }
 
   private runCompilerStage<T>(
-    scriptName: string,
+    scriptName: Exclude<ServerStageScript, "server-build-stage.mjs" | "server-runner-stage.mjs">,
     input: object,
     timeoutMs: number,
     assetPaths: readonly string[],
@@ -437,7 +450,7 @@ export class ServerCompiler implements Compiler {
     }
     this.assertCurrent(operation, "Server compilation was cancelled before its compiler stage started.");
     return new Promise((resolve, reject) => {
-      const script = resolveStageScript(scriptName);
+      const script = serverStageScript(this.stageDirectory, scriptName);
       const child = spawn(
         process.execPath,
         ["--experimental-strip-types", "--disable-warning=ExperimentalWarning", script],
@@ -578,27 +591,9 @@ function uint8View(bytes: Buffer): Uint8Array {
   return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
-function resolveStageScript(scriptName: string): string {
-  if (!SERVER_STAGE_SCRIPTS.has(scriptName)) {
-    throw new Error(`Unknown isolated server compiler stage '${scriptName}'.`);
-  }
-  const modulePath = fileURLToPath(import.meta.url);
-  const moduleDirectory = path.dirname(modulePath);
-  const moduleFilename = path.basename(modulePath);
-  let stageDirectory: string;
-  if (moduleFilename === "server-compiler.ts" && path.basename(moduleDirectory) === "server") {
-    stageDirectory = moduleDirectory;
-  } else if (moduleFilename === "server-compiler.js" && path.basename(moduleDirectory) === "chunks") {
-    stageDirectory = path.dirname(moduleDirectory);
-  } else {
-    throw new Error(`Unsupported ServerCompiler module layout '${modulePath}'.`);
-  }
-  return path.join(stageDirectory, scriptName);
-}
-
 /** @internal Entry point used only by the isolated Node compiler process. */
 export async function buildServerProjectInProcess(
-  options: ServerCompilerOptions,
+  options: ServerCompilerStageOptions,
   project: Project,
   cacheKey: string,
   onProgress: (progress: WorkerProgress) => void,

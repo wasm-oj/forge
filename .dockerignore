@@ -42,6 +42,7 @@ packages/*/*
 !container/tree-digest.mjs
 !container/submission-result.mjs
 !container/progress.mjs
+!container/runtime-smoke.mjs
 !container/output-budget.mjs
 !container/validation-budget.mjs
 
