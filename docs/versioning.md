@@ -21,9 +21,9 @@ rejected; WASM-OJ does not silently migrate or probe legacy wire formats.
 Other versions remain deliberately independent:
 
 - `@wasm-oj/contracts`, `@wasm-oj/core`, `@wasm-oj/browser`, `@wasm-oj/server`,
-  `@wasm-oj/organizer`, and `@wasm-oj/sdk` use one synchronized SDK SemVer. Compatible releases
-  may implement the same WASM-OJ contract.
-- The five `@wasm-oj/toolchain-*` packages release independently. Their descriptor declares the
+  `@wasm-oj/organizer`, `@wasm-oj/cli`, and `@wasm-oj/sdk` use one synchronized SDK SemVer.
+  Compatible releases may implement the same WASM-OJ contract.
+- The six `@wasm-oj/toolchain-*` packages release independently. Their descriptor declares the
   supported WASM-OJ contract and exact content identity.
 - Upstream compiler/runtime versions and packaging revisions participate in artifact/cache/cost
   identity without creating another protocol compatibility number.

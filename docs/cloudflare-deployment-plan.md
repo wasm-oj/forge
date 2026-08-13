@@ -129,7 +129,8 @@ then executes this fail-closed sequence:
    non-personal tombstone and read the object back byte-for-byte. The receipt binds every source key
    and the complete inventory digest.
 5. Recheck D1 quiescence, the external Workflow assertion, inventory, receipt, protected reset
-   token, and that 0017 is the only pending migration. Only then apply the reset.
+   token, and that 0017 is the first pending migration. Only then apply the reset and any later
+   exact migrations in the same guarded invocation.
 6. Deploy the v2 Worker, Submission Workflow, Catalog Workflow, and Submission Container using the
    release ID, canonical manifest digest, and digest-pinned Container reference from that request.
 7. Before activation, require `scripts/wait-container-rollout.mjs` to prove the digest-pinned

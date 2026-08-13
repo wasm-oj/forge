@@ -58,6 +58,25 @@ async function fixture() {
 describe("formal mutation resume release fence", () => {
   beforeEach(() => releaseMocks.assertActiveRelease.mockReset());
 
+  it("does not accept a CLI bearer for the browser-confirmed production control", async () => {
+    const request = new Request("https://wasm-oj.test/api/admin/formal-mutations/resume", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${"b".repeat(43)}`,
+        origin: "https://wasm-oj.test",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ reason: "architecture-v2-production-smoke-passed" }),
+    });
+    await expect(updateFormalMutationControl(request, {
+      PUBLIC_ORIGIN: "https://wasm-oj.test",
+    } as WasmOjWorkerEnv, true)).rejects.toMatchObject({
+      status: 401,
+      code: "browser-authentication-required",
+    });
+    expect(releaseMocks.assertActiveRelease).not.toHaveBeenCalled();
+  });
+
   it("refuses to reopen when D1 does not identify the deployed release", async () => {
     const { env, request, update } = await fixture();
     releaseMocks.assertActiveRelease.mockRejectedValueOnce(new Error("release mismatch"));

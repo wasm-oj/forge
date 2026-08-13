@@ -1,10 +1,28 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { eraseAccount } from "../worker/account-erasure";
+import type { WasmOjWorkerEnv } from "../worker/env";
 import { submissionSourceKey } from "../worker/submissions";
 
 const SOURCE_ID = "0198dbd3-5c00-7000-8000-000000000003";
 
 describe("account erasure privacy boundaries", () => {
+  it("requires a browser-confirmed session rather than a CLI bearer", async () => {
+    const request = new Request("https://wasm-oj.test/api/settings/account", {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${"b".repeat(43)}`,
+        origin: "https://wasm-oj.test",
+      },
+    });
+    await expect(eraseAccount(request, {
+      PUBLIC_ORIGIN: "https://wasm-oj.test",
+    } as WasmOjWorkerEnv)).rejects.toMatchObject({
+      status: 401,
+      code: "browser-authentication-required",
+    });
+  });
+
   it("keeps the permanent tombstone at the exact opaque source key", () => {
     expect(submissionSourceKey(SOURCE_ID)).toBe(`submission-sources/v2/${SOURCE_ID}`);
   });
@@ -16,7 +34,7 @@ describe("account erasure privacy boundaries", () => {
     ]);
     expect(erasure).toContain("receipt_json");
     expect(erasure).toContain("receipt_sha256");
-    expect(erasure).toMatch(/eraseAccount[\s\S]*requireMutationSession[\s\S]*requireFormalMutationsEnabled[\s\S]*env\.DB\.batch/);
+    expect(erasure).toMatch(/eraseAccount[\s\S]*requireBrowserMutationSession[\s\S]*requireFormalMutationsEnabled[\s\S]*env\.DB\.batch/);
     expect(erasure).toContain("content_sha256=NULL, bytes=NULL");
     expect(erasure).not.toContain("deletion_receipt_r2_key");
     expect(erasure).not.toContain("account-erasure/");

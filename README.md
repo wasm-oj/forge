@@ -29,6 +29,9 @@ browser server  organizer
    └────┴────┬─────┘
              ▼
        @wasm-oj/sdk
+        server ─────┐
+       organizer ───┼──▶ @wasm-oj/cli
+          core ─────┘
 ```
 
 | Package | Boundary |
@@ -38,6 +41,7 @@ browser server  organizer
 | `@wasm-oj/browser` | Browser Workers, IndexedDB/Cache Storage adapters, and `createBrowserEngine()` |
 | `@wasm-oj/server` | Node.js/Wasmer adapters, filesystem storage, native runtime processes, and `createServerEngine()` |
 | `@wasm-oj/organizer` | Static collection and immutable judge-package validation/publication; never compiles or runs reference solutions |
+| `@wasm-oj/cli` | The local-first `woj` Student/Organizer interface; explicit local runtime/toolchain commands and authenticated remote resource commands |
 | `@wasm-oj/sdk` | Convenience entrypoints that re-export the packages above without embedding duplicate copies |
 
 Compiler and runtime assets are independently versioned packages:
@@ -158,18 +162,27 @@ const engine = await createServerEngine({
 Startup verifies both executables and every declared asset. It does not search the filesystem,
 download missing files, invoke a host compiler for user code, or fall back to another distribution.
 
-## Organizer and collection CLI
+## `woj` CLI
 
-Install `@wasm-oj/organizer` in a problem repository and use its single executable:
+Install the one Student and Organizer CLI. Local commands do not authenticate or access the
+network; remote commands use browser-assisted authorization and store the resulting token only in
+the operating system credential store.
 
 ```sh
-pnpm exec wasm-oj-collection build .
-pnpm exec wasm-oj-collection validate .
-pnpm exec wasm-oj-collection verify .
+pnpm add -D @wasm-oj/cli
+pnpm exec woj organizer collection build .
+pnpm exec woj organizer collection verify .
+pnpm exec woj auth login
+pnpm exec woj organizer collection validate <collection-id> --ref <branch-tag-or-commit> --wait
 ```
 
-The Organizer boundary validates canonical schema, normalized paths, bounded byte lengths,
-digests, and deployable `WOJJDG02` judge packages. Reference solutions remain author-owned input;
+`build` and `verify` are deterministic local preflight. Remote `validate` resolves the requested ref
+once and statically validates that immutable commit; it never compiles or runs a reference
+solution. Publication and official-practice activation are separate explicit commands. See the
+[CLI journey](docs/cli.md) for the complete command tree and stable exit-code contract.
+
+The Organizer boundary checks canonical schema, normalized paths, bounded byte lengths, digests,
+and deployable `WOJJDG02` judge packages. Reference solutions remain author-owned input;
 Organizer does not compile, execute, score, benchmark, or decide whether they are correct.
 
 Official Submit is the execution boundary. It compiles a user's source inside a one-shot Container

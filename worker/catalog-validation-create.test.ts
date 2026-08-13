@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./auth", () => ({
   authenticatedSession: vi.fn(async () => undefined),
-  requireMutationSession: vi.fn(async () => ({
+  requireBrowserOrBearerMutationSession: vi.fn(async () => ({
     userId: "11111111-1111-4111-8111-111111111111",
     login: "organizer",
     avatarUrl: "https://example.test/organizer.png",

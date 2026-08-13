@@ -1,5 +1,6 @@
 import type { WasmOjWorkerEnv } from "./env";
-import { ApiError, readBoundedResponseJson } from "./http";
+import { requireBrowserMutationSession } from "./auth";
+import { ApiError, jsonResponse, readBoundedResponseJson, readJsonBody } from "./http";
 import {
   FORMAL_RISK_ALLOWANCE_MS,
   FORMAL_RISK_COST_THRESHOLD,
@@ -9,6 +10,8 @@ import {
 } from "../src/online-judge/formal-risk";
 
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const FORMAL_RISK_REQUEST_KEY = /^[0-9a-f]{64}$/;
+const MAX_CLI_TURNSTILE_REQUEST_BYTES = 1024;
 
 export function parseGithubUserAllowlist(source: string): ReadonlySet<number> {
   if (!source) return new Set();
@@ -107,11 +110,54 @@ export async function requireOfficialSubmissionRiskTurnstile(
   };
   const token = request.headers.get("x-wasm-oj-turnstile-token");
   if (!formalRiskRequiresTurnstile(signals) && token === null) return;
-  await verifyTurnstile(request, env, "official-submit");
+  try {
+    await verifyTurnstile(request, env, "official-submit");
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "turnstile-required" && request.headers.has("authorization")) {
+      const verification = new URL("/auth/cli/turnstile", env.PUBLIC_ORIGIN);
+      verification.searchParams.set("requestKey", requestKey);
+      throw new ApiError(403, "turnstile-required", error.message, {
+        requestKey,
+        verificationUrl: verification.toString(),
+      });
+    }
+    throw error;
+  }
   const expiresAt = new Date(now.getTime() + FORMAL_RISK_ALLOWANCE_MS).toISOString();
   await env.DB.prepare(
     "INSERT INTO formal_risk_allowances (user_id, request_key, expires_at, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, request_key) DO UPDATE SET expires_at=excluded.expires_at",
   ).bind(userId, requestKey, expiresAt, now.toISOString()).run();
+}
+
+function exactTurnstileAllowanceRequest(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError(400, "invalid-request", "CLI Turnstile approval must be a JSON object.");
+  }
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 1 || keys[0] !== "requestKey") {
+    throw new ApiError(400, "invalid-request", "CLI Turnstile approval has an invalid shape.");
+  }
+  const requestKey = (value as Record<string, unknown>).requestKey;
+  if (typeof requestKey !== "string" || !FORMAL_RISK_REQUEST_KEY.test(requestKey)) {
+    throw new ApiError(400, "formal-risk-request-key-invalid", "requestKey must be a lowercase SHA-256 value.");
+  }
+  return requestKey;
+}
+
+export async function approveCliOfficialSubmissionRisk(
+  request: Request,
+  env: WasmOjWorkerEnv,
+): Promise<Response> {
+  const session = await requireBrowserMutationSession(request, env);
+  const requestKey = exactTurnstileAllowanceRequest(await readJsonBody(request, MAX_CLI_TURNSTILE_REQUEST_BYTES));
+  await requireStagingFormalAccess(env, session.userId);
+  await verifyTurnstile(request, env, "official-submit");
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + FORMAL_RISK_ALLOWANCE_MS).toISOString();
+  await env.DB.prepare(
+    "INSERT INTO formal_risk_allowances (user_id, request_key, expires_at, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, request_key) DO UPDATE SET expires_at=excluded.expires_at, created_at=excluded.created_at",
+  ).bind(session.userId, requestKey, expiresAt, now.toISOString()).run();
+  return jsonResponse({ requestKey, state: "approved", expiresAt });
 }
 
 export async function cleanupExpiredFormalRiskAllowances(env: WasmOjWorkerEnv): Promise<number> {

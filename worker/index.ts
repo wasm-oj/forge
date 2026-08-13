@@ -1,7 +1,16 @@
 import handler from "vinext/server/app-router-entry";
 import { apiErrorResponse, jsonResponse } from "./http";
 import type { WasmOjWorkerEnv } from "./env";
-import { beginGithubLogin, completeGithubLogin, logout, sessionResponse } from "./auth";
+import {
+  approveCliLogin,
+  beginGithubLogin,
+  completeGithubLogin,
+  exchangeCliLoginToken,
+  getCliLoginFlow,
+  logout,
+  sessionResponse,
+  startCliLogin,
+} from "./auth";
 import {
   cancelSubmission,
   createSubmission,
@@ -24,10 +33,13 @@ import {
   contestLeaderboard,
   createContest,
   currentProfile,
+  addOrganizerContestProblem,
+  archiveOrganizerContest,
   getContest,
   getOrganizerContest,
   joinContest,
   listOrganizerContests,
+  listOrganizerContestParticipants,
   listContests,
   listProblems,
   managedProblemProjection,
@@ -35,6 +47,7 @@ import {
   problemLeaderboard,
   publicProfile,
   publishContest,
+  removeOrganizerContestProblem,
   rotateContestInviteCode,
   updateOrganizerContest,
   updateProfile,
@@ -46,6 +59,7 @@ import {
   createProblemCollection,
   getCatalogPublication,
   getCatalogValidation,
+  getProblemCollection,
   listCatalogPublications,
   listProblemCollections,
   publicProblemContent,
@@ -65,6 +79,7 @@ import { eraseAccount } from "./account-erasure";
 import { cancelRejudgeBatch, createRejudgeBatch, getRejudgeBatch, listRejudgeBatches, rejudgeOptions } from "./rejudge";
 import { withSecurityHeaders } from "./security-headers";
 import { TURNSTILE_CHALLENGE_PATH, turnstileChallengeResponse } from "./turnstile-challenge";
+import { approveCliOfficialSubmissionRisk } from "./formal-access";
 
 export { withSecurityHeaders } from "./security-headers";
 
@@ -99,6 +114,13 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   }
   if (request.method === "GET" && pathname === "/api/auth/github") return beginGithubLogin(request, env);
   if (request.method === "GET" && pathname === "/api/auth/github/callback") return completeGithubLogin(request, env);
+  if (request.method === "POST" && pathname === "/api/auth/cli/start") return startCliLogin(request, env);
+  if (request.method === "POST" && pathname === "/api/auth/cli/token") return exchangeCliLoginToken(request, env);
+  if (request.method === "POST" && pathname === "/api/auth/cli/turnstile/approve") return approveCliOfficialSubmissionRisk(request, env);
+  const cliLoginFlowId = identifier(pathname, new RegExp(`^/api/auth/cli/flows/(${UUID})$`));
+  if (request.method === "GET" && cliLoginFlowId) return getCliLoginFlow(request, env, cliLoginFlowId);
+  const approveCliLoginFlowId = identifier(pathname, new RegExp(`^/api/auth/cli/flows/(${UUID})/approve$`));
+  if (request.method === "POST" && approveCliLoginFlowId) return approveCliLogin(request, env, approveCliLoginFlowId);
   if (request.method === "GET" && pathname === "/api/auth/session") return sessionResponse(request, env);
   if (request.method === "POST" && pathname === "/api/auth/logout") return logout(request, env);
   if (request.method === "DELETE" && pathname === "/api/account") return eraseAccount(request, env);
@@ -119,6 +141,8 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   if (request.method === "GET" && pathname === "/api/organizer/github/callback") return completeGithubAppInstall(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/repositories") return listOrganizerRepositories(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/collections") return listProblemCollections(request, env);
+  const organizerCollectionId = identifier(pathname, new RegExp(`^/api/organizer/collections/(${UUID})$`));
+  if (request.method === "GET" && organizerCollectionId) return getProblemCollection(request, env, organizerCollectionId);
   if (request.method === "GET" && pathname === "/api/organizer/publications") return listCatalogPublications(request, env);
   if (request.method === "POST" && pathname === "/api/organizer/collections") return createProblemCollection(request, env);
   const validationCollectionId = identifier(pathname, new RegExp(`^/api/organizer/collections/(${UUID})/validations$`));
@@ -137,6 +161,17 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   if (request.method === "PUT" && organizerContestId) return updateOrganizerContest(request, env, organizerContestId);
   const rotateContestInviteId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/invite-code$`));
   if (request.method === "POST" && rotateContestInviteId) return rotateContestInviteCode(request, env, rotateContestInviteId);
+  const contestProblemIds = new RegExp(`^/api/organizer/contests/(${UUID})/problems/(${UUID})$`).exec(pathname);
+  if (request.method === "POST" && contestProblemIds) {
+    return addOrganizerContestProblem(request, env, contestProblemIds[1]!, contestProblemIds[2]!);
+  }
+  if (request.method === "DELETE" && contestProblemIds) {
+    return removeOrganizerContestProblem(request, env, contestProblemIds[1]!, contestProblemIds[2]!);
+  }
+  const archiveContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/archive$`));
+  if (request.method === "POST" && archiveContestId) return archiveOrganizerContest(request, env, archiveContestId);
+  const participantContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/participants$`));
+  if (request.method === "GET" && participantContestId) return listOrganizerContestParticipants(request, env, participantContestId);
   if (request.method === "GET" && pathname === "/api/organizer/rejudges/options") return rejudgeOptions(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/rejudges") return listRejudgeBatches(request, env);
   if (request.method === "POST" && pathname === "/api/organizer/rejudges") return createRejudgeBatch(request, env);

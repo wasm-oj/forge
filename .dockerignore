@@ -19,8 +19,6 @@ packages/*/*
 !packages/*/package.json
 !packages/sdk/src/
 !packages/sdk/src/**
-!packages/organizer/bin/
-!packages/organizer/bin/wasm-oj-collection.js
 
 !licenses/
 !licenses/**

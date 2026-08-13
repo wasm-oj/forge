@@ -46,6 +46,8 @@ jobs:
           npm publish release-tarballs/wasm-oj-browser-${GITHUB_REF_NAME#v}.tgz --access public
           npm publish release-tarballs/wasm-oj-server-${GITHUB_REF_NAME#v}.tgz --access public
           npm publish release-tarballs/wasm-oj-organizer-${GITHUB_REF_NAME#v}.tgz --access public
+      - name: Publish CLI
+        run: npm publish release-tarballs/wasm-oj-cli-${GITHUB_REF_NAME#v}.tgz --access public
       - name: Publish umbrella SDK
         run: npm publish release-tarballs/wasm-oj-sdk-${GITHUB_REF_NAME#v}.tgz --access public
       - env:

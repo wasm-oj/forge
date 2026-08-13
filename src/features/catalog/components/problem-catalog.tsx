@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Filter, Search, Sparkles } from "lucide-react";
+import { BookOpen, Filter, Search, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FilterField } from "../../../components/ui/filter-field";
 import { useProduct } from "../../platform/components/app-shell";
@@ -12,6 +12,18 @@ import type { CatalogProblem } from "../model/education-model";
 
 function hasCurrentLocalSamplesPassed(records: ReadonlyMap<string, LocalSamplesPassedRecord>, problem: CatalogProblem): boolean {
   return hasMatchingLocalSamplesPassed(records, problem.id, problem.contentDigest);
+}
+
+export function CatalogEmptyState({ message, clearLabel, filtered, onClear }: {
+  readonly message: string;
+  readonly clearLabel: string;
+  readonly filtered: boolean;
+  onClear(): void;
+}) {
+  return <div className="product-empty large catalog-empty-state">
+    <span>{message}</span>
+    {filtered && <button className="secondary-action" type="button" onClick={onClear}><X aria-hidden="true" size={14} />{clearLabel}</button>}
+  </div>;
 }
 
 export function ProblemCatalog() {
@@ -40,13 +52,22 @@ export function ProblemCatalog() {
           || (status === "local" && hasCurrentLocalSamplesPassed(localSamplesPassed, problem)));
     }),
   })).filter(({ problems }) => problems.length > 0);
+  const hasActiveFilters = normalizedQuery.length > 0 || collectionId !== "all" || difficulty !== "all" || topic !== "all" || status !== "all";
+
+  function clearFilters() {
+    setQuery("");
+    setCollectionId("all");
+    setDifficulty("all");
+    setTopic("all");
+    setStatus("all");
+  }
 
   const labels = locale === "zh-TW" ? {
     search: "搜尋", collection: "題庫", allCollections: "所有題庫", difficulty: "難度", topic: "主題", status: "解題狀態",
-    solved: "正式解題", local: "本機範例通過", retry: "重新載入題庫", loading: "正在載入題庫…",
+    solved: "正式解題", local: "本機範例通過", retry: "重新載入題庫", loading: "正在載入題庫…", clearAll: "清除全部篩選",
   } : {
     search: "Search", collection: "Collection", allCollections: "All collections", difficulty: "Difficulty", topic: "Topic", status: "Progress",
-    solved: "Verified solved", local: "Samples passed locally", retry: "Reload problems", loading: "Loading problems…",
+    solved: "Verified solved", local: "Samples passed locally", retry: "Reload problems", loading: "Loading problems…", clearAll: "Clear all filters",
   };
 
   return <main className="product-page" id="main-content">
@@ -66,6 +87,6 @@ export function ProblemCatalog() {
         <div className="problem-list"><div className="problem-list-head"><span /><span>#</span><span>Problem</span><span>Difficulty</span><span>Topics</span><span>Score</span><span /></div>{problems.map((problem) => <ProblemRow key={problem.id} problem={problem} collection={collection} locale={locale} localSamplesPassed={hasCurrentLocalSamplesPassed(localSamplesPassed, problem)} />)}</div>
       </section>;
     })}
-    {!loading && !error && visibleCollections.length === 0 && <div className="product-empty large">{text.empty}</div>}
+    {!loading && !error && visibleCollections.length === 0 && <CatalogEmptyState message={text.empty} clearLabel={labels.clearAll} filtered={hasActiveFilters} onClear={clearFilters} />}
   </main>;
 }

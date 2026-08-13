@@ -1,4 +1,4 @@
-import { authenticatedSession, requireMutationSession, requireSession } from "./auth";
+import { authenticatedSession, requireBrowserMutationSession, requireBrowserOrBearerMutationSession, requireSession } from "./auth";
 import { constantTimeEqual, hmacSha256Hex } from "./crypto";
 import type { WasmOjWorkerEnv } from "./env";
 import { requireOrganizer } from "./github";
@@ -199,7 +199,7 @@ export async function currentProfile(request: Request, env: WasmOjWorkerEnv): Pr
 }
 
 export async function updateProfile(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   const body = exact(await readJsonBody(request, 32 * 1024), ["displayName", "bio", "visibility"], ["websiteUrl"]);
   if (
     typeof body.displayName !== "string" || body.displayName.trim().length < 1 || body.displayName.length > 80
@@ -727,7 +727,7 @@ function contestProblemInsert(
 }
 
 export async function createContest(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   await requireOrganizer(env, session);
   const input = await contestDraftInput(request);
@@ -850,7 +850,7 @@ export async function getOrganizerContest(request: Request, env: WasmOjWorkerEnv
 }
 
 export async function updateOrganizerContest(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   await requireOrganizer(env, session);
   const input = await contestDraftInput(request);
@@ -896,7 +896,7 @@ export async function updateOrganizerContest(request: Request, env: WasmOjWorker
 }
 
 export async function rotateContestInviteCode(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   await requireOrganizer(env, session);
   const body = exact(await readJsonBody(request, 8 * 1024), ["inviteCode"]);
@@ -916,8 +916,157 @@ export async function rotateContestInviteCode(request: Request, env: WasmOjWorke
   return jsonResponse({ contestId, inviteCodeConfigured: true, updatedAt });
 }
 
+export async function addOrganizerContestProblem(
+  request: Request,
+  env: WasmOjWorkerEnv,
+  contestId: string,
+  problemVersionId: string,
+): Promise<Response> {
+  const session = await requireBrowserOrBearerMutationSession(request, env);
+  await requireStagingFormalAccess(env, session.userId);
+  await requireOrganizer(env, session);
+  exact(await readJsonBody(request, 8 * 1024), []);
+  const [problem] = await requireOwnedContestProblems(env, session.userId, [problemVersionId]);
+  await requireFormalMutationsEnabled(env, request);
+  const inserted = await env.DB.prepare(`INSERT OR IGNORE INTO contest_problems
+      (contest_id, problem_series_id, problem_version_id, ordinal)
+    SELECT contests.id, ?, ?,
+      COALESCE((SELECT MAX(ordinal) FROM contest_problems WHERE contest_id=contests.id), 0) + 1
+    FROM contests
+    WHERE contests.id=? AND contests.organizer_user_id=? AND contests.status='draft'
+      AND contests.catalog_publication_id=?
+      AND (SELECT COUNT(*) FROM contest_problems WHERE contest_id=contests.id) < 100`)
+    .bind(problem!.problem_series_id, problem!.id, contestId, session.userId, problem!.catalog_publication_id)
+    .run();
+  if (inserted.meta.changes !== 1) {
+    const contest = await env.DB.prepare(`SELECT status, catalog_publication_id,
+        (SELECT COUNT(*) FROM contest_problems WHERE contest_id=contests.id) AS problem_count,
+        EXISTS(SELECT 1 FROM contest_problems WHERE contest_id=contests.id
+          AND (problem_version_id=? OR problem_series_id=?)) AS already_present
+      FROM contests WHERE id=? AND organizer_user_id=?`)
+      .bind(problemVersionId, problem!.problem_series_id, contestId, session.userId)
+      .first<{ readonly status: string; readonly catalog_publication_id: string; readonly problem_count: number; readonly already_present: number }>();
+    if (!contest) throw new ApiError(404, "contest-not-found", "Organizer-owned contest was not found.");
+    if (contest.status !== "draft") throw new ApiError(409, "contest-not-editable", "Only contest drafts can be edited.");
+    if (contest.catalog_publication_id !== problem!.catalog_publication_id) {
+      throw new ApiError(409, "contest-publication-invalid", "The problem version is not from this contest's publication.");
+    }
+    if (contest.already_present === 1) throw new ApiError(409, "contest-problem-present", "This problem series is already in the contest.");
+    if (contest.problem_count >= 100) throw new ApiError(409, "contest-problem-limit", "A contest can contain at most 100 problems.");
+    throw new ApiError(409, "contest-state-changed", "Contest draft changed before the problem could be added.");
+  }
+  const row = await env.DB.prepare("SELECT ordinal FROM contest_problems WHERE contest_id=? AND problem_version_id=?")
+    .bind(contestId, problemVersionId).first<{ readonly ordinal: number }>();
+  if (!row) throw new Error("Inserted contest problem could not be read back.");
+  return jsonResponse({ contestId, problemVersionId, ordinal: row.ordinal, changed: true });
+}
+
+export async function removeOrganizerContestProblem(
+  request: Request,
+  env: WasmOjWorkerEnv,
+  contestId: string,
+  problemVersionId: string,
+): Promise<Response> {
+  const session = await requireBrowserOrBearerMutationSession(request, env);
+  await requireStagingFormalAccess(env, session.userId);
+  await requireOrganizer(env, session);
+  exact(await readJsonBody(request, 8 * 1024), []);
+  await requireFormalMutationsEnabled(env, request);
+  const removed = await env.DB.prepare(`DELETE FROM contest_problems
+    WHERE contest_id=? AND problem_version_id=?
+      AND EXISTS (SELECT 1 FROM contests WHERE id=? AND organizer_user_id=? AND status='draft')`)
+    .bind(contestId, problemVersionId, contestId, session.userId).run();
+  if (removed.meta.changes === 1) return jsonResponse({ contestId, problemVersionId, changed: true });
+  const contest = await env.DB.prepare("SELECT status FROM contests WHERE id=? AND organizer_user_id=?")
+    .bind(contestId, session.userId).first<{ readonly status: string }>();
+  if (!contest) throw new ApiError(404, "contest-not-found", "Organizer-owned contest was not found.");
+  if (contest.status !== "draft") throw new ApiError(409, "contest-not-editable", "Only contest drafts can be edited.");
+  return jsonResponse({ contestId, problemVersionId, changed: false });
+}
+
+export async function archiveOrganizerContest(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
+  const session = await requireBrowserOrBearerMutationSession(request, env);
+  await requireStagingFormalAccess(env, session.userId);
+  await requireOrganizer(env, session);
+  exact(await readJsonBody(request, 8 * 1024), []);
+  await requireFormalMutationsEnabled(env, request);
+  const now = new Date().toISOString();
+  const result = await env.DB.prepare(`UPDATE contests SET status='archived', updated_at=?
+    WHERE id=? AND organizer_user_id=?
+      AND (status='draft' OR (status='published' AND ends_at<=?))`)
+    .bind(now, contestId, session.userId, now).run();
+  if (result.meta.changes === 1) {
+    return jsonResponse({ contestId, status: "archived", changed: true, updatedAt: now });
+  }
+  const current = await env.DB.prepare("SELECT status FROM contests WHERE id=? AND organizer_user_id=?")
+    .bind(contestId, session.userId).first<{ readonly status: string }>();
+  if (!current) throw new ApiError(404, "contest-not-found", "Organizer-owned contest was not found.");
+  if (current.status === "archived") {
+    return jsonResponse({ contestId, status: "archived", changed: false });
+  }
+  throw new ApiError(409, "contest-not-archivable", "A published contest can be archived only after it ends.");
+}
+
+export async function listOrganizerContestParticipants(
+  request: Request,
+  env: WasmOjWorkerEnv,
+  contestId: string,
+): Promise<Response> {
+  const session = await requireSession(request, env);
+  await requireOrganizer(env, session);
+  const owned = await env.DB.prepare("SELECT 1 AS present FROM contests WHERE id=? AND organizer_user_id=?")
+    .bind(contestId, session.userId).first<{ readonly present: number }>();
+  if (!owned) throw new ApiError(404, "contest-not-found", "Organizer-owned contest was not found.");
+  const url = new URL(request.url);
+  const participantQueryKeys = new Set(["limit", "afterJoinedAt", "afterUserId"]);
+  for (const key of new Set(url.searchParams.keys())) {
+    if (!participantQueryKeys.has(key) || url.searchParams.getAll(key).length !== 1) {
+      throw new ApiError(400, "contest-participant-cursor-invalid", "Participant query has an invalid shape.");
+    }
+  }
+  const rawLimit = url.searchParams.get("limit") ?? "100";
+  if (!/^[1-9]\d{0,2}$/u.test(rawLimit)) {
+    throw new ApiError(400, "contest-participant-cursor-invalid", "Participant limit must be an integer from 1 to 100.");
+  }
+  const limit = Number(rawLimit);
+  if (limit > 100) throw new ApiError(400, "contest-participant-cursor-invalid", "Participant limit must be an integer from 1 to 100.");
+  const afterJoinedAt = url.searchParams.get("afterJoinedAt");
+  const afterUserId = url.searchParams.get("afterUserId");
+  if ((afterJoinedAt === null) !== (afterUserId === null)) {
+    throw new ApiError(400, "contest-participant-cursor-invalid", "Both participant cursor fields are required together.");
+  }
+  if (afterJoinedAt !== null && (
+    Number.isNaN(Date.parse(afterJoinedAt))
+    || new Date(afterJoinedAt).toISOString() !== afterJoinedAt
+    || !afterUserId
+    || !UUID_PATTERN.test(afterUserId)
+  )) {
+    throw new ApiError(400, "contest-participant-cursor-invalid", "Participant cursor is invalid.");
+  }
+  const rows = afterJoinedAt === null
+    ? await env.DB.prepare(`SELECT user_id, joined_at FROM contest_participants
+      WHERE contest_id=? ORDER BY joined_at, user_id LIMIT ?`)
+      .bind(contestId, limit + 1).all<{ readonly user_id: string; readonly joined_at: string }>()
+    : await env.DB.prepare(`SELECT user_id, joined_at FROM contest_participants
+      WHERE contest_id=? AND (joined_at>? OR (joined_at=? AND user_id>?))
+      ORDER BY joined_at, user_id LIMIT ?`)
+      .bind(contestId, afterJoinedAt, afterJoinedAt, afterUserId, limit + 1)
+      .all<{ readonly user_id: string; readonly joined_at: string }>();
+  const page = rows.results.slice(0, limit);
+  const identities = await leaderboardParticipants(env, page.map((row) => row.user_id));
+  const last = rows.results.length > limit ? page.at(-1) : undefined;
+  return jsonResponse({
+    participants: page.map((row) => ({
+      participant: identities.get(row.user_id)
+        ?? { id: "participant-unavailable", kind: "anonymous", label: "Private participant" },
+      joinedAt: row.joined_at,
+    })),
+    nextCursor: last ? { afterJoinedAt: last.joined_at, afterUserId: last.user_id } : null,
+  }, 200, { "cache-control": "private, no-store" });
+}
+
 export async function publishContest(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   await requireOrganizer(env, session);
   await requireFormalMutationsEnabled(env, request);
@@ -930,7 +1079,7 @@ export async function publishContest(request: Request, env: WasmOjWorkerEnv, con
 }
 
 export async function joinContest(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireFormalMutationsEnabled(env, request);
   const body = exact(await readJsonBody(request, 8 * 1024), [], ["inviteCode"]);
   const contest = await env.DB.prepare("SELECT access_mode, invite_code_hash, status, ends_at FROM contests WHERE id=?")

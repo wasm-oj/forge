@@ -8,6 +8,7 @@ COPY packages/core/package.json ./packages/core/package.json
 COPY packages/browser/package.json ./packages/browser/package.json
 COPY packages/server/package.json ./packages/server/package.json
 COPY packages/organizer/package.json ./packages/organizer/package.json
+COPY packages/cli/package.json ./packages/cli/package.json
 COPY packages/sdk/package.json ./packages/sdk/package.json
 COPY packages/toolchain-clang/package.json ./packages/toolchain-clang/package.json
 COPY packages/toolchain-rust/package.json ./packages/toolchain-rust/package.json

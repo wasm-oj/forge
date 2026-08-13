@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { link, mkdtemp, mkdir, readFile, rename, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -28,12 +28,30 @@ async function digest(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.slice().buffer)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+async function writeBasicCollection(root: string): Promise<void> {
+  await mkdir(path.join(root, "authoring"), { recursive: true });
+  await mkdir(path.join(root, "statements"), { recursive: true });
+  await mkdir(path.join(root, "collection"), { recursive: true });
+  const problem = PROBLEMS[0]!;
+  await writeFile(path.join(root, "authoring/problem.json"), JSON.stringify({ problem, schema: BROWSER_PROBLEM_SCHEMA }));
+  await writeFile(path.join(root, "statements/problem.en.md"), "# Example\n");
+  await writeFile(path.join(root, "statements/problem.zh-TW.md"), "# 範例\n");
+  await writeFile(path.join(root, "collection/source.json"), JSON.stringify({
+    schema: "wasm-oj-browser-collection-source-v1",
+    localization: { defaultLocale: "zh-TW", supportedLocales: ["zh-TW", "en"] },
+    problems: [{
+      statementPaths: { "zh-TW": "statements/problem.zh-TW.md", en: "statements/problem.en.md" },
+      bundlePath: "authoring/problem.json",
+    }],
+  }));
+}
+
 afterEach(async () => {
   vi.restoreAllMocks();
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
-describe("wasm-oj-collection CLI", () => {
+describe("woj Organizer collection commands", () => {
   it("consumes the shared WOJJDG02 v2 golden vector", async () => {
     const hex = (await readFile(new URL("../testdata/wojjdg02-v2-text.hex", import.meta.url), "utf8")).trim();
     if (!/^(?:[0-9a-f]{2})+$/.test(hex)) throw new Error("WOJJDG02 golden vector is not lowercase hexadecimal.");
@@ -240,5 +258,90 @@ describe("wasm-oj-collection CLI", () => {
     packageBytes[packageBytes.byteLength - 1] ^= 1;
     await writeFile(packageFile, packageBytes);
     await expect(runCollectionCli(["verify", root, "--managed", "collection/managed.json"])).rejects.toThrow("integrity verification");
+  });
+
+  it.each([
+    ["collection/source.json", "collection/source.json", undefined, undefined],
+    ["collection/Source.json", "collection/source.json", undefined, undefined],
+    ["collection/index.json", "collection/source.json", "collection/managed-source.json", "collection/managed-source.json"],
+  ])("rejects declared input/output overlap before changing the input", async (indexPath, sourcePath, managedPath, managedSourcePath) => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-collection-overlap-test-"));
+    temporaryDirectories.push(root);
+    await mkdir(path.join(root, "collection"), { recursive: true });
+    await writeFile(path.join(root, sourcePath), "source sentinel\n");
+    if (managedSourcePath) await writeFile(path.join(root, managedSourcePath), "managed sentinel\n");
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const arguments_ = ["build", root, "--index", indexPath, "--source", sourcePath];
+    if (managedPath && managedSourcePath) arguments_.push("--managed", managedPath, "--managed-source", managedSourcePath);
+    await expect(runCollectionCli(arguments_)).rejects.toThrow("must not be the same input and output path");
+    expect(await readFile(path.join(root, managedSourcePath ?? sourcePath), "utf8")).toContain("sentinel");
+  });
+
+  it.runIf(process.platform === "darwin")("rejects an APFS Unicode alias between a declared source and output", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-collection-apfs-alias-test-"));
+    temporaryDirectories.push(root);
+    await writeBasicCollection(root);
+    const source = path.join(root, "collection/source.json");
+    const longS = path.join(root, "collection/ſ.json");
+    await rename(source, longS);
+    const original = new Uint8Array(await readFile(longS));
+    await expect(runCollectionCli([
+      "build", root,
+      "--source", "collection/ſ.json",
+      "--index", "collection/s.json",
+    ])).rejects.toThrow("aliases declared input");
+    expect(new Uint8Array(await readFile(longS))).toEqual(original);
+  });
+
+  it("requires configurable output paths to use portable ASCII segments", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-collection-portable-output-test-"));
+    temporaryDirectories.push(root);
+    await writeBasicCollection(root);
+    await expect(runCollectionCli(["build", root, "--index", "collection/索引.json"])).rejects.toThrow("portable ASCII");
+    expect(await readFile(path.join(root, "collection/source.json"), "utf8")).toContain("wasm-oj-browser-collection-source-v1");
+  });
+
+  it("rejects sparse oversized source and index files before allocating or writing", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-collection-sparse-test-"));
+    temporaryDirectories.push(root);
+    await mkdir(path.join(root, "collection"), { recursive: true });
+    const source = path.join(root, "collection/source.json");
+    await writeFile(source, "{}");
+    await truncate(source, 2 * 1024 * 1024 + 1);
+    await expect(runCollectionCli(["build", root])).rejects.toThrow("allowed byte limit");
+    expect(await readFile(source)).toHaveLength(2 * 1024 * 1024 + 1);
+    const index = path.join(root, "collection/index.json");
+    await writeFile(index, "{}");
+    await truncate(index, 512 * 1024 + 1);
+    await expect(runCollectionCli(["verify", root])).rejects.toThrow("allowed byte limit");
+  });
+
+  it("allows unrelated repository symlinks while fencing declared paths", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-collection-unrelated-link-test-"));
+    temporaryDirectories.push(root);
+    const outside = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-collection-unrelated-target-"));
+    temporaryDirectories.push(outside);
+    await writeBasicCollection(root);
+    await symlink(outside, path.join(root, "node_modules"));
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    await runCollectionCli(["build", root]);
+    await runCollectionCli(["verify", root]);
+  });
+
+  it("atomically replaces a hardlinked generated bundle without truncating its peer", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-collection-hardlink-test-"));
+    temporaryDirectories.push(root);
+    await writeBasicCollection(root);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    await runCollectionCli(["build", root]);
+    const index = JSON.parse(await readFile(path.join(root, "collection/index.json"), "utf8")) as ProblemCollectionIndex;
+    const output = path.join(root, "collection", index.problems[0]!.bundle.path);
+    const sentinel = path.join(root, "sentinel.txt");
+    await writeFile(sentinel, "hardlink sentinel\n");
+    await rm(output);
+    await link(sentinel, output);
+    await runCollectionCli(["build", root]);
+    expect(await readFile(sentinel, "utf8")).toBe("hardlink sentinel\n");
+    expect(await readFile(output, "utf8")).not.toBe("hardlink sentinel\n");
   });
 });

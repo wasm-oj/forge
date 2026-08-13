@@ -1,7 +1,7 @@
 # WASM-OJ library contract
 
 This document defines the active contract-2 invariants shared by browser and server hosts. Public
-symbols live in the six npm code packages; toolchain bytes live in six independently versioned
+symbols live in the seven npm code packages; toolchain bytes live in six independently versioned
 asset packages.
 
 ## Compatibility boundary
@@ -32,8 +32,10 @@ contracts
  ▼ ▼          ▼
 browser    server    organizer
  └──────────┬─────────┘
-            ▼
-           sdk
+            ├──────────────▶ sdk
+ core ──────┬──────────────▶ cli
+ server ────┤
+ organizer ─┘
 ```
 
 - `@wasm-oj/contracts` is environment-neutral and has no runtime dependencies.
@@ -42,6 +44,9 @@ browser    server    organizer
   architectural package edge.
 - `@wasm-oj/browser`, `@wasm-oj/server`, and `@wasm-oj/organizer` depend on contracts/core and do
   not depend on each other.
+- `@wasm-oj/cli` depends on core, server, and Organizer to expose one local-first executable. It
+  acquires toolchain bytes only through an explicit `woj toolchain fetch`; it does not install a
+  toolchain package.
 - `@wasm-oj/sdk` is a convenience façade. It re-exports package instances and must not bundle a
   second embedded core.
 - Toolchain packages depend only on the contract types needed for their descriptor. No code

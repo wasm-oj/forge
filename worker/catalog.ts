@@ -1,6 +1,6 @@
 import capacity from "../config/capacity.json";
 import { canonicalJsonBytes } from "../src/core/canonical-json";
-import { authenticatedSession, requireMutationSession, requireSession } from "./auth";
+import { authenticatedSession, requireBrowserOrBearerMutationSession, requireSession } from "./auth";
 import {
   authorizedCatalogRepository,
   catalogRepositoryById,
@@ -123,7 +123,7 @@ function idempotencyKey(value: unknown): string {
 }
 
 async function organizerMutation(request: Request, env: WasmOjWorkerEnv) {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireOrganizer(env, session);
   await requireStagingFormalAccess(env, session.userId);
   await requireFormalMutationsEnabled(env, request);
@@ -193,6 +193,24 @@ export async function listProblemCollections(request: Request, env: WasmOjWorker
     WHERE collections.organizer_user_id=? ORDER BY collections.created_at DESC, collections.id DESC LIMIT 200`)
     .bind(session.userId).all();
   return jsonResponse({ collections: rows.results });
+}
+
+export async function getProblemCollection(
+  request: Request,
+  env: WasmOjWorkerEnv,
+  collectionId: string,
+): Promise<Response> {
+  const session = await organizerRead(request, env);
+  const row = await env.DB.prepare(`SELECT collections.id, collections.github_repository_id,
+      collections.index_path, collections.created_at, collections.updated_at,
+      repositories.owner_login, repositories.name
+    FROM problem_collections AS collections
+    JOIN github_repositories AS repositories
+      ON repositories.github_repository_id=collections.github_repository_id
+    WHERE collections.id=? AND collections.organizer_user_id=?`)
+    .bind(collectionId, session.userId).first<Record<string, unknown>>();
+  if (!row) throw new ApiError(404, "collection-not-found", "Collection was not found.");
+  return jsonResponse({ collection: row }, 200, { "cache-control": "private, no-store" });
 }
 
 export async function createCatalogValidation(

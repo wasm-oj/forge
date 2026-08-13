@@ -78,9 +78,9 @@ export function assertNormalProductionReleaseState(rows, expected) {
 export function assertArchitectureResetMigrationState(localNames, appliedNames) {
   assertNoUnknownAppliedMigrations(localNames, appliedNames);
   const pending = pendingMigrationNames(localNames, appliedNames);
-  if (pending.length !== 1 || pending[0] !== RESET_MIGRATION) {
+  if (pending.length === 0 || pending[0] !== RESET_MIGRATION) {
     throw new Error(
-      `Architecture reset requires ${RESET_MIGRATION} to be the only pending migration; found ${JSON.stringify(pending)}.`,
+      `Architecture reset requires ${RESET_MIGRATION} to be the first pending migration; found ${JSON.stringify(pending)}.`,
     );
   }
 }
@@ -139,7 +139,7 @@ function usage() {
 
 The normal path refuses while 0017 is pending. The architecture-reset path
 requires the protected reset token, exact R2 inventory, verified source
-tombstones, D1 quiescence, and exactly one pending migration.
+tombstones, D1 quiescence, and 0017 as the first pending migration.
 `;
 }
 

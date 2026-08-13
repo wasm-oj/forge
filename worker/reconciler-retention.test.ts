@@ -117,6 +117,12 @@ function fixture(): { readonly database: DatabaseSync; readonly env: WasmOjWorke
     CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, expires_at TEXT NOT NULL) STRICT;
     CREATE TABLE oauth_states (state_hash TEXT PRIMARY KEY, expires_at TEXT NOT NULL) STRICT;
     CREATE TABLE github_installation_states (state_hash TEXT PRIMARY KEY, expires_at TEXT NOT NULL) STRICT;
+    CREATE TABLE cli_login_flows (id TEXT PRIMARY KEY, expires_at TEXT NOT NULL) STRICT;
+    CREATE TABLE cli_access_tokens (
+      token_hash TEXT PRIMARY KEY,
+      login_flow_id TEXT NOT NULL UNIQUE REFERENCES cli_login_flows(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL
+    ) STRICT;
     CREATE TABLE github_installation_claim_proofs (
       installation_id INTEGER PRIMARY KEY, delivery_id TEXT, expires_at TEXT NOT NULL,
       FOREIGN KEY (delivery_id) REFERENCES github_webhook_deliveries(delivery_id) ON DELETE RESTRICT
@@ -161,12 +167,21 @@ describe("cursor-based retention", () => {
     database.prepare("INSERT INTO sessions VALUES ('session-old', ?)").run(old);
     database.prepare("INSERT INTO oauth_states VALUES ('oauth-old', ?)").run(old);
     database.prepare("INSERT INTO github_installation_states VALUES ('install-old', ?)").run(old);
+    database.prepare("INSERT INTO cli_login_flows VALUES ('cli-flow-old', ?)").run(old);
+    database.prepare("INSERT INTO cli_login_flows VALUES ('cli-flow-token-old', ?)").run(old);
+    database.prepare("INSERT INTO cli_access_tokens VALUES ('cli-token-old', 'cli-flow-token-old', ?)").run(old);
+    database.prepare("INSERT INTO cli_login_flows VALUES ('cli-flow-active-token', ?)").run(old);
+    database.prepare("INSERT INTO cli_access_tokens VALUES ('cli-token-active', 'cli-flow-active-token', '2026-09-01T00:00:00.000Z')").run();
 
     const now = new Date("2026-08-12T12:34:00.000Z");
     const first = await reconcileRetention(env, now);
     expect(first.submissionEvents).toBe(50);
     expect(first.catalogJobs).toBe(2);
-    expect(first.auth).toBe(4);
+    expect(first.auth).toBe(6);
+    expect(database.prepare("SELECT token_hash FROM cli_access_tokens WHERE token_hash='cli-token-active'").get())
+      .toEqual({ token_hash: "cli-token-active" });
+    expect(database.prepare("SELECT id FROM cli_login_flows WHERE id='cli-flow-active-token'").get())
+      .toEqual({ id: "cli-flow-active-token" });
     expect(first.webhooks).toBe(1);
     expect(first.outbox).toBe(1);
     expect(database.prepare("SELECT COUNT(*) AS count FROM submission_events").get()).toEqual({ count: 6 });

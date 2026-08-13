@@ -512,7 +512,7 @@ async function retainOutbox(env: WasmOjWorkerEnv, now: Date): Promise<number> {
 
 interface AuthRetentionRow {
   readonly sort_key: string;
-  readonly table_kind: "session" | "oauth" | "installation-state" | "claim";
+  readonly table_kind: "session" | "oauth" | "installation-state" | "claim" | "cli-flow" | "cli-token";
   readonly record_key: string;
 }
 
@@ -533,8 +533,17 @@ async function retainExpiredAuth(env: WasmOjWorkerEnv, now: Date): Promise<numbe
       SELECT '3:' || printf('%020d', installation_id) AS sort_key, 'claim' AS table_kind,
              CAST(installation_id AS TEXT) AS record_key
         FROM github_installation_claim_proofs WHERE expires_at<=?
+      UNION ALL
+      SELECT '4:' || id AS sort_key, 'cli-flow' AS table_kind, id AS record_key
+        FROM cli_login_flows AS flow WHERE expires_at<=?
+          AND NOT EXISTS (
+            SELECT 1 FROM cli_access_tokens AS token WHERE token.login_flow_id=flow.id
+          )
+      UNION ALL
+      SELECT '5:' || token_hash AS sort_key, 'cli-token' AS table_kind, token_hash AS record_key
+        FROM cli_access_tokens WHERE expires_at<=?
     ) WHERE sort_key>? ORDER BY sort_key LIMIT ?`)
-    .bind(expiryCutoff, expiryCutoff, expiryCutoff, expiryCutoff, state.cursor ?? "", SQL_RETENTION_QUOTA)
+    .bind(expiryCutoff, expiryCutoff, expiryCutoff, expiryCutoff, expiryCutoff, expiryCutoff, state.cursor ?? "", SQL_RETENTION_QUOTA)
     .all<AuthRetentionRow>();
   const complete = rows.results.length < SQL_RETENTION_QUOTA;
   const next = complete ? null : rows.results.at(-1)!.sort_key;
@@ -549,6 +558,15 @@ async function retainExpiredAuth(env: WasmOjWorkerEnv, now: Date): Promise<numbe
     }
     if (row.table_kind === "installation-state") {
       return env.DB.prepare("DELETE FROM github_installation_states WHERE state_hash=? AND expires_at<=?")
+        .bind(row.record_key, expiryCutoff);
+    }
+    if (row.table_kind === "cli-flow") {
+      return env.DB.prepare(`DELETE FROM cli_login_flows WHERE id=? AND expires_at<=?
+        AND NOT EXISTS (SELECT 1 FROM cli_access_tokens WHERE login_flow_id=cli_login_flows.id)`)
+        .bind(row.record_key, expiryCutoff);
+    }
+    if (row.table_kind === "cli-token") {
+      return env.DB.prepare("DELETE FROM cli_access_tokens WHERE token_hash=? AND expires_at<=?")
         .bind(row.record_key, expiryCutoff);
     }
     return env.DB.prepare("DELETE FROM github_installation_claim_proofs WHERE installation_id=? AND expires_at<=?")

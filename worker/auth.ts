@@ -1,13 +1,21 @@
 import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
-import { constantTimeEqual, randomToken, sha256Hex } from "./crypto";
-import { ApiError, assertSameOrigin, cookieHeader, jsonResponse, parseCookies, readBoundedResponseJson } from "./http";
+import { base64Url, constantTimeEqual, randomToken, sha256Hex } from "./crypto";
+import { ApiError, assertSameOrigin, cookieHeader, jsonResponse, parseCookies, readBoundedResponseJson, readJsonBody } from "./http";
 
 const SESSION_COOKIE = "wasm_oj_session";
 const CSRF_COOKIE = "wasm_oj_csrf";
 const OAUTH_VERIFIER_COOKIE = "wasm_oj_oauth_verifier";
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
 const OAUTH_STATE_SECONDS = 10 * 60;
+const CLI_LOGIN_SECONDS = 10 * 60;
+const CLI_ACCESS_TOKEN_SECONDS = 30 * 24 * 60 * 60;
+const CLI_LOGIN_POLL_SECONDS = 2;
+const MAX_CLI_AUTH_REQUEST_BYTES = 4 * 1024;
 const MAX_GITHUB_AUTH_RESPONSE_BYTES = 1024 * 1024;
+const CLI_LOGIN_FLOW_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const CLI_CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
+const CLI_CODE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
+const CLI_ACCESS_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
 interface SessionRow {
   readonly user_id: string;
@@ -15,6 +23,131 @@ interface SessionRow {
   readonly csrf_hash: string;
   readonly login: string;
   readonly avatar_url: string;
+}
+
+interface CliLoginFlowRow {
+  readonly id: string;
+  readonly code_challenge: string;
+  readonly device_name: string;
+  readonly approved_user_id: string | null;
+  readonly expires_at: string;
+  readonly exchanged_at: string | null;
+}
+
+interface ResolvedSession {
+  readonly session: AuthenticatedSession;
+  readonly transport: "browser" | "bearer";
+  readonly token: string;
+}
+
+function exactObject(value: unknown, keys: readonly string[], label: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError(400, "invalid-request", `${label} must be a JSON object.`);
+  }
+  const record = value as Record<string, unknown>;
+  const actual = Object.keys(record).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+    throw new ApiError(400, "invalid-request", `${label} has an invalid shape.`);
+  }
+  return record;
+}
+
+function cliDeviceName(value: unknown): string {
+  if (
+    typeof value !== "string"
+    || value.length < 1
+    || new TextEncoder().encode(value).byteLength > 80
+    || value !== value.normalize("NFC")
+    || value !== value.trim()
+    || /[\p{Cc}\p{Cf}\p{Cs}]/u.test(value)
+  ) {
+    throw new ApiError(400, "invalid-device-name", "deviceName must be NFC-normalized UTF-8 with 1–80 visible bytes and no surrounding whitespace.");
+  }
+  return value;
+}
+
+function cliFlowId(value: unknown): string {
+  if (typeof value !== "string" || !CLI_LOGIN_FLOW_ID.test(value)) {
+    throw new ApiError(400, "invalid-cli-login-flow", "flowId must be a canonical UUID.");
+  }
+  return value;
+}
+
+function bearerToken(request: Request): string | undefined {
+  const authorization = request.headers.get("authorization");
+  if (authorization === null) return undefined;
+  const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization);
+  return match?.[1];
+}
+
+async function sessionFromRow(row: SessionRow | null, env: WasmOjWorkerEnv): Promise<AuthenticatedSession | undefined> {
+  if (!row || row.expires_at <= new Date().toISOString()) return undefined;
+  const roles = await env.DB.prepare("SELECT role FROM user_roles WHERE user_id = ? ORDER BY role")
+    .bind(row.user_id).all<{ role: "admin" | "organizer" }>();
+  return {
+    userId: row.user_id,
+    login: row.login,
+    avatarUrl: row.avatar_url,
+    roles: roles.results.map((item) => item.role),
+    expiresAt: row.expires_at,
+  };
+}
+
+async function resolveSession(request: Request, env: WasmOjWorkerEnv): Promise<ResolvedSession | undefined> {
+  const authorization = request.headers.get("authorization");
+  if (authorization !== null) {
+    const token = bearerToken(request);
+    if (!token || !CLI_ACCESS_TOKEN.test(token)) return undefined;
+    const row = await env.DB.prepare(
+      "SELECT cli_access_tokens.user_id, cli_access_tokens.expires_at, '' AS csrf_hash, github_identities.login, github_identities.avatar_url FROM cli_access_tokens JOIN users ON users.id = cli_access_tokens.user_id JOIN github_identities ON github_identities.user_id = users.id WHERE cli_access_tokens.token_hash = ? AND users.status = 'active'",
+    ).bind(await sha256Hex(token)).first<SessionRow>();
+    const session = await sessionFromRow(row, env);
+    return session ? { session, transport: "bearer", token } : undefined;
+  }
+
+  const token = parseCookies(request).get(SESSION_COOKIE);
+  if (!token) return undefined;
+  const row = await env.DB.prepare(
+    "SELECT sessions.user_id, sessions.expires_at, sessions.csrf_hash, github_identities.login, github_identities.avatar_url FROM sessions JOIN users ON users.id = sessions.user_id JOIN github_identities ON github_identities.user_id = users.id WHERE sessions.token_hash = ? AND users.status = 'active'",
+  ).bind(await sha256Hex(token)).first<SessionRow>();
+  const session = await sessionFromRow(row, env);
+  return session ? { session, transport: "browser", token } : undefined;
+}
+
+async function requireBrowserSession(request: Request, env: WasmOjWorkerEnv): Promise<ResolvedSession> {
+  if (request.headers.has("authorization")) {
+    throw new ApiError(401, "browser-authentication-required", "Open the verification link in a signed-in browser.");
+  }
+  const resolved = await resolveSession(request, env);
+  if (!resolved || resolved.transport !== "browser") {
+    throw new ApiError(401, "authentication-required", "Sign in with GitHub to continue.");
+  }
+  return resolved;
+}
+
+export async function requireBrowserAuthenticatedSession(
+  request: Request,
+  env: WasmOjWorkerEnv,
+): Promise<AuthenticatedSession> {
+  return (await requireBrowserSession(request, env)).session;
+}
+
+export async function requireBrowserMutationSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession> {
+  assertSameOrigin(request, env.PUBLIC_ORIGIN);
+  const resolved = await requireBrowserSession(request, env);
+  const cookies = parseCookies(request);
+  const csrfCookie = cookies.get(CSRF_COOKIE);
+  const csrfHeader = request.headers.get("x-wasm-oj-csrf");
+  if (!csrfCookie || !csrfHeader || !constantTimeEqual(csrfCookie, csrfHeader)) {
+    throw new ApiError(403, "csrf-rejected", "CSRF verification failed.");
+  }
+  const row = await env.DB.prepare("SELECT csrf_hash FROM sessions WHERE token_hash = ?")
+    .bind(await sha256Hex(resolved.token)).first<{ csrf_hash: string }>();
+  if (!row || !constantTimeEqual(row.csrf_hash, await sha256Hex(csrfCookie))) {
+    throw new ApiError(403, "csrf-rejected", "CSRF verification failed.");
+  }
+  return resolved.session;
 }
 
 function safeReturnPath(value: string | null): string {
@@ -138,45 +271,22 @@ export async function completeGithubLogin(request: Request, env: WasmOjWorkerEnv
 }
 
 export async function authenticatedSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession | undefined> {
-  const token = parseCookies(request).get(SESSION_COOKIE);
-  if (!token) return undefined;
-  const row = await env.DB.prepare(
-    "SELECT sessions.user_id, sessions.expires_at, sessions.csrf_hash, github_identities.login, github_identities.avatar_url FROM sessions JOIN users ON users.id = sessions.user_id JOIN github_identities ON github_identities.user_id = users.id WHERE sessions.token_hash = ? AND users.status = 'active'",
-  ).bind(await sha256Hex(token)).first<SessionRow>();
-  if (!row || row.expires_at <= new Date().toISOString()) return undefined;
-  const roles = await env.DB.prepare("SELECT role FROM user_roles WHERE user_id = ? ORDER BY role")
-    .bind(row.user_id).all<{ role: "admin" | "organizer" }>();
-  return {
-    userId: row.user_id,
-    login: row.login,
-    avatarUrl: row.avatar_url,
-    roles: roles.results.map((item) => item.role),
-    expiresAt: row.expires_at,
-  };
+  return (await resolveSession(request, env))?.session;
 }
 
 export async function requireSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession> {
-  const session = await authenticatedSession(request, env);
-  if (!session) throw new ApiError(401, "authentication-required", "Sign in with GitHub to continue.");
-  return session;
+  const resolved = await resolveSession(request, env);
+  if (!resolved) throw new ApiError(401, "authentication-required", "Sign in with GitHub to continue.");
+  return resolved.session;
 }
 
-export async function requireMutationSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession> {
-  assertSameOrigin(request, env.PUBLIC_ORIGIN);
-  const session = await requireSession(request, env);
-  const cookies = parseCookies(request);
-  const csrfCookie = cookies.get(CSRF_COOKIE);
-  const csrfHeader = request.headers.get("x-wasm-oj-csrf");
-  const sessionToken = cookies.get(SESSION_COOKIE);
-  if (!csrfCookie || !csrfHeader || !sessionToken || !constantTimeEqual(csrfCookie, csrfHeader)) {
-    throw new ApiError(403, "csrf-rejected", "CSRF verification failed.");
+export async function requireBrowserOrBearerMutationSession(request: Request, env: WasmOjWorkerEnv): Promise<AuthenticatedSession> {
+  if (!request.headers.has("authorization")) return requireBrowserMutationSession(request, env);
+  const resolved = await resolveSession(request, env);
+  if (!resolved || resolved.transport !== "bearer") {
+    throw new ApiError(401, "authentication-required", "The CLI access token is invalid or expired.");
   }
-  const row = await env.DB.prepare("SELECT csrf_hash FROM sessions WHERE token_hash = ?")
-    .bind(await sha256Hex(sessionToken)).first<{ csrf_hash: string }>();
-  if (!row || !constantTimeEqual(row.csrf_hash, await sha256Hex(csrfCookie))) {
-    throw new ApiError(403, "csrf-rejected", "CSRF verification failed.");
-  }
-  return session;
+  return resolved.session;
 }
 
 export async function sessionResponse(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
@@ -185,11 +295,131 @@ export async function sessionResponse(request: Request, env: WasmOjWorkerEnv): P
 }
 
 export async function logout(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  await requireMutationSession(request, env);
-  const sessionToken = parseCookies(request).get(SESSION_COOKIE);
-  if (sessionToken) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Hex(sessionToken)).run();
+  await requireBrowserOrBearerMutationSession(request, env);
+  const cliToken = bearerToken(request);
+  if (request.headers.has("authorization")) {
+    if (!cliToken) throw new ApiError(401, "authentication-required", "The CLI access token is invalid or expired.");
+    await env.DB.prepare("DELETE FROM cli_access_tokens WHERE token_hash = ?").bind(await sha256Hex(cliToken)).run();
+    return jsonResponse({ ok: true });
+  }
+  const browserToken = parseCookies(request).get(SESSION_COOKIE);
+  if (browserToken) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Hex(browserToken)).run();
   const headers = new Headers();
   headers.append("set-cookie", cookieHeader(SESSION_COOKIE, "", { httpOnly: true, maxAge: 0, sameSite: "Lax" }));
   headers.append("set-cookie", cookieHeader(CSRF_COOKIE, "", { maxAge: 0, sameSite: "Strict" }));
   return jsonResponse({ ok: true }, 200, headers);
+}
+
+export async function startCliLogin(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
+  const body = exactObject(await readJsonBody(request, MAX_CLI_AUTH_REQUEST_BYTES), ["codeChallenge", "deviceName"], "CLI login request");
+  if (typeof body.codeChallenge !== "string" || !CLI_CODE_CHALLENGE.test(body.codeChallenge)) {
+    throw new ApiError(400, "invalid-code-challenge", "codeChallenge must be an S256 base64url value.");
+  }
+  const deviceName = cliDeviceName(body.deviceName);
+  const flowId = crypto.randomUUID();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + CLI_LOGIN_SECONDS * 1_000).toISOString();
+  await env.DB.prepare(
+    "INSERT INTO cli_login_flows (id, code_challenge, device_name, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+  ).bind(flowId, body.codeChallenge, deviceName, now.toISOString(), expiresAt).run();
+  const verification = new URL("/auth/cli", env.PUBLIC_ORIGIN);
+  verification.searchParams.set("flow", flowId);
+  return jsonResponse({
+    flowId,
+    verificationUrl: verification.toString(),
+    expiresAt,
+    pollIntervalSeconds: CLI_LOGIN_POLL_SECONDS,
+  }, 201);
+}
+
+async function cliLoginFlow(env: WasmOjWorkerEnv, flowId: string): Promise<CliLoginFlowRow | null> {
+  return env.DB.prepare(
+    "SELECT id, code_challenge, device_name, approved_user_id, expires_at, exchanged_at FROM cli_login_flows WHERE id = ?",
+  ).bind(flowId).first<CliLoginFlowRow>();
+}
+
+function cliLoginFlowState(flow: CliLoginFlowRow, now: string): "pending" | "approved" | "complete" | "expired" {
+  if (flow.expires_at <= now) return "expired";
+  if (flow.exchanged_at) return "complete";
+  return flow.approved_user_id ? "approved" : "pending";
+}
+
+export async function getCliLoginFlow(request: Request, env: WasmOjWorkerEnv, flowIdValue: string): Promise<Response> {
+  const { session } = await requireBrowserSession(request, env);
+  const flowId = cliFlowId(flowIdValue);
+  const flow = await cliLoginFlow(env, flowId);
+  if (!flow) throw new ApiError(404, "cli-login-not-found", "This CLI login request does not exist.");
+  return jsonResponse({
+    flowId: flow.id,
+    deviceName: flow.device_name,
+    expiresAt: flow.expires_at,
+    state: cliLoginFlowState(flow, new Date().toISOString()),
+    approvedByCurrentUser: flow.approved_user_id === session.userId,
+  });
+}
+
+export async function approveCliLogin(request: Request, env: WasmOjWorkerEnv, flowIdValue: string): Promise<Response> {
+  const session = await requireBrowserMutationSession(request, env);
+  exactObject(await readJsonBody(request, MAX_CLI_AUTH_REQUEST_BYTES), [], "CLI login approval");
+  const flowId = cliFlowId(flowIdValue);
+  const now = new Date().toISOString();
+  const flow = await cliLoginFlow(env, flowId);
+  if (!flow) throw new ApiError(404, "cli-login-not-found", "This CLI login request does not exist.");
+  if (flow.expires_at <= now) throw new ApiError(410, "cli-login-expired", "This CLI login request has expired.");
+  if (flow.exchanged_at) throw new ApiError(409, "cli-login-complete", "This CLI login request has already issued a token.");
+  if (flow.approved_user_id) {
+    if (flow.approved_user_id !== session.userId) {
+      throw new ApiError(409, "cli-login-already-approved", "This CLI login request was approved by another account.");
+    }
+    return jsonResponse({ flowId, state: "approved", expiresAt: flow.expires_at });
+  }
+  const result = await env.DB.prepare(
+    "UPDATE cli_login_flows SET approved_user_id = ?, approved_at = ? WHERE id = ? AND approved_user_id IS NULL AND exchanged_at IS NULL AND expires_at > ?",
+  ).bind(session.userId, now, flowId, now).run();
+  if (result.meta.changes !== 1) {
+    throw new ApiError(409, "cli-login-state-changed", "This CLI login request changed before it could be approved.");
+  }
+  return jsonResponse({ flowId, state: "approved", expiresAt: flow.expires_at });
+}
+
+export async function exchangeCliLoginToken(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
+  const body = exactObject(await readJsonBody(request, MAX_CLI_AUTH_REQUEST_BYTES), ["codeVerifier", "flowId"], "CLI token request");
+  const flowId = cliFlowId(body.flowId);
+  if (typeof body.codeVerifier !== "string" || !CLI_CODE_VERIFIER.test(body.codeVerifier)) {
+    throw new ApiError(400, "invalid-code-verifier", "codeVerifier must contain 43–128 PKCE verifier characters.");
+  }
+  const flow = await cliLoginFlow(env, flowId);
+  if (!flow) throw new ApiError(400, "cli-login-invalid", "The CLI login request is invalid.");
+  const verifierBytes = new TextEncoder().encode(body.codeVerifier);
+  const challenge = base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", verifierBytes)));
+  verifierBytes.fill(0);
+  if (!constantTimeEqual(challenge, flow.code_challenge)) {
+    throw new ApiError(400, "cli-login-invalid", "The CLI login request is invalid.");
+  }
+  const now = new Date();
+  const nowIso = now.toISOString();
+  if (flow.expires_at <= nowIso) throw new ApiError(400, "cli-login-expired", "The CLI login request has expired.");
+  if (flow.exchanged_at) throw new ApiError(409, "cli-login-complete", "The CLI login request has already issued a token.");
+  if (!flow.approved_user_id) {
+    throw new ApiError(428, "cli-login-pending", "Approve this CLI login request in the browser before polling again.", {
+      retryAfterSeconds: CLI_LOGIN_POLL_SECONDS,
+    });
+  }
+
+  const accessToken = randomToken();
+  const accessTokenHash = await sha256Hex(accessToken);
+  const exchangeNonce = randomToken();
+  const expiresAt = new Date(now.getTime() + CLI_ACCESS_TOKEN_SECONDS * 1_000).toISOString();
+  const [claim, issued] = await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE cli_login_flows SET exchange_nonce = ?, exchanged_at = ? WHERE id = ? AND approved_user_id = ? AND exchange_nonce IS NULL AND exchanged_at IS NULL AND expires_at > ? AND EXISTS (SELECT 1 FROM users WHERE users.id = approved_user_id AND users.status = 'active')",
+    ).bind(exchangeNonce, nowIso, flowId, flow.approved_user_id, nowIso),
+    env.DB.prepare(
+      "INSERT INTO cli_access_tokens (token_hash, user_id, login_flow_id, created_at, expires_at, last_seen_at) SELECT ?, approved_user_id, id, ?, ?, ? FROM cli_login_flows WHERE id = ? AND exchange_nonce = ? AND exchanged_at = ? AND approved_user_id = ? AND expires_at > ?",
+    ).bind(accessTokenHash, nowIso, expiresAt, nowIso, flowId, exchangeNonce, nowIso, flow.approved_user_id, nowIso),
+  ]);
+  if (claim.meta.changes !== 1 || issued.meta.changes !== 1) {
+    throw new ApiError(409, "cli-login-state-changed", "The CLI login request was already exchanged or is no longer active.");
+  }
+  return jsonResponse({ accessToken, tokenType: "Bearer", expiresAt });
 }

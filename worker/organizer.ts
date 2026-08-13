@@ -1,4 +1,4 @@
-import { authenticatedSession, requireSession } from "./auth";
+import { authenticatedSession, requireBrowserAuthenticatedSession, requireSession } from "./auth";
 import { randomToken, sha256Hex } from "./crypto";
 import type { WasmOjWorkerEnv } from "./env";
 import {
@@ -149,7 +149,7 @@ async function associateInstallation(env: WasmOjWorkerEnv, installationId: numbe
 }
 
 export async function beginGithubAppInstall(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireSession(request, env);
+  const session = await requireBrowserAuthenticatedSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   await requireOrganizer(env, session);
   const state = randomToken();
@@ -172,7 +172,7 @@ export async function completeGithubAppInstall(request: Request, env: WasmOjWork
     "cache-control": "no-store",
   } });
   try {
-    const session = await requireSession(request, env);
+    const session = await requireBrowserAuthenticatedSession(request, env);
     await requireStagingFormalAccess(env, session.userId);
     await requireOrganizer(env, session);
     const url = new URL(request.url);

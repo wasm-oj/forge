@@ -13,6 +13,10 @@ describe("judge UI localization", () => {
 
     expect(zh.topbar.judgeLocally).toBe("本機判題");
     expect(en.topbar.judgeLocally).toBe("Judge Locally");
+    expect(zh.topbar.runPublicSamples).toBe("執行公開範例");
+    expect(en.topbar.runPublicSamples).toBe("Run Public Samples");
+    expect(zh.topbar.officialSubmit).toBe("正式提交");
+    expect(en.topbar.officialSubmit).toBe("Official Submit");
     expect(zh.panel.diagnostics).toBe("編譯診斷");
     expect(en.panel.diagnostics).toBe("Diagnostics");
     expect(zh.settings.localDataTitle).toBe("本機資料與隱私");

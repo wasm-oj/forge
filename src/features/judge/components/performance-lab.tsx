@@ -7,10 +7,11 @@ import { type BuiltinLanguage, isBuiltinLanguage } from "../../../core/types";
 import { languageLabel } from "../../../core/toolchains";
 import { wasmOjJson } from "../../platform/api/online-api";
 import type { ProblemLocale } from "../../../judge/problem-model";
+import { SubmissionPolicySummaryContent } from "../../submissions/components/submission-policy-summary";
 import {
   parseProblemPerformanceResponse,
-  parseSubmissionPolicySummaryResponse,
   problemPerformanceApiPath,
+  readSubmissionPolicySummaryResponse,
   submissionPolicySummaryApiPath,
   type PerformanceEvolutionPoint,
   type PerformanceFrontierPoint,
@@ -74,28 +75,9 @@ function dateTime(value: string, locale: ProblemLocale): string {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export async function readPolicySummaryResponse(response: Response, submissionId: string): Promise<SubmissionPolicySummaryResponse | null> {
-  let value: unknown;
-  try {
-    value = await response.json() as unknown;
-  } catch {
-    throw new Error(`WASM-OJ returned a non-JSON response (HTTP ${response.status}).`);
-  }
-  if (response.status === 404 || response.status === 409) return null;
-  if (!response.ok) {
-    const message = value && typeof value === "object" && !Array.isArray(value)
-      && "error" in value && value.error && typeof value.error === "object" && !Array.isArray(value.error)
-      && "message" in value.error && typeof value.error.message === "string"
-      ? value.error.message
-      : `Request failed with HTTP ${response.status}.`;
-    throw new Error(message);
-  }
-  return parseSubmissionPolicySummaryResponse(value, submissionId);
-}
-
 async function loadPolicySummary(submissionId: string, signal: AbortSignal): Promise<SubmissionPolicySummaryResponse | null> {
   const response = await fetch(submissionPolicySummaryApiPath(submissionId), { credentials: "same-origin", signal });
-  return readPolicySummaryResponse(response, submissionId);
+  return readSubmissionPolicySummaryResponse(response, submissionId);
 }
 
 function chartPoints(response: ProblemPerformanceResponse): readonly ChartPoint[] {
@@ -390,18 +372,7 @@ export function PerformanceLabView({
         {policyUnavailable && <div className="online-empty">{chinese ? "你沒有權限讀取這個提交的策略摘要，或該摘要尚不可用。" : "This submission policy summary is not readable or is not available yet."}</div>}
         {policyLoading && <div className="online-empty" role="status">{chinese ? "載入策略摘要中…" : "Loading policy summary…"}</div>}
         {policyError && <div className="online-error" role="alert">{policyError}</div>}
-        {policySummary && <>
-          <p>{chinese
-            ? `輸出正確 ${policySummary.policySummary.outputAcceptedCases} / ${policySummary.policySummary.totalCases} cases；逐層顯示因資源門檻未通過的數量。`
-            : `${policySummary.policySummary.outputAcceptedCases} / ${policySummary.policySummary.totalCases} cases produced accepted output; each level shows resource-gate misses.`}</p>
-          <div className="performance-policy-grid">
-            {policySummary.policySummary.policies.map((policy, index) => <article key={policy.id} className={index === 2 ? "is-optimal" : ""}>
-              <span>0{index + 1}</span><h4>{policy.id}</h4><strong>{policy.earnedCases} / {policySummary.policySummary.totalCases}</strong>
-              <progress value={policy.earnedCases} max={Math.max(1, policySummary.policySummary.totalCases)} aria-label={`${policy.id}: ${policy.earnedCases} / ${policySummary.policySummary.totalCases}`} />
-              <dl><div><dt>{chinese ? "成本" : "Cost"}</dt><dd>{policy.costExceededCases}</dd></div><div><dt>{chinese ? "記憶體" : "Memory"}</dt><dd>{policy.memoryExceededCases}</dd></div><div><dt>{chinese ? "邏輯時間" : "Logical time"}</dt><dd>{policy.logicalTimeExceededCases}</dd></div></dl>
-            </article>)}
-          </div>
-        </>}
+        {policySummary && <SubmissionPolicySummaryContent response={policySummary} locale={locale} />}
       </section>
     </>}
   </section>;
