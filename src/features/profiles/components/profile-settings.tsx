@@ -119,14 +119,15 @@ export function ProfileSettings() {
     }
   }
 
-  if (erasureMessage) return <main className="product-page narrow-page" id="main-content"><section className="account-erasure-complete" role="status"><UserRound aria-hidden="true" size={28} /><h1>{erasureMessage}</h1><Link className="primary-action" href="/">WASM-OJ</Link></section></main>;
+  if (erasureMessage) return <main className="product-page" id="main-content"><section className="account-erasure-complete" role="status"><UserRound aria-hidden="true" size={28} /><h1>{erasureMessage}</h1><Link className="primary-action" href="/">WASM-OJ</Link></section></main>;
 
-  return <main className="product-page narrow-page" id="main-content">
+  return <main className="product-page" id="main-content">
     <header className="product-page-header"><span className="product-eyebrow"><UserRound aria-hidden="true" size={14} /> {text.eyebrow}</span><h1>{text.title}</h1><p>{text.intro}</p></header>
-    {sessionStatus === "loading" && <div className="product-load-state" role="status"><span>{text.loading}</span></div>}
-    {sessionStatus === "error" && <div className="product-error" role="alert"><span>{locale === "zh-TW" ? "無法確認帳號狀態。" : "Could not verify your account."}</span><button type="button" onClick={() => void refreshSession()}>{text.retry}</button></div>}
-    {sessionStatus === "ready" && !session?.authenticated && <section className="sign-in-empty"><UserRound aria-hidden="true" size={30} /><h2>{text.signIn}</h2><p>{text.signInDetail}</p><a className="primary-action" href="/api/auth/github?return=%2Fsettings%2Fprofile"><GitBranch aria-hidden="true" size={16} />{text.signIn}</a></section>}
-    {sessionStatus === "ready" && session?.authenticated && <RemoteStateView state={profileState} loadingLabel={text.loading} retryLabel={text.retry} empty={null} isEmpty={() => false}>{(profile) => <>
+    <div className="profile-settings-content">
+      {sessionStatus === "loading" && <div className="product-load-state" role="status"><span>{text.loading}</span></div>}
+      {sessionStatus === "error" && <div className="product-error" role="alert"><span>{locale === "zh-TW" ? "無法確認帳號狀態。" : "Could not verify your account."}</span><button type="button" onClick={() => void refreshSession()}>{text.retry}</button></div>}
+      {sessionStatus === "ready" && !session?.authenticated && <section className="sign-in-empty"><UserRound aria-hidden="true" size={30} /><h2>{text.signIn}</h2><p>{text.signInDetail}</p><a className="primary-action" href="/api/auth/github?return=%2Fsettings%2Fprofile"><GitBranch aria-hidden="true" size={16} />{text.signIn}</a></section>}
+      {sessionStatus === "ready" && session?.authenticated && <RemoteStateView state={profileState} loadingLabel={text.loading} retryLabel={text.retry} empty={null} isEmpty={() => false}>{(profile) => <>
       <form className="profile-form" onSubmit={(event) => void save(event, profile)}>
         <div className="profile-identity"><Image src={profile.avatarUrl} alt="" width={48} height={48} unoptimized /><div><strong>{profile.displayName}</strong><span>@{profile.login} · {profile.verifiedSolvedCount} {text.verified}</span></div></div>
         <label>{text.displayName}<input value={profile.displayName} maxLength={80} required onChange={(event) => updateProfile({ displayName: event.target.value })} /></label>
@@ -146,6 +147,7 @@ export function ProfileSettings() {
           <footer><button className="secondary-action" type="button" disabled={deleting} onClick={closeDelete}>{text.cancel}</button><button className="danger-action" type="button" disabled={deleting || deleteConfirmation !== profile.login} onClick={() => void deleteAccount(profile)}><Trash2 aria-hidden="true" size={15} />{deleting ? text.deleting : text.delete}</button></footer>
         </div>
       </Drawer>
-    </>}</RemoteStateView>}
+      </>}</RemoteStateView>}
+    </div>
   </main>;
 }
