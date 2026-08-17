@@ -35,7 +35,7 @@ web = [
 
 [dependencies]
 base64 = { version = "=0.23.1", default-features = false, features = ["std"] }
-futures = "=0.3.33"
+futures = "=0.3.34"
 radix-wasm-instrument = "1.0.0"
 meter-wasmparser = { package = "wasmparser", version = "0.107.0" }
 serde = { version = "1.0.229", features = ["derive"] }
