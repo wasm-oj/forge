@@ -6,6 +6,7 @@ import { WASM_OJ_SCHEMAS } from "../core/contract";
 import { sha256Hex } from "../core/hash";
 import {
   GO_PACKAGE_ASSET_PATH,
+  JAVA_COMPILER_ASSET_PATH,
   PYTHON_PACKAGE_ASSET_PATH,
   RUST_PACKAGE_ASSET_PATH,
 } from "../core/toolchains";
@@ -55,6 +56,9 @@ import RustcStageWorkerUrl from "./rustc-stage.worker?worker&url";
 import GoStageWorkerUrl from "./go-stage.worker?worker&url";
 import type { GoCompileRequest, GoCompileResult, GoStageRequest } from "@/src/compiler/go-toolchain";
 import { GO_COMPILE_TIMEOUT_MS } from "@/src/compiler/go-toolchain";
+import JavaStageWorkerUrl from "./java-stage.worker?worker&url";
+import type { JavaCompileRequest, JavaCompileResult, JavaStageRequest } from "@/src/compiler/java-toolchain";
+import { JAVA_COMPILE_TIMEOUT_MS } from "@/src/compiler/java-toolchain";
 import { PersistentIsolatedStage, runIsolatedStage } from "./isolated-stage";
 import {
   createModuleWorker,
@@ -72,6 +76,7 @@ let runtimeInitialization: Promise<void> | undefined;
 let wasmerThreadWorkerBootstrap: ModuleWorkerBootstrap | undefined;
 let rustStage: PersistentIsolatedStage<RustcStageRequest, RustCompileResult> | undefined;
 let goStage: PersistentIsolatedStage<GoStageRequest, GoCompileResult> | undefined;
+let javaStage: PersistentIsolatedStage<JavaStageRequest, JavaCompileResult> | undefined;
 const clangBuildGraphPersistence = new ClangBuildGraphPersistenceController({
   load: loadClangBuildGraphState,
   restore: restoreSdkDirectClangBuildGraphState,
@@ -192,6 +197,19 @@ function compileGo(request: GoCompileRequest): Promise<GoCompileResult> {
   });
 }
 
+function compileJava(request: JavaCompileRequest): Promise<JavaCompileResult> {
+  javaStage ??= new PersistentIsolatedStage({
+    createWorker: () => createModuleWorker(JavaStageWorkerUrl, { name: "wasm-oj-java-stage" }),
+    timeoutMs: JAVA_COMPILE_TIMEOUT_MS + 5_000,
+    stageLabel: "Java",
+  });
+  return javaStage.run({
+    type: "compile",
+    request,
+    assetBaseUrl: assetBaseUrl(JAVA_COMPILER_ASSET_PATH),
+  });
+}
+
 function configureCompilerHost(): void {
   configureWasmerCompilerHost({
     getRuntime: () => {
@@ -203,6 +221,7 @@ function configureCompilerHost(): void {
     compileRust,
     compilePython,
     compileGo,
+    compileJava,
     progress,
     trace,
   });
@@ -278,12 +297,15 @@ async function quiesce(): Promise<void> {
   quiescing = true;
   const activeRustStage = rustStage;
   const activeGoStage = goStage;
+  const activeJavaStage = javaStage;
   rustStage = undefined;
   goStage = undefined;
+  javaStage = undefined;
   try {
     await Promise.all([
       activeRustStage?.shutdown({ type: "shutdown" }),
       activeGoStage?.shutdown({ type: "shutdown" }),
+      activeJavaStage?.shutdown({ type: "shutdown", assetBaseUrl: assetBaseUrl(JAVA_COMPILER_ASSET_PATH) }),
     ]);
   } finally {
     try {

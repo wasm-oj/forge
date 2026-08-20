@@ -37,8 +37,13 @@ import type {
 import { RUST_COMPILE_TIMEOUT_MS, RUST_TOOLCHAIN } from "../compiler/rust-toolchain.ts";
 import type { GoCompileRequest, GoCompileResult } from "../compiler/go-toolchain.ts";
 import { GO_COMPILE_TIMEOUT_MS, GO_TOOLCHAIN } from "../compiler/go-toolchain.ts";
+import type { JavaCompileRequest, JavaCompileResult } from "../compiler/java-toolchain.ts";
+import { JAVA_COMPILE_TIMEOUT_MS } from "../compiler/java-toolchain.ts";
 import { initializeServerWasmerSdk } from "./wasmer-runtime.ts";
 import {
+  JAVA_COMPILER_ASSET_PATH,
+  JAVA_COMPILE_CLASSLIB_ASSET_PATH,
+  JAVA_RUNTIME_CLASSLIB_ASSET_PATH,
   PYTHON_PACKAGE_ASSET_PATH,
 } from "../core/toolchains.ts";
 import { BoundedByteCollector, readBoundedRegularFile } from "./bounded-transport.ts";
@@ -174,6 +179,7 @@ export class ServerCompiler implements Compiler {
         compileRust: (request) => this.compileRust(request),
         compilePython: (request) => this.compilePython(request),
         compileGo: (request) => this.compileGo(request),
+        compileJava: (request) => this.compileJava(request),
         progress: (_requestId, phase, label, value) => {
           if (!this.isCurrent(operation)) return;
           const progress = { phase, label, progress: value };
@@ -432,6 +438,25 @@ export class ServerCompiler implements Compiler {
     return {
       ...result,
       diagnostics: parseGoDiagnostics(result.stderr),
+      wasm: result.wasmBase64
+        ? new Uint8Array(Buffer.from(result.wasmBase64, "base64"))
+        : undefined,
+    };
+  }
+
+  private async compileJava(request: JavaCompileRequest): Promise<JavaCompileResult> {
+    const result = await this.runCompilerStage<Omit<JavaCompileResult, "wasm"> & { wasmBase64?: string }>(
+      "java-stage.mjs",
+      { request },
+      JAVA_COMPILE_TIMEOUT_MS,
+      [
+        JAVA_COMPILER_ASSET_PATH,
+        JAVA_COMPILE_CLASSLIB_ASSET_PATH,
+        JAVA_RUNTIME_CLASSLIB_ASSET_PATH,
+      ],
+    );
+    return {
+      ...result,
       wasm: result.wasmBase64
         ? new Uint8Array(Buffer.from(result.wasmBase64, "base64"))
         : undefined,

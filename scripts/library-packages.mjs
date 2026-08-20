@@ -206,6 +206,21 @@ export const TOOLCHAIN_PACKAGES = Object.freeze([
       "wasi-libc-b9ef79d-musl-MIT.txt",
     ],
   }),
+  toolchain("toolchain-java", {
+    id: "java-teavm",
+    toolchainVersion: "teavm-0.13.1-wasi",
+    languages: ["java"],
+    targets: ["wasip1"],
+    assets: [
+      "java-teavm-0.13.1.compile-classlib.bin",
+      "java-teavm-0.13.1.runtime-classlib.bin",
+      "java-teavm-0.13.1.wasi.compiler.webc.gz.bin",
+    ],
+    licenses: [
+      "Apache-2.0.txt",
+      "openjdk-21-GPL-2.0-with-Classpath-exception.txt",
+    ],
+  }),
 ]);
 
 export const PUBLIC_PACKAGES = Object.freeze([...CODE_PACKAGES, ...TOOLCHAIN_PACKAGES]);

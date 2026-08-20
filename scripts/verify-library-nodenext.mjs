@@ -2,11 +2,13 @@ import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { promisify } from "node:util";
 import { resolveTypeScriptCli } from "./typescript-cli.mjs";
 import { PUBLIC_PACKAGES, packagesRoot, repositoryRoot } from "./library-packages.mjs";
 
 const run = promisify(execFile);
+const require = createRequire(import.meta.url);
 const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-nodenext-consumer-"));
 
 try {
@@ -83,6 +85,7 @@ import { browserSource as rustBrowser } from "@wasm-oj/toolchain-rust";
 import { browserSource as goBrowser } from "@wasm-oj/toolchain-go";
 import { browserSource as pythonBrowser } from "@wasm-oj/toolchain-python";
 import { browserSource as javascriptBrowser } from "@wasm-oj/toolchain-javascript";
+import { browserSource as javaBrowser, serverSource as javaServer } from "@wasm-oj/toolchain-java";
 
 const browserSources: readonly BrowserToolchainSource[] = [
   clangBrowser("/assets/wasm-oj/clang/"),
@@ -90,8 +93,9 @@ const browserSources: readonly BrowserToolchainSource[] = [
   goBrowser("/assets/wasm-oj/go/"),
   pythonBrowser("/assets/wasm-oj/python/"),
   javascriptBrowser("/assets/wasm-oj/javascript/"),
+  javaBrowser("/assets/wasm-oj/java/"),
 ];
-const serverSources: readonly ServerToolchainSource[] = [clangServer()];
+const serverSources: readonly ServerToolchainSource[] = [clangServer(), javaServer()];
 const descriptor: ToolchainDescriptor = browserSources[0]!.descriptor;
 const browserEngine: Promise<Engine> = createBrowserEngine({ toolchains: browserSources });
 const serverEngine: Promise<Engine> = createServerEngine({
@@ -191,21 +195,36 @@ if (
 
 async function packInstalledRuntimeDependencies() {
   const publicNames = new Set(PUBLIC_PACKAGES.map((definition) => definition.name));
-  const queue = PUBLIC_PACKAGES.flatMap((definition) => definition.runtimeDependencies ?? [])
-    .filter((name) => !publicNames.has(name));
+  const queue = PUBLIC_PACKAGES.flatMap((definition) => (definition.runtimeDependencies ?? [])
+    .map((name) => ({ name, from: repositoryRoot })))
+    .filter(({ name }) => !publicNames.has(name));
   const tarballs = new Map();
   while (queue.length > 0) {
-    const name = queue.shift();
+    const { name, from } = queue.shift();
     if (tarballs.has(name)) continue;
-    const packageRoot = path.join(repositoryRoot, "node_modules", name);
+    const packageRoot = await resolvePackageRoot(name, from);
     const manifest = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
     if (manifest.name !== name) throw new Error(`Installed dependency '${name}' has package identity '${manifest.name}'.`);
     tarballs.set(name, await packPackage(packageRoot, name));
     for (const dependency of Object.keys(manifest.dependencies ?? {})) {
-      if (!publicNames.has(dependency) && !tarballs.has(dependency)) queue.push(dependency);
+      if (!publicNames.has(dependency) && !tarballs.has(dependency)) queue.push({ name: dependency, from: packageRoot });
     }
   }
   return tarballs;
+}
+
+async function resolvePackageRoot(name, from) {
+  let current = path.dirname(require.resolve(name, { paths: [from] }));
+  while (current !== path.dirname(current)) {
+    try {
+      const manifest = JSON.parse(await readFile(path.join(current, "package.json"), "utf8"));
+      if (manifest.name === name) return current;
+    } catch {
+      // Keep walking until the package boundary is found.
+    }
+    current = path.dirname(current);
+  }
+  throw new Error(`Unable to locate package root for '${name}'.`);
 }
 
 async function packPackage(packageRoot, packageName) {

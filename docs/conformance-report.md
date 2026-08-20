@@ -86,3 +86,26 @@ charged. Raw cost and the complete opcode map remain in every transcript.
 
 The raw experiment remains available in repository history. Do not use its
 identifiers or measurements as WASM-OJ v2 compatibility evidence.
+
+## Current contract-2 Java server evidence
+
+The Java/WASI profile is implemented as a downstream toolchain profile for
+contract 2. The server-native full conformance run passed all 26 declared
+cases, including Java stdout, exception handling, empty release, and empty
+debug programs. Browser parity is not claimed here because the current
+WASM-OJ application does not expose a browser conformance route.
+
+| Case | Raw execution cost | Empty-program baseline | Net execution cost | Result |
+| --- | ---: | ---: | ---: | --- |
+| Java / wasip1 | 53,958 | 2,907 | 51,051 | pass |
+| Java / wasip1 / exceptions | 33,851 | 2,907 | 30,944 | pass |
+| Java / wasip1 / empty release | 2,907 | 2,907 | 0 | pass |
+| Java / wasip1 / empty debug | 2,907 | 2,907 | 0 | pass |
+
+The `2,907` baseline is the measured weighted execution cost of the empty
+Java `main` for both pinned optimization profiles. Three server-native reruns
+per profile produced the same value. It covers the fixed TeaVM runtime and
+class-library startup path plus the empty program; compilation wall time is a
+separate host-side measurement. The profile key binds the compiler assets,
+class libraries, runtime, target, optimization, and meter model, so any input
+change requires a new calibration.

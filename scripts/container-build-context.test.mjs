@@ -63,6 +63,7 @@ test("judge image exposes its immutable runtime graph to wasmoj before committin
     "@wasm-oj/toolchain-clang",
     "@wasm-oj/toolchain-go",
     "@wasm-oj/toolchain-javascript",
+    "@wasm-oj/toolchain-java",
     "@wasm-oj/toolchain-python",
     "@wasm-oj/toolchain-rust",
   ]) {

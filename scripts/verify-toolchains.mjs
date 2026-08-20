@@ -15,6 +15,12 @@ import {
   GO_PACKAGE_MANIFEST_ASSET_PATH,
   GO_STANDARD_LIBRARY_ASSET_PATH,
   GO_VERSION,
+  JAVA_COMPILER_ASSET_PATH,
+  JAVA_COMPILER_PACKAGE_SHA256,
+  JAVA_COMPILE_CLASSLIB_ASSET_PATH,
+  JAVA_COMPILE_CLASSLIB_SHA256,
+  JAVA_RUNTIME_CLASSLIB_ASSET_PATH,
+  JAVA_RUNTIME_CLASSLIB_SHA256,
   PINNED_TOOLCHAIN_ASSET_SHA256,
   QUICKJS_ASSET_PATH,
   PYTHON_COMPRESSED_PACKAGE_SHA256,
@@ -380,6 +386,28 @@ try {
     throw new Error("Go standard-library archive does not match its canonical package index.");
   }
   process.stdout.write("verified Go WebC commands and deterministic standard-library archive\n");
+
+  const javaCompressed = await readFile(path.join(directory, path.basename(JAVA_COMPILER_ASSET_PATH)));
+  const javaWebc = gunzipSync(javaCompressed);
+  if (createHash("sha256").update(javaWebc).digest("hex") !== JAVA_COMPILER_PACKAGE_SHA256) {
+    throw new Error("Java compiler WebC expanded digest does not match its toolchain contract.");
+  }
+  const javaWebcPath = path.join(temporary, "java-teavm-0.13.1.wasi.compiler.webc");
+  await writeFile(javaWebcPath, javaWebc, { flag: "wx" });
+  await run("cargo", [
+    "run", "--locked", "--release", "--quiet",
+    "--manifest-path", path.resolve("tools/package-java-webc/Cargo.toml"),
+    "--", "--verify", javaWebcPath,
+  ], { maxBuffer: 4 * 1024 * 1024 });
+  const javaCompileClasslib = await readFile(path.join(directory, path.basename(JAVA_COMPILE_CLASSLIB_ASSET_PATH)));
+  const javaRuntimeClasslib = await readFile(path.join(directory, path.basename(JAVA_RUNTIME_CLASSLIB_ASSET_PATH)));
+  if (
+    createHash("sha256").update(javaCompileClasslib).digest("hex") !== JAVA_COMPILE_CLASSLIB_SHA256
+    || createHash("sha256").update(javaRuntimeClasslib).digest("hex") !== JAVA_RUNTIME_CLASSLIB_SHA256
+  ) {
+    throw new Error("Java class-library asset digest does not match its toolchain contract.");
+  }
+  process.stdout.write("verified Java compiler WebC imports and class-library asset digests\n");
 
   const inspection = await run(process.execPath, [
     "--experimental-strip-types",

@@ -63,6 +63,9 @@ export function createSdkProject(input: CompileInput): Project {
   if (isBuiltinLanguage(input.language) && !TOOLCHAINS[input.language].targets.includes(target)) {
     throw new Error(`${input.language} does not support the ${target.toUpperCase()} target.`);
   }
+  if (input.language === "java" && target !== "wasip1") {
+    throw new Error("Java does not support the WASIX target.");
+  }
   const optimization = input.optimization ?? "release";
   if (optimization !== "debug" && optimization !== "release") {
     throw new Error(`Unsupported optimization level '${String(optimization)}'.`);

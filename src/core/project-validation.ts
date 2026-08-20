@@ -155,6 +155,9 @@ function assertProjectConfig(value: unknown): asserts value is ProjectConfig {
   ) {
     throw new Error(`Project target '${config.target}' is unsupported for built-in language '${config.language}'.`);
   }
+  if (config.language === "java" && config.target !== "wasip1") {
+    throw new Error("Project target 'wasix' is unsupported for Java.");
+  }
   requiredTrimmedString(config.entry, "Project entry", 4_096);
   assertStringArray(config.args, "Project arguments");
   if (typeof config.stdin !== "string") throw new Error("Project stdin must be a string.");

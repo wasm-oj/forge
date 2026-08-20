@@ -137,6 +137,7 @@ async function buildServerStages(stagingDir, definition) {
     "python-stage",
     "rustc-stage",
     "go-stage",
+    "java-stage",
   ];
   await build({
     configFile: false,
