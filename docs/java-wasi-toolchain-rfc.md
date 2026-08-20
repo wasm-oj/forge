@@ -39,6 +39,19 @@ The profile deliberately supports only `wasip1`; WASIX is rejected. Java
 `try/catch` is lowered by TeaVM software runtime handling, so the WASM-OJ runner
 does not need a new exception mechanism.
 
+## Cost calibration
+
+The pinned Java profile measures an empty `public static void main(String[] args) {}`
+at exactly `2,907` weighted instructions for both `debug` and `release`. Three
+server-native reruns produced the same raw cost for each profile. The default
+cost-baseline registry subtracts this fixed startup cost, so the empty program
+reports net cost `0`; compilation wall time is a separate host-side measurement
+and is not part of the deterministic instruction budget.
+
+The calibration key includes the Java compiler assets, class libraries, WASM-OJ
+runtime identity, target, optimization, and meter model. Any change to those
+inputs creates a new profile and requires a new empty-program measurement.
+
 ## Rejected candidates
 
 | Candidate | Current output | Contract result |

@@ -1,6 +1,7 @@
 import { costProfileId, isCostProfileFor } from "./cost-profile";
 import { WEIGHTED_METER_MODEL } from "./resources";
 import { isBuiltinLanguage, type BuildArtifact, type ExecutionMetrics } from "./types";
+import { DEFAULT_COST_BASELINES } from "./cost-baselines";
 
 export interface RawExecutionMetrics {
   cost: number;
@@ -49,13 +50,13 @@ export class CostBaselineRegistry {
 }
 
 export function createDefaultCostBaselineRegistry(): CostBaselineRegistry {
-  return new CostBaselineRegistry();
+  return new CostBaselineRegistry(DEFAULT_COST_BASELINES);
 }
 
 export function createExtendedCostBaselineRegistry(
   additional: Readonly<Record<string, number>> = {},
 ): CostBaselineRegistry {
-  return new CostBaselineRegistry(additional);
+  return new CostBaselineRegistry({ ...DEFAULT_COST_BASELINES, ...additional });
 }
 
 export function resolveCostBudget(
@@ -93,7 +94,11 @@ export function resolveArtifactCostBudget(
       + `${artifact.language}/${artifact.target}/${artifact.optimization}.`,
     );
   }
-  return resolveCostBudget(artifact.costProfile, netInstructionBudget, registry);
+  const budget = resolveCostBudget(artifact.costProfile, netInstructionBudget, registry);
+  if (artifact.language === "java" && budget.baselineCost === 0) {
+    throw new Error(`Java cost profile '${artifact.costProfile}' has no calibrated empty-program baseline.`);
+  }
+  return budget;
 }
 
 export function normalizeExecutionMetrics(
