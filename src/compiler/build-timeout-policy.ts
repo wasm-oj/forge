@@ -14,6 +14,7 @@ export const RUST_BUILD_CONTROL_TIMEOUT_MS = RUST_COMPILE_TIMEOUT_MS + 10_000;
  * JavaScript event loop and therefore cannot enforce its own timer.
  */
 export function buildControlTimeoutMs(language: Language): number {
+  if (language === "java") return DEFAULT_BUILD_CONTROL_TIMEOUT_MS + 70_000;
   if (!isBuiltinLanguage(language)) {
     throw new Error(`The built-in WASM-OJ compiler does not support language '${language}'.`);
   }

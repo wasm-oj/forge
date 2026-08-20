@@ -7,6 +7,7 @@ export const SERVER_STAGE_SCRIPTS = Object.freeze([
   "python-stage.mjs",
   "rustc-stage.mjs",
   "go-stage.mjs",
+  "java-stage.mjs",
 ] as const);
 
 export type ServerStageScript = typeof SERVER_STAGE_SCRIPTS[number];

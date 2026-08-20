@@ -37,7 +37,8 @@ pnpm add @wasm-oj/browser \
   @wasm-oj/toolchain-rust \
   @wasm-oj/toolchain-go \
   @wasm-oj/toolchain-python \
-  @wasm-oj/toolchain-javascript
+  @wasm-oj/toolchain-javascript \
+  @wasm-oj/toolchain-java
 ```
 
 Each package exports an immutable contract-2 `descriptor`, `browserSource(baseUrl)`, and
@@ -61,6 +62,7 @@ import { browserSource as rustSource } from "@wasm-oj/toolchain-rust";
 import { browserSource as goSource } from "@wasm-oj/toolchain-go";
 import { browserSource as pythonSource } from "@wasm-oj/toolchain-python";
 import { browserSource as javascriptSource } from "@wasm-oj/toolchain-javascript";
+import { browserSource as javaSource } from "@wasm-oj/toolchain-java";
 
 await registerToolchainCache({
   scriptUrl: "/toolchain-cache-sw.js",
@@ -82,6 +84,7 @@ const engine = await createBrowserEngine({
     goSource(baseUrl),
     pythonSource(baseUrl),
     javascriptSource(baseUrl),
+    javaSource(baseUrl),
   ],
   artifactCache: true,
   dependencyNetworkAuthorizer: dependencyConsent,
@@ -114,6 +117,7 @@ import { serverSource as rustSource } from "@wasm-oj/toolchain-rust";
 import { serverSource as goSource } from "@wasm-oj/toolchain-go";
 import { serverSource as pythonSource } from "@wasm-oj/toolchain-python";
 import { serverSource as javascriptSource } from "@wasm-oj/toolchain-javascript";
+import { serverSource as javaSource } from "@wasm-oj/toolchain-java";
 
 const engine = await createServerEngine({
   runtimeDirectory: "/srv/wasm-oj/runtime/release",
@@ -124,6 +128,7 @@ const engine = await createServerEngine({
     goSource(),
     pythonSource(),
     javascriptSource(),
+    javaSource(),
   ],
 });
 ```

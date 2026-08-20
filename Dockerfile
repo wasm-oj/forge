@@ -13,6 +13,7 @@ COPY packages/toolchain-clang/package.json ./packages/toolchain-clang/package.js
 COPY packages/toolchain-rust/package.json ./packages/toolchain-rust/package.json
 COPY packages/toolchain-python/package.json ./packages/toolchain-python/package.json
 COPY packages/toolchain-javascript/package.json ./packages/toolchain-javascript/package.json
+COPY packages/toolchain-java/package.json ./packages/toolchain-java/package.json
 COPY packages/toolchain-go/package.json ./packages/toolchain-go/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
@@ -68,7 +69,7 @@ RUN mkdir -p /app/release \
     WASM_OJ_GIT_COMMIT="$WASM_OJ_GIT_COMMIT" \
     node /app/container/generate-identity.mjs \
   && chmod a-w /app/release /app/release/container-identity.json \
-  && runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node --input-type=module -e "const dependencies = ['@wasm-oj/core', '@wasm-oj/server', '@wasm-oj/toolchain-clang', '@wasm-oj/toolchain-go', '@wasm-oj/toolchain-javascript', '@wasm-oj/toolchain-python', '@wasm-oj/toolchain-rust']; await Promise.all(dependencies.map((dependency) => import(dependency))); const { loadEmbeddedContainerIdentity } = await import('/app/container/identity.mjs'); await loadEmbeddedContainerIdentity();" \
+  && runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node --input-type=module -e "const dependencies = ['@wasm-oj/core', '@wasm-oj/server', '@wasm-oj/toolchain-clang', '@wasm-oj/toolchain-go', '@wasm-oj/toolchain-javascript', '@wasm-oj/toolchain-java', '@wasm-oj/toolchain-python', '@wasm-oj/toolchain-rust']; await Promise.all(dependencies.map((dependency) => import(dependency))); const { loadEmbeddedContainerIdentity } = await import('/app/container/identity.mjs'); await loadEmbeddedContainerIdentity();" \
   && runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node /app/container/runtime-smoke.mjs \
   && runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node -e "const fs=require('node:fs/promises');const targets=['/app/release/container-identity.json','/app/runtime/wasm-oj-compiler','/app/runtime/wasm-oj-runner'];Promise.all(targets.flatMap((p)=>[fs.access(p,2).then(()=>{throw new Error('wasmoj can write '+p)},()=>{}),fs.unlink(p).then(()=>{throw new Error('wasmoj can delete '+p)},(error)=>{if(!['EACCES','EPERM'].includes(error.code))throw error})])).catch((error)=>{console.error(error);process.exit(1)})"
 USER wasmoj

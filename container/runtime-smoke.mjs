@@ -3,6 +3,7 @@ import { createServerEngine } from "@wasm-oj/server";
 import { serverSource as clangToolchain } from "@wasm-oj/toolchain-clang";
 import { serverSource as goToolchain } from "@wasm-oj/toolchain-go";
 import { serverSource as javascriptToolchain } from "@wasm-oj/toolchain-javascript";
+import { serverSource as javaToolchain } from "@wasm-oj/toolchain-java";
 import { serverSource as pythonToolchain } from "@wasm-oj/toolchain-python";
 import { serverSource as rustToolchain } from "@wasm-oj/toolchain-rust";
 import { loadEmbeddedContainerIdentity } from "./identity.mjs";
@@ -16,6 +17,7 @@ const toolchains = Object.freeze([
   pythonToolchain(),
   javascriptToolchain(),
   goToolchain(),
+  javaToolchain(),
 ].map((source) => Object.freeze({
   ...source,
   directory: new URL("file:///app/public/toolchains/"),

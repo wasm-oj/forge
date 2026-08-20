@@ -5,7 +5,7 @@ import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "../core/contract.ts";
 import { LANGUAGES, type ServerToolchainSource, type ToolchainProfile } from "../core/types.ts";
 import { PINNED_TOOLCHAIN_ASSET_SHA256 } from "../core/toolchains.ts";
 
-const TEST_LANGUAGES = Object.freeze([...LANGUAGES, "zig"]);
+const TEST_LANGUAGES = Object.freeze([...LANGUAGES, "java", "zig"]);
 const PROFILES: readonly ToolchainProfile[] = Object.freeze(TEST_LANGUAGES.flatMap((language) => {
   const targets = language === "c" || language === "cpp" ? ["wasip1", "wasix"] as const : ["wasip1"] as const;
   return targets.flatMap((target) => (["debug", "release"] as const).map((optimization) => Object.freeze({

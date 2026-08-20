@@ -106,6 +106,24 @@ const definitions = [
     licenses: ["licenses/go-BSD-3-Clause.txt"],
   },
   {
+    id: "java-teavm",
+    name: "TeaVM Java WASI compiler and OpenJDK class library",
+    version: "teavm-0.13.1-wasi",
+    source: {
+      url: "https://github.com/konsoletyper/teavm-javac",
+      revision: "teavm-javac@7e4a44cf521694a4e326e33850dd8aec165eb5c9; teavm@b3a245b7d9034ff35cdfab2def057a3d4f256efb plus WASI compiler patch",
+    },
+    files: [
+      "public/toolchains/java-teavm-0.13.1.compile-classlib.bin",
+      "public/toolchains/java-teavm-0.13.1.runtime-classlib.bin",
+      "public/toolchains/java-teavm-0.13.1.wasi.compiler.webc.gz.bin",
+    ],
+    licenses: [
+      "licenses/Apache-2.0.txt",
+      "licenses/openjdk-21-GPL-2.0-with-Classpath-exception.txt",
+    ],
+  },
+  {
     id: "quickjs-ng",
     name: "QuickJS-ng",
     version: "0.15.1",

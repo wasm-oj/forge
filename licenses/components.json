@@ -190,6 +190,42 @@
       ]
     },
     {
+      "id": "java-teavm",
+      "name": "TeaVM Java WASI compiler and OpenJDK class library",
+      "version": "teavm-0.13.1-wasi",
+      "source": {
+        "url": "https://github.com/konsoletyper/teavm-javac",
+        "revision": "teavm-javac@7e4a44cf521694a4e326e33850dd8aec165eb5c9; teavm@b3a245b7d9034ff35cdfab2def057a3d4f256efb plus WASI compiler patch"
+      },
+      "distributions": [
+        {
+          "kind": "file",
+          "path": "public/toolchains/java-teavm-0.13.1.compile-classlib.bin",
+          "sha256": "acfe3fb09e5f2c0c7c8dc2339c66fcdadc1f8e1bf1c74be446926175ef770868"
+        },
+        {
+          "kind": "file",
+          "path": "public/toolchains/java-teavm-0.13.1.runtime-classlib.bin",
+          "sha256": "21a9394586e416af2fca4eb0ed08521cbc8924e1d1afaa07863a59a3cfae54ab"
+        },
+        {
+          "kind": "file",
+          "path": "public/toolchains/java-teavm-0.13.1.wasi.compiler.webc.gz.bin",
+          "sha256": "129f1f51d591e58954f88787d36396b856a9a68ba3ae9c9d14f20bd67c2c7722"
+        }
+      ],
+      "licenseFiles": [
+        {
+          "path": "licenses/Apache-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "licenses/openjdk-21-GPL-2.0-with-Classpath-exception.txt",
+          "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726"
+        }
+      ]
+    },
+    {
       "id": "quickjs-ng",
       "name": "QuickJS-ng",
       "version": "0.15.1",

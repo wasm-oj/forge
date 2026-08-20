@@ -86,6 +86,7 @@
     "@wasm-oj/toolchain-clang": "workspace:0.1.0",
     "@wasm-oj/toolchain-go": "workspace:0.1.0",
     "@wasm-oj/toolchain-javascript": "workspace:0.1.0",
+    "@wasm-oj/toolchain-java": "workspace:0.1.0",
     "@wasm-oj/toolchain-python": "workspace:0.1.0",
     "@wasm-oj/toolchain-rust": "workspace:0.1.0",
     "@wasmer/sdk": "0.10.0",

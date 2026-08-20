@@ -74,6 +74,16 @@ export const GO_COMPRESSED_STANDARD_LIBRARY_SHA256 = "aeffc384fdc624544f174ba5fc
 export const GO_STANDARD_LIBRARY_SHA256 = "e1ec64b08efd02b35b7ffdaf3970875aaae98325fa4795eafca94ebae2d0d192";
 export const GO_COMPILER_SHA256 = "9e557f5b86961fd604217d7521461c5d2b7322e383fa30dead5669b77db12201";
 export const GO_LINKER_SHA256 = "2eefca10af935a307ab7946447146bd30e0ea0fb5460be54dc1c55844d155580";
+export const JAVA_VERSION = "teavm-0.13.1-wasi";
+export const JAVA_COMPILER_PACKAGE = `wasm-oj/java-teavm@${JAVA_VERSION}`;
+export const JAVA_COMPILER_ASSET_PATH = "/toolchains/java-teavm-0.13.1.wasi.compiler.webc.gz.bin";
+export const JAVA_COMPILE_CLASSLIB_ASSET_PATH = "/toolchains/java-teavm-0.13.1.compile-classlib.bin";
+export const JAVA_RUNTIME_CLASSLIB_ASSET_PATH = "/toolchains/java-teavm-0.13.1.runtime-classlib.bin";
+export const JAVA_COMPILER_COMPRESSED_PACKAGE_SHA256 = "129f1f51d591e58954f88787d36396b856a9a68ba3ae9c9d14f20bd67c2c7722";
+export const JAVA_COMPILER_PACKAGE_SHA256 = "f8f86761cf31062565187e4a66f73b6903f257fe84c0ce70ea1cd28441b6c2e9";
+export const JAVA_COMPILER_SHA256 = "33a0d662395256f10a5d02ea305fc7b18007b2b8fe8996859017b084d3d19735";
+export const JAVA_COMPILE_CLASSLIB_SHA256 = "acfe3fb09e5f2c0c7c8dc2339c66fcdadc1f8e1bf1c74be446926175ef770868";
+export const JAVA_RUNTIME_CLASSLIB_SHA256 = "21a9394586e416af2fca4eb0ed08521cbc8924e1d1afaa07863a59a3cfae54ab";
 
 export const PINNED_TOOLCHAIN_ASSET_SHA256 = Object.freeze<Record<string, string>>({
   [CLANG_PACKAGE_ASSET_PATH]: CLANG_COMPRESSED_PACKAGE_SHA256,
@@ -91,6 +101,9 @@ export const PINNED_TOOLCHAIN_ASSET_SHA256 = Object.freeze<Record<string, string
   [GO_PACKAGE_ASSET_PATH]: GO_COMPRESSED_PACKAGE_SHA256,
   [GO_PACKAGE_MANIFEST_ASSET_PATH]: GO_PACKAGE_MANIFEST_SHA256,
   [GO_STANDARD_LIBRARY_ASSET_PATH]: GO_COMPRESSED_STANDARD_LIBRARY_SHA256,
+  [JAVA_COMPILER_ASSET_PATH]: JAVA_COMPILER_COMPRESSED_PACKAGE_SHA256,
+  [JAVA_COMPILE_CLASSLIB_ASSET_PATH]: JAVA_COMPILE_CLASSLIB_SHA256,
+  [JAVA_RUNTIME_CLASSLIB_ASSET_PATH]: JAVA_RUNTIME_CLASSLIB_SHA256,
 });
 
 const TOOLCHAIN_CONTENT_SHA256: Readonly<Record<BuiltinLanguage, readonly string[]>> = Object.freeze({
@@ -132,6 +145,15 @@ const TOOLCHAIN_CONTENT_SHA256: Readonly<Record<BuiltinLanguage, readonly string
 
 /** Exact executable/compiler content used by cache keys and cost calibration. */
 export function toolchainContentIdentity(language: Language): string {
+  if (language === "java") {
+    return [
+      JAVA_COMPILER_COMPRESSED_PACKAGE_SHA256,
+      JAVA_COMPILER_PACKAGE_SHA256,
+      JAVA_COMPILER_SHA256,
+      JAVA_COMPILE_CLASSLIB_SHA256,
+      JAVA_RUNTIME_CLASSLIB_SHA256,
+    ].join(".");
+  }
   if (!isBuiltinLanguage(language)) throw new Error(`WASM-OJ has no built-in toolchain for '${language}'.`);
   return TOOLCHAIN_CONTENT_SHA256[language].join(".");
 }
@@ -239,6 +261,14 @@ export const TOOLCHAINS: Readonly<Record<BuiltinLanguage, Readonly<ToolchainDefi
 });
 
 export function toolchainCacheIdentity(language: Language) {
+  if (language === "java") {
+    return {
+      wasmOjContract: WASM_OJ_CONTRACT_VERSION,
+      version: JAVA_VERSION,
+      compilerPackages: [JAVA_COMPILER_PACKAGE],
+      contentSha256: toolchainContentIdentity(language).split("."),
+    };
+  }
   if (!isBuiltinLanguage(language)) throw new Error(`WASM-OJ has no built-in toolchain for '${language}'.`);
   const toolchain = TOOLCHAINS[language];
   return {
@@ -251,6 +281,7 @@ export function toolchainCacheIdentity(language: Language) {
 }
 
 export function toolchainPackageIdentities(language: Language): string[] {
+  if (language === "java") return [JAVA_COMPILER_PACKAGE];
   if (!isBuiltinLanguage(language)) throw new Error(`WASM-OJ has no built-in toolchain for '${language}'.`);
   const toolchain = TOOLCHAINS[language];
   return [...new Set([
@@ -273,10 +304,12 @@ export function extensionLanguage(path: string): Language | undefined {
     js: "javascript",
     ts: "typescript",
     go: "go",
+    java: "java",
   } as Record<string, Language | undefined>)[extension];
 }
 
 export function languageLabel(language: Language): string {
+  if (language === "java") return "Java";
   if (!isBuiltinLanguage(language)) return language;
-  return ({ c: "C", cpp: "C++", rust: "Rust", python: "Python", javascript: "JavaScript", typescript: "TypeScript", go: "Go" })[language];
+  return ({ c: "C", cpp: "C++", rust: "Rust", python: "Python", javascript: "JavaScript", typescript: "TypeScript", go: "Go", java: "Java" })[language];
 }

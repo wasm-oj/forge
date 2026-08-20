@@ -2,9 +2,10 @@
 
 ## Status
 
-Java is not a built-in WASM-OJ language yet. This is intentional: adding
-`java` to the language list without a compatible compiler and runtime would
-make browser preview and Official Submit disagree.
+WASM-OJ now ships Java as an explicit downstream toolchain profile. It is not in
+the default `LANGUAGES` list yet: promotion requires a published TeaVM source
+revision and a browser conformance host that is part of the WASM-OJ application.
+The implemented server path is contract-2 compatible and uses no host JVM.
 
 ## Contract that Java must satisfy
 
@@ -25,30 +26,42 @@ The implementation must not invoke a host JVM or host `javac` for contestant
 source. That would bypass the compiler isolation, artifact identity, and
 browser/server parity guarantees of the WASM-OJ contract.
 
-## Current candidates
+## Current implementation
+
+The Java profile uses a patched TeaVM 0.13.1 WASI compiler plus separate
+compile-time and runtime OpenJDK class-library assets. The compiler is packaged
+as a digest-pinned WebC command and invoked by the existing browser/server
+WASI stages. Java source diagnostics, package-qualified `main` classes,
+stdin/stdout, deterministic runner policy, and Java exception handling are
+covered by the server conformance cases.
+
+The profile deliberately supports only `wasip1`; WASIX is rejected. Java
+`try/catch` is lowered by TeaVM software runtime handling, so the WASM-OJ runner
+does not need a new exception mechanism.
+
+## Rejected candidates
 
 | Candidate | Current output | Contract result |
 | --- | --- | --- |
-| TeaVM | WebAssembly GC plus a JavaScript runtime | Not a standalone WASI module |
+| TeaVM upstream release | WebAssembly GC plus a JavaScript runtime | The upstream artifact is not the pinned standalone WASI compiler used here |
 | GraalVM Web Image | JavaScript launcher plus `.js.wasm` | Depends on a JavaScript host and is experimental |
 | Bytecoder | Browser-oriented WebAssembly module plus JavaScript imports | No WASI stdin/stdout runtime |
 | OpenJDK/JVM bundle | JVM process or embedded JVM | Requires a host runtime and is not a WASI artifact |
 
-These candidates may become useful for a browser-only extension, but none is a
-valid built-in judge toolchain under the current contract.
+These candidates may become useful for a browser-only extension, but they do
+not replace the pinned WASI profile.
 
 ## Proposed landing sequence
 
-1. Select a compiler/runtime pair that emits a standalone WASI module and
-   freeze its exact source revision, license set, and asset digests.
-2. Add an independently versioned `@wasm-oj/toolchain-java` package and a
-   compiler stage that emits contract-2 artifacts.
-3. Add Java conformance cases covering compilation diagnostics, line- and
-   token-oriented input, output, non-zero exit, timeout, memory, filesystem,
-   deterministic time, and deterministic randomness.
-4. Run the same cases through browser and server hosts before adding `java`
-   to the built-in language set.
+1. Publish the patched TeaVM compiler source and freeze its public revision,
+   license set, and asset digests.
+2. Keep the independently versioned `@wasm-oj/toolchain-java` package and
+   compiler stages explicit until the browser host exposes the same conformance
+   harness.
+3. Expand Java conformance to resource, filesystem, clock, and randomness
+   cases.
+4. Add `java` to the built-in language set only after both hosts run that
+   matrix from the published package.
 
-Until step 1 is possible, Java should remain a downstream extension or use a
-separate non-WASM-OJ judge path. It must not be represented as a WASM-OJ built-in
-language with a fallback JVM command.
+Until step 1 is complete, Java remains an opt-in downstream extension. It must
+not use a fallback JVM command or be represented as a default WASM-OJ language.

@@ -1,7 +1,7 @@
 # WASM-OJ library contract
 
 This document defines the active contract-2 invariants shared by browser and server hosts. Public
-symbols live in the six npm code packages; toolchain bytes live in five independently versioned
+symbols live in the six npm code packages; toolchain bytes live in six independently versioned
 asset packages.
 
 ## Compatibility boundary

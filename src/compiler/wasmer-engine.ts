@@ -19,6 +19,7 @@ import {
   RUST_VERSION,
   TYPESCRIPT_ASSET_PATH,
   TYPESCRIPT_VERSION,
+  toolchainContentIdentity,
   toolchainPackageIdentities,
 } from "../core/toolchains.ts";
 import { LanguageDriverRegistry } from "./language-driver.ts";
@@ -42,6 +43,8 @@ import type {
 } from "./rust-toolchain.ts";
 import type { PythonFrontendRequest, PythonFrontendResult } from "./python-toolchain.ts";
 import type { GoCompileRequest, GoCompileResult } from "./go-toolchain.ts";
+import type { JavaCompileRequest, JavaCompileResult } from "./java-toolchain.ts";
+import { javaMainClass } from "./java-toolchain.ts";
 import { buildClangWithSdkDirect } from "./sdk-direct-clang.ts";
 import {
   assertProjectDependencyEcosystem,
@@ -60,6 +63,7 @@ export interface WasmerCompilerHost {
   compileRust(request: RustCompileRequest): Promise<RustCompileResult>;
   compilePython(request: PythonFrontendRequest): Promise<PythonFrontendResult>;
   compileGo(request: GoCompileRequest): Promise<GoCompileResult>;
+  compileJava(request: JavaCompileRequest): Promise<JavaCompileResult>;
   progress(requestId: string, phase: WorkerPhase, label: string, value?: number): void;
   trace(requestId: string, operation: CompilerTraceOperation, state: CompilerTraceEvent["state"]): void;
 }
@@ -93,7 +97,7 @@ async function getTypeScriptCompiler(): Promise<Wasmer> {
   }
 }
 
-function createArtifactBase(project: Project, cacheKey: string, started: number, size: number, toolchains: string[]) {
+function createArtifactBase(project: Project, cacheKey: string, started: number, size: number, toolchains: string[], contentIdentity?: string) {
   return {
     wasmOjContract: WASM_OJ_CONTRACT_VERSION,
     id: crypto.randomUUID(),
@@ -111,6 +115,7 @@ function createArtifactBase(project: Project, cacheKey: string, started: number,
       project.config.language,
       project.config.target,
       project.config.optimization,
+      contentIdentity,
     ),
     ...(project.dependencies === undefined ? {} : { dependencyLockSha256: project.dependencies.lockSha256 }),
   } as const;
@@ -235,6 +240,66 @@ async function buildGo(project: Project, cacheKey: string, requestId: string): P
   const artifact: WasmArtifact = {
     kind: "wasm",
     ...createArtifactBase(project, cacheKey, started, compiled.wasm.byteLength, toolchainPackageIdentities("go")),
+    bytes: compiled.wasm,
+  };
+  return {
+    success: true,
+    diagnostics: compiled.diagnostics,
+    artifact,
+    stdout: compiled.stdout,
+    stderr: compiled.stderr,
+    cacheHit: false,
+  };
+}
+
+async function buildJava(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
+  const started = performance.now();
+  const entry = project.files.find((file) => file.path === project.config.entry);
+  if (!entry || !entry.path.endsWith(".java")) {
+    return {
+      success: false,
+      diagnostics: [{
+        severity: "error",
+        message: "The Java entry must be a .java source file.",
+        file: project.config.entry,
+        line: 1,
+        column: 1,
+        source: "project",
+      }],
+      stdout: "",
+      stderr: "",
+      cacheHit: false,
+    };
+  }
+  progress(requestId, "compiling", `Compiling Java ${javaMainClass(entry.path, entry.content)}`, 0.3);
+  const compiled = await requireHost().compileJava({
+    entry: project.config.entry,
+    files: project.files,
+    optimization: project.config.optimization,
+  });
+  if (!compiled.success || !compiled.wasm) {
+    return {
+      success: false,
+      diagnostics: ensureFailureDiagnostic(compiled.diagnostics, {
+        file: project.config.entry,
+        source: "java",
+        message: compiled.stderr.trim() || "Java compilation failed without a diagnostic.",
+      }),
+      stdout: compiled.stdout,
+      stderr: compiled.stderr,
+      cacheHit: false,
+    };
+  }
+  const artifact: WasmArtifact = {
+    kind: "wasm",
+    ...createArtifactBase(
+      project,
+      cacheKey,
+      started,
+      compiled.wasm.byteLength,
+      toolchainPackageIdentities("java"),
+      toolchainContentIdentity("java"),
+    ),
     bytes: compiled.wasm,
   };
   return {
@@ -417,6 +482,11 @@ languageDrivers.register({
   id: "go",
   languages: ["go"],
   build: ({ project, cacheKey, requestId }) => buildGo(project, cacheKey, requestId),
+});
+languageDrivers.register({
+  id: "teavm-java",
+  languages: ["java"],
+  build: ({ project, cacheKey, requestId }) => buildJava(project, cacheKey, requestId),
 });
 
 export function clearCompilerHostCaches(): void {

@@ -42,6 +42,9 @@ importers:
       '@wasm-oj/toolchain-go':
         specifier: workspace:0.1.0
         version: link:packages/toolchain-go
+      '@wasm-oj/toolchain-java':
+        specifier: workspace:0.1.0
+        version: link:packages/toolchain-java
       '@wasm-oj/toolchain-javascript':
         specifier: workspace:0.1.0
         version: link:packages/toolchain-javascript
@@ -221,6 +224,12 @@ importers:
         version: link:../contracts
 
   packages/toolchain-go:
+    dependencies:
+      '@wasm-oj/contracts':
+        specifier: workspace:0.2.0
+        version: link:../contracts
+
+  packages/toolchain-java:
     dependencies:
       '@wasm-oj/contracts':
         specifier: workspace:0.2.0

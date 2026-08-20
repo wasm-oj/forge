@@ -47,6 +47,7 @@ Compiler and runtime assets are independently versioned packages:
 - `@wasm-oj/toolchain-go`
 - `@wasm-oj/toolchain-python`
 - `@wasm-oj/toolchain-javascript`
+- `@wasm-oj/toolchain-java`
 
 Neither `@wasm-oj/sdk` nor a host package installs or selects toolchains implicitly. Every host
 receives an explicit source array. Source registration rejects a missing source, stale contract,
@@ -64,7 +65,8 @@ pnpm add @wasm-oj/browser \
   @wasm-oj/toolchain-rust \
   @wasm-oj/toolchain-go \
   @wasm-oj/toolchain-python \
-  @wasm-oj/toolchain-javascript
+  @wasm-oj/toolchain-javascript \
+  @wasm-oj/toolchain-java
 ```
 
 Applications that prefer one namespace can install `@wasm-oj/sdk` and import
@@ -83,6 +85,7 @@ import { browserSource as rustSource } from "@wasm-oj/toolchain-rust";
 import { browserSource as goSource } from "@wasm-oj/toolchain-go";
 import { browserSource as pythonSource } from "@wasm-oj/toolchain-python";
 import { browserSource as javascriptSource } from "@wasm-oj/toolchain-javascript";
+import { browserSource as javaSource } from "@wasm-oj/toolchain-java";
 
 const toolchainBase = "/toolchains/";
 const engine = await createBrowserEngine({
@@ -92,6 +95,7 @@ const engine = await createBrowserEngine({
     goSource(toolchainBase),
     pythonSource(toolchainBase),
     javascriptSource(toolchainBase),
+    javaSource(toolchainBase),
   ],
   artifactCache: true,
 });
@@ -135,6 +139,7 @@ import { serverSource as rustSource } from "@wasm-oj/toolchain-rust";
 import { serverSource as goSource } from "@wasm-oj/toolchain-go";
 import { serverSource as pythonSource } from "@wasm-oj/toolchain-python";
 import { serverSource as javascriptSource } from "@wasm-oj/toolchain-javascript";
+import { serverSource as javaSource } from "@wasm-oj/toolchain-java";
 
 const engine = await createServerEngine({
   runtimeDirectory: "/srv/wasm-oj/runtime/release",
@@ -145,6 +150,7 @@ const engine = await createServerEngine({
     goSource(),
     pythonSource(),
     javascriptSource(),
+    javaSource(),
   ],
 });
 ```

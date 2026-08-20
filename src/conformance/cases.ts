@@ -239,6 +239,55 @@ export const DEFAULT_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze(
     expect: { code: 0, stdout: "42\n", stderr: "", termination: "exited" },
   },
   {
+    id: "java-wasip1",
+    label: "Java / wasip1",
+    input: {
+      language: "java",
+      target: "wasip1",
+      entry: "Main.java",
+      files: {
+        "Main.java": [
+          "import java.io.BufferedReader;",
+          "import java.io.InputStreamReader;",
+          "import java.util.StringTokenizer;",
+          "public final class Main {",
+          "  public static void main(String[] args) throws Exception {",
+          "    StringTokenizer tokens = new StringTokenizer(new BufferedReader(new InputStreamReader(System.in)).readLine());",
+          "    System.out.println(Integer.parseInt(tokens.nextToken()) + Integer.parseInt(tokens.nextToken()));",
+          "  }",
+          "}",
+          "",
+        ].join("\n"),
+      },
+    },
+    run: { stdin: "7 35\n" },
+    expect: { code: 0, stdout: "42\n", stderr: "", termination: "exited" },
+  },
+  {
+    id: "java-wasip1-exceptions",
+    label: "Java / wasip1 / exceptions",
+    input: {
+      language: "java",
+      target: "wasip1",
+      entry: "Main.java",
+      files: {
+        "Main.java": [
+          "public final class Main {",
+          "  public static void main(String[] args) {",
+          "    try {",
+          "      throw new IllegalArgumentException(\"expected\");",
+          "    } catch (IllegalArgumentException error) {",
+          "      System.out.println(\"caught\");",
+          "    }",
+          "  }",
+          "}",
+          "",
+        ].join("\n"),
+      },
+    },
+    expect: { code: 0, stdout: "caught\n", stderr: "", termination: "exited" },
+  },
+  {
     id: "c-wasip1-virtual-clock",
     label: "C / wasip1 / virtual clock",
     input: {

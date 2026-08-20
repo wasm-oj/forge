@@ -10,6 +10,7 @@ import { createServerEngine } from "@wasm-oj/server";
 import { serverSource as clangToolchain } from "@wasm-oj/toolchain-clang";
 import { serverSource as goToolchain } from "@wasm-oj/toolchain-go";
 import { serverSource as javascriptToolchain } from "@wasm-oj/toolchain-javascript";
+import { serverSource as javaToolchain } from "@wasm-oj/toolchain-java";
 import { serverSource as pythonToolchain } from "@wasm-oj/toolchain-python";
 import { serverSource as rustToolchain } from "@wasm-oj/toolchain-rust";
 import { assertExpectedContainerIdentity, loadEmbeddedContainerIdentity } from "./identity.mjs";
@@ -26,7 +27,7 @@ function containerToolchainSource(source) {
   return Object.freeze({ ...source, directory: new URL("file:///app/public/toolchains/") });
 }
 const toolchains = Object.freeze([
-  clangToolchain(), rustToolchain(), pythonToolchain(), javascriptToolchain(), goToolchain(),
+  clangToolchain(), rustToolchain(), pythonToolchain(), javascriptToolchain(), goToolchain(), javaToolchain(),
 ].map(containerToolchainSource));
 
 class ContainerProtocolError extends Error {
