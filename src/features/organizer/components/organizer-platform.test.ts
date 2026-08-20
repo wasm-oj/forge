@@ -42,6 +42,17 @@ describe("Organizer catalog v2 polling", () => {
     expect(createValidation).not.toMatch(/setValidation\(\{[\s\S]*requestedRef:/);
     expect(createValidation).toContain('result.validation.state === "valid"');
   });
+
+  it("mirrors the CLI exact-resource journey without silently defaulting a mutable ref", async () => {
+    const source = await readFile(new URL("./organizer-platform.tsx", import.meta.url), "utf8");
+    expect(source).toContain('initialSearchParameter("ref")');
+    expect(source).not.toContain('initialSearchParameter("ref", "main")');
+    expect(source).toContain("woj organizer collection build .");
+    expect(source).toContain("woj organizer collection verify .");
+    expect(source).toContain("woj organizer collection validation {validation.id} --watch");
+    expect(source).toContain("woj organizer collection publication {publication.jobId} --watch");
+    expect(source).toContain("setRepositoryId(String(collection.github_repository_id))");
+  });
 });
 
 describe("Organizer one-time contest secrets", () => {

@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { PerformanceLabView, performanceLabIdentity, readPolicySummaryResponse } from "./performance-lab";
-import type { ProblemPerformanceResponse, SubmissionPolicySummaryResponse } from "../model/performance-contract";
+import { PerformanceLabView, performanceLabIdentity } from "./performance-lab";
+import { readSubmissionPolicySummaryResponse, type ProblemPerformanceResponse, type SubmissionPolicySummaryResponse } from "../model/performance-contract";
 
 const SELECTED_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -169,15 +169,15 @@ describe("Performance Lab", () => {
   });
 
   it("classifies policy 404/409 as unavailable while keeping unexpected failures visible", async () => {
-    await expect(readPolicySummaryResponse(new Response(JSON.stringify({ error: { message: "Not found" } }), {
+    await expect(readSubmissionPolicySummaryResponse(new Response(JSON.stringify({ error: { message: "Not found" } }), {
       status: 404,
       headers: { "content-type": "application/json" },
     }), SELECTED_ID)).resolves.toBeNull();
-    await expect(readPolicySummaryResponse(new Response(JSON.stringify({ error: { message: "Not ready" } }), {
+    await expect(readSubmissionPolicySummaryResponse(new Response(JSON.stringify({ error: { message: "Not ready" } }), {
       status: 409,
       headers: { "content-type": "application/json" },
     }), SELECTED_ID)).resolves.toBeNull();
-    await expect(readPolicySummaryResponse(new Response(JSON.stringify({ error: { message: "Database unavailable" } }), {
+    await expect(readSubmissionPolicySummaryResponse(new Response(JSON.stringify({ error: { message: "Database unavailable" } }), {
       status: 503,
       headers: { "content-type": "application/json" },
     }), SELECTED_ID)).rejects.toThrow("Database unavailable");

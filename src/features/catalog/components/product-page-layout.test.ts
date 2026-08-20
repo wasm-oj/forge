@@ -22,7 +22,7 @@ vi.mock("../model/education-model", async () => {
 });
 
 import { ProfileSettings } from "../../profiles/components/profile-settings";
-import { ProblemCatalog } from "./problem-catalog";
+import { CatalogEmptyState, ProblemCatalog } from "./problem-catalog";
 
 test("problem catalog search uses only the toolbar FilterField layout", () => {
   const html = renderToStaticMarkup(createElement(ProblemCatalog));
@@ -38,6 +38,25 @@ test("catalog toolbar search modifier only controls responsive grid placement", 
     .map((match) => match[1].trim());
 
   assert.deepEqual(rules, ["grid-column: 1 / -1;", "grid-column: auto;"]);
+});
+
+test("filtered empty catalog offers one action that clears every filter", () => {
+  const clear = vi.fn();
+  const filtered = renderToStaticMarkup(createElement(CatalogEmptyState, {
+    message: "No problems match these filters.",
+    clearLabel: "Clear all filters",
+    filtered: true,
+    onClear: clear,
+  }));
+  const unfiltered = renderToStaticMarkup(createElement(CatalogEmptyState, {
+    message: "No problems have been published.",
+    clearLabel: "Clear all filters",
+    filtered: false,
+    onClear: clear,
+  }));
+
+  assert.match(filtered, /<button[^>]*>.*Clear all filters<\/button>/u);
+  assert.doesNotMatch(unfiltered, /<button/u);
 });
 
 test("profile settings uses the standard product page width", () => {

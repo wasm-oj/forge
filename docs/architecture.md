@@ -8,6 +8,9 @@ flowchart LR
   CO --> BR["@wasm-oj/browser"]
   CO --> SE["@wasm-oj/server"]
   CO --> OR["@wasm-oj/organizer"]
+  CO --> CLI["@wasm-oj/cli"]
+  SE --> CLI
+  OR --> CLI
   BR --> SDK["@wasm-oj/sdk"]
   SE --> SDK
   OR --> SDK
@@ -17,8 +20,9 @@ flowchart LR
 
 Contracts own only environment-neutral identities and wire types. Core owns orchestration and
 interfaces, not browser or Node.js I/O. Browser, server, and Organizer are sibling adapters. The
-umbrella SDK re-exports these packages and does not embed duplicate core code. Toolchain packages
-are independent content releases registered explicitly with a host.
+umbrella SDK re-exports these packages and does not embed duplicate core code. The CLI composes
+core, server, and Organizer behind the single `woj` executable. Toolchain packages are independent
+content releases registered explicitly with a host.
 
 ## Compile and execution flow
 

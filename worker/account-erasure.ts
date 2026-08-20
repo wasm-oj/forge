@@ -1,4 +1,4 @@
-import { requireMutationSession } from "./auth";
+import { requireBrowserMutationSession } from "./auth";
 import { hmacSha256Hex, sha256Hex } from "./crypto";
 import type { WasmOjWorkerEnv } from "./env";
 import { deleteGithubInstallationClaimsForUser } from "./github-installation-claims";
@@ -263,6 +263,7 @@ async function finalizeAccountErasure(
             installed_by_user_id=NULL, status='removed', updated_at=?
       WHERE installed_by_user_id=?`).bind(now, job.user_id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(job.user_id),
+    env.DB.prepare("DELETE FROM cli_login_flows WHERE approved_user_id=?").bind(job.user_id),
     env.DB.prepare("DELETE FROM github_installation_states WHERE user_id=?").bind(job.user_id),
     env.DB.prepare("DELETE FROM user_roles WHERE user_id=?").bind(job.user_id),
     env.DB.prepare("DELETE FROM users WHERE id=?").bind(job.user_id),
@@ -344,7 +345,7 @@ function clearSessionHeaders(): Headers {
 }
 
 export async function eraseAccount(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   await requireFormalMutationsEnabled(env, request);
   if (env.ACCOUNT_ERASURE_HMAC_SECRET.length < 32) throw new Error("Account erasure secret is not configured.");
   const originalHash = await hmacSha256Hex(env.ACCOUNT_ERASURE_HMAC_SECRET, encoder.encode(session.userId));
@@ -359,6 +360,7 @@ export async function eraseAccount(request: Request, env: WasmOjWorkerEnv): Prom
        WHERE id=? AND status='active'`)
       .bind(jobId, anonymousUserId, now, now, session.userId),
     env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(session.userId),
+    env.DB.prepare("DELETE FROM cli_login_flows WHERE approved_user_id=?").bind(session.userId),
     env.DB.prepare("DELETE FROM user_roles WHERE user_id=?").bind(session.userId),
     env.DB.prepare("UPDATE github_installations SET status='removed', updated_at=? WHERE installed_by_user_id=?")
       .bind(now, session.userId),

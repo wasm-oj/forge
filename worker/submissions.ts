@@ -1,6 +1,6 @@
 import { parseOfficialSubmissionRequest, type SubmissionVerdict } from "../src/online-judge/contracts";
 import { parseStoredProblemTitle } from "../src/online-judge/stored-problem-title";
-import { authenticatedSession, requireMutationSession, requireSession } from "./auth";
+import { authenticatedSession, requireBrowserMutationSession, requireBrowserOrBearerMutationSession, requireSession } from "./auth";
 import { sha256Hex } from "./crypto";
 import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { ApiError, jsonResponse, readJsonBody } from "./http";
@@ -374,7 +374,7 @@ export async function reconcileAdmittingSubmission(env: WasmOjWorkerEnv, submiss
 }
 
 export async function createSubmission(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   const input = parseOfficialSubmissionRequest(await readJsonBody(request, SOURCE_MAX_BYTES));
   const problem = await problemVersion(env, input.problemVersionId);
@@ -616,7 +616,7 @@ export async function getSubmissionEvents(request: Request, env: WasmOjWorkerEnv
 export async function cancelSubmission(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
   // Cancellation remains available while formal admissions are paused so a
   // maintenance drain can converge without accepting any new durable work.
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   const row = await submissionForOwner(env, submissionId, session.userId);
   if (["completed", "compile-error", "judge-error", "infrastructure-error", "cancelled"].includes(row.state)) {
     return jsonResponse({ submissionId, state: row.state, changed: false });
@@ -645,7 +645,7 @@ export async function cancelSubmission(request: Request, env: WasmOjWorkerEnv, s
 }
 
 export async function updateSubmissionVisibility(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   await requireFormalMutationsEnabled(env, request);
   const row = await submissionProductRow(env, submissionId);
   if (!row || row.user_id !== session.userId) throw new ApiError(404, "submission-not-found", "Submission does not exist.");

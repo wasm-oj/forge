@@ -1,6 +1,6 @@
 import { parseCreateRejudgeRequest, classifyRejudgeChildState } from "../src/online-judge/rejudge";
 import { parseStoredProblemTitle } from "../src/online-judge/stored-problem-title";
-import { requireMutationSession, requireSession } from "./auth";
+import { requireBrowserOrBearerMutationSession, requireSession } from "./auth";
 import { sha256Hex } from "./crypto";
 import { dispatchSubmissionJobs } from "./dispatcher";
 import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
@@ -253,7 +253,7 @@ async function batchForActor(env: WasmOjWorkerEnv, batchId: string, session: Aut
 }
 
 export async function createRejudgeBatch(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   await requireOrganizer(env, session);
   let input;
@@ -508,7 +508,7 @@ export async function cancelRejudgeBatch(
   env: WasmOjWorkerEnv,
   batchId: string,
 ): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireOrganizer(env, session);
   const batch = await batchForActor(env, batchId, session);
   if (["effective", "failed", "cancelled"].includes(batch.state)) {

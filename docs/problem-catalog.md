@@ -14,27 +14,27 @@ entries, and local solved progress cannot cross-contaminate revisions.
 The package publishes one validator used by repository authors and the browser parser:
 
 ```sh
-pnpm exec wasm-oj-collection build .
-pnpm exec wasm-oj-collection validate .
-pnpm exec wasm-oj-collection verify .
+pnpm exec woj organizer collection build .
+pnpm exec woj organizer collection verify .
 ```
 
 `build` reads `collection/source.json`, emits canonical content-addressed bundles and
-`collection/index.json`, and recomputes the collection revision. `validate` checks the published
-schema and integrity. `verify` additionally requires canonical JSON and rejects undeclared
-content-addressed bundles. Paths change only through explicit `--source` and `--index` options;
-WASM-OJ never guesses alternate locations.
+`collection/index.json`, and recomputes the collection revision. `verify` requires canonical JSON,
+checks the published schema and integrity, and rejects undeclared content-addressed bundles. Paths
+change only through explicit `--source` and `--index` options; WASM-OJ never guesses alternate
+locations. The distinct remote command `woj organizer collection validate <collection-id> --ref
+<ref>` resolves the ref once and validates that exact commit on the platform.
 
-Repositories can use `.github/actions/wasm-oj-collection/action.yml`, pinned to the exact
-`@wasm-oj/organizer@0.2.0` release.
+Repositories can use `.github/actions/woj/action.yml`, pinned to the exact
+`@wasm-oj/cli@0.2.0` release.
 A collection intended for managed import supplies a separate author-only descriptor and builds the
 published contract and packages explicitly:
 
 ```sh
-pnpm exec wasm-oj-collection build . \
+pnpm exec woj organizer collection build . \
   --managed-source collection/managed-source.json \
   --managed collection/managed.json
-pnpm exec wasm-oj-collection verify . --managed collection/managed.json
+pnpm exec woj organizer collection verify . --managed collection/managed.json
 ```
 
 `collection/managed-source.json` is unnecessary for browser-only practice. Its schema is
@@ -134,7 +134,7 @@ absolute paths, empty segments, `.`, `..`, backslashes, NULs, and trailing slash
 The entry file must be non-empty. All source text must be valid Unicode without an unpaired
 surrogate.
 
-These source strings are part of the integrity-addressed bundle. `wasm-oj-collection build` and the
+These source strings are part of the integrity-addressed bundle. `woj organizer collection build` and the
 browser use the same exact parser, so an external author must provide every language template and
 cannot rely on WASM-OJ to synthesize a missing file. Creating a draft copies the declared file map
 byte-for-byte, sorts paths deterministically, and selects the declared entry. The local 45-problem

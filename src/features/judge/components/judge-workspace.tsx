@@ -526,8 +526,8 @@ export function JudgeWorkspace({
           ) : explicitManagedContext ? (
             <>
               <button className="workspace-advanced-button" onClick={openSettings}><Settings2 size={14} />{problemLocale === "zh-TW" ? "測試 / 進階" : "Test / Advanced"}</button>
-              <button className="workspace-run-button" onClick={() => void doRunSamples()} disabled={!runtimeReady}><Play size={14} />{problemLocale === "zh-TW" ? "執行" : "Run"}</button>
-              <button className="workspace-submit-button" onClick={() => void doOfficialSubmit()}><Send size={14} />{problemLocale === "zh-TW" ? "提交" : "Submit"}</button>
+              <button className="workspace-run-button" onClick={() => void doRunSamples()} disabled={!runtimeReady}><Play size={14} />{text.topbar.runPublicSamples}</button>
+              <button className="workspace-submit-button" onClick={() => void doOfficialSubmit()}><Send size={14} />{text.topbar.officialSubmit}</button>
             </>
           ) : (
             <>

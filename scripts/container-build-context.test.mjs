@@ -9,8 +9,6 @@ const REQUIRED_PACKAGE_INPUTS = [
   "!packages/*/package.json",
   "!packages/sdk/src/",
   "!packages/sdk/src/**",
-  "!packages/organizer/bin/",
-  "!packages/organizer/bin/wasm-oj-collection.js",
 ];
 
 test("judge Docker context uses an explicit package source allowlist", async () => {
@@ -30,6 +28,7 @@ test("judge Docker context uses an explicit package source allowlist", async () 
 
 test("judge Dockerfile fails closed if generated state still enters the context", async () => {
   const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
+  assert.match(dockerfile, /COPY packages\/cli\/package\.json \.\/packages\/cli\/package\.json/u);
   const copyIndex = dockerfile.indexOf("COPY . .");
   const buildIndex = dockerfile.indexOf("RUN pnpm run library:build");
   const audit = dockerfile.slice(copyIndex, buildIndex);

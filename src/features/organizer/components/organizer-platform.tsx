@@ -256,7 +256,7 @@ function CollectionsContent() {
   const [repositories, setRepositories] = useState<readonly Repository[]>([]);
   const [data, setData] = useState<CollectionResult>({ collections: [] });
   const [repositoryId, setRepositoryId] = useState(() => initialSearchParameter("repositoryId"));
-  const [ref, setRef] = useState(() => initialSearchParameter("ref", "main"));
+  const [ref, setRef] = useState(() => initialSearchParameter("ref"));
   const [indexPath, setIndexPath] = useState("collection/index.json");
   const [validation, setValidation] = useState<CatalogValidation>();
   const [publication, setPublication] = useState<CatalogPublication>();
@@ -347,8 +347,8 @@ function CollectionsContent() {
       publicationRequestKeys.current.clear();
       await load();
       setMessage(result.validation.state === "valid"
-        ? `Resolved ${result.validation.commitSha.slice(0, 12)} to an existing valid revision. Publication is ready.`
-        : `Resolved ${result.validation.commitSha.slice(0, 12)} once. Static validation is queued.`);
+        ? `Resolved ${result.validation.commitSha} to an existing valid revision. Publication is ready.`
+        : `Resolved ${result.validation.commitSha} once. Static validation is queued.`);
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : String(reason)); } finally { setBusy(false); }
   }
   async function publish() {
@@ -386,6 +386,10 @@ function CollectionsContent() {
   const publicationWarning = `Materialize immutable judge packages and publish this exact revision as ${publishMode === "contest" ? "contest material" : "official practice"}?`;
   return <><main className="product-page" id="main-content" data-drawer-background>
     <header className="product-page-header"><span className="product-eyebrow"><CodeXml size={14} /> Organizer</span><h1>Collections</h1><p>Resolve one requested ref to an exact commit, statically validate declared content, then explicitly publish and activate. Validation never executes judge code.</p></header>
+    <section className="organizer-panel organizer-cli-preflight" aria-labelledby="collection-local-preflight">
+      <div><span className="product-eyebrow">Local preflight</span><h2 id="collection-local-preflight">Build and verify before remote validation</h2><p>These commands are deterministic and local. They do not compile or execute judge or reference code.</p></div>
+      <pre><code>woj organizer collection build .{"\n"}woj organizer collection verify .</code></pre>
+    </section>
     <div className="wizard-steps">{["Collection", "Static validation", "Publication", "Activation"].map((label, index) => <span className={index + 1 <= step ? "is-active" : ""} key={label}><i>{index + 1}</i>{label}</span>)}</div>
     <div className="organizer-split">
       <form className="organizer-panel organizer-product-form" onSubmit={(event) => void createValidation(event)}>
@@ -400,16 +404,17 @@ function CollectionsContent() {
         <h2>2–4. Validate, publish, activate</h2>
         {validation ? <div className="catalog-job-result">
           <span className={`catalog-job-state state-${validation.state}`}>{validation.state === "queued" || validation.state === "running" ? <LoaderCircle size={14} className="spin" /> : validation.state === "valid" ? <Check size={14} /> : <CircleAlert size={14} />}{validation.state}</span>
-          <dl><dt>Requested ref</dt><dd>{validation.requestedRef}</dd><dt>Exact commit</dt><dd><code>{validation.commitSha}</code></dd>{validation.errorCode && <><dt>Issue</dt><dd>{catalogIssueMessage(validation.errorCode)}</dd></>}</dl>
-          {validation.summary && <div className="collection-summary"><div><span>Static contract verified</span><strong>{validation.summary.problemCount} problems</strong><small>Revision {validation.summary.collectionRevision.slice(0, 12)}</small></div></div>}
+          <dl><dt>Validation job</dt><dd><code>{validation.id}</code></dd><dt>Requested ref</dt><dd>{validation.requestedRef}</dd><dt>Exact commit</dt><dd><code>{validation.commitSha}</code></dd>{validation.revisionId && <><dt>Revision ID</dt><dd><code>{validation.revisionId}</code></dd></>}{validation.errorCode && <><dt>Issue</dt><dd>{catalogIssueMessage(validation.errorCode)}</dd></>}</dl>
+          {validation.summary && <div className="collection-summary"><div><span>Static contract verified</span><strong>{validation.summary.problemCount} problems</strong><small>Collection revision {validation.summary.collectionRevision}</small></div></div>}
+          {!isTerminalCatalogValidation(validation.state) && <p className="organizer-resume-command">Resume from another terminal: <code>woj organizer collection validation {validation.id} --watch</code></p>}
           <div className="organizer-actions"><button className="primary-action" type="button" disabled={busy || validation.state !== "valid" || !validation.revisionId} onClick={(event) => { publishReturnRef.current = event.currentTarget; setMessage(""); setPublishMode("official-practice"); }}>Publish practice</button><button className="secondary-action" type="button" disabled={busy || validation.state !== "valid" || !validation.revisionId} onClick={(event) => { publishReturnRef.current = event.currentTarget; setMessage(""); setPublishMode("contest"); }}>Publish for contest</button></div>
-          {publication && <div className="collection-summary"><div><span>{publication.mode}</span><strong>{publication.state === "published" ? "Immutable publication ready" : `Publication ${publication.state}`}</strong>{publication.errorCode && <small>{catalogIssueMessage(publication.errorCode)}</small>}</div>{publication.mode === "official-practice" && publication.state === "published" && publication.id && <button className="primary-action" type="button" disabled={busy} onClick={() => void activate()}>Activate official practice</button>}</div>}
+          {publication && <><div className="collection-summary"><div><span>{publication.mode}</span><strong>{publication.state === "published" ? "Immutable publication ready" : `Publication ${publication.state}`}</strong><small>Job {publication.jobId}</small>{publication.id && <small>Publication {publication.id}</small>}{publication.errorCode && <small>{catalogIssueMessage(publication.errorCode)}</small>}</div>{publication.mode === "official-practice" && publication.state === "published" && publication.id && <button className="primary-action" type="button" disabled={busy} onClick={() => void activate()}>Activate official practice</button>}</div>{!isTerminalCatalogPublication(publication.state) && <p className="organizer-resume-command">Resume from another terminal: <code>woj organizer collection publication {publication.jobId} --watch</code></p>}</>}
         </div> : <p className="product-empty">Start a static validation to see its exact-commit result here.</p>}
       </section>
     </div>
-    <section className="organizer-product-section"><h2>Configured collections</h2>{data.collections.map((collection) => <article className="collection-summary" key={collection.id}><div><span>GitHub authoring authority</span><strong>{collection.owner_login}/{collection.name}</strong><small>{collection.index_path}</small></div></article>)}{data.collections.length === 0 && <p className="product-empty">No collection pointers configured yet.</p>}</section>
+    <section className="organizer-product-section"><h2>Configured collections</h2>{data.collections.map((collection) => <article className="collection-summary" key={collection.id}><div><span>GitHub authoring authority</span><strong>{collection.owner_login}/{collection.name}</strong><small>{collection.index_path}</small><small>Collection {collection.id}</small></div><button className="secondary-action" type="button" onClick={() => { setRepositoryId(String(collection.github_repository_id)); setIndexPath(collection.index_path); setValidation(undefined); setPublication(undefined); setMessage("Collection loaded. Enter an explicit branch, tag, or commit to validate."); }}>Use collection</button></article>)}{data.collections.length === 0 && <p className="product-empty">No collection pointers configured yet.</p>}</section>
     {message && <output className="product-message">{message}</output>}
-  </main><Drawer open={Boolean(publishMode)} label="Publish collection" onClose={() => { if (!busy) setPublishMode(undefined); }} returnFocusRef={publishReturnRef}><div className="account-delete-drawer"><header><div><span className="product-eyebrow"><CircleAlert aria-hidden="true" size={14} /> Organizer confirmation</span><h2>{publishMode === "contest" ? "Publish contest material" : "Publish official practice"}</h2></div><IconButton icon={X} label="Close confirmation" disabled={busy} onClick={() => setPublishMode(undefined)} /></header><p>{publicationWarning}</p>{validation && <p>Exact commit <code>{validation.commitSha.slice(0, 12)}</code> passed static validation. Publishing copies only immutable judge packages to R2.</p>}{message && <div className="product-error" role="alert"><span>{message}</span></div>}<footer><button type="button" className="secondary-action" disabled={busy} onClick={() => setPublishMode(undefined)}>Cancel</button><button type="button" className="primary-action" disabled={busy} onClick={() => void publish()}>{publishMode === "contest" ? "Publish for contest" : "Publish practice"}</button></footer></div></Drawer></>;
+  </main><Drawer open={Boolean(publishMode)} label="Publish collection" onClose={() => { if (!busy) setPublishMode(undefined); }} returnFocusRef={publishReturnRef}><div className="account-delete-drawer"><header><div><span className="product-eyebrow"><CircleAlert aria-hidden="true" size={14} /> Organizer confirmation</span><h2>{publishMode === "contest" ? "Publish contest material" : "Publish official practice"}</h2></div><IconButton icon={X} label="Close confirmation" disabled={busy} onClick={() => setPublishMode(undefined)} /></header><p>{publicationWarning}</p>{validation && <p>Exact commit <code>{validation.commitSha}</code> passed static validation. Publishing copies only immutable judge packages to R2.</p>}{message && <div className="product-error" role="alert"><span>{message}</span></div>}<footer><button type="button" className="secondary-action" disabled={busy} onClick={() => setPublishMode(undefined)}>Cancel</button><button type="button" className="primary-action" disabled={busy} onClick={() => void publish()}>{publishMode === "contest" ? "Publish for contest" : "Publish practice"}</button></footer></div></Drawer></>;
 }
 
 function useOrganizerContestPublications() {

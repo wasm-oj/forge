@@ -60,6 +60,16 @@ export const CODE_PACKAGES = Object.freeze([
     licenses: ["fflate-MIT.txt"],
     runtimeDependencies: ["@wasm-oj/core"],
   }),
+  code("cli", "src/cli/index.ts", {
+    cli: true,
+    licenses: ["napi-rs-keyring-MIT.txt"],
+    runtimeDependencies: [
+      "@napi-rs/keyring",
+      "@wasm-oj/core",
+      "@wasm-oj/organizer",
+      "@wasm-oj/server",
+    ],
+  }),
   code("sdk", "packages/sdk/src/index.ts", {
     sdk: true,
     licenses: [],
@@ -225,4 +235,4 @@ export const TOOLCHAIN_PACKAGES = Object.freeze([
 
 export const PUBLIC_PACKAGES = Object.freeze([...CODE_PACKAGES, ...TOOLCHAIN_PACKAGES]);
 export const PUBLIC_PACKAGE_BY_NAME = new Map(PUBLIC_PACKAGES.map((entry) => [entry.name, entry]));
-export const WORKSPACE_PACKAGE_PATTERN = /^@wasm-oj\/(?:contracts|core|browser|server|organizer|sdk)(?:\/|$)/u;
+export const WORKSPACE_PACKAGE_PATTERN = /^@wasm-oj\/(?:contracts|core|browser|server|organizer|cli|sdk|toolchain-(?:clang|go|java|javascript|python|rust))(?:\/|$)/u;

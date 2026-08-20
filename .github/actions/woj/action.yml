@@ -1,8 +1,8 @@
 name: Verify WASM-OJ problem collection
-description: Validate schema, byte lengths, SHA-256 digests, revision, and canonical publication output.
+description: Verify canonical collection schema, byte lengths, digests, revision, and publication output.
 inputs:
   version:
-    description: Exact @wasm-oj/organizer release containing the collection contract.
+    description: Exact @wasm-oj/cli release containing the collection contract.
     required: false
     default: 0.2.0
   root:
@@ -19,12 +19,12 @@ runs:
     - name: Verify WASM-OJ collection
       shell: bash
       env:
-        WASM_OJ_ACTION_PACKAGE: "@wasm-oj/organizer@${{ inputs.version }}"
+        WASM_OJ_ACTION_PACKAGE: "@wasm-oj/cli@${{ inputs.version }}"
         WASM_OJ_ACTION_ROOT: "${{ inputs.root }}"
         WASM_OJ_ACTION_MANAGED: "${{ inputs.managed }}"
       run: |
-        arguments=(verify "$WASM_OJ_ACTION_ROOT")
+        arguments=(organizer collection verify "$WASM_OJ_ACTION_ROOT")
         if [[ -n "$WASM_OJ_ACTION_MANAGED" ]]; then
           arguments+=(--managed "$WASM_OJ_ACTION_MANAGED")
         fi
-        npx --yes "$WASM_OJ_ACTION_PACKAGE" "${arguments[@]}"
+        npx --yes --package "$WASM_OJ_ACTION_PACKAGE" -- woj "${arguments[@]}"

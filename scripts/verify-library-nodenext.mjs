@@ -75,6 +75,7 @@ import {
   createVerifiedServerDistribution,
 } from "@wasm-oj/server";
 import { runCollectionCli } from "@wasm-oj/organizer";
+import { runWojCli, WOJ_EXIT } from "@wasm-oj/cli";
 import { Engine as UmbrellaEngine } from "@wasm-oj/sdk";
 import { createBrowserEngine as UmbrellaBrowser } from "@wasm-oj/sdk/browser";
 import { createServerEngine as UmbrellaServer } from "@wasm-oj/sdk/server";
@@ -127,6 +128,8 @@ export const publicValues = [
   createServerEngine,
   createVerifiedServerDistribution,
   runCollectionCli,
+  runWojCli,
+  WOJ_EXIT,
   UmbrellaEngine,
   UmbrellaBrowser,
   UmbrellaServer,
@@ -145,6 +148,7 @@ import * as core from "@wasm-oj/core";
 import * as browser from "@wasm-oj/browser";
 import * as server from "@wasm-oj/server";
 import * as organizer from "@wasm-oj/organizer";
+import * as cli from "@wasm-oj/cli";
 import * as sdk from "@wasm-oj/sdk";
 import * as sdkBrowser from "@wasm-oj/sdk/browser";
 import * as sdkContracts from "@wasm-oj/sdk/contracts";
@@ -165,6 +169,8 @@ if (
   || sdkBrowser.createBrowserEngine !== browser.createBrowserEngine
   || sdkServer.createServerEngine !== server.createServerEngine
   || sdkOrganizer.runCollectionCli !== organizer.runCollectionCli
+  || typeof cli.runWojCli !== "function"
+  || cli.WOJ_EXIT.usage !== 2
 ) {
   throw new Error("Umbrella entrypoints created a second core/contracts identity.");
 }

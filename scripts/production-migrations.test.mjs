@@ -15,6 +15,7 @@ const migrations = [
   "0001_initial.sql",
   "0016_single_store.sql",
   "0017_architecture_reset.sql",
+  "0018_cli_auth.sql",
 ];
 
 test("normal production migrations fail closed until the architecture reset is recorded", () => {
@@ -64,22 +65,19 @@ test("normal production migrations require the rendered release to be the exact 
   );
 });
 
-test("architecture reset must be the only pending migration", () => {
+test("architecture reset must be the first pending migration", () => {
   assert.deepEqual(
     pendingMigrationNames(migrations, ["0001_initial.sql", "0016_single_store.sql"]),
-    ["0017_architecture_reset.sql"],
+    ["0017_architecture_reset.sql", "0018_cli_auth.sql"],
   );
   assert.doesNotThrow(() => assertArchitectureResetMigrationState(
     migrations,
     ["0001_initial.sql", ...RETIRED_PRODUCTION_MIGRATIONS, "0016_single_store.sql"],
   ));
-  assert.throws(
-    () => assertArchitectureResetMigrationState(
-      [...migrations, "0018_future.sql"],
-      ["0001_initial.sql", "0016_single_store.sql"],
-    ),
-    /only pending migration/,
-  );
+  assert.doesNotThrow(() => assertArchitectureResetMigrationState(
+    [...migrations, "0019_future.sql"],
+    ["0001_initial.sql", "0016_single_store.sql"],
+  ));
   assert.throws(() => assertArchitectureResetMigrationState(migrations, migrations), /found \[\]/);
   assert.throws(
     () => assertNoUnknownAppliedMigrations(migrations, [...migrations, "0018_unknown.sql"]),

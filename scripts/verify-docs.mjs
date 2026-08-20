@@ -97,6 +97,7 @@ for (const required of [
   "@wasm-oj/contracts",
   "@wasm-oj/core",
   "@wasm-oj/browser",
+  "@wasm-oj/cli",
   "@wasm-oj/server",
   "@wasm-oj/organizer",
   "@wasm-oj/sdk",
@@ -111,7 +112,7 @@ for (const required of [
   "browserSource",
   "serverSource",
   "WasmOjError",
-  "wasm-oj-collection",
+  "woj organizer collection",
   "WOJRPL02",
   "WOJJDG02",
   "WOJFS002",
@@ -186,9 +187,10 @@ for (const entry of await readdir(path.join(root, "public/toolchains"), { withFi
 
 const problemCatalog = await readFile(path.join(root, "docs/problem-catalog.md"), "utf8");
 for (const required of [
-  "wasm-oj-collection",
-  ".github/actions/wasm-oj-collection/action.yml",
-  "@wasm-oj/organizer@0.2.0",
+  "woj organizer collection build",
+  "woj organizer collection validate",
+  ".github/actions/woj/action.yml",
+  "@wasm-oj/cli@0.2.0",
   "wasm-oj-platform/managed-collection-source/v1",
   "wasm-oj-platform/managed-collection/v2",
   "WOJJDG02",

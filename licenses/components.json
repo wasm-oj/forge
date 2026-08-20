@@ -226,6 +226,28 @@
       ]
     },
     {
+      "id": "napi-rs-keyring",
+      "name": "@napi-rs/keyring",
+      "version": "1.3.0",
+      "source": {
+        "url": "https://github.com/Brooooooklyn/keyring-node",
+        "revision": "e46be75c3ba8d5fde6b88a17c6153b87ffe4b946"
+      },
+      "distributions": [
+        {
+          "kind": "npm",
+          "package": "@napi-rs/keyring@1.3.0",
+          "integrity": "sha512-WrOw/bcXm0f9qHkumlT1QlArXSTWqaY9sunsDpOk+yCCorCKMxvWT/a3xko4EYHVdeZoh00yI2TydXn6eyICDA=="
+        }
+      ],
+      "licenseFiles": [
+        {
+          "path": "licenses/napi-rs-keyring-MIT.txt",
+          "sha256": "02965ed67e29f871a53f7a7afa593a0ddc8020f86ccce0faaf1aa59215b5269e"
+        }
+      ]
+    },
+    {
       "id": "quickjs-ng",
       "name": "QuickJS-ng",
       "version": "0.15.1",

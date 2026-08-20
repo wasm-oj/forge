@@ -12,6 +12,17 @@ listed file to a SHA-256 digest and rejects unlisted toolchain or license files.
 
 ## JavaScript runtime dependency
 
+### N-API keyring
+
+- Component: `@napi-rs/keyring` 1.3.0
+- Source revision: `Brooooooklyn/keyring-node@e46be75c3ba8d5fde6b88a17c6153b87ffe4b946`
+- Source: <https://github.com/Brooooooklyn/keyring-node/tree/e46be75c3ba8d5fde6b88a17c6153b87ffe4b946>
+- License: MIT
+- License material: `licenses/napi-rs-keyring-MIT.txt`
+
+The `woj` CLI stores remote access tokens in the operating system credential
+store through this native binding. It does not provide a plaintext fallback.
+
 ### es-module-lexer
 
 - Component: `es-module-lexer` 2.3.1

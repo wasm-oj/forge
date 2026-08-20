@@ -150,7 +150,7 @@ async function verifyReleaseWorkflows() {
     }
     if (source.includes("pnpm publish")) throw new Error(`${label} release workflow must publish through npm's OIDC-aware CLI.`);
   }
-  const publishOrder = ["contracts", "core", "browser", "server", "organizer", "sdk"]
+  const publishOrder = ["contracts", "core", "browser", "server", "organizer", "cli", "sdk"]
     .map((name) => codeRelease.indexOf(`npm publish release-tarballs/wasm-oj-${name}-`));
   if (publishOrder.some((position) => position < 0)
     || publishOrder.some((position, index) => index > 0 && position <= publishOrder[index - 1])) {
@@ -236,20 +236,20 @@ async function verifyCode(definition, packedRoot, packedFiles, manifest) {
   if (toolchainAssets.length > 0) {
     throw new Error(`${definition.name} code package contains toolchain assets: ${toolchainAssets.join(", ")}.`);
   }
-  if (definition.organizer) {
-    requireFile(packedFiles, definition.name, "bin/wasm-oj-collection.js");
-    requireFile(packedFiles, definition.name, "dist/collection-cli.js");
-    if (manifest.bin?.["wasm-oj-collection"] !== "./bin/wasm-oj-collection.js" || Object.keys(manifest.bin ?? {}).length !== 1) {
-      throw new Error("@wasm-oj/organizer must expose only the wasm-oj-collection CLI.");
-    }
-    const bin = await readFile(path.join(packedRoot, "bin/wasm-oj-collection.js"), "utf8");
-    if (!bin.startsWith("#!/usr/bin/env node\n")
-      || !bin.includes('from "../dist/index.js"')
-      || !bin.includes("runCollectionCli(process.argv.slice(2))")) {
-      throw new Error("Organizer CLI does not call the public runCollectionCli entrypoint.");
-    }
-  } else if (Object.hasOwn(manifest, "bin")) {
+  if (!definition.cli && Object.hasOwn(manifest, "bin")) {
     throw new Error(`${definition.name} must not expose a CLI.`);
+  }
+  if (definition.cli) {
+    if (JSON.stringify(manifest.bin) !== JSON.stringify({ woj: "./bin/woj.js" })) {
+      throw new Error("@wasm-oj/cli must expose only the 'woj' executable.");
+    }
+    requireFile(packedFiles, definition.name, "bin/woj.js");
+    const executable = await readFile(path.join(packedRoot, "bin/woj.js"), "utf8");
+    if (!executable.startsWith("#!/usr/bin/env node\n")
+      || !executable.includes('import { main } from "../dist/index.js";')
+      || !executable.includes("process.exitCode = await main(process.argv.slice(2));")) {
+      throw new Error("@wasm-oj/cli packed an invalid executable entry point.");
+    }
   }
   if (definition.server) {
     for (const required of [

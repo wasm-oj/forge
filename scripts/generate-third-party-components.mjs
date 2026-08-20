@@ -98,6 +98,17 @@ const definitions = [
     licenses: ["licenses/go-BSD-3-Clause.txt"],
   },
   {
+    id: "napi-rs-keyring",
+    name: "@napi-rs/keyring",
+    version: "1.3.0",
+    source: {
+      url: "https://github.com/Brooooooklyn/keyring-node",
+      revision: "e46be75c3ba8d5fde6b88a17c6153b87ffe4b946",
+    },
+    npm: "@napi-rs/keyring@1.3.0",
+    licenses: ["licenses/napi-rs-keyring-MIT.txt"],
+  },
+  {
     id: "go-typescript-runtime",
     name: "Go standard library and WASI runtime embedded by TypeScript-Go",
     version: "1.26.3",

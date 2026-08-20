@@ -115,7 +115,6 @@ async function buildSourcePackage(definition, stagingDir) {
 
   if (definition.server) await buildServerStages(stagingDir, definition);
   await emitAndRollDeclarations(definition, stagingDir);
-  if (definition.organizer) await writeOrganizerCli(stagingDir);
 }
 
 function externalFor(definition) {
@@ -261,16 +260,6 @@ async function buildSdkFacade(stagingDir) {
     await writeFile(path.join(stagingDir, `${entry}.js`), source);
     await writeFile(path.join(stagingDir, `${entry}.d.ts`), source);
   }
-}
-
-async function writeOrganizerCli(stagingDir) {
-  await writeFile(path.join(stagingDir, "collection-cli.js"), [
-    "#!/usr/bin/env node",
-    'import { runCollectionCli } from "./index.js";',
-    "",
-    "await runCollectionCli(process.argv.slice(2));",
-    "",
-  ].join("\n"), { mode: 0o755 });
 }
 
 async function buildToolchainPackage(definition) {

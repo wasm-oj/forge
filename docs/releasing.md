@@ -1,6 +1,6 @@
 # Releasing the npm packages
 
-WASM-OJ publishes six synchronized code packages and five independently versioned toolchain
+WASM-OJ publishes seven synchronized code packages and six independently versioned toolchain
 packages. The repository remains `wasm-oj/forge`; package metadata must keep that repository,
 homepage, and issue URL until a separate repository migration is approved.
 
@@ -11,10 +11,11 @@ The following packages always share one exact version:
 1. `@wasm-oj/contracts`
 2. `@wasm-oj/core`
 3. `@wasm-oj/browser`, `@wasm-oj/server`, and `@wasm-oj/organizer`
-4. `@wasm-oj/sdk`
+4. `@wasm-oj/cli`
+5. `@wasm-oj/sdk`
 
 Update `CODE_VERSION` in `scripts/library-packages.mjs`, the private root version and exact
-workspace dependency specs, all six package manifests (including their exact internal dependency
+workspace dependency specs, all seven package manifests (including their exact internal dependency
 specs), and the changelog. Then run:
 
 ```sh
@@ -24,7 +25,7 @@ pnpm run library:verify
 pnpm run ci:verify
 ```
 
-Create and push an annotated `vX.Y.Z` tag whose version exactly matches all six manifests. The
+Create and push an annotated `vX.Y.Z` tag whose version exactly matches all seven manifests. The
 Release workflow uses npm trusted publishing, checks the tag against every code package, packs
 verified tarballs with pnpm, and publishes those exact tarballs with npm's OIDC-aware CLI in the
 dependency order above. Node 24.18.0 supplies npm 11.16.0, which satisfies trusted publishing's

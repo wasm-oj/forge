@@ -48,6 +48,24 @@ function revocationRequest(): Request {
 }
 
 describe("Organizer role revocation", () => {
+  it("does not accept a CLI bearer for role administration", async () => {
+    const request = new Request(`https://wasm-oj.test/api/admin/organizers/${TARGET_USER_ID}/revoke`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${"b".repeat(43)}`,
+        origin: "https://wasm-oj.test",
+        "content-type": "application/json",
+      },
+      body: "{}",
+    });
+    await expect(revokeOrganizerRole(request, {
+      PUBLIC_ORIGIN: "https://wasm-oj.test",
+    } as WasmOjWorkerEnv, TARGET_USER_ID)).rejects.toMatchObject({
+      status: 401,
+      code: "browser-authentication-required",
+    });
+  });
+
   it("rejects an Admin target before deleting any role", async () => {
     const { env, deletion } = await revocationEnvironment(true);
     await expect(revokeOrganizerRole(revocationRequest(), env, TARGET_USER_ID))

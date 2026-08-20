@@ -360,6 +360,25 @@ export function parseSubmissionPolicySummaryResponse(value: unknown, expectedSub
   return { submissionId, policySummary: { totalCases, outputAcceptedCases, policies } };
 }
 
+export async function readSubmissionPolicySummaryResponse(response: Response, submissionId: string): Promise<SubmissionPolicySummaryResponse | null> {
+  let value: unknown;
+  try {
+    value = await response.json() as unknown;
+  } catch {
+    throw new Error(`WASM-OJ returned a non-JSON response (HTTP ${response.status}).`);
+  }
+  if (response.status === 404 || response.status === 409) return null;
+  if (!response.ok) {
+    const message = value && typeof value === "object" && !Array.isArray(value)
+      && "error" in value && value.error && typeof value.error === "object" && !Array.isArray(value.error)
+      && "message" in value.error && typeof value.error.message === "string"
+      ? value.error.message
+      : `Request failed with HTTP ${response.status}.`;
+    throw new Error(message);
+  }
+  return parseSubmissionPolicySummaryResponse(value, submissionId);
+}
+
 export function problemPerformanceApiPath(
   problemVersionId: string,
   languageFilter: BuiltinLanguage | "all",

@@ -1,4 +1,4 @@
-import { requireMutationSession, requireSession } from "./auth";
+import { requireBrowserAuthenticatedSession, requireBrowserMutationSession } from "./auth";
 import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { ApiError, jsonResponse, readJsonBody } from "./http";
 import { requireFirstOrganizerApplicationTurnstile, requireStagingFormalAccess } from "./formal-access";
@@ -17,7 +17,7 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 export async function createOrganizerApplication(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   if (session.roles.includes("organizer") || session.roles.includes("admin")) {
     throw new ApiError(409, "organizer-already-approved", "This account already has Organizer access.");
@@ -41,7 +41,7 @@ export async function createOrganizerApplication(request: Request, env: WasmOjWo
 }
 
 export async function listOrganizerApplications(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireSession(request, env);
+  const session = await requireBrowserAuthenticatedSession(request, env);
   requireAdmin(session);
   const status = new URL(request.url).searchParams.get("status") ?? "pending";
   if (!['pending', 'approved', 'rejected'].includes(status)) throw new ApiError(400, "application-status-invalid", "Application status is invalid.");
@@ -64,7 +64,7 @@ export async function reviewOrganizerApplication(
   env: WasmOjWorkerEnv,
   applicationId: string,
 ): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   requireAdmin(session);
   const body = record(await readJsonBody(request, 8 * 1024));
   if (body.decision !== "approved" && body.decision !== "rejected") {
@@ -99,7 +99,7 @@ export async function revokeOrganizerRole(
   env: WasmOjWorkerEnv,
   userId: string,
 ): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   requireAdmin(session);
   const body = record(await readJsonBody(request, 1_024));
   if (Object.keys(body).length !== 0) throw new ApiError(400, "revoke-invalid", "Organizer revocation payload must be empty.");
@@ -117,7 +117,7 @@ export async function revokeOrganizerRole(
 }
 
 export async function getFormalMutationControl(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireSession(request, env);
+  const session = await requireBrowserAuthenticatedSession(request, env);
   requireAdmin(session);
   return jsonResponse(await formalMutationStatus(env));
 }
@@ -127,7 +127,7 @@ export async function updateFormalMutationControl(
   env: WasmOjWorkerEnv,
   enabled: boolean,
 ): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   requireAdmin(session);
   const body = record(await readJsonBody(request, 8 * 1024));
   if (Object.keys(body).length !== 1 || typeof body.reason !== "string") {
@@ -153,7 +153,7 @@ export async function updateFormalMutationControl(
 }
 
 export async function activateProductionRelease(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireMutationSession(request, env);
+  const session = await requireBrowserMutationSession(request, env);
   requireAdmin(session);
   const body = record(await readJsonBody(request, 300 * 1024));
   if (

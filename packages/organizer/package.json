@@ -21,9 +21,6 @@
   "type": "module",
   "sideEffects": false,
   "types": "./dist/index.d.ts",
-  "bin": {
-    "wasm-oj-collection": "./bin/wasm-oj-collection.js"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -31,7 +28,7 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["bin", "dist", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "licenses"],
+  "files": ["dist", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "licenses"],
   "engines": {
     "node": ">=24.18.0 <25"
   },
