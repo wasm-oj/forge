@@ -45,6 +45,7 @@ Toolchains are separate asset packages:
 - `@wasm-oj/toolchain-go`
 - `@wasm-oj/toolchain-python`
 - `@wasm-oj/toolchain-javascript`
+- `@wasm-oj/toolchain-java`
 
 Increment only the package whose descriptor or asset bytes changed, plus its exact root workspace
 dependency spec, and refresh the lockfile. Regenerate its contract-2 manifest and pinned digests,
