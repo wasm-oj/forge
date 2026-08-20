@@ -80,7 +80,7 @@ separate and explicit in either form.
 ## Browser host
 
 Deploy each installed toolchain package's exported `assets/` directory to an HTTP directory. A
-single directory may contain all five packages when filenames remain unchanged.
+single directory may contain every toolchain package when filenames remain unchanged.
 
 ```ts
 import { createBrowserEngine } from "@wasm-oj/browser";
@@ -119,6 +119,19 @@ if (build.artifact) {
 
 engine.dispose();
 ```
+
+`@wasm-oj/browser` resolves its own workers and WebAssembly modules at runtime through
+`new URL("../assets/", import.meta.url)`, so a bundler cannot see them and will not emit them.
+Copy the installed package's `dist/assets/` directory into the `assets/` directory beside the
+built entry chunk:
+
+```sh
+cp node_modules/@wasm-oj/browser/dist/assets/* dist/assets/
+```
+
+Without this the page loads and then fails on the first compile with
+`failed to fetch Wasm: 404 Not Found`. Vite reports the same requirement at build time as a
+`doesn't exist at build time, it will remain unchanged to be resolved at runtime` warning.
 
 The page must be cross-origin isolated. Serve documents with COOP `same-origin`, COEP
 `require-corp`, and CORP `same-origin`; CSP must permit `worker-src 'self' blob:`. Toolchain
