@@ -23,7 +23,7 @@ SELECT
 DROP TABLE repository_cutover_guard;
 
 -- Capture the identities needed after the old views and foreign keys disappear.
-CREATE TEMP TABLE repository_cutover_version_map AS
+CREATE TABLE repository_cutover_version_map AS
 SELECT versions.id AS version_id,
        versions.problem_series_id AS problem_id,
        details.collection_id AS catalog_id,
@@ -36,7 +36,7 @@ JOIN collection_revisions AS revisions ON revisions.id=details.collection_revisi
 CREATE UNIQUE INDEX repository_cutover_version_map_id
 ON repository_cutover_version_map(version_id);
 
-CREATE TEMP TABLE repository_cutover_active_commits AS
+CREATE TABLE repository_cutover_active_commits AS
 SELECT collection_id AS catalog_id, commit_sha
 FROM (
   SELECT revisions.collection_id, revisions.commit_sha,
@@ -52,7 +52,7 @@ FROM (
 )
 WHERE precedence=1;
 
-CREATE TEMP TABLE repository_cutover_kept_revisions AS
+CREATE TABLE repository_cutover_kept_revisions AS
 SELECT revision_problems.collection_revision_id, revision_problems.problem_series_id
 FROM repository_cutover_active_commits AS active
 JOIN collection_revisions AS revisions
@@ -69,7 +69,7 @@ FROM rejudge_batches AS batches
 JOIN problem_version_details AS details
   ON details.id IN (batches.old_problem_version_id, batches.new_problem_version_id);
 
-CREATE TEMP TABLE repository_cutover_effective AS
+CREATE TABLE repository_cutover_effective AS
 SELECT origin_submission_id, effective_submission_id,
        effective_rejudge_batch_id, became_effective_at
 FROM effective_submission_results
@@ -648,5 +648,4 @@ DROP TABLE repository_cutover_active_commits;
 DROP TABLE repository_cutover_kept_revisions;
 DROP TABLE repository_cutover_effective;
 
-PRAGMA optimize;
 PRAGMA foreign_key_check;
