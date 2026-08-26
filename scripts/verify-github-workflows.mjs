@@ -20,8 +20,21 @@ for (const value of [
   "timeout-minutes: 60",
   "node-version: 24.18.0",
   "version: 10.34.5",
+  'CONTAINER_IMAGE: wasm-oj-submission-production:${{ github.sha }}',
+  'DOCKER_BUILD_RECORD_UPLOAD: "false"',
   "render-production-config.mjs",
+  "docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5",
+  "driver: docker-container",
+  "docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf",
+  "platforms: linux/amd64",
+  "load: true",
+  "provenance: false",
+  "tags: ${{ env.CONTAINER_IMAGE }}",
+  "build-args: WASM_OJ_BUILD_ID=${{ github.sha }}",
+  "cache-from: type=gha,scope=wasm-oj-submission-production",
+  "cache-to: type=gha,scope=wasm-oj-submission-production,mode=max",
   'production-migrations.mjs apply',
+  'wrangler containers push "$CONTAINER_IMAGE" --config wrangler.quick-production.jsonc',
   'wrangler deploy --config wrangler.quick-production.jsonc --tag "$GITHUB_SHA"',
   "wait-container-rollout.mjs",
   "--capture-baseline",
@@ -42,12 +55,16 @@ for (const removed of [
   "configure-production-release",
   "release-evidence",
   "/api/admin/releases/activate",
+  "--dockerfile Dockerfile",
 ]) forbidText(production, removed, "Production deployment");
 
 const ordered = [
   "render-production-config.mjs",
+  "docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5",
+  "docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf",
   "production-migrations.mjs apply",
   "--capture-baseline",
+  'wrangler containers push "$CONTAINER_IMAGE" --config wrangler.quick-production.jsonc',
   'wrangler deploy --config wrangler.quick-production.jsonc --tag "$GITHUB_SHA"',
   "--baseline",
   "/api/health/container",
@@ -62,11 +79,12 @@ for (const value of ordered) {
   previous = index;
 }
 
-if (productionSource.split("__WASM_OJ_BUILD_ID__").length - 1 !== 1
+if (productionSource.split("__WASM_OJ_BUILD_ID__").length - 1 !== 2
   || productionConfig.vars?.WASM_OJ_BUILD_ID !== "__WASM_OJ_BUILD_ID__"
   || productionConfig.containers?.length !== 1
-  || productionConfig.containers[0]?.image !== "./Dockerfile") {
-  throw new Error("Production config must contain one Worker build placeholder and a repository Dockerfile Container.");
+  || productionConfig.containers[0]?.image !== "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-submission-production:__WASM_OJ_BUILD_ID__"
+  || productionConfig.containers[0]?.rollout_step_percentage !== 100) {
+  throw new Error("Production config must bind one exact Git commit to the Worker and prebuilt Container with one-step rollout.");
 }
 if (developmentConfig.vars?.WASM_OJ_BUILD_ID !== "0".repeat(40)
   || developmentConfig.containers?.[0]?.image !== "./Dockerfile") {

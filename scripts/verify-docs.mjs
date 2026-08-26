@@ -250,6 +250,9 @@ for (const required of [
   "scripts/render-production-config.mjs",
   "scripts/production-migrations.mjs",
   "scripts/wait-container-rollout.mjs",
+  "type=gha,scope=wasm-oj-submission-production",
+  "wrangler containers push",
+  "rollout_step_percentage: 100",
   "repository-source-truth-production-smoke-passed",
   "0019_repository_source_truth.sql",
 ]) {

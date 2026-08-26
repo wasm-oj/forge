@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment: production
+    env:
+      CONTAINER_IMAGE: wasm-oj-submission-production:${{ github.sha }}
+      DOCKER_BUILD_RECORD_UPLOAD: "false"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -42,7 +45,22 @@ jobs:
           node scripts/render-production-config.mjs
           --build-id "$GITHUB_SHA"
           --config wrangler.quick-production.jsonc
-          --dockerfile Dockerfile
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+        with:
+          driver: docker-container
+      - name: Build exact Container image with GitHub Actions cache
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          load: true
+          provenance: false
+          tags: ${{ env.CONTAINER_IMAGE }}
+          build-args: WASM_OJ_BUILD_ID=${{ github.sha }}
+          cache-from: type=gha,scope=wasm-oj-submission-production
+          cache-to: type=gha,scope=wasm-oj-submission-production,mode=max
       - name: Apply migrations with repository-cutover preflight
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
@@ -56,7 +74,12 @@ jobs:
           node scripts/wait-container-rollout.mjs
           --config wrangler.quick-production.jsonc
           --capture-baseline "$RUNNER_TEMP/container-rollout-baseline.json"
-      - name: Build, push, and deploy Worker plus Container
+      - name: Push exact Container image
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler containers push "$CONTAINER_IMAGE" --config wrangler.quick-production.jsonc
+      - name: Deploy Worker with prebuilt Container image
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

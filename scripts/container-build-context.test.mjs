@@ -41,21 +41,27 @@ test("judge Dockerfile fails closed if generated state still enters the context"
   assert.match(audit, /-lname '\*\/tmp\/\*'/u);
 });
 
-test("judge image exposes its immutable runtime graph to wasmoj before committing the image", async () => {
+test("judge image caches runtime validation before its commit-specific identity layer", async () => {
   const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
   const grantReadIndex = dockerfile.indexOf("chmod -R a+rX /app");
   const removeWriteIndex = dockerfile.indexOf("chmod -R a-w /app");
   const runtimeSmokeIndex = dockerfile.indexOf("runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node --input-type=module");
   const executionSmokeIndex = dockerfile.indexOf("runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node /app/container/runtime-smoke.mjs");
+  const buildIdArgumentIndex = dockerfile.indexOf("ARG WASM_OJ_BUILD_ID=");
+  const generateIdentityIndex = dockerfile.indexOf("node /app/container/generate-identity.mjs");
+  const loadIdentityIndex = dockerfile.indexOf("loadEmbeddedContainerIdentity");
   const finalUserIndex = dockerfile.indexOf("USER wasmoj");
 
   assert.ok(grantReadIndex >= 0, "the copied runtime tree must be readable and traversable by wasmoj");
   assert.ok(removeWriteIndex > grantReadIndex, "read/traverse repair must happen before the immutable write fence");
   assert.ok(runtimeSmokeIndex > removeWriteIndex, "runtime imports must execute after permission hardening");
-  assert.ok(executionSmokeIndex > runtimeSmokeIndex, "the real runtime smoke must follow immutable identity verification");
-  assert.ok(finalUserIndex > executionSmokeIndex, "the real runtime smoke must execute during the image build");
+  assert.ok(executionSmokeIndex > runtimeSmokeIndex, "the real runtime smoke must follow runtime imports");
+  assert.ok(buildIdArgumentIndex > executionSmokeIndex, "the expensive runtime smoke must be cached before the build ID invalidates a layer");
+  assert.ok(generateIdentityIndex > buildIdArgumentIndex, "the exact identity must be generated in the commit-specific layer");
+  assert.ok(loadIdentityIndex > generateIdentityIndex, "the generated identity must be loaded before the image is committed");
+  assert.ok(finalUserIndex > loadIdentityIndex, "identity verification must execute during the image build");
 
-  const runtimeSmoke = dockerfile.slice(runtimeSmokeIndex, finalUserIndex);
+  const runtimeSmoke = dockerfile.slice(runtimeSmokeIndex, buildIdArgumentIndex);
   for (const packageName of [
     "@wasm-oj/core",
     "@wasm-oj/server",
@@ -68,8 +74,12 @@ test("judge image exposes its immutable runtime graph to wasmoj before committin
   ]) {
     assert.ok(runtimeSmoke.includes(`'${packageName}'`), `${packageName} must be imported as wasmoj`);
   }
-  assert.match(runtimeSmoke, /loadEmbeddedContainerIdentity\(\)/u);
+  assert.doesNotMatch(runtimeSmoke, /loadEmbeddedContainerIdentity/u);
   assert.doesNotMatch(runtimeSmoke, /container\/server\.mjs/u);
+
+  const identityLayer = dockerfile.slice(buildIdArgumentIndex, finalUserIndex);
+  assert.match(identityLayer, /loadEmbeddedContainerIdentity\(\)/u);
+  assert.doesNotMatch(identityLayer, /runtime-smoke\.mjs/u);
 });
 
 test("judge image compiles and runs Python through packaged server stages as wasmoj", async () => {
@@ -79,6 +89,7 @@ test("judge image compiles and runs Python through packaged server stages as was
   ]);
   assert.match(dockerfile, /COPY --from=build \/src\/container\/runtime-smoke\.mjs \.\/container\/runtime-smoke\.mjs/u);
   assert.match(dockerfile, /runuser -u wasmoj -- env HOME=\/tmp NODE_ENV=production node \/app\/container\/runtime-smoke\.mjs/u);
+  assert.doesNotMatch(smoke, /loadEmbeddedContainerIdentity|verifiedDistribution/u);
   assert.match(smoke, /language: "python"/u);
   assert.match(smoke, /createServerEngine/u);
   assert.match(smoke, /engine\.execute/u);

@@ -49,15 +49,23 @@ function readyFixture(overrides = {}) {
   };
 }
 
-test("configured target requires one repository-built Container", () => {
+test("configured target requires one exact prebuilt production Container", () => {
   assert.deepEqual(configuredContainerRolloutTarget({ containers: [{
     class_name: target.className,
-    image: "./Dockerfile",
+    image: `registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-submission-production:${"a".repeat(40)}`,
     name: target.name,
   }] }), target);
   assert.throws(
     () => configuredContainerRolloutTarget({ containers: [{ ...target, class_name: target.className, image: "repo:latest" }] }),
-    /built from \.\/Dockerfile/u,
+    /exact prebuilt production Git commit/u,
+  );
+  assert.throws(
+    () => configuredContainerRolloutTarget({ containers: [{
+      class_name: target.className,
+      image: `registry.cloudflare.com/${"c".repeat(32)}/wasm-oj-submission-production:${"a".repeat(40)}`,
+      name: target.name,
+    }] }),
+    /exact prebuilt production Git commit/u,
   );
   assert.throws(() => configuredContainerRolloutTarget({ containers: [] }), /exactly one/u);
 });
