@@ -98,7 +98,7 @@
     {
       "name": "wasm-oj-submission-production",
       "class_name": "SubmissionJudgeContainer",
-      "image": "./Dockerfile",
+      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-submission-production:__WASM_OJ_BUILD_ID__",
       "instance_type": "standard-2",
       "max_instances": 50,
       "rollout_step_percentage": 100,

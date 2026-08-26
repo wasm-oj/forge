@@ -9,18 +9,30 @@ the complete deployment identity and is injected only into the Worker config and
 
 1. Install, typecheck, and build the repository.
 2. Run `scripts/render-production-config.mjs --build-id "$GITHUB_SHA"`.
-3. Apply D1 migrations through `scripts/production-migrations.mjs apply`.
-4. Run `wrangler deploy --config wrangler.quick-production.jsonc --tag "$GITHUB_SHA"`.
-5. Run `scripts/wait-container-rollout.mjs` until the Container application is stably ready.
-6. Probe `/api/health/container`, `/api/health/live`, and `/api/health/ready`.
-7. Leave formal mutations unchanged by default. If the operator explicitly checks
+3. Build the exact amd64 Container with Buildx, loading and updating the shared
+   `type=gha,scope=wasm-oj-submission-production` layer cache.
+4. Apply D1 migrations through `scripts/production-migrations.mjs apply` and capture the current
+   Container rollout baseline.
+5. Push `wasm-oj-submission-production:$GITHUB_SHA` through `wrangler containers push`.
+6. Run `wrangler deploy --config wrangler.quick-production.jsonc --tag "$GITHUB_SHA"`; the rendered
+   config references the prebuilt exact-commit image rather than a Dockerfile.
+7. Run `scripts/wait-container-rollout.mjs` until the Container application is stably ready.
+8. Probe `/api/health/container`, `/api/health/live`, and `/api/health/ready`.
+9. Leave formal mutations unchanged by default. If the operator explicitly checks
    `resume_formal_mutations` after completing the product smoke, run
    `scripts/production-migrations.mjs resume --cutover-smoke-confirmed`.
 
-The renderer replaces exactly one Worker `WASM_OJ_BUILD_ID` placeholder and exactly one Docker
-`ARG WASM_OJ_BUILD_ID`. Both must be the lowercase 40-character `$GITHUB_SHA`. Wrangler builds and
-pushes `containers[].image: "./Dockerfile"`; the workflow does not create an independent image
-coordinate. The deploy tag is available as Worker version metadata.
+The renderer replaces exactly two config placeholders: the Worker `WASM_OJ_BUILD_ID` and the
+Container image tag. Buildx passes the same lowercase 40-character `$GITHUB_SHA` through Docker
+`ARG WASM_OJ_BUILD_ID`. A cache miss performs the same complete build; it never selects another
+image. Wrangler authenticates and pushes the locally validated image to Cloudflare's managed
+registry, and the deploy tag remains available as Worker version metadata.
+
+The Dockerfile performs dependency imports, an identity-independent runtime execution smoke, and
+broad permission hardening before the commit-specific build argument. Identity generation then
+loads and verifies the embedded identity, executable inventory, and toolchain distribution before
+the final write/delete fences. A new commit can therefore reuse the execution-tested runtime layer
+while the small build-ID layer still verifies the exact final image contents.
 
 Rollout wait remains mandatory because Worker and Container rollout do not complete as one
 transaction. Production uses `rollout_step_percentage: 100` to replace Container capacity in one

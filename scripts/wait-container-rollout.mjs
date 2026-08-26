@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
 const CONTAINER_IMAGE = /^registry\.cloudflare\.com\/[^@\s]+@sha256:[0-9a-f]{64}$/u;
+const CONFIGURED_CONTAINER_IMAGE = /^registry\.cloudflare\.com\/b1c3d1b89f9131a84a0f1f6a973232f1\/wasm-oj-submission-production:[0-9a-f]{40}$/u;
 const BASELINE_SCHEMA = "wasm-oj/container-rollout-baseline/v1";
 const HEALTH_KEYS = ["active", "assigned", "healthy", "stopped", "failed", "scheduling", "starting"];
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1_000;
@@ -38,8 +39,8 @@ export function configuredContainerRolloutTarget(config) {
   if (typeof container.class_name !== "string" || container.class_name.length === 0) {
     throw new TypeError("Worker config Container class name is invalid.");
   }
-  if (container.image !== "./Dockerfile") {
-    throw new TypeError("Worker config Container image must be built from ./Dockerfile by Wrangler.");
+  if (typeof container.image !== "string" || !CONFIGURED_CONTAINER_IMAGE.test(container.image)) {
+    throw new TypeError("Worker config Container image must reference the exact prebuilt production Git commit.");
   }
   return Object.freeze({
     className: container.class_name,

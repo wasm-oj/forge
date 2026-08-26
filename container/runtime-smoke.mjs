@@ -6,7 +6,6 @@ import { serverSource as javascriptToolchain } from "@wasm-oj/toolchain-javascri
 import { serverSource as javaToolchain } from "@wasm-oj/toolchain-java";
 import { serverSource as pythonToolchain } from "@wasm-oj/toolchain-python";
 import { serverSource as rustToolchain } from "@wasm-oj/toolchain-rust";
-import { loadEmbeddedContainerIdentity } from "./identity.mjs";
 
 const CACHE_DIRECTORY = "/tmp/wasm-oj-image-runtime-smoke";
 const EXPECTED_STDOUT = "42\n";
@@ -23,13 +22,11 @@ const toolchains = Object.freeze([
   directory: new URL("file:///app/public/toolchains/"),
 })));
 
-const identity = await loadEmbeddedContainerIdentity({ toolchains });
 const engine = await createServerEngine({
   runtimeDirectory: "/app/runtime",
   toolchains,
   cacheDirectory: CACHE_DIRECTORY,
   artifactCache: false,
-  verifiedDistribution: identity.verifiedDistribution,
 });
 
 try {
