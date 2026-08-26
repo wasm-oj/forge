@@ -6,6 +6,7 @@ import {
   assertNoUnknownAppliedMigrations,
   assertRepositoryCutoverReady,
   cutoverPreflightCounts,
+  HISTORICAL_PRODUCTION_MIGRATIONS,
   PAUSE_REPOSITORY_CUTOVER_SQL,
   pendingMigrationNames,
   REPOSITORY_CUTOVER_PREFLIGHT_SQL,
@@ -26,9 +27,32 @@ test("migration inventory is exact and ordered", () => {
     [REPOSITORY_CUTOVER_MIGRATION],
   );
   assert.doesNotThrow(() => assertNoUnknownAppliedMigrations(migrations, migrations.slice(0, 3)));
+  assert.doesNotThrow(() => assertNoUnknownAppliedMigrations(
+    migrations,
+    [...migrations.slice(0, 3), ...HISTORICAL_PRODUCTION_MIGRATIONS],
+  ));
   assert.throws(
     () => assertNoUnknownAppliedMigrations(migrations, [...migrations, "0020_unknown.sql"]),
     /absent from this checkout/u,
+  );
+});
+
+test("historical production ledger names are exact and cannot hide unknown migrations", () => {
+  assert.deepEqual(HISTORICAL_PRODUCTION_MIGRATIONS, [
+    "0007_staging_acceptance.sql",
+    "0008_staging_acceptance_controls.sql",
+    "0009_release_drain_evidence.sql",
+    "0011_release_transition_drain_nonce.sql",
+    "0014_release_package_active_root.sql",
+    "0015_release_package_mutation_lease.sql",
+    "0016_staging_acceptance_fixture.sql",
+  ]);
+  assert.throws(
+    () => assertNoUnknownAppliedMigrations(migrations, [
+      ...HISTORICAL_PRODUCTION_MIGRATIONS,
+      "0016_unrecognized_history.sql",
+    ]),
+    /0016_unrecognized_history\.sql/u,
   );
 });
 
