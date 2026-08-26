@@ -18,7 +18,18 @@ SELECT
       WHERE state NOT IN ('completed', 'compile-error', 'judge-error', 'infrastructure-error', 'cancelled'))
   + (SELECT COUNT(*) FROM rejudge_batches WHERE state IN ('queued', 'running', 'ready'))
   + (SELECT COUNT(*) FROM rejudge_jobs WHERE state IN ('pending', 'dispatched'))
-  + (SELECT COUNT(*) FROM workflow_outbox WHERE state = 'pending');
+  + (SELECT COUNT(*) FROM workflow_outbox WHERE state = 'pending')
+  + (SELECT COUNT(*) FROM (
+      SELECT collections.github_repository_id
+      FROM problem_collections AS collections
+      WHERE EXISTS (
+        SELECT 1 FROM problem_series WHERE collection_id=collections.id
+      ) OR EXISTS (
+        SELECT 1 FROM collection_revisions WHERE collection_id=collections.id
+      )
+      GROUP BY collections.github_repository_id
+      HAVING COUNT(*) > 1
+    ));
 
 DROP TABLE repository_cutover_guard;
 
@@ -132,7 +143,12 @@ INSERT INTO catalogs (
 SELECT collections.id, collections.organizer_user_id, collections.github_repository_id,
        active.commit_sha, collections.created_at, collections.updated_at
 FROM problem_collections AS collections
-LEFT JOIN repository_cutover_active_commits AS active ON active.catalog_id=collections.id;
+LEFT JOIN repository_cutover_active_commits AS active ON active.catalog_id=collections.id
+WHERE EXISTS (
+  SELECT 1 FROM problem_series_legacy WHERE collection_id=collections.id
+) OR EXISTS (
+  SELECT 1 FROM collection_revisions WHERE collection_id=collections.id
+);
 
 CREATE TABLE catalog_sync_jobs (
   id TEXT PRIMARY KEY CHECK (length(id)=36),

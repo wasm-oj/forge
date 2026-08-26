@@ -912,6 +912,11 @@ test("repository-source cutover preserves terminal practice history and removes 
   apply(database, MIGRATION);
   apply(database, "0018_cli_auth.sql");
   const ids = seedCatalog(database);
+  const emptyDuplicateCollection = uuid(304);
+  database.prepare(`INSERT INTO problem_collections (
+    id, organizer_user_id, github_repository_id, index_path, created_at, updated_at
+  ) VALUES (?, ?, 11, 'collection/unused.json', ?, ?)`)
+    .run(emptyDuplicateCollection, uuid(1), NOW, NOW);
   const source = uuid(301);
   const submission = uuid(302);
   insertSource(database, source);
@@ -933,6 +938,8 @@ test("repository-source cutover preserves terminal practice history and removes 
   assert.deepEqual({ ...database.prepare("SELECT active_commit_sha FROM catalogs WHERE id=?").get(ids.collection) }, {
     active_commit_sha: gitSha("b"),
   });
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM catalogs").get().count, 1);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM catalogs WHERE id=?").get(emptyDuplicateCollection).count, 0);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM problem_revisions WHERE problem_id=?").get(ids.series).count, 2);
   assert.deepEqual({ ...database.prepare(`SELECT problem_id, catalog_commit, judge_digest
     FROM submissions WHERE id=?`).get(submission) }, {
@@ -1011,5 +1018,26 @@ test("repository-source cutover aborts when any contest exists", () => {
     'draft', ?, ?)`).run(uuid(303), uuid(1), ids.contestPublicationA, NOW, NOW, NOW);
   assert.throws(() => apply(database, "0019_repository_source_truth.sql"), /CHECK constraint failed/);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM contests").get().count, 1);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM sqlite_schema WHERE name='catalogs'").get().count, 0);
+});
+
+test("repository-source cutover aborts instead of merging two material catalogs", () => {
+  const database = legacyDatabase();
+  seedPreservedIdentity(database);
+  apply(database, MIGRATION);
+  apply(database, "0018_cli_auth.sql");
+  seedCatalog(database);
+  const secondCollection = uuid(305);
+  database.prepare(`INSERT INTO problem_collections (
+    id, organizer_user_id, github_repository_id, index_path, created_at, updated_at
+  ) VALUES (?, ?, 11, 'collection/second.json', ?, ?)`)
+    .run(secondCollection, uuid(1), NOW, NOW);
+  database.prepare(`INSERT INTO problem_series (
+    id, collection_id, problem_slug, created_at
+  ) VALUES (?, ?, 'second-problem', ?)`)
+    .run(uuid(306), secondCollection, NOW);
+
+  assert.throws(() => apply(database, "0019_repository_source_truth.sql"), /CHECK constraint failed/);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM problem_collections").get().count, 2);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM sqlite_schema WHERE name='catalogs'").get().count, 0);
 });
