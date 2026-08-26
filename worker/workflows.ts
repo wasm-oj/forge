@@ -147,10 +147,13 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<WasmOjWorkerEnv, Subm
             timeout: "30 minutes",
           }, async () => {
             const started = await this.env.DB.prepare(`UPDATE submission_attempts
-                SET state='running', started_at=?
+                SET state='running', started_at=?, runtime_build_id=?, worker_version_id=?
               WHERE submission_id=? AND attempt=? AND state='created' AND token_hash=?
                 AND EXISTS (SELECT 1 FROM submissions WHERE id=? AND state NOT IN (${TERMINAL_STATES}))`)
-              .bind(new Date().toISOString(), submission.submissionId, attempt, await sha256Hex(token), submission.submissionId).run();
+              .bind(
+                new Date().toISOString(), submission.buildId, submission.workerVersionId,
+                submission.submissionId, attempt, await sha256Hex(token), submission.submissionId,
+              ).run();
             if (started.meta.changes !== 1) throw new Error("Submission attempt lost its execution fence.");
             const container = this.env.SUBMISSION_CONTAINER.getByName(`${submission.submissionId}:${attempt}`);
             const response = await container.fetch(new Request("https://judge.container/execute", {
@@ -166,10 +169,9 @@ export class SubmissionWorkflow extends WorkflowEntrypoint<WasmOjWorkerEnv, Subm
                 sourceR2Key: submission.sourceR2Key,
                 sourceSha256: submission.sourceSha256,
                 judgeR2Key: submission.judgeR2Key,
-                executionSemanticSha256: submission.executionSemanticSha256,
-                expectedReleaseId: submission.expectedReleaseId,
-                expectedManifestSha256: submission.expectedManifestSha256,
-                expectedContainerIdentitySha256: submission.expectedContainerIdentitySha256,
+                judgeDigest: submission.judgeDigest,
+                expectedBuildId: submission.buildId,
+                expectedWorkerVersionId: submission.workerVersionId,
               }),
             }));
             if (!response.ok) throw new Error(`Judge container failed with HTTP ${response.status}.`);

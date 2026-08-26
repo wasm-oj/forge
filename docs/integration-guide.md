@@ -20,7 +20,7 @@ code into a client bundle.
 | `@wasm-oj/core` | Host-neutral engine, compiler/runner interfaces, judge, dependency, replay, and conformance APIs |
 | `@wasm-oj/browser` | Browser Workers, browser storage, runtime-driver plug-ins, and `createBrowserEngine()` |
 | `@wasm-oj/server` | Node.js/Wasmer processes, filesystem stores, and `createServerEngine()` |
-| `@wasm-oj/organizer` | Collection and immutable judge-package publication validation |
+| `@wasm-oj/organizer` | Repository manifest, public projection, and deployable judge-package validation |
 | `@wasm-oj/cli` | Single local-first `woj` executable for Student and Organizer journeys |
 | `@wasm-oj/sdk` | Convenience root re-export of the host-neutral contracts and core APIs |
 | `@wasm-oj/sdk/contracts`, `@wasm-oj/sdk/browser`, `@wasm-oj/sdk/server`, `@wasm-oj/sdk/organizer` | Explicit convenience subpaths that re-export those same package instances |

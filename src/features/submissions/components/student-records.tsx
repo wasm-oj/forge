@@ -92,7 +92,7 @@ export function SubmissionDetailActions({ submission, locale, cancelBusy, visibi
   onChangeVisibility(): void;
 }) {
   return <div className="detail-actions">
-    <Link className="primary-action" href={submission.contest ? `/contests/${submission.contest.id}/problems/${submission.problemVersionId}` : `/problems/${submission.problemVersionId}`}>Open problem</Link>
+    <Link className="primary-action" href={submission.contest ? `/contests/${submission.contest.id}/problems/${submission.problemId}` : `/problems/${submission.problemId}`}>Open problem</Link>
     {submission.sourceAvailable && <a className="secondary-action" href={`/api/submissions/${submission.id}/source`}>View source</a>}
     {submissionCanBeCancelled(submission) && <button className="danger-action" type="button" disabled={cancelBusy} onClick={onCancel}>
       <CircleStop aria-hidden="true" size={15} />

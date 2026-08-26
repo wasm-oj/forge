@@ -88,7 +88,7 @@ export function markParetoFrontier(rows: readonly FrontierDatabaseRow[]): readon
 export async function queryPerformanceFrontier(
   database: D1Database,
   input: {
-    readonly problemVersionId: string;
+    readonly problemId: string;
     readonly contestId?: string;
     readonly language?: string;
     readonly submittedAtOrBefore?: string;
@@ -96,8 +96,8 @@ export async function queryPerformanceFrontier(
 ): Promise<readonly PerformanceFrontierRow[]> {
   const contest = input.contestId !== undefined;
   const bindings: unknown[] = contest
-    ? [input.contestId, input.problemVersionId]
-    : [input.problemVersionId];
+    ? [input.contestId, input.problemId]
+    : [input.problemId];
   if (input.language) bindings.push(input.language);
   if (input.submittedAtOrBefore) bindings.push(input.submittedAtOrBefore);
   const rows = await database.prepare(`WITH candidates AS (
@@ -112,12 +112,15 @@ export async function queryPerformanceFrontier(
       FROM effective_submission_results AS effective
       JOIN submissions AS origin ON origin.id=effective.origin_submission_id
       JOIN submissions AS result ON result.id=effective.effective_submission_id
-      ${contest ? `JOIN contest_problems AS contest_problem
+      ${contest ? `JOIN contest_series AS contest ON contest.id=origin.contest_id
+      JOIN catalogs ON catalogs.id=contest.catalog_id
+      JOIN contest_revision_problems AS contest_problem
         ON contest_problem.contest_id=origin.contest_id
-       AND contest_problem.problem_series_id=origin.problem_series_id` : ""}
+       AND contest_problem.commit_sha=catalogs.active_commit_sha
+       AND contest_problem.problem_id=origin.problem_id` : ""}
       WHERE ${contest
-        ? "origin.contest_id=? AND contest_problem.problem_version_id=?"
-        : "origin.contest_id IS NULL AND effective.effective_problem_version_id=?"}
+        ? "origin.contest_id=? AND contest_problem.problem_id=?"
+        : "origin.contest_id IS NULL AND effective.problem_id=?"}
         AND result.state='completed'
         AND result.score IS NOT NULL
         AND result.fully_passed_cases IS NOT NULL
@@ -152,12 +155,12 @@ export async function queryPerformanceEvolution(
   database: D1Database,
   input: {
     readonly userId: string;
-    readonly problemSeriesId: string;
+    readonly problemId: string;
     readonly contestId?: string;
     readonly language?: string;
   },
 ): Promise<{ readonly entries: readonly PerformanceEvolutionRow[]; readonly truncated: boolean }> {
-  const bindings: unknown[] = [input.userId, input.problemSeriesId];
+  const bindings: unknown[] = [input.userId, input.problemId];
   if (input.contestId) bindings.push(input.contestId);
   if (input.language) bindings.push(input.language);
   const rows = await database.prepare(`WITH resolved AS (SELECT
@@ -179,7 +182,7 @@ export async function queryPerformanceEvolution(
       ON result.id=effective.effective_submission_id
     WHERE origin.origin_submission_id=origin.id
       AND origin.user_id=?
-      AND origin.problem_series_id=?
+      AND origin.problem_id=?
       AND ${input.contestId ? "origin.contest_id=?" : "origin.contest_id IS NULL"}
     ), numbered AS (SELECT
       submission_id,

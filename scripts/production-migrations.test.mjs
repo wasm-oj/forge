@@ -1,94 +1,88 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+
 import {
-  assertArchitectureResetMigrationState,
   assertNoUnknownAppliedMigrations,
-  assertNormalProductionMigrationState,
-  assertNormalProductionReleaseState,
-  configuredProductionRelease,
+  assertRepositoryCutoverReady,
+  cutoverPreflightCounts,
+  PAUSE_REPOSITORY_CUTOVER_SQL,
   pendingMigrationNames,
-  RETIRED_PRODUCTION_MIGRATIONS,
+  REPOSITORY_CUTOVER_PREFLIGHT_SQL,
+  REPOSITORY_CUTOVER_MIGRATION,
+  RESUME_REPOSITORY_CUTOVER_SQL,
 } from "./production-migrations.mjs";
-import { assertArchitectureResetToken } from "./architecture-reset-safety.mjs";
 
 const migrations = [
   "0001_initial.sql",
-  "0016_single_store.sql",
   "0017_architecture_reset.sql",
   "0018_cli_auth.sql",
+  REPOSITORY_CUTOVER_MIGRATION,
 ];
 
-test("normal production migrations fail closed until the architecture reset is recorded", () => {
-  assert.throws(
-    () => assertNormalProductionMigrationState(["0001_initial.sql", "0016_single_store.sql"]),
-    /guarded architecture-v2 cutover/,
-  );
-  assert.doesNotThrow(() => assertNormalProductionMigrationState(migrations));
-});
-
-test("normal production migrations require the rendered release to be the exact active D1 release", () => {
-  const expected = {
-    releaseId: "018f0f2e-7b3c-7f51-8b36-df6ec12f8d31",
-    manifestSha256: "a".repeat(64),
-  };
-  assert.deepEqual(configuredProductionRelease(JSON.stringify({
-    vars: {
-      ENVIRONMENT: "production",
-      WASM_OJ_RELEASE_ID: expected.releaseId,
-      WASM_OJ_RELEASE_MANIFEST_SHA256: expected.manifestSha256,
-    },
-  })), expected);
-  assert.doesNotThrow(() => assertNormalProductionReleaseState([{
-    release_id: expected.releaseId,
-    manifest_sha256: expected.manifestSha256,
-  }], expected));
-  assert.throws(
-    () => configuredProductionRelease(JSON.stringify({
-      vars: {
-        ENVIRONMENT: "production",
-        WASM_OJ_RELEASE_ID: "__WASM_OJ_RELEASE_ID__",
-        WASM_OJ_RELEASE_MANIFEST_SHA256: "__WASM_OJ_RELEASE_MANIFEST_SHA256__",
-      },
-    })),
-    /invalid release coordinates/,
-  );
-  assert.throws(
-    () => assertNormalProductionReleaseState([], expected),
-    /does not exactly match/,
-  );
-  assert.throws(
-    () => assertNormalProductionReleaseState([{
-      release_id: expected.releaseId,
-      manifest_sha256: "b".repeat(64),
-    }], expected),
-    /does not exactly match/,
-  );
-});
-
-test("architecture reset must be the first pending migration", () => {
+test("migration inventory is exact and ordered", () => {
   assert.deepEqual(
-    pendingMigrationNames(migrations, ["0001_initial.sql", "0016_single_store.sql"]),
-    ["0017_architecture_reset.sql", "0018_cli_auth.sql"],
+    pendingMigrationNames(migrations, migrations.slice(0, 3)),
+    [REPOSITORY_CUTOVER_MIGRATION],
   );
-  assert.doesNotThrow(() => assertArchitectureResetMigrationState(
-    migrations,
-    ["0001_initial.sql", ...RETIRED_PRODUCTION_MIGRATIONS, "0016_single_store.sql"],
-  ));
-  assert.doesNotThrow(() => assertArchitectureResetMigrationState(
-    [...migrations, "0019_future.sql"],
-    ["0001_initial.sql", "0016_single_store.sql"],
-  ));
-  assert.throws(() => assertArchitectureResetMigrationState(migrations, migrations), /found \[\]/);
+  assert.doesNotThrow(() => assertNoUnknownAppliedMigrations(migrations, migrations.slice(0, 3)));
   assert.throws(
-    () => assertNoUnknownAppliedMigrations(migrations, [...migrations, "0018_unknown.sql"]),
-    /absent from this checkout/,
+    () => assertNoUnknownAppliedMigrations(migrations, [...migrations, "0020_unknown.sql"]),
+    /absent from this checkout/u,
   );
 });
 
-test("architecture reset token requires a protected high-entropy exact match", () => {
-  const token = "architecture-v2-reset-token-0123456789abcdef";
-  assert.doesNotThrow(() => assertArchitectureResetToken(token, token));
-  assert.throws(() => assertArchitectureResetToken(undefined, token), /PROVIDED is required/);
-  assert.throws(() => assertArchitectureResetToken(`${token}x`, token), /does not match/);
-  assert.throws(() => assertArchitectureResetToken("short", "short"), /at least 32 bytes/);
+test("repository cutover accepts only an empty and fully drained operational boundary", () => {
+  const ready = cutoverPreflightCounts([{ contests: 0, formal_enabled: 0, mutations: 0, outbox: 0 }]);
+  assert.doesNotThrow(() => assertRepositoryCutoverReady(ready));
+  for (const key of ["contests", "formal_enabled", "mutations", "outbox"]) {
+    assert.throws(
+      () => assertRepositoryCutoverReady({ ...ready, [key]: 1 }),
+      /not drained/u,
+    );
+  }
+  assert.throws(() => cutoverPreflightCounts([]), /no exact row/u);
+  assert.throws(
+    () => cutoverPreflightCounts([{ contests: 0, formal_enabled: 0, mutations: -1, outbox: 0 }]),
+    /invalid counts/u,
+  );
+});
+
+test("repository cutover SQL targets the real 0017 control and active-job schema", () => {
+  const database = new DatabaseSync(":memory:");
+  database.exec(`
+    CREATE TABLE formal_mutation_controls (
+      environment TEXT PRIMARY KEY,
+      formal_mutations_enabled INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE contests (id TEXT PRIMARY KEY) STRICT;
+    CREATE TABLE catalog_validation_jobs (id TEXT PRIMARY KEY, state TEXT NOT NULL) STRICT;
+    CREATE TABLE catalog_publish_jobs (id TEXT PRIMARY KEY, state TEXT NOT NULL) STRICT;
+    CREATE TABLE submissions (id TEXT PRIMARY KEY, state TEXT NOT NULL) STRICT;
+    CREATE TABLE rejudge_batches (id TEXT PRIMARY KEY, state TEXT NOT NULL) STRICT;
+    CREATE TABLE rejudge_jobs (id TEXT PRIMARY KEY, state TEXT NOT NULL) STRICT;
+    CREATE TABLE workflow_outbox (id TEXT PRIMARY KEY, state TEXT NOT NULL) STRICT;
+    INSERT INTO formal_mutation_controls VALUES (
+      'production', 1, 'production-open', '2026-08-26T00:00:00.000Z'
+    );
+  `);
+  database.prepare(PAUSE_REPOSITORY_CUTOVER_SQL).run();
+  const ready = cutoverPreflightCounts([database.prepare(REPOSITORY_CUTOVER_PREFLIGHT_SQL).get()]);
+  assert.deepEqual({ ...ready }, { formal_enabled: 0, contests: 0, outbox: 0, mutations: 0 });
+  assert.doesNotThrow(() => assertRepositoryCutoverReady(ready));
+
+  database.prepare("INSERT INTO catalog_publish_jobs VALUES ('publish', 'materializing')").run();
+  assert.equal(database.prepare(REPOSITORY_CUTOVER_PREFLIGHT_SQL).get().mutations, 1);
+  database.prepare("DELETE FROM catalog_publish_jobs").run();
+  database.prepare("INSERT INTO rejudge_jobs VALUES ('rejudge', 'dispatched')").run();
+  assert.equal(database.prepare(REPOSITORY_CUTOVER_PREFLIGHT_SQL).get().mutations, 1);
+  database.prepare("DELETE FROM rejudge_jobs").run();
+
+  assert.deepEqual({ ...database.prepare(RESUME_REPOSITORY_CUTOVER_SQL).get() }, {
+    enabled: 1,
+    reason: "repository-source-truth-production-smoke-passed",
+  });
+  assert.equal(database.prepare(RESUME_REPOSITORY_CUTOVER_SQL).get(), undefined);
 });

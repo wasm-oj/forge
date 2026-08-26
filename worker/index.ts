@@ -18,7 +18,6 @@ import {
   getSubmissionEvents,
   getSubmissionPolicySummary,
   listOwnSubmissions,
-  managedMatch,
   publicSubmissionSource,
   updateSubmissionVisibility,
 } from "./submissions";
@@ -31,10 +30,7 @@ import {
 } from "./organizer";
 import {
   contestLeaderboard,
-  createContest,
   currentProfile,
-  addOrganizerContestProblem,
-  archiveOrganizerContest,
   getContest,
   getOrganizerContest,
   joinContest,
@@ -46,35 +42,27 @@ import {
   problemPerformance,
   problemLeaderboard,
   publicProfile,
-  publishContest,
-  removeOrganizerContestProblem,
   rotateContestInviteCode,
-  updateOrganizerContest,
   updateProfile,
 } from "./product";
 import {
-  activateCatalogPublication,
-  createCatalogPublication,
-  createCatalogValidation,
-  createProblemCollection,
-  getCatalogPublication,
-  getCatalogValidation,
-  getProblemCollection,
-  listCatalogPublications,
-  listProblemCollections,
+  createCatalog,
+  createCatalogSync,
+  getCatalog,
+  getCatalogSync,
+  listCatalogs,
   publicProblemContent,
 } from "./catalog";
 import { reconcile } from "./reconciler";
 import {
   createOrganizerApplication,
-  activateProductionRelease,
   getFormalMutationControl,
   listOrganizerApplications,
   revokeOrganizerRole,
   reviewOrganizerApplication,
   updateFormalMutationControl,
 } from "./admin";
-import { detailedReadiness } from "./readiness";
+import { detailedReadiness, probeDeploymentContainer } from "./readiness";
 import { eraseAccount } from "./account-erasure";
 import { cancelRejudgeBatch, createRejudgeBatch, getRejudgeBatch, listRejudgeBatches, rejudgeOptions } from "./rejudge";
 import { withSecurityHeaders } from "./security-headers";
@@ -112,6 +100,7 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
     const ready = (await detailedReadiness(env)).ready;
     return jsonResponse({ ready }, ready ? 200 : 503);
   }
+  if (request.method === "GET" && pathname === "/api/health/container") return probeDeploymentContainer(request, env);
   if (request.method === "GET" && pathname === "/api/auth/github") return beginGithubLogin(request, env);
   if (request.method === "GET" && pathname === "/api/auth/github/callback") return completeGithubLogin(request, env);
   if (request.method === "POST" && pathname === "/api/auth/cli/start") return startCliLogin(request, env);
@@ -128,7 +117,6 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   if (request.method === "POST" && pathname === "/api/organizer/applications") return createOrganizerApplication(request, env);
   if (request.method === "GET" && pathname === "/api/admin/organizer-applications") return listOrganizerApplications(request, env);
   if (request.method === "GET" && pathname === "/api/admin/formal-mutations") return getFormalMutationControl(request, env);
-  if (request.method === "POST" && pathname === "/api/admin/releases/activate") return activateProductionRelease(request, env);
   if (request.method === "POST" && pathname === "/api/admin/formal-mutations/pause") return updateFormalMutationControl(request, env, false);
   if (request.method === "POST" && pathname === "/api/admin/formal-mutations/resume") return updateFormalMutationControl(request, env, true);
   const applicationId = identifier(pathname, new RegExp(`^/api/admin/organizer-applications/(${UUID})/review$`));
@@ -140,36 +128,19 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   if (request.method === "GET" && pathname === "/api/organizer/github/install") return beginGithubAppInstall(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/github/callback") return completeGithubAppInstall(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/repositories") return listOrganizerRepositories(request, env);
-  if (request.method === "GET" && pathname === "/api/organizer/collections") return listProblemCollections(request, env);
-  const organizerCollectionId = identifier(pathname, new RegExp(`^/api/organizer/collections/(${UUID})$`));
-  if (request.method === "GET" && organizerCollectionId) return getProblemCollection(request, env, organizerCollectionId);
-  if (request.method === "GET" && pathname === "/api/organizer/publications") return listCatalogPublications(request, env);
-  if (request.method === "POST" && pathname === "/api/organizer/collections") return createProblemCollection(request, env);
-  const validationCollectionId = identifier(pathname, new RegExp(`^/api/organizer/collections/(${UUID})/validations$`));
-  if (request.method === "POST" && validationCollectionId) return createCatalogValidation(request, env, validationCollectionId);
-  const validationId = identifier(pathname, new RegExp(`^/api/organizer/validations/(${UUID})$`));
-  if (request.method === "GET" && validationId) return getCatalogValidation(request, env, validationId);
-  const publicationRevisionId = identifier(pathname, new RegExp(`^/api/organizer/revisions/(${UUID})/publications$`));
-  if (request.method === "POST" && publicationRevisionId) return createCatalogPublication(request, env, publicationRevisionId);
-  const publicationJobId = identifier(pathname, new RegExp(`^/api/organizer/publications/(${UUID})$`));
-  if (request.method === "GET" && publicationJobId) return getCatalogPublication(request, env, publicationJobId);
-  const activatePublicationId = identifier(pathname, new RegExp(`^/api/organizer/publications/(${UUID})/activate$`));
-  if (request.method === "POST" && activatePublicationId) return activateCatalogPublication(request, env, activatePublicationId);
+  if (request.method === "GET" && pathname === "/api/organizer/catalogs") return listCatalogs(request, env);
+  if (request.method === "POST" && pathname === "/api/organizer/catalogs") return createCatalog(request, env);
+  const organizerCatalogId = identifier(pathname, new RegExp(`^/api/organizer/catalogs/(${UUID})$`));
+  if (request.method === "GET" && organizerCatalogId) return getCatalog(request, env, organizerCatalogId);
+  const syncCatalogId = identifier(pathname, new RegExp(`^/api/organizer/catalogs/(${UUID})/syncs$`));
+  if (request.method === "POST" && syncCatalogId) return createCatalogSync(request, env, syncCatalogId);
+  const syncId = identifier(pathname, new RegExp(`^/api/organizer/catalog-syncs/(${UUID})$`));
+  if (request.method === "GET" && syncId) return getCatalogSync(request, env, syncId);
   if (request.method === "GET" && pathname === "/api/organizer/contests") return listOrganizerContests(request, env);
   const organizerContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})$`));
   if (request.method === "GET" && organizerContestId) return getOrganizerContest(request, env, organizerContestId);
-  if (request.method === "PUT" && organizerContestId) return updateOrganizerContest(request, env, organizerContestId);
   const rotateContestInviteId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/invite-code$`));
   if (request.method === "POST" && rotateContestInviteId) return rotateContestInviteCode(request, env, rotateContestInviteId);
-  const contestProblemIds = new RegExp(`^/api/organizer/contests/(${UUID})/problems/(${UUID})$`).exec(pathname);
-  if (request.method === "POST" && contestProblemIds) {
-    return addOrganizerContestProblem(request, env, contestProblemIds[1]!, contestProblemIds[2]!);
-  }
-  if (request.method === "DELETE" && contestProblemIds) {
-    return removeOrganizerContestProblem(request, env, contestProblemIds[1]!, contestProblemIds[2]!);
-  }
-  const archiveContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/archive$`));
-  if (request.method === "POST" && archiveContestId) return archiveOrganizerContest(request, env, archiveContestId);
   const participantContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/participants$`));
   if (request.method === "GET" && participantContestId) return listOrganizerContestParticipants(request, env, participantContestId);
   if (request.method === "GET" && pathname === "/api/organizer/rejudges/options") return rejudgeOptions(request, env);
@@ -193,8 +164,6 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   if (request.method === "GET" && sourceSubmissionId) return publicSubmissionSource(request, env, sourceSubmissionId);
   const policySummarySubmissionId = identifier(pathname, new RegExp(`^/api/submissions/(${UUID})/policy-summary$`));
   if (request.method === "GET" && policySummarySubmissionId) return getSubmissionPolicySummary(request, env, policySummarySubmissionId);
-  if (request.method === "GET" && pathname === "/api/collections/managed-match") return managedMatch(request, env);
-
   if (request.method === "GET" && pathname === "/api/profile") return currentProfile(request, env);
   if (request.method === "PATCH" && pathname === "/api/profile") return updateProfile(request, env);
   const profileLogin = identifier(pathname, /^\/api\/profiles\/([A-Za-z0-9-]{1,39})$/);
@@ -209,11 +178,8 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const problemPerformanceId = identifier(pathname, new RegExp(`^/api/problems/(${UUID})/performance$`));
   if (request.method === "GET" && problemPerformanceId) return problemPerformance(request, env, problemPerformanceId);
   if (request.method === "GET" && pathname === "/api/contests") return listContests(request, env);
-  if (request.method === "POST" && pathname === "/api/contests") return createContest(request, env);
   const contestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})$`));
   if (request.method === "GET" && contestId) return getContest(request, env, contestId);
-  const publishContestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})/publish$`));
-  if (request.method === "POST" && publishContestId) return publishContest(request, env, publishContestId);
   const joinContestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})/join$`));
   if (request.method === "POST" && joinContestId) return joinContest(request, env, joinContestId);
   const leaderboardContestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})/leaderboard$`));

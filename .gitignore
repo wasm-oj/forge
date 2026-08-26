@@ -25,4 +25,5 @@ release-tarballs/
 __pycache__/
 *.pyc
 *.tsbuildinfo
+*.shadow.md
 .DS_Store

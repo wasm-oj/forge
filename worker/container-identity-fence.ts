@@ -1,131 +1,54 @@
-import { sha256Hex } from "./crypto";
 import { readBoundedResponseJson } from "./http";
 
 const SHA256 = /^[0-9a-f]{64}$/;
-const COMMIT = /^[0-9a-f]{40}$/;
+const BUILD_ID = /^[0-9a-f]{40}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const VERSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,511}$/;
-const MAX_CONTAINER_IDENTITY_BYTES = 16 * 1024;
-const CONTAINER_IDENTITY_SCHEMA = "wasm-oj-platform/container-identity/v2" as const;
-const CONTAINER_IDENTITY_FENCE_SCHEMA = "wasm-oj-platform/container-identity-fence/v2" as const;
-const CONTAINER_PROTOCOL = "wasm-oj-container-v2" as const;
+const MAX_CONTAINER_IDENTITY_BYTES = 4 * 1024;
+const CONTAINER_IDENTITY_SCHEMA = "wasm-oj-platform/container-identity/v3" as const;
+const CONTAINER_IDENTITY_FENCE_SCHEMA = "wasm-oj-platform/container-identity-fence/v3" as const;
+export const CONTAINER_PROTOCOL = "wasm-oj-container-v2" as const;
 const CONTRACT_VERSION = 2 as const;
 
-const IDENTITY_KEYS = [
-  "compilerSha256",
-  "contract",
-  "executionRootSha256",
-  "gitCommit",
-  "identitySha256",
-  "protocol",
-  "releaseId",
-  "runnerSha256",
-  "runtimeRootSha256",
-  "schema",
-  "toolchainRootSha256",
-] as const;
-
-const EMBEDDED_IDENTITY_KEYS = [
-  "compilerSha256",
-  "contract",
-  "executionRootSha256",
-  "gitCommit",
-  "protocol",
-  "releaseId",
-  "runnerSha256",
-  "runtimeRootSha256",
-  "schema",
-  "toolchainRootSha256",
-] as const;
-
+const IDENTITY_KEYS = ["buildId", "contract", "protocol", "schema"] as const;
 const FENCE_KEYS = [
-  "attempt",
-  "attemptTokenHash",
-  "compilerSha256",
-  "environment",
-  "executionRootSha256",
-  "identitySha256",
-  "jobId",
-  "manifestSha256",
-  "protocol",
-  "releaseId",
-  "runnerSha256",
-  "runtimeRootSha256",
-  "schema",
-  "toolchainRootSha256",
-  "workerVersionId",
+  "attempt", "attemptTokenHash", "buildId", "environment", "jobId",
+  "protocol", "schema", "workerVersionId",
 ] as const;
 
 export interface ProbedContainerIdentity {
   readonly schema: typeof CONTAINER_IDENTITY_SCHEMA;
   readonly contract: typeof CONTRACT_VERSION;
   readonly protocol: typeof CONTAINER_PROTOCOL;
-  readonly releaseId: string;
-  readonly gitCommit: string;
-  readonly identitySha256: string;
-  readonly executionRootSha256: string;
-  readonly runtimeRootSha256: string;
-  readonly toolchainRootSha256: string;
-  readonly compilerSha256: string;
-  readonly runnerSha256: string;
+  readonly buildId: string;
 }
 
-export interface ContainerIdentityReleaseBinding {
+export interface ContainerIdentityWorkerBinding {
   readonly environment: "development" | "staging" | "production";
-  readonly releaseId: string;
-  readonly manifestSha256: string;
+  readonly buildId: string;
   readonly workerVersionId: string;
-  readonly wasmOjContract: typeof CONTRACT_VERSION;
-  readonly sourceCommit: string;
-  readonly containerIdentitySha256: string;
-  readonly protocol: typeof CONTAINER_PROTOCOL;
-  readonly executionRootSha256: string;
-  readonly runtimeRootSha256: string;
-  readonly toolchainRootSha256: string;
-  readonly compilerSha256: string;
-  readonly runnerSha256: string;
 }
 
 export interface ContainerIdentityJobBinding {
   readonly jobId: string;
   readonly attempt: number;
   readonly attemptTokenHash: string;
-  readonly expectedReleaseId: string;
-  readonly expectedManifestSha256: string;
-  readonly expectedContainerIdentitySha256: string;
+  readonly expectedBuildId: string;
+  readonly expectedWorkerVersionId: string;
 }
 
 export interface ContainerIdentityFence {
   readonly schema: typeof CONTAINER_IDENTITY_FENCE_SCHEMA;
-  readonly environment: ContainerIdentityReleaseBinding["environment"];
+  readonly environment: ContainerIdentityWorkerBinding["environment"];
   readonly jobId: string;
   readonly attempt: number;
   readonly attemptTokenHash: string;
-  readonly releaseId: string;
-  readonly manifestSha256: string;
+  readonly buildId: string;
   readonly workerVersionId: string;
-  readonly identitySha256: string;
   readonly protocol: typeof CONTAINER_PROTOCOL;
-  readonly executionRootSha256: string;
-  readonly runtimeRootSha256: string;
-  readonly toolchainRootSha256: string;
-  readonly compilerSha256: string;
-  readonly runnerSha256: string;
 }
 
-export interface FencedContainerAuthorization {
-  readonly jobId: string;
-  readonly attempt: number;
-  readonly attemptTokenHash: string;
-  readonly expectedReleaseId: string;
-  readonly expectedManifestSha256: string;
-  readonly expectedContainerIdentitySha256: string;
-}
-
-export type ContainerIdentityWorkerBinding = Pick<
-  ContainerIdentityReleaseBinding,
-  "environment" | "releaseId" | "manifestSha256" | "workerVersionId"
->;
+export type FencedContainerAuthorization = ContainerIdentityJobBinding;
 
 function record(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError(`${label} must be an object.`);
@@ -135,14 +58,21 @@ function record(value: unknown, label: string): Record<string, unknown> {
 function exact(value: Record<string, unknown>, keys: readonly string[], label: string): void {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
-  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
-    throw new TypeError(`${label} has an invalid shape.`);
-  }
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) throw new TypeError(`${label} has an invalid shape.`);
 }
 
-function digest(value: unknown, label: string): string {
-  if (typeof value !== "string" || !SHA256.test(value)) throw new TypeError(`${label} must be a lowercase SHA-256 digest.`);
-  return value;
+function validWorker(worker: ContainerIdentityWorkerBinding): boolean {
+  return ["development", "staging", "production"].includes(worker.environment)
+    && BUILD_ID.test(worker.buildId)
+    && VERSION_ID.test(worker.workerVersionId);
+}
+
+function validJob(job: ContainerIdentityJobBinding): boolean {
+  return UUID.test(job.jobId)
+    && Number.isSafeInteger(job.attempt) && job.attempt >= 1
+    && SHA256.test(job.attemptTokenHash)
+    && BUILD_ID.test(job.expectedBuildId)
+    && VERSION_ID.test(job.expectedWorkerVersionId);
 }
 
 export function parseProbedContainerIdentity(value: unknown): ProbedContainerIdentity {
@@ -152,23 +82,14 @@ export function parseProbedContainerIdentity(value: unknown): ProbedContainerIde
     identity.schema !== CONTAINER_IDENTITY_SCHEMA
     || identity.contract !== CONTRACT_VERSION
     || identity.protocol !== CONTAINER_PROTOCOL
-    || typeof identity.releaseId !== "string"
-    || !UUID.test(identity.releaseId)
-    || typeof identity.gitCommit !== "string"
-    || !COMMIT.test(identity.gitCommit)
-  ) throw new TypeError("Container identity probe has invalid release coordinates.");
+    || typeof identity.buildId !== "string"
+    || !BUILD_ID.test(identity.buildId)
+  ) throw new TypeError("Container identity probe has invalid build coordinates.");
   return {
     schema: CONTAINER_IDENTITY_SCHEMA,
     contract: CONTRACT_VERSION,
     protocol: CONTAINER_PROTOCOL,
-    releaseId: identity.releaseId,
-    gitCommit: identity.gitCommit,
-    identitySha256: digest(identity.identitySha256, "Container identity"),
-    executionRootSha256: digest(identity.executionRootSha256, "Container execution root"),
-    runtimeRootSha256: digest(identity.runtimeRootSha256, "Container runtime root"),
-    toolchainRootSha256: digest(identity.toolchainRootSha256, "Container toolchain root"),
-    compilerSha256: digest(identity.compilerSha256, "Container compiler"),
-    runnerSha256: digest(identity.runnerSha256, "Container runner"),
+    buildId: identity.buildId,
   };
 }
 
@@ -177,98 +98,31 @@ export async function readBoundedProbedContainerIdentity(response: Response): Pr
     await response.body?.cancel().catch(() => undefined);
     throw new TypeError("Container identity probe failed.");
   }
-  try {
-    return parseProbedContainerIdentity(await readBoundedResponseJson(response, MAX_CONTAINER_IDENTITY_BYTES));
-  } catch {
-    throw new TypeError("Container identity probe is invalid or oversized.");
-  }
-}
-
-function embeddedContainerIdentityBytes(identity: ProbedContainerIdentity): Uint8Array {
-  const embedded = Object.fromEntries(EMBEDDED_IDENTITY_KEYS.map((key) => [key, identity[key]]));
-  return new TextEncoder().encode(`${JSON.stringify(embedded)}\n`);
-}
-
-export async function assertSelfAuthenticatedContainerIdentity(identity: ProbedContainerIdentity): Promise<void> {
-  if (await sha256Hex(embeddedContainerIdentityBytes(identity)) !== identity.identitySha256) {
-    throw new TypeError("Container identity probe does not authenticate its embedded identity fields.");
-  }
-}
-
-export function assertProbedContainerIdentityMatchesRelease(
-  identity: ProbedContainerIdentity,
-  release: ContainerIdentityReleaseBinding,
-): void {
-  if (
-    !UUID.test(release.releaseId)
-    || !SHA256.test(release.manifestSha256)
-    || !VERSION_ID.test(release.workerVersionId)
-    || !["development", "staging", "production"].includes(release.environment)
-    || release.wasmOjContract !== CONTRACT_VERSION
-    || !COMMIT.test(release.sourceCommit)
-    || release.protocol !== CONTAINER_PROTOCOL
-    || !SHA256.test(release.containerIdentitySha256)
-    || !SHA256.test(release.executionRootSha256)
-    || !SHA256.test(release.runtimeRootSha256)
-    || !SHA256.test(release.toolchainRootSha256)
-    || !SHA256.test(release.compilerSha256)
-    || !SHA256.test(release.runnerSha256)
-  ) throw new TypeError("Container release identity binding is invalid.");
-  if (
-    identity.releaseId !== release.releaseId
-    || identity.identitySha256 !== release.containerIdentitySha256
-    || identity.contract !== release.wasmOjContract
-    || identity.gitCommit !== release.sourceCommit
-    || identity.protocol !== release.protocol
-    || identity.executionRootSha256 !== release.executionRootSha256
-    || identity.runtimeRootSha256 !== release.runtimeRootSha256
-    || identity.toolchainRootSha256 !== release.toolchainRootSha256
-    || identity.compilerSha256 !== release.compilerSha256
-    || identity.runnerSha256 !== release.runnerSha256
-  ) throw new TypeError("Container identity does not match the immutable Worker release binding.");
+  try { return parseProbedContainerIdentity(await readBoundedResponseJson(response, MAX_CONTAINER_IDENTITY_BYTES)); }
+  catch { throw new TypeError("Container identity probe is invalid or oversized."); }
 }
 
 export function createContainerIdentityFence(
   identityValue: unknown,
   job: ContainerIdentityJobBinding,
-  release: ContainerIdentityReleaseBinding,
+  worker: ContainerIdentityWorkerBinding,
 ): ContainerIdentityFence {
   const identity = parseProbedContainerIdentity(identityValue);
+  if (!validJob(job) || !validWorker(worker)) throw new TypeError("Container identity fence coordinates are invalid.");
   if (
-    !UUID.test(job.jobId)
-    || !Number.isSafeInteger(job.attempt)
-    || job.attempt < 1
-    || !SHA256.test(job.attemptTokenHash)
-    || !UUID.test(job.expectedReleaseId)
-    || !SHA256.test(job.expectedManifestSha256)
-    || !SHA256.test(job.expectedContainerIdentitySha256)
-    || !UUID.test(release.releaseId)
-    || !SHA256.test(release.manifestSha256)
-    || !VERSION_ID.test(release.workerVersionId)
-    || !["development", "staging", "production"].includes(release.environment)
-  ) throw new TypeError("Container identity fence coordinates are invalid.");
-  if (
-    job.expectedReleaseId !== release.releaseId
-    || job.expectedManifestSha256 !== release.manifestSha256
-    || job.expectedContainerIdentitySha256 !== release.containerIdentitySha256
-  ) throw new TypeError("Container job does not match the immutable Worker release binding.");
-  assertProbedContainerIdentityMatchesRelease(identity, release);
+    job.expectedBuildId !== worker.buildId
+    || job.expectedWorkerVersionId !== worker.workerVersionId
+    || identity.buildId !== worker.buildId
+  ) throw new TypeError("Container identity does not match the executing Worker build.");
   return Object.freeze({
     schema: CONTAINER_IDENTITY_FENCE_SCHEMA,
-    environment: release.environment,
+    environment: worker.environment,
     jobId: job.jobId,
     attempt: job.attempt,
     attemptTokenHash: job.attemptTokenHash,
-    releaseId: release.releaseId,
-    manifestSha256: release.manifestSha256,
-    workerVersionId: release.workerVersionId,
-    identitySha256: identity.identitySha256,
+    buildId: worker.buildId,
+    workerVersionId: worker.workerVersionId,
     protocol: identity.protocol,
-    executionRootSha256: identity.executionRootSha256,
-    runtimeRootSha256: identity.runtimeRootSha256,
-    toolchainRootSha256: identity.toolchainRootSha256,
-    compilerSha256: identity.compilerSha256,
-    runnerSha256: identity.runnerSha256,
   });
 }
 
@@ -281,78 +135,37 @@ export function assertContainerIdentityFence(
   const fence = record(value, "Container identity fence");
   exact(fence, FENCE_KEYS, "Container identity fence");
   if (
-    fence.schema !== CONTAINER_IDENTITY_FENCE_SCHEMA
-    || !["development", "staging", "production"].includes(fence.environment as string)
+    !validJob(authorization) || !validWorker(worker) || !SHA256.test(requestTokenHash)
+    || fence.schema !== CONTAINER_IDENTITY_FENCE_SCHEMA
     || fence.protocol !== CONTAINER_PROTOCOL
-    || typeof fence.jobId !== "string"
-    || !UUID.test(fence.jobId)
-    || !Number.isSafeInteger(fence.attempt)
-    || (fence.attempt as number) < 1
-    || typeof fence.releaseId !== "string"
-    || !UUID.test(fence.releaseId)
+    || fence.environment !== worker.environment
     || fence.jobId !== authorization.jobId
     || fence.attempt !== authorization.attempt
     || fence.attemptTokenHash !== authorization.attemptTokenHash
     || fence.attemptTokenHash !== requestTokenHash
-    || fence.releaseId !== authorization.expectedReleaseId
-    || fence.manifestSha256 !== authorization.expectedManifestSha256
-    || fence.identitySha256 !== authorization.expectedContainerIdentitySha256
-    || fence.environment !== worker.environment
-    || fence.releaseId !== worker.releaseId
-    || fence.manifestSha256 !== worker.manifestSha256
+    || fence.buildId !== authorization.expectedBuildId
+    || fence.buildId !== worker.buildId
+    || fence.workerVersionId !== authorization.expectedWorkerVersionId
     || fence.workerVersionId !== worker.workerVersionId
-    || typeof fence.workerVersionId !== "string"
-    || !VERSION_ID.test(fence.workerVersionId)
-    || !UUID.test(authorization.jobId)
-    || !Number.isSafeInteger(authorization.attempt)
-    || authorization.attempt < 1
-    || !UUID.test(authorization.expectedReleaseId)
   ) throw new TypeError("Container callback is not covered by the exact Worker-side identity fence.");
-  for (const [label, digestValue] of Object.entries({
-    token: fence.attemptTokenHash,
-    manifest: fence.manifestSha256,
-    identity: fence.identitySha256,
-    executionRoot: fence.executionRootSha256,
-    runtimeRoot: fence.runtimeRootSha256,
-    toolchainRoot: fence.toolchainRootSha256,
-    compiler: fence.compilerSha256,
-    runner: fence.runnerSha256,
-  })) digest(digestValue, `Container fence ${label}`);
 }
 
-/**
- * Establishes the identity fence before the job bytes can reach the Container.
- * This ordering is security-critical: a mismatched old image is never forwarded
- * an attempt token and therefore cannot pass any outbound callback gate.
- */
+/** Probe and commit the build fence before forwarding job bytes or attempt credentials. */
 export async function establishContainerIdentityFence<T>(input: {
   readonly probe: () => Promise<unknown>;
   readonly job: ContainerIdentityJobBinding;
-  readonly loadRelease: () => Promise<ContainerIdentityReleaseBinding>;
+  readonly worker: ContainerIdentityWorkerBinding;
   readonly commit: (fence: ContainerIdentityFence) => Promise<void>;
   readonly forward: () => Promise<T>;
 }): Promise<T> {
+  if (!validJob(input.job) || !validWorker(input.worker)
+    || input.job.expectedBuildId !== input.worker.buildId
+    || input.job.expectedWorkerVersionId !== input.worker.workerVersionId) {
+    throw new TypeError("Worker build identity does not match the immutable job binding.");
+  }
   const identity = parseProbedContainerIdentity(await input.probe());
-  // The image returns both the embedded release identity and its digest. Hash
-  // the exact canonical embedded bytes here instead of trusting that claimed
-  // digest. This makes every protocol/root/tool digest mismatch detectable
-  // before loading the active release manifest from R2.
-  await assertSelfAuthenticatedContainerIdentity(identity);
-  if (
-    !UUID.test(input.job.jobId)
-    || !Number.isSafeInteger(input.job.attempt)
-    || input.job.attempt < 1
-    || !SHA256.test(input.job.attemptTokenHash)
-    || !UUID.test(input.job.expectedReleaseId)
-    || !SHA256.test(input.job.expectedManifestSha256)
-    || !SHA256.test(input.job.expectedContainerIdentitySha256)
-    || identity.releaseId !== input.job.expectedReleaseId
-    || identity.identitySha256 !== input.job.expectedContainerIdentitySha256
-  ) throw new TypeError("Container identity probe does not match the immutable job binding.");
-  // Loading the active release reads its canonical manifest from D1. The exact
-  // job/image identity check above therefore must remain before this callback.
-  const release = await input.loadRelease();
-  const fence = createContainerIdentityFence(identity, input.job, release);
+  if (identity.buildId !== input.job.expectedBuildId) throw new TypeError("Container identity probe does not match the immutable job binding.");
+  const fence = createContainerIdentityFence(identity, input.job, input.worker);
   await input.commit(fence);
   return input.forward();
 }

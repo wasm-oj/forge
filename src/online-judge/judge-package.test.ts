@@ -119,7 +119,7 @@ describe("WOJJDG02 judge package", () => {
     expect(decoded.judge.assets).toEqual([{ guestPath: "/checker/assets/policy.bin", bytes: asset }]);
   });
 
-  it("rejects corruption, trailing bytes, and publication disagreement", async () => {
+  it("rejects corruption, trailing bytes, and descriptor disagreement", async () => {
     const encoded = await packageFixture();
     const corrupted = encoded.bytes.slice();
     corrupted[corrupted.byteLength - 1] ^= 1;

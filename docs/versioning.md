@@ -30,8 +30,8 @@ Other versions remain deliberately independent:
 
 Pre-reset protocols and runners are removed rather than carried as compatibility paths. Historical
 reports may describe earlier experiments, but active core protocol and storage identities are
-scoped to `wasm-oj-v2`. Product-specific authoring/publication schemas retain their own explicit
-WASM-OJ names and versions, such as `wasm-oj-platform/managed-collection/v2` and
+scoped to `wasm-oj-v2`. Product-specific repository and authoring schemas retain their own explicit
+WASM-OJ names and versions, such as `wasm-oj-platform/repository/v1` and
 `wasm-oj-browser-collection-v5`; they do not create alternate compiler/runtime contracts.
 
 The canonical TypeScript declaration is `src/core/contract.ts`; the native runtime mirrors it in

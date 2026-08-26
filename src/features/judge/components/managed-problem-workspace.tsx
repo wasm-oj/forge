@@ -24,7 +24,7 @@ interface ManagedProblemSession {
 interface ContestWorkspaceDetail {
   readonly contest: { readonly id: string; readonly title: string };
   readonly problems: readonly {
-    readonly problemVersionId: string;
+    readonly problemId: string;
     readonly problemSlug: string;
     readonly title: Record<string, string>;
   }[];
@@ -34,23 +34,23 @@ type ManagedProblemLoadState =
   | { readonly key: string; readonly session: ManagedProblemSession }
   | { readonly key: string; readonly error: string };
 
-export function ManagedProblemWorkspace({ problemVersionId, contestId }: ManagedProblemContext) {
+export function ManagedProblemWorkspace({ problemId, contestId }: ManagedProblemContext) {
   const { locale: problemLocale, setLocale: changeLocale } = useProduct();
   const parsedContext = useMemo(() => {
     try {
       return { ok: true, context: normalizeManagedProblemContext({
-        problemVersionId,
+        problemId,
         ...(contestId === undefined ? {} : { contestId }),
       }) } as const;
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) } as const;
     }
-  }, [contestId, problemVersionId]);
+  }, [contestId, problemId]);
   const [loadState, setLoadState] = useState<ManagedProblemLoadState>();
   const [retry, setRetry] = useState(0);
   const text = judgeUiText(problemLocale);
   const loadKey = parsedContext.ok
-    ? `${parsedContext.context.contestId ?? "practice"}:${parsedContext.context.problemVersionId}:${retry}`
+    ? `${parsedContext.context.contestId ?? "practice"}:${parsedContext.context.problemId}:${retry}`
     : `invalid:${retry}`;
 
   useEffect(() => {
@@ -70,12 +70,12 @@ export function ManagedProblemWorkspace({ problemVersionId, contestId }: Managed
         });
         if (!response.ok) throw new Error(`Contest navigation failed with HTTP ${response.status}.`);
         const detail = await response.json() as ContestWorkspaceDetail;
-        const position = detail.problems.findIndex((candidate) => candidate.problemVersionId === parsedContext.context.problemVersionId);
+        const position = detail.problems.findIndex((candidate) => candidate.problemId === parsedContext.context.problemId);
         if (position < 0) throw new Error("The active problem is absent from its contest.");
         const link = (index: number) => {
           const candidate = detail.problems[index];
           return candidate ? {
-            href: managedProblemWorkspacePath({ contestId: detail.contest.id, problemVersionId: candidate.problemVersionId }),
+            href: managedProblemWorkspacePath({ contestId: detail.contest.id, problemId: candidate.problemId }),
             label: candidate.title[problemLocale] ?? candidate.title.en ?? candidate.problemSlug,
           } : undefined;
         };

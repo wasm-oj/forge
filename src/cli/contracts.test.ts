@@ -21,7 +21,7 @@ describe("woj CLI public contract", () => {
       "auth login", "init", "build", "run", "test", "bench", "watch",
       "problem pull", "submit", "submission watch", "contest standings",
       "performance frontier", "judge execute", "toolchain fetch",
-      "organizer repo list", "organizer collection activate",
+      "organizer repo list", "organizer catalog sync",
       "organizer contest participants", "organizer rejudge cancel",
       "config set", "cache clear", "doctor", "completion", "version",
     ];
@@ -34,5 +34,7 @@ describe("woj CLI public contract", () => {
     expect(COMMAND_BY_KEY.get("toolchain fetch")?.boundary).toBe("network");
     expect(COMMAND_BY_KEY.get("build")?.boundary).toBe("local");
     expect(COMMAND_BY_KEY.get("organizer collection verify")?.boundary).toBe("local");
+    expect(COMMAND_BY_KEY.has("organizer collection activate")).toBe(false);
+    expect(COMMAND_BY_KEY.has("organizer contest create")).toBe(false);
   });
 });

@@ -21,7 +21,7 @@ export function readLocalSamplesPassed(storage: Pick<Storage, "getItem">): Reado
     const value = JSON.parse(raw) as Partial<StoredLocalSamplesProgress>;
     if (value.version !== 1 || !value.problems || typeof value.problems !== "object" || Array.isArray(value.problems)) return new Map();
     const records = new Map<string, LocalSamplesPassedRecord>();
-    for (const [problemVersionId, candidate] of Object.entries(value.problems)) {
+    for (const [problemId, candidate] of Object.entries(value.problems)) {
       if (
         !candidate
         || typeof candidate !== "object"
@@ -30,7 +30,7 @@ export function readLocalSamplesPassed(storage: Pick<Storage, "getItem">): Reado
         || typeof candidate.samplesPassedAt !== "string"
         || Number.isNaN(Date.parse(candidate.samplesPassedAt))
       ) return new Map();
-      records.set(problemVersionId, {
+      records.set(problemId, {
         bundleDigest: candidate.bundleDigest,
         samplesPassedAt: candidate.samplesPassedAt,
       });
@@ -43,20 +43,20 @@ export function readLocalSamplesPassed(storage: Pick<Storage, "getItem">): Reado
 
 export function recordLocalSamplesPassed(
   storage: Pick<Storage, "getItem" | "setItem">,
-  problemVersionId: string,
+  problemId: string,
   bundleDigest: string,
   samplesPassedAt = new Date().toISOString(),
 ): void {
   if (!SHA256.test(bundleDigest) || Number.isNaN(Date.parse(samplesPassedAt))) throw new TypeError("Local sample progress identity is invalid.");
   const records = Object.fromEntries(readLocalSamplesPassed(storage));
-  records[problemVersionId] = { bundleDigest, samplesPassedAt };
+  records[problemId] = { bundleDigest, samplesPassedAt };
   storage.setItem(LOCAL_SAMPLES_PASSED_KEY, JSON.stringify({ version: 1, problems: records }));
 }
 
 export function hasMatchingLocalSamplesPassed(
   records: ReadonlyMap<string, LocalSamplesPassedRecord>,
-  problemVersionId: string,
+  problemId: string,
   bundleDigest: string,
 ): boolean {
-  return records.get(problemVersionId)?.bundleDigest === bundleDigest;
+  return records.get(problemId)?.bundleDigest === bundleDigest;
 }

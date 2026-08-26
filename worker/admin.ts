@@ -3,9 +3,6 @@ import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { ApiError, jsonResponse, readJsonBody } from "./http";
 import { requireFirstOrganizerApplicationTurnstile, requireStagingFormalAccess } from "./formal-access";
 import { formalMutationStatus, setFormalMutationsEnabled } from "./formal-mutations";
-import { parseReleaseManifest, releaseManifestBytes } from "../src/release-manifest";
-import { sha256Hex } from "./crypto";
-import { activateRelease, assertActiveRelease } from "./release";
 
 function requireAdmin(session: AuthenticatedSession): void {
   if (!session.roles.includes("admin")) throw new ApiError(403, "admin-required", "An Admin role is required.");
@@ -133,60 +130,5 @@ export async function updateFormalMutationControl(
   if (Object.keys(body).length !== 1 || typeof body.reason !== "string") {
     throw new ApiError(400, "formal-mutation-control-invalid", "A reason is required.");
   }
-  if (enabled) {
-    try {
-      await assertActiveRelease(
-        env.DB,
-        env.ENVIRONMENT,
-        env.WASM_OJ_RELEASE_ID,
-        env.WASM_OJ_RELEASE_MANIFEST_SHA256,
-      );
-    } catch {
-      throw new ApiError(
-        503,
-        "active-release-mismatch",
-        "Formal mutations cannot resume until the deployed release is the exact active release.",
-      );
-    }
-  }
   return jsonResponse(await setFormalMutationsEnabled(env, enabled, body.reason));
-}
-
-export async function activateProductionRelease(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const session = await requireBrowserMutationSession(request, env);
-  requireAdmin(session);
-  const body = record(await readJsonBody(request, 300 * 1024));
-  if (
-    Object.keys(body).sort().join("\0") !== ["expectedCurrentReleaseId", "manifest"].sort().join("\0")
-    || (body.expectedCurrentReleaseId !== null && typeof body.expectedCurrentReleaseId !== "string")
-  ) throw new ApiError(400, "release-activation-invalid", "Release activation payload has an invalid shape.");
-  const manifest = parseReleaseManifest(body.manifest);
-  const manifestBytes = releaseManifestBytes(manifest);
-  const manifestSha256 = await sha256Hex(manifestBytes);
-  if (
-    manifest.releaseId !== env.WASM_OJ_RELEASE_ID
-    || manifestSha256 !== env.WASM_OJ_RELEASE_MANIFEST_SHA256
-  ) throw new ApiError(409, "release-worker-mismatch", "Release manifest does not identify the deployed Worker and Container release.");
-  const manifestJson = new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes);
-  await activateRelease(env.DB, {
-    releaseId: manifest.releaseId,
-    version: manifest.version,
-    manifestJson,
-    manifestBytes: manifestBytes.byteLength,
-    manifestSha256,
-    sourceGitCommit: manifest.source.commit,
-    createdAt: manifest.createdAt,
-    activatedBy: session.userId,
-    environment: env.ENVIRONMENT,
-    expectedCurrentReleaseId: body.expectedCurrentReleaseId as string | null,
-  });
-  const active = await assertActiveRelease(env.DB, env.ENVIRONMENT, manifest.releaseId, manifestSha256);
-  return jsonResponse({
-    release: {
-      id: active.releaseId,
-      manifestSha256: active.manifestSha256,
-      environment: env.ENVIRONMENT,
-      status: "active",
-    },
-  });
 }

@@ -37,16 +37,6 @@ export {
   WASM_OJ_RUNTIME_IDENTITY_SHA256,
   verifyRuntimeIdentity,
 } from "../core/runtime-identity";
-export {
-  createReleaseManifest,
-  releaseManifestBytes,
-  releaseManifestSha256,
-  WASM_OJ_CONTAINER_PROTOCOL_VERSION,
-  WASM_OJ_RELEASE_MANIFEST_SCHEMA,
-  parseReleaseManifest,
-  verifyReleaseManifestBytes,
-} from "../release-manifest";
-export type { ArtifactDigest, ReleaseManifest } from "../release-manifest";
 export { assertLanguageIdentifier, isBuiltinLanguage, LANGUAGES } from "../core/types";
 export { assertValidProject } from "../core/project-validation";
 export { PROJECT_SOURCE_LIMITS } from "../core/project-files";
@@ -212,17 +202,6 @@ export {
   summarizeProblemPolicies,
 } from "../judge/problem-scoring";
 export {
-  MANAGED_COLLECTION_SCHEMA,
-  parseManagedCollectionContract,
-  parseManagedCollectionV2,
-  parseManagedCollectionValueV2,
-} from "../online-judge/managed-collection";
-export type {
-  ManagedCollectionV2,
-  ManagedProblemPublication,
-  ManagedRepositoryObject,
-} from "../online-judge/managed-collection";
-export {
   CONTEST_PUBLIC_PROJECTION_SCHEMA,
   contestPublicProjectionBytes,
   createContestPublicProjection,
@@ -268,17 +247,17 @@ export type {
   ValidatedJudgePackage,
 } from "../online-judge/judge-package";
 export {
-  MANAGED_COLLECTION_SOURCE_SCHEMA,
-  parseManagedCollectionSource,
-} from "../online-judge/managed-collection-source";
+  REPOSITORY_AUTHORING_JUDGES_SCHEMA,
+  parseRepositoryAuthoringJudges,
+} from "../online-judge/repository-authoring";
 export type {
-  ManagedCollectionSource,
-  ManagedCollectionSourceProblem,
-  ManagedSourceArtifact,
-  ManagedSourceAsset,
-  ManagedSourceJudge,
-  ManagedSourceObject,
-} from "../online-judge/managed-collection-source";
+  RepositoryAuthoringJudges,
+  RepositoryAuthoringJudgeProblem,
+  RepositorySourceArtifact,
+  RepositorySourceAsset,
+  RepositorySourceJudge,
+  RepositorySourceObject,
+} from "../online-judge/repository-authoring";
 export {
   TRUSTED_JUDGE_RUNTIME_PROFILES,
   TRUSTED_JUDGE_WASIP1_IMPORTS,

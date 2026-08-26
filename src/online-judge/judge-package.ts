@@ -517,8 +517,8 @@ export async function validateJudgePackage(
     }
   }
   const completed = await reader.finish();
-  if (options.expectedBytes !== undefined && completed.bytes !== options.expectedBytes) throw new TypeError("Judge package byte length disagrees with its publication.");
-  if (options.expectedSha256 !== undefined && completed.sha256 !== options.expectedSha256) throw new TypeError("Judge package digest disagrees with its publication.");
+  if (options.expectedBytes !== undefined && completed.bytes !== options.expectedBytes) throw new TypeError("Judge package byte length disagrees with its descriptor.");
+  if (options.expectedSha256 !== undefined && completed.sha256 !== options.expectedSha256) throw new TypeError("Judge package digest disagrees with its descriptor.");
   if (!judgeData) throw new TypeError("Judge package is missing its judgeData blob.");
   return { manifest, judgeData, bytes: completed.bytes, executionSemanticSha256: completed.sha256 };
 }

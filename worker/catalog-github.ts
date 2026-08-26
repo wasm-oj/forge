@@ -227,3 +227,31 @@ export async function readVerifiedBlob(
   }
   return bytes;
 }
+
+/** Fetch repository bytes through the Contents API at one already-resolved commit. */
+export async function readExactCommitContents(
+  repository: AuthorizedCatalogRepository,
+  commitSha: string,
+  path: string,
+  expectedBytes: number,
+  maximumBytes: number,
+): Promise<Uint8Array> {
+  if (!COMMIT.test(commitSha)) throw new TypeError("Exact commit SHA is invalid.");
+  const normalized = normalizeRepositoryPath(path);
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes < 1 || expectedBytes > maximumBytes) {
+    throw new TypeError("Expected repository content length is invalid.");
+  }
+  const encodedPath = normalized.split("/").map(encodeURIComponent).join("/");
+  const response = await githubApiRaw(
+    `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repository)}/contents/${encodedPath}?ref=${commitSha}`,
+    repository.token,
+    maximumBytes,
+    expectedBytes,
+  );
+  const bytes = await readBoundedResponseBytes(response, maximumBytes);
+  if (bytes.byteLength !== expectedBytes) {
+    bytes.fill(0);
+    throw new ApiError(502, "github-content-length", "GitHub returned unexpected exact-commit content length.");
+  }
+  return bytes;
+}

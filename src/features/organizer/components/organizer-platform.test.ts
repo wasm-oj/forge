@@ -1,57 +1,30 @@
-import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   CATALOG_POLL_DELAYS_MS,
   catalogIssueMessage,
   catalogPollDelay,
-  contestInviteNeedsSaveConfirmation,
   generateContestInviteCode,
-  isTerminalCatalogPublication,
-  isTerminalCatalogValidation,
+  isTerminalCatalogSync,
 } from "./organizer-platform";
 
-describe("Organizer catalog v2 polling", () => {
+describe("Organizer repository sync polling", () => {
   it("backs off 1, 2, 5, then 10 seconds and remains capped", () => {
     expect(CATALOG_POLL_DELAYS_MS).toEqual([1_000, 2_000, 5_000, 10_000]);
     expect([0, 1, 2, 3, 4, 50].map(catalogPollDelay)).toEqual([1_000, 2_000, 5_000, 10_000, 10_000, 10_000]);
     expect(() => catalogPollDelay(-1)).toThrow("non-negative integer");
   });
 
-  it("stops only on canonical validation and publication terminal states", () => {
-    expect(isTerminalCatalogValidation("queued")).toBe(false);
-    expect(isTerminalCatalogValidation("running")).toBe(false);
-    expect(isTerminalCatalogValidation("valid")).toBe(true);
-    expect(isTerminalCatalogValidation("invalid")).toBe(true);
-    expect(isTerminalCatalogValidation("infrastructure-error")).toBe(true);
-    expect(isTerminalCatalogPublication("queued")).toBe(false);
-    expect(isTerminalCatalogPublication("materializing")).toBe(false);
-    expect(isTerminalCatalogPublication("published")).toBe(true);
-    expect(isTerminalCatalogPublication("failed")).toBe(true);
+  it("stops only on sync terminal states", () => {
+    expect(isTerminalCatalogSync("queued")).toBe(false);
+    expect(isTerminalCatalogSync("running")).toBe(false);
+    expect(isTerminalCatalogSync("succeeded")).toBe(true);
+    expect(isTerminalCatalogSync("failed")).toBe(true);
   });
 
-  it("directs validation failures to a new exact-commit validation, not a legacy retry", () => {
-    expect(catalogIssueMessage("catalog-contract-invalid")).toContain("validate a new exact commit");
-    expect(catalogIssueMessage("catalog-validation-failed")).toContain("Static validation failed");
+  it("reports fail-closed exact-commit failures", () => {
+    expect(catalogIssueMessage("catalog-contract-invalid")).toContain("Repository schema");
+    expect(catalogIssueMessage("github-content-unavailable")).toContain("active commit was not changed");
     expect(catalogIssueMessage("unknown-code")).toBe("unknown-code");
-  });
-
-  it("uses the complete validation returned by creation without rebuilding a partial client projection", async () => {
-    const source = await readFile(new URL("./organizer-platform.tsx", import.meta.url), "utf8");
-    const createValidation = source.slice(source.indexOf("async function createValidation"), source.indexOf("async function publish"));
-    expect(createValidation).toContain("setValidation(result.validation)");
-    expect(createValidation).not.toMatch(/setValidation\(\{[\s\S]*requestedRef:/);
-    expect(createValidation).toContain('result.validation.state === "valid"');
-  });
-
-  it("mirrors the CLI exact-resource journey without silently defaulting a mutable ref", async () => {
-    const source = await readFile(new URL("./organizer-platform.tsx", import.meta.url), "utf8");
-    expect(source).toContain('initialSearchParameter("ref")');
-    expect(source).not.toContain('initialSearchParameter("ref", "main")');
-    expect(source).toContain("woj organizer collection build .");
-    expect(source).toContain("woj organizer collection verify .");
-    expect(source).toContain("woj organizer collection validation {validation.id} --watch");
-    expect(source).toContain("woj organizer collection publication {publication.jobId} --watch");
-    expect(source).toContain("setRepositoryId(String(collection.github_repository_id))");
   });
 });
 
@@ -61,11 +34,5 @@ describe("Organizer one-time contest secrets", () => {
     expect(generateContestInviteCode(Uint8Array.from({ length: 16 }, (_, index) => index)))
       .toBe("000102030405060708090a0b0c0d0e0f");
     expect(() => generateContestInviteCode(new Uint8Array(15))).toThrow("at least 16 bytes");
-  });
-
-  it("blocks publication until the one-time invite code is explicitly saved", () => {
-    expect(contestInviteNeedsSaveConfirmation({ contestId: "contest-1", acknowledged: false }, "contest-1")).toBe(true);
-    expect(contestInviteNeedsSaveConfirmation({ contestId: "contest-1", acknowledged: true }, "contest-1")).toBe(false);
-    expect(contestInviteNeedsSaveConfirmation({ contestId: "contest-2", acknowledged: false }, "contest-1")).toBe(false);
   });
 });

@@ -15,10 +15,7 @@ interface FormalMutationRow {
 }
 
 export const MAINTENANCE_SMOKE_HEADER = "x-wasm-oj-maintenance-smoke-token";
-const MAINTENANCE_SMOKE_REASONS = new Set([
-  "architecture-v2-cutover",
-  "architecture-reset-maintenance",
-]);
+const MAINTENANCE_SMOKE_REASONS = new Set(["repository-source-truth-cutover"]);
 const MAINTENANCE_SMOKE_TOKEN_PATTERN = /^[\x21-\x7e]{32,256}$/;
 const encoder = new TextEncoder();
 

@@ -8,12 +8,14 @@ import {
   publicSubmissionEvent,
 } from "./contracts";
 
-const problemVersionId = "018f0d8a-7110-7cc8-9f08-15b28df8307b";
+const problemId = "018f0d8a-7110-7cc8-9f08-15b28df8307b";
+const catalogCommit = "a".repeat(40);
 
 describe("online judge contracts", () => {
   it("accepts only source-based official submissions", () => {
     const request = parseOfficialSubmissionRequest({
-      problemVersionId,
+      problemId,
+      catalogCommit,
       language: "c",
       target: "wasip1",
       optimization: "release",
@@ -28,7 +30,8 @@ describe("online judge contracts", () => {
 
   it("enforces source limits and normalized paths", () => {
     const base = {
-      problemVersionId,
+      problemId,
+      catalogCommit,
       language: "c",
       target: "wasip1",
       optimization: "release",

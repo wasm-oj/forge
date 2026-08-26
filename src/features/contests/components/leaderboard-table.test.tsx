@@ -15,7 +15,7 @@ describe("contest leaderboard breakdown", () => {
         deterministicCost: 100,
         peakMemoryBytes: 1_048_576,
         achievedAt: "2026-08-12T00:00:00.000Z",
-        problemResults: [{ problemVersionId: "problem-1", score: 75, fullyPassedCases: 3 }],
+        problemResults: [{ problemId: "problem-1", score: 75, fullyPassedCases: 3 }],
       }]}
     />);
     expect(html).toContain("<details");

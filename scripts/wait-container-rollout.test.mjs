@@ -8,8 +8,8 @@ import {
   waitForContainerRollout,
 } from "./wait-container-rollout.mjs";
 
-const image = `registry.cloudflare.com/account/submission:release-1@sha256:${"a".repeat(64)}`;
-const target = Object.freeze({ className: "SubmissionJudgeContainer", image, name: "submission-production" });
+const image = "registry.cloudflare.com/account/submission:generated-by-wrangler";
+const target = Object.freeze({ className: "SubmissionJudgeContainer", name: "submission-production" });
 const applicationId = "a0341d3a-33dc-469a-a7ac-26061efd46db";
 
 function readyFixture(overrides = {}) {
@@ -41,15 +41,15 @@ function readyFixture(overrides = {}) {
   return { assessment: assessContainerRollout(target, summary, info, instances), info, instances, summary };
 }
 
-test("configured target requires the one exact tag@digest Container", () => {
+test("configured target requires one repository-built Container", () => {
   assert.deepEqual(configuredContainerRolloutTarget({ containers: [{
     class_name: target.className,
-    image,
+    image: "./Dockerfile",
     name: target.name,
   }] }), target);
   assert.throws(
     () => configuredContainerRolloutTarget({ containers: [{ ...target, class_name: target.className, image: "repo:latest" }] }),
-    /exact tag@sha256 digest/u,
+    /built from \.\/Dockerfile/u,
   );
   assert.throws(() => configuredContainerRolloutTarget({ containers: [] }), /exactly one/u);
 });
@@ -62,7 +62,7 @@ test("ready assessment accepts inactive history and exact live version", () => {
   assert.deepEqual(result.reasons, []);
 });
 
-test("assessment rejects non-terminal health, image drift, and an old live instance", () => {
+test("assessment rejects non-terminal health and an old live instance", () => {
   const result = readyFixture({
     summary: { image: image.replace(/a{64}$/u, "b".repeat(64)), state: "active" },
     info: {
@@ -74,7 +74,6 @@ test("assessment rejects non-terminal health, image drift, and an old live insta
     instances: [{ id: "old", state: "running", version: 13 }],
   }).assessment;
   assert.equal(result.ready, false);
-  assert.match(result.reasons.join("\n"), /exact configured digest/u);
   assert.match(result.reasons.join("\n"), /not ready/u);
   assert.match(result.reasons.join("\n"), /health contains errors/u);
   assert.match(result.reasons.join("\n"), /healthy instance count 6/u);

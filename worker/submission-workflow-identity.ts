@@ -14,8 +14,6 @@ const ATTEMPT_CREDENTIAL_DOMAIN = "wasm-oj-submission-attempt-v2\0";
 export interface SubmissionWorkflowParameters {
   readonly submissionId: string;
   readonly attempt: number;
-  readonly expectedReleaseId: string;
-  readonly expectedManifestSha256: string;
 }
 
 export function parseSubmissionAttemptToken(value: unknown): string {
@@ -26,13 +24,11 @@ export function parseSubmissionAttemptToken(value: unknown): string {
 export function parseSubmissionWorkflowParameters(value: unknown): SubmissionWorkflowParameters {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Submission Workflow reference is invalid.");
   const record = value as Record<string, unknown>;
-  const keys = ["attempt", "expectedManifestSha256", "expectedReleaseId", "submissionId"];
+  const keys = ["attempt", "submissionId"];
   if (
     Object.keys(record).sort().join("\0") !== keys.join("\0")
     || typeof record.submissionId !== "string" || !UUID.test(record.submissionId)
     || !Number.isSafeInteger(record.attempt) || (record.attempt as number) < 1
-    || typeof record.expectedReleaseId !== "string" || !UUID.test(record.expectedReleaseId)
-    || typeof record.expectedManifestSha256 !== "string" || !SHA256.test(record.expectedManifestSha256)
   ) throw new TypeError("Submission Workflow reference is invalid.");
   return record as unknown as SubmissionWorkflowParameters;
 }

@@ -27,9 +27,23 @@ function environment(input: {
           login: "ada",
           avatar_url: "https://example.test/avatar.png",
         } : null;
-        if (sql.includes("FROM contest_problems AS contest_problem")) return input.pinned === false ? null : {
-          problem_series_id: "series",
+        if (sql.includes("FROM problem_series AS problems JOIN catalogs")) return {
+          problem_id: PROBLEM_ID,
+          catalog_id: "catalog",
+          commit_sha: "a".repeat(40),
+          slug: "sum-two",
+          ordinal: 1,
+          title_json: JSON.stringify({ "zh-TW": "加總", en: "Sum" }),
+          summary_json: JSON.stringify({ "zh-TW": "摘要", en: "Summary" }),
+          practice_enabled: 1,
           allowed_profiles_json: JSON.stringify({ rust: { target: "wasip1", optimization: "release" } }),
+          judge_digest: "b".repeat(64),
+          practice_bundle_bytes: 100,
+          practice_bundle_sha256: "c".repeat(64),
+          contest_bundle_bytes: 100,
+          contest_bundle_sha256: "d".repeat(64),
+        };
+        if (sql.includes("FROM contest_series AS contests JOIN catalogs")) return input.pinned === false ? null : {
           organizer_user_id: input.organizer ? USER_ID : "55555555-5555-4555-8555-555555555555",
           access_mode: input.invite ? "invite" : "public",
           status: "published",
@@ -37,7 +51,7 @@ function environment(input: {
           starts_at: input.startsAt ?? "2020-01-01T00:00:00.000Z",
           ends_at: "2999-01-01T00:00:00.000Z",
         };
-        if (sql.includes("SELECT 1 AS allowed FROM contest_participants")) return input.participant ? { allowed: 1 } : null;
+        if (sql.includes("SELECT 1 FROM contest_participants")) return input.participant ? { allowed: 1 } : null;
         throw new Error(`Unexpected first query: ${sql}`);
       },
       all: async () => {
@@ -100,7 +114,7 @@ describe("performance API contest context", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(response.headers.get("vary")).toBe("Cookie");
     expect(body).toMatchObject({
-      context: { problemVersionId: PROBLEM_ID, contestId: CONTEST_ID, frozen: true, selectedLanguage: null, myEvolutionTruncated: false },
+      context: { problemId: PROBLEM_ID, contestId: CONTEST_ID, frozen: true, selectedLanguage: null, myEvolutionTruncated: false },
       myEvolution: null,
       frontier: [{ submissionId: SUBMISSION_ID, isPareto: true, participant: { kind: "profile", login: "ada" } }],
     });

@@ -17,17 +17,10 @@ export interface ContainerVerifiedDistributionEvidence {
 }
 
 export interface ContainerIdentity {
-  readonly schema: "wasm-oj-platform/container-identity/v2";
-  readonly releaseId: string;
-  readonly gitCommit: string;
+  readonly schema: "wasm-oj-platform/container-identity/v3";
+  readonly buildId: string;
   readonly contract: 2;
-  readonly executionRootSha256: string;
   readonly protocol: "wasm-oj-container-v2";
-  readonly identitySha256: string;
-  readonly runtimeRootSha256: string;
-  readonly toolchainRootSha256: string;
-  readonly compilerSha256: string;
-  readonly runnerSha256: string;
   /** Process-local capability; intentionally non-enumerable in JSON output. */
   readonly verifiedDistribution: ContainerVerifiedDistribution;
 }
@@ -35,7 +28,6 @@ export function loadEmbeddedContainerIdentity(options?: {
   readonly identityPath?: string;
   readonly compilerPath?: string;
   readonly runnerPath?: string;
-  readonly runtimePath?: string;
   readonly toolchainPath?: string;
   readonly executionPath?: string;
   readonly executionExcludedRelativePaths?: readonly string[];
@@ -46,6 +38,6 @@ export function loadEmbeddedContainerIdentity(options?: {
   ) => ContainerVerifiedDistribution;
 }): Promise<ContainerIdentity>;
 export function assertExpectedContainerIdentity(
-  job: { readonly expectedReleaseId?: string; readonly expectedContainerIdentitySha256?: string },
+  job: { readonly expectedBuildId?: string },
   identity: ContainerIdentity,
 ): void;

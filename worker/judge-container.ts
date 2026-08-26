@@ -4,14 +4,12 @@ import { constantTimeEqual, sha256Hex } from "./crypto";
 import { ApiError, apiErrorResponse, jsonResponse, readBoundedResponseBytes, readJsonBody } from "./http";
 import { parseExecuteRequest, type SubmissionExecuteRequest } from "./container-job";
 import { publicSubmissionEvent } from "../src/online-judge/contracts";
-import { assertActiveRelease } from "./release";
 import {
   assertContainerIdentityFence,
   establishContainerIdentityFence,
   parseProbedContainerIdentity,
   readBoundedProbedContainerIdentity,
   type ContainerIdentityFence,
-  type ContainerIdentityReleaseBinding,
   type ContainerIdentityWorkerBinding,
 } from "./container-identity-fence";
 import { appendAuthorizedSubmissionEvent, containerSubmissionEventKey } from "./submission-events";
@@ -45,12 +43,15 @@ export class SubmissionJudgeContainer extends Container<WasmOjWorkerEnv> {
   interceptHttps = false;
 
   private currentWorkerBinding(): ContainerIdentityWorkerBinding {
-    return {
+    const binding = {
       environment: this.env.ENVIRONMENT,
-      releaseId: this.env.WASM_OJ_RELEASE_ID,
-      manifestSha256: this.env.WASM_OJ_RELEASE_MANIFEST_SHA256,
+      buildId: this.env.WASM_OJ_BUILD_ID,
       workerVersionId: this.env.CF_VERSION_METADATA.id,
     };
+    if (this.env.CF_VERSION_METADATA.tag !== binding.buildId) {
+      throw new ApiError(409, "worker-build-mismatch", "Worker version tag does not match its build ID.");
+    }
+    return binding;
   }
 
   private async probeContainerIdentity(): Promise<unknown> {
@@ -62,29 +63,6 @@ export class SubmissionJudgeContainer extends Container<WasmOjWorkerEnv> {
     try { return await readBoundedProbedContainerIdentity(response); } catch {
       throw new ApiError(409, "container-identity-mismatch", "Judge Container identity could not be verified.");
     }
-  }
-
-  private async loadReleaseBinding(expectedReleaseId: string, expectedManifestSha256: string): Promise<ContainerIdentityReleaseBinding> {
-    const active = await assertActiveRelease(this.env.DB, this.env.ENVIRONMENT, expectedReleaseId, expectedManifestSha256);
-    const worker = this.currentWorkerBinding();
-    if (active.releaseId !== worker.releaseId || active.manifestSha256 !== worker.manifestSha256) {
-      throw new ApiError(409, "container-identity-mismatch", "Judge Container identity could not be verified.");
-    }
-    return {
-      environment: worker.environment,
-      releaseId: active.releaseId,
-      manifestSha256: active.manifestSha256,
-      workerVersionId: worker.workerVersionId,
-      wasmOjContract: active.manifest.wasmOjContract,
-      sourceCommit: active.manifest.source.commit,
-      containerIdentitySha256: active.manifest.artifacts.containerImage.identitySha256,
-      protocol: active.manifest.runtime.protocolVersion,
-      executionRootSha256: active.manifest.runtime.executionRootSha256,
-      runtimeRootSha256: active.manifest.runtime.rootSha256,
-      toolchainRootSha256: active.manifest.toolchains.rootSha256,
-      compilerSha256: active.manifest.runtime.compilerSha256,
-      runnerSha256: active.manifest.runtime.runnerSha256,
-    };
   }
 
   override async fetch(request: Request): Promise<Response> {
@@ -118,11 +96,10 @@ export class SubmissionJudgeContainer extends Container<WasmOjWorkerEnv> {
             jobId: job.jobId,
             attempt: job.attempt,
             attemptTokenHash: authorization.attemptTokenHash,
-            expectedReleaseId: job.expectedReleaseId,
-            expectedManifestSha256: job.expectedManifestSha256,
-            expectedContainerIdentitySha256: job.expectedContainerIdentitySha256,
+            expectedBuildId: job.expectedBuildId,
+            expectedWorkerVersionId: job.expectedWorkerVersionId,
           },
-          loadRelease: () => this.loadReleaseBinding(job.expectedReleaseId, job.expectedManifestSha256),
+          worker: this.currentWorkerBinding(),
           commit: async (fence) => this.ctx.storage.put({ authorization, "identity-fence": fence }),
           forward: () => super.fetch(containerRequest as never),
         });
@@ -172,7 +149,7 @@ export class SubmissionJudgeContainer extends Container<WasmOjWorkerEnv> {
         return this.r2Object(authorization.sourceR2Key, authorization.sourceSha256);
       }
       if (request.method === "GET" && url.pathname === "/__wasm-oj/r2/judge") {
-        return this.r2Object(authorization.judgeR2Key, authorization.executionSemanticSha256);
+        return this.r2Object(authorization.judgeR2Key, authorization.judgeDigest);
       }
       if (request.method === "POST" && url.pathname === "/__wasm-oj/events") {
         const event = publicSubmissionEvent(await readJsonBody(request, 32 * 1024));
@@ -192,7 +169,9 @@ export class SubmissionJudgeContainer extends Container<WasmOjWorkerEnv> {
   private async r2Object(key: string, expectedSha256: string): Promise<Response> {
     const object = await this.env.JUDGE_BUCKET.get(key);
     if (!object) throw new ApiError(404, "r2-object-missing", "Authorized job object does not exist.");
-    if (object.customMetadata?.sha256 !== expectedSha256) throw new ApiError(500, "r2-object-integrity", "Authorized job object metadata does not match its expected digest.");
+    if (object.checksums.toJSON().sha256 !== expectedSha256) {
+      throw new ApiError(500, "r2-object-integrity", "Authorized job object checksum does not match its expected digest.");
+    }
     const headers = new Headers({ "content-type": object.httpMetadata?.contentType ?? "application/octet-stream" });
     headers.set("content-length", String(object.size));
     if (object.checksums.sha256) headers.set("digest", `sha-256=${btoa(String.fromCharCode(...new Uint8Array(object.checksums.sha256)))}`);

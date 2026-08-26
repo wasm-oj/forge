@@ -45,8 +45,7 @@ describe("submission Workflow delivery", () => {
     const database = new DatabaseSync(":memory:");
     database.exec(`CREATE TABLE submissions (
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL, state TEXT NOT NULL,
-        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-        wasm_oj_release_id TEXT NOT NULL, wasm_oj_manifest_sha256 TEXT NOT NULL
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       ) STRICT;
       CREATE TABLE submission_attempts (
         submission_id TEXT NOT NULL, attempt INTEGER NOT NULL,
@@ -65,7 +64,7 @@ describe("submission Workflow delivery", () => {
       CREATE TABLE rejudge_jobs (new_submission_id TEXT PRIMARY KEY) STRICT;
       INSERT INTO submissions VALUES (
         'submission', 'user', 'queued', '2026-08-12T00:00:00.000Z',
-        '2026-08-12T00:00:00.000Z', 'release', '${"f".repeat(64)}'
+        '2026-08-12T00:00:00.000Z'
       );
       INSERT INTO submission_attempts VALUES ('submission', 1);
       INSERT INTO workflow_outbox VALUES (
@@ -85,8 +84,6 @@ describe("submission Workflow delivery", () => {
       params: {
         submissionId: "submission",
         attempt: 1,
-        expectedReleaseId: "release",
-        expectedManifestSha256: "f".repeat(64),
       },
     });
     expect(database.prepare(`SELECT state FROM submissions WHERE id='submission'`).get())

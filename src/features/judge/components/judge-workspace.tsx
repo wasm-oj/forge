@@ -405,8 +405,6 @@ export function JudgeWorkspace({
     location,
     compileAhead,
     shareState,
-    managedMatch,
-    managedMatchChecked,
     officialSubmissionStatus,
     draftPersistenceController,
     draftPersistence,
@@ -417,7 +415,7 @@ export function JudgeWorkspace({
     text,
     activeProblemText,
     activeProblemEntry,
-    managedProblemVersionId,
+    managedProblemId,
     fullLocalJudgeAvailable,
     editorialAvailable,
     activeBaseline,
@@ -544,7 +542,7 @@ export function JudgeWorkspace({
               {fullLocalJudgeAvailable
                 ? <button className="submit-button" onClick={() => void doJudge()} disabled={!runtimeReady}><Send size={14} /> {text.topbar.judgeLocally}</button>
                 : <button className="submit-button" disabled title={text.official.contestSamplesOnly}><LockKeyhole size={14} /> {text.topbar.samplesOnly}</button>}
-              {managedProblemVersionId && <button className="official-submit-button" onClick={() => void doOfficialSubmit()}><ShieldCheck size={14} /> {text.topbar.officialSubmit}</button>}
+              {managedProblemId && <button className="official-submit-button" onClick={() => void doOfficialSubmit()}><ShieldCheck size={14} /> {text.topbar.officialSubmit}</button>}
             </>
           )}
         </div>
@@ -563,7 +561,6 @@ export function JudgeWorkspace({
             </button>
           </div>
         )}
-        {!explicitManagedContext && managedMatchChecked && managedMatch && <div className="managed-capability" role="status"><ShieldCheck size={14} /> {managedProblemVersionId ? text.official.available : text.official.snapshotOnly}</div>}
         {officialSubmissionStatus && (
           <div className={`official-submission-status connection-${officialSubmissionStatus.connection}`} role="status" aria-live="polite">
             <ShieldCheck size={14} />
@@ -641,7 +638,7 @@ export function JudgeWorkspace({
               </div>
               : <div>
                 <strong>{collection.source.mode === "contest" ? text.catalog.managedContest : text.catalog.managedPractice}</strong>
-                <span>{collection.source.problemVersionId} · {collection.index.revision.slice(0, 12)} · {text.catalog.verifiedManaged}</span>
+                <span>{collection.source.problemId} · {collection.source.catalogCommit.slice(0, 12)} · {text.catalog.verifiedManaged}</span>
               </div>}
           </div>
         </aside>}
@@ -692,13 +689,13 @@ export function JudgeWorkspace({
           </div>
           {problemPane === "leaderboard" && explicitManagedContext && !explicitManagedContext.contestId
             ? <ProblemLeaderboard
-              problemVersionId={explicitManagedContext.problemVersionId}
+              problemId={explicitManagedContext.problemId}
               locale={problemLocale}
               refreshKey={officialSubmissionStatus?.state && isTerminalSubmissionState(officialSubmissionStatus.state) ? officialSubmissionStatus.submissionId : undefined}
             />
             : problemPane === "performance" && explicitManagedContext
               ? <PerformanceLab
-                problemVersionId={explicitManagedContext.problemVersionId}
+                problemId={explicitManagedContext.problemId}
                 contestId={explicitManagedContext.contestId}
                 locale={problemLocale}
                 refreshKey={officialSubmissionStatus?.state && isTerminalSubmissionState(officialSubmissionStatus.state) ? officialSubmissionStatus.submissionId : undefined}
