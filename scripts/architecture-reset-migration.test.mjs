@@ -980,6 +980,24 @@ test("repository-source cutover preserves terminal practice history and removes 
   for (const table of removed) assert.equal(tables.has(table), false, `retained ${table}`);
 });
 
+test("repository-source cutover uses only Cloudflare D1 persistent schemas", () => {
+  const source = readFileSync(
+    path.join(process.cwd(), "migrations/core/0019_repository_source_truth.sql"),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /\bCREATE\s+TEMP(?:ORARY)?\s+TABLE\b/iu);
+  assert.doesNotMatch(source, /\bPRAGMA\s+optimize\b/iu);
+  for (const table of [
+    "repository_cutover_version_map",
+    "repository_cutover_active_commits",
+    "repository_cutover_kept_revisions",
+    "repository_cutover_effective",
+  ]) {
+    assert.match(source, new RegExp(`CREATE TABLE ${table}\\b`, "u"));
+    assert.match(source, new RegExp(`DROP TABLE ${table}\\b`, "u"));
+  }
+});
+
 test("repository-source cutover aborts when any contest exists", () => {
   const database = legacyDatabase();
   seedPreservedIdentity(database);
