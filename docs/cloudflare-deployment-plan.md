@@ -23,9 +23,10 @@ pushes `containers[].image: "./Dockerfile"`; the workflow does not create an ind
 coordinate. The deploy tag is available as Worker version metadata.
 
 Rollout wait remains mandatory because Worker and Container rollout do not complete as one
-transaction. Readiness rejects a Worker tag/build mismatch. The protected Container smoke rejects
-a Container build, contract, or protocol mismatch before any real submission attempt token is
-forwarded.
+transaction. Production uses `rollout_step_percentage: 100` to replace Container capacity in one
+step rather than staging 10% and 100% rollouts. Readiness rejects a Worker tag/build mismatch. The
+protected Container smoke rejects a Container build, contract, or protocol mismatch before any
+real submission attempt token is forwarded.
 
 ## One-time repository-source cutover
 

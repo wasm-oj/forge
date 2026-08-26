@@ -250,6 +250,7 @@ for (const required of [
   "scripts/render-production-config.mjs",
   "scripts/production-migrations.mjs",
   "scripts/wait-container-rollout.mjs",
+  "rollout_step_percentage: 100",
   "repository-source-truth-production-smoke-passed",
   "0019_repository_source_truth.sql",
 ]) {
