@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { exactCommitTree, type AuthorizedCatalogRepository } from "./catalog-github";
+import { exactCommitTree, resolveExactCommit, type AuthorizedCatalogRepository } from "./catalog-github";
 
 const COMMIT_SHA = "1".repeat(40);
 const TREE_SHA = "2".repeat(40);
@@ -19,6 +19,18 @@ afterEach(() => {
 });
 
 describe("exactCommitTree", () => {
+  it("resolves a requested ref through exactly one commit lookup", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ sha: COMMIT_SHA }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resolveExactCommit(repository, "main")).resolves.toBe(COMMIT_SHA);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.github.com/repos/wasm-oj/problems/commits/main");
+  });
+
   it("resolves the commit object to its exact tree before listing blobs", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ tree: { sha: TREE_SHA } }), {

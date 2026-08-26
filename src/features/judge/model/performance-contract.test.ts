@@ -14,7 +14,7 @@ const SUBMISSION_B = "44444444-4444-4444-8444-444444444444";
 function performanceResponse() {
   return {
     context: {
-      problemVersionId: PROBLEM_ID,
+      problemId: PROBLEM_ID,
       contestId: CONTEST_ID,
       frozen: true,
       availableLanguages: ["rust", "python"],
@@ -69,7 +69,7 @@ describe("performance API contracts", () => {
     const response = performanceResponse();
     response.myEvolution[0]!.attemptNumber = 10_001;
     const parsed = parseProblemPerformanceResponse(response, {
-      problemVersionId: PROBLEM_ID,
+      problemId: PROBLEM_ID,
       contestId: CONTEST_ID,
       language: "all",
     });
@@ -82,17 +82,17 @@ describe("performance API contracts", () => {
   it("fails closed on extra keys, stale context, removed states, and bounded inventories", () => {
     const extra = performanceResponse() as ReturnType<typeof performanceResponse> & { compatibility?: boolean };
     extra.compatibility = true;
-    expect(() => parseProblemPerformanceResponse(extra, { problemVersionId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
+    expect(() => parseProblemPerformanceResponse(extra, { problemId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
       .toThrow(/invalid shape/i);
 
     const stale = performanceResponse();
-    stale.context.problemVersionId = "55555555-5555-4555-8555-555555555555";
-    expect(() => parseProblemPerformanceResponse(stale, { problemVersionId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
+    stale.context.problemId = "55555555-5555-4555-8555-555555555555";
+    expect(() => parseProblemPerformanceResponse(stale, { problemId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
       .toThrow(/does not match/i);
 
     const removedState = performanceResponse();
     removedState.myEvolution[0]!.state = "waiting-capacity";
-    expect(() => parseProblemPerformanceResponse(removedState, { problemVersionId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
+    expect(() => parseProblemPerformanceResponse(removedState, { problemId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
       .toThrow(/state is invalid/i);
 
     const fakeErrorCoordinates = performanceResponse();
@@ -101,7 +101,7 @@ describe("performance API contracts", () => {
       deterministicCost: 1,
       peakMemoryBytes: 1,
     });
-    expect(() => parseProblemPerformanceResponse(fakeErrorCoordinates, { problemVersionId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
+    expect(() => parseProblemPerformanceResponse(fakeErrorCoordinates, { problemId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
       .toThrow(/before completion/i);
 
     const tooMany = performanceResponse();
@@ -109,7 +109,7 @@ describe("performance API contracts", () => {
       ...tooMany.frontier[0]!,
       submissionId: `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`,
     }));
-    expect(() => parseProblemPerformanceResponse(tooMany, { problemVersionId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
+    expect(() => parseProblemPerformanceResponse(tooMany, { problemId: PROBLEM_ID, contestId: CONTEST_ID, language: "all" }))
       .toThrow(/frontier is invalid/i);
   });
 

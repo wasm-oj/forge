@@ -67,10 +67,10 @@ normalized POSIX relative path。
   偷渡次佳解法。
 - Solution 只輸出題目要求的內容，不得包含提示、debug log 或 fallback。
 
-## Author-owned quality review (not a publish gate)
+## Author-owned quality review (not a sync gate)
 
 The following checks are optional authoring guidance for the official repository. WASM-OJ does not
-run them during Organizer import or publication and does not decide whether a reference solution
+run them during Organizer sync and does not decide whether a reference solution
 is correct, optimal, or deserving of a particular score.
 
 - `validator.py` 對任意輸入 fail closed。

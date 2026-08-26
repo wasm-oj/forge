@@ -19,7 +19,7 @@ describe("woj workspace pins", () => {
     expect(await readFile(path.join(root, "main.rs"), "utf8")).toContain("fn main");
   });
 
-  it("requires exact immutable server and publication identity for pulled problems", () => {
+  it("requires a stable problem and exact catalog commit for pulled problems", () => {
     const workspace = parseWorkspace({
       schema: WOJ_WORKSPACE_SCHEMA,
       name: "pinned",
@@ -29,8 +29,8 @@ describe("woj workspace pins", () => {
       entry: "main.cpp",
       sources: ["main.cpp"],
       problem: {
-        problemVersionId: "11111111-1111-4111-8111-111111111111",
-        catalogPublicationId: "22222222-2222-4222-8222-222222222222",
+        problemId: "11111111-1111-4111-8111-111111111111",
+        catalogCommit: "a".repeat(40),
         serverOrigin: "https://judge.example",
         contentUrl: "/api/problems/11111111-1111-4111-8111-111111111111/content?role=practice",
         contentSha256: "a".repeat(64),
@@ -38,7 +38,7 @@ describe("woj workspace pins", () => {
         locale: "zh-TW",
       },
     });
-    expect(workspace.problem?.catalogPublicationId).toBe("22222222-2222-4222-8222-222222222222");
+    expect(workspace.problem?.catalogCommit).toBe("a".repeat(40));
     expect(workspace.problem?.serverOrigin).toBe("https://judge.example");
   });
 

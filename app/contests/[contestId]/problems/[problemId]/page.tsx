@@ -5,9 +5,9 @@ export default async function ContestProblemPage({
 }: {
   readonly params: Promise<{
     readonly contestId: string;
-    readonly problemVersionId: string;
+    readonly problemId: string;
   }>;
 }) {
-  const { contestId, problemVersionId } = await params;
-  return <ManagedProblemWorkspace contestId={contestId} problemVersionId={problemVersionId} />;
+  const { contestId, problemId } = await params;
+  return <ManagedProblemWorkspace contestId={contestId} problemId={problemId} />;
 }

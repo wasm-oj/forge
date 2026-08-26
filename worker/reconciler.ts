@@ -19,8 +19,6 @@ const DAY_MS = 24 * HOUR_MS;
 const RETENTION_RUN_INTERVAL_MS = HOUR_MS;
 const SQL_RETENTION_QUOTA = 50;
 const TOMBSTONE_QUOTA = 25;
-const STAGING_PACKAGE_QUOTA = 25;
-const R2_RETENTION_QUOTA = 100;
 const TERMINAL_SUBMISSION_STATES = [
   "completed",
   "compile-error",
@@ -29,16 +27,13 @@ const TERMINAL_SUBMISSION_STATES = [
   "cancelled",
 ] as const;
 const TERMINAL_WORKFLOW_STATES = new Set(["complete", "errored", "terminated"]);
-const JUDGE_PACKAGE_KEY = /^judge-packages\/v2\/([0-9a-f]{64})$/;
-const JUDGE_PACKAGE_MAX_BYTES = 32 * 1024 * 1024;
 
 type RetentionKind =
   | "submission-events"
   | "terminal-catalog-jobs"
   | "github-webhook-deliveries"
   | "settled-outbox"
-  | "expired-auth"
-  | "orphan-judge-packages";
+  | "expired-auth";
 
 interface CursorRow {
   readonly cursor: string | null;
@@ -47,17 +42,15 @@ interface CursorRow {
 
 interface PendingOutboxRow {
   readonly id: string;
-  readonly catalog_validation_job_id: string | null;
-  readonly catalog_publish_job_id: string | null;
+  readonly catalog_sync_job_id: string | null;
   readonly submission_id: string | null;
   readonly attempts: number;
 }
 
-type PendingOutboxKind = "validation" | "publish" | "submission";
+type PendingOutboxKind = "catalog" | "submission";
 
 function pendingOutboxKind(row: PendingOutboxRow): PendingOutboxKind {
-  if (row.catalog_validation_job_id) return "validation";
-  if (row.catalog_publish_job_id) return "publish";
+  if (row.catalog_sync_job_id) return "catalog";
   if (row.submission_id) return "submission";
   throw new Error("Workflow outbox target is missing.");
 }
@@ -68,7 +61,6 @@ export interface RetentionCounts {
   readonly webhooks: number;
   readonly outbox: number;
   readonly auth: number;
-  readonly orphanJudgePackages: number;
 }
 
 export function retentionIsDue(
@@ -148,7 +140,7 @@ async function workflowAlreadyExists(
   const namespace = kind === "submission" ? env.SUBMISSION_WORKFLOW : env.CATALOG_WORKFLOW;
   const workflowId = kind === "submission"
     ? row.submission_id!
-    : `catalog-${kind}-${row.catalog_validation_job_id ?? row.catalog_publish_job_id}`;
+    : `catalog-sync-${row.catalog_sync_job_id}`;
   const status = await workflowStatusOrUnknown(namespace, workflowId);
   return status.status !== "unknown";
 }
@@ -195,17 +187,11 @@ async function failExhaustedOutbox(env: WasmOjWorkerEnv, row: PendingOutboxRow, 
         requiredState: "infrastructure-error",
       }),
     );
-  } else if (kind === "validation" && row.catalog_validation_job_id) {
-    statements.push(env.DB.prepare(`UPDATE catalog_validation_jobs
-        SET state='infrastructure-error', error_code='workflow-delivery-exhausted',
-            finished_at=?, updated_at=?
-      WHERE id=? AND state='running'`)
-      .bind(now, now, row.catalog_validation_job_id));
-  } else if (kind === "publish" && row.catalog_publish_job_id) {
-    statements.push(env.DB.prepare(`UPDATE catalog_publish_jobs
+  } else if (kind === "catalog" && row.catalog_sync_job_id) {
+    statements.push(env.DB.prepare(`UPDATE catalog_sync_jobs
         SET state='failed', error_code='workflow-delivery-exhausted', finished_at=?, updated_at=?
-      WHERE id=? AND state='materializing'`)
-      .bind(now, now, row.catalog_publish_job_id));
+      WHERE id=? AND state='running'`)
+      .bind(now, now, row.catalog_sync_job_id));
   }
   statements.push(env.DB.prepare(`UPDATE workflow_outbox
       SET state='failed', settled_at=?, last_error='workflow-delivery-exhausted', updated_at=?
@@ -214,8 +200,7 @@ async function failExhaustedOutbox(env: WasmOjWorkerEnv, row: PendingOutboxRow, 
 }
 
 export async function reconcilePendingOutbox(env: WasmOjWorkerEnv): Promise<number> {
-  const rows = await env.DB.prepare(`SELECT id, catalog_validation_job_id,
-      catalog_publish_job_id, submission_id, attempts
+  const rows = await env.DB.prepare(`SELECT id, catalog_sync_job_id, submission_id, attempts
     FROM workflow_outbox
     WHERE state='pending'
     ORDER BY created_at, id LIMIT 50`).all<PendingOutboxRow>();
@@ -252,28 +237,22 @@ export async function reconcilePendingOutbox(env: WasmOjWorkerEnv): Promise<numb
         continue;
       }
       {
-        const parameters: CatalogWorkflowParameters = kind === "validation"
-          ? { kind: "validation", jobId: row.catalog_validation_job_id! }
-          : { kind: "publish", jobId: row.catalog_publish_job_id! };
-        if (!parameters.jobId) throw new Error("Catalog outbox target is missing.");
-        const table = parameters.kind === "validation" ? "catalog_validation_jobs" : "catalog_publish_jobs";
-        const state = parameters.kind === "validation" ? "running" : "materializing";
-        const target = await env.DB.prepare(`SELECT state FROM ${table} WHERE id=?`)
-          .bind(parameters.jobId).first<{ readonly state: string }>();
+        const parameters: CatalogWorkflowParameters = { syncJobId: row.catalog_sync_job_id! };
+        if (!parameters.syncJobId) throw new Error("Catalog outbox target is missing.");
+        const target = await env.DB.prepare("SELECT state FROM catalog_sync_jobs WHERE id=?")
+          .bind(parameters.syncJobId).first<{ readonly state: string }>();
         if (!target) {
           await settleOutboxCancelled(env, row.id, now, "workflow-target-missing");
           handled += 1;
           continue;
         }
         if (target.state === "queued") continue;
-        const terminal = parameters.kind === "validation"
-          ? ["valid", "invalid", "infrastructure-error"].includes(target.state)
-          : ["published", "failed", "cancelled"].includes(target.state);
+        const terminal = ["succeeded", "failed"].includes(target.state);
         if (terminal || await workflowAlreadyExists(env, row)) {
           await markOutboxDelivered(env, row.id, now);
         } else if (row.attempts >= 20) {
           await failExhaustedOutbox(env, row, now);
-        } else if (target.state === state) {
+        } else if (target.state === "running") {
           await redeliverClaimedCatalogJob(env, parameters);
         }
         handled += 1;
@@ -426,8 +405,6 @@ async function retainSubmissionEvents(env: WasmOjWorkerEnv, now: Date): Promise<
 }
 
 interface CatalogRetentionRow {
-  readonly sort_key: string;
-  readonly kind: "validation" | "publish";
   readonly id: string;
 }
 
@@ -435,27 +412,17 @@ async function retainCatalogJobs(env: WasmOjWorkerEnv, now: Date): Promise<numbe
   const state = await retentionCursor(env, "terminal-catalog-jobs", now);
   if (!state) return 0;
   const terminalCutoff = cutoff(now, 30 * DAY_MS);
-  const rows = await env.DB.prepare(`SELECT sort_key, kind, id FROM (
-      SELECT 'validation:' || id AS sort_key, 'validation' AS kind, id
-        FROM catalog_validation_jobs
-       WHERE state IN ('valid','invalid','infrastructure-error') AND finished_at<=?
-      UNION ALL
-      SELECT 'publish:' || id AS sort_key, 'publish' AS kind, id
-        FROM catalog_publish_jobs
-       WHERE state IN ('published','failed','cancelled') AND finished_at<=?
-    ) WHERE sort_key>? ORDER BY sort_key LIMIT ?`)
-    .bind(terminalCutoff, terminalCutoff, state.cursor ?? "", SQL_RETENTION_QUOTA)
+  const rows = await env.DB.prepare(`SELECT id FROM catalog_sync_jobs
+    WHERE id>? AND state IN ('succeeded','failed') AND finished_at<=?
+    ORDER BY id LIMIT ?`)
+    .bind(state.cursor ?? "", terminalCutoff, SQL_RETENTION_QUOTA)
     .all<CatalogRetentionRow>();
   const complete = rows.results.length < SQL_RETENTION_QUOTA;
-  const next = complete ? null : rows.results.at(-1)!.sort_key;
+  const next = complete ? null : rows.results.at(-1)!.id;
   await env.DB.batch([
-    ...rows.results.map((row) => row.kind === "validation"
-      ? env.DB.prepare(`DELETE FROM catalog_validation_jobs
-          WHERE id=? AND state IN ('valid','invalid','infrastructure-error') AND finished_at<=?`)
-        .bind(row.id, terminalCutoff)
-      : env.DB.prepare(`DELETE FROM catalog_publish_jobs
-          WHERE id=? AND state IN ('published','failed','cancelled') AND finished_at<=?`)
-        .bind(row.id, terminalCutoff)),
+    ...rows.results.map((row) => env.DB.prepare(`DELETE FROM catalog_sync_jobs
+      WHERE id=? AND state IN ('succeeded','failed') AND finished_at<=?`)
+      .bind(row.id, terminalCutoff)),
     cursorUpdate(env, "terminal-catalog-jobs", next, complete, now),
   ]);
   return rows.results.length;
@@ -579,155 +546,6 @@ async function retainExpiredAuth(env: WasmOjWorkerEnv, now: Date): Promise<numbe
   return rows.results.length;
 }
 
-interface DeletingJudgePackage {
-  readonly sha256: string;
-  readonly delete_token: string;
-}
-
-interface OrphanR2Cursor {
-  readonly r2: string | null;
-  readonly scanComplete: boolean;
-}
-
-function parseOrphanCursor(value: string | null): OrphanR2Cursor {
-  if (value === null) return { r2: null, scanComplete: false };
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    throw new Error("Orphan judge package cursor is invalid.");
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Orphan judge package cursor is invalid.");
-  }
-  const record = parsed as Record<string, unknown>;
-  if (
-    Object.keys(record).some((key) => !["r2", "scanComplete"].includes(key))
-    || (record.r2 !== null && typeof record.r2 !== "string")
-    || typeof record.scanComplete !== "boolean"
-  ) throw new Error("Orphan judge package cursor is invalid.");
-  return { r2: record.r2 as string | null, scanComplete: record.scanComplete };
-}
-
-function activePublishReferenceSql(alias: string): string {
-  return `EXISTS (
-    SELECT 1 FROM collection_revision_problems AS revision_problems
-    JOIN catalog_publish_jobs AS publish_jobs
-      ON publish_jobs.collection_revision_id=revision_problems.collection_revision_id
-    WHERE revision_problems.judge_package_sha256=${alias}.sha256
-      AND publish_jobs.state IN ('queued','materializing')
-  )`;
-}
-
-async function claimExpiredStagingPackage(
-  env: WasmOjWorkerEnv,
-  now: Date,
-): Promise<DeletingJudgePackage | null> {
-  const timestamp = now.toISOString();
-  const token = crypto.randomUUID();
-  const leaseExpiresAt = new Date(now.getTime() + 5 * 60 * 1_000).toISOString();
-  return env.DB.prepare(`UPDATE judge_packages
-      SET state='deleting', delete_token=?, lease_expires_at=?, last_error=NULL
-    WHERE sha256=(
-      SELECT candidate.sha256 FROM judge_packages AS candidate
-      WHERE (
-          candidate.state='staging' AND candidate.staged_at<=?
-          AND NOT ${activePublishReferenceSql("candidate")}
-        ) OR (
-          candidate.state='deleting' AND candidate.lease_expires_at<=?
-        )
-      ORDER BY candidate.staged_at, candidate.sha256 LIMIT 1
-    )
-    RETURNING sha256, delete_token`)
-    .bind(token, leaseExpiresAt, cutoff(now, DAY_MS), timestamp)
-    .first<DeletingJudgePackage>();
-}
-
-async function deleteFencedJudgePackage(
-  env: WasmOjWorkerEnv,
-  claim: DeletingJudgePackage,
-): Promise<boolean> {
-  const key = `judge-packages/v2/${claim.sha256}`;
-  try {
-    await env.JUDGE_BUCKET.delete(key);
-    if (await env.JUDGE_BUCKET.head(key)) throw new Error("Judge package GC read-back found a deleted object.");
-    const deleted = await env.DB.prepare(`DELETE FROM judge_packages
-      WHERE sha256=? AND state='deleting' AND delete_token=?`)
-      .bind(claim.sha256, claim.delete_token).run();
-    if (deleted.meta.changes !== 1) throw new Error("Judge package GC lost its per-digest deletion fence.");
-    return true;
-  } catch (error) {
-    await env.DB.prepare(`UPDATE judge_packages
-        SET last_error=?
-      WHERE sha256=? AND state='deleting' AND delete_token=?`)
-      .bind(safeError(error), claim.sha256, claim.delete_token).run();
-    return false;
-  }
-}
-
-async function claimR2OnlyJudgePackage(
-  env: WasmOjWorkerEnv,
-  object: R2Object,
-  digest: string,
-  now: Date,
-): Promise<DeletingJudgePackage | null> {
-  if (object.size < 1 || object.size > JUDGE_PACKAGE_MAX_BYTES) return null;
-  const token = crypto.randomUUID();
-  const leaseExpiresAt = new Date(now.getTime() + 5 * 60 * 1_000).toISOString();
-  const inserted = await env.DB.prepare(`INSERT INTO judge_packages
-      (sha256, bytes, state, staged_at, delete_token, lease_expires_at, last_error)
-    VALUES (?, ?, 'deleting', ?, ?, ?, NULL)
-    ON CONFLICT(sha256) DO NOTHING`)
-    .bind(digest, object.size, object.uploaded.toISOString(), token, leaseExpiresAt).run();
-  return inserted.meta.changes === 1 ? { sha256: digest, delete_token: token } : null;
-}
-
-async function hasPendingPackageDeletion(env: WasmOjWorkerEnv, now: Date): Promise<boolean> {
-  const row = await env.DB.prepare(`SELECT 1 AS pending FROM judge_packages AS candidate
-    WHERE (
-        candidate.state='staging' AND candidate.staged_at<=?
-        AND NOT ${activePublishReferenceSql("candidate")}
-      ) OR candidate.state='deleting'
-    LIMIT 1`).bind(cutoff(now, DAY_MS)).first<{ readonly pending: number }>();
-  return row !== null;
-}
-
-async function retainOrphanJudgePackages(env: WasmOjWorkerEnv, now: Date): Promise<number> {
-  const state = await retentionCursor(env, "orphan-judge-packages", now);
-  if (!state) return 0;
-  const cursor = parseOrphanCursor(state.cursor);
-  let deleted = 0;
-  for (let iteration = 0; iteration < STAGING_PACKAGE_QUOTA; iteration += 1) {
-    const claim = await claimExpiredStagingPackage(env, now);
-    if (!claim) break;
-    if (await deleteFencedJudgePackage(env, claim)) deleted += 1;
-  }
-
-  let r2Cursor: string | null = cursor.r2;
-  let scanComplete = cursor.scanComplete;
-  if (!scanComplete) {
-    const page = await env.JUDGE_BUCKET.list({
-      prefix: "judge-packages/v2/",
-      cursor: r2Cursor ?? undefined,
-      limit: R2_RETENTION_QUOTA,
-    });
-    for (const object of page.objects) {
-      const match = JUDGE_PACKAGE_KEY.exec(object.key);
-      if (!match || object.uploaded.getTime() > now.getTime() - DAY_MS) continue;
-      const claim = await claimR2OnlyJudgePackage(env, object, match[1]!, now);
-      if (claim && await deleteFencedJudgePackage(env, claim)) deleted += 1;
-    }
-    r2Cursor = page.truncated ? page.cursor : null;
-    scanComplete = !page.truncated;
-  }
-
-  const pending = await hasPendingPackageDeletion(env, now);
-  const complete = scanComplete && !pending;
-  const nextCursor = complete ? null : JSON.stringify({ r2: r2Cursor, scanComplete });
-  await env.DB.batch([cursorUpdate(env, "orphan-judge-packages", nextCursor, complete, now)]);
-  return deleted;
-}
-
 export async function reconcileRetention(env: WasmOjWorkerEnv, now: Date): Promise<RetentionCounts> {
   // Every class owns its cursor and quota. A large event backlog cannot delay
   // authentication or webhook cleanup, and missed cron ticks resume naturally.
@@ -736,8 +554,7 @@ export async function reconcileRetention(env: WasmOjWorkerEnv, now: Date): Promi
   const auth = await reconcilePhase("auth-retention", 0, () => retainExpiredAuth(env, now));
   const webhooks = await reconcilePhase("webhook-retention", 0, () => retainWebhookDeliveries(env, now));
   const outbox = await reconcilePhase("workflow-outbox-retention", 0, () => retainOutbox(env, now));
-  const orphanJudgePackages = await reconcilePhase("orphan-judge-package-retention", 0, () => retainOrphanJudgePackages(env, now));
-  return { submissionEvents, catalogJobs, webhooks, outbox, auth, orphanJudgePackages };
+  return { submissionEvents, catalogJobs, webhooks, outbox, auth };
 }
 
 export async function reconcile(env: WasmOjWorkerEnv, now = new Date()): Promise<{

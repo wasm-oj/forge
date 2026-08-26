@@ -95,10 +95,10 @@ describe("D1 formal mutation control", () => {
   });
 
   it("keeps public mutations paused while an exact production smoke token opens only the cutover lane", async () => {
-    const token = "maintenance-smoke-token-2026-08-12-architecture-v2";
+    const token = "maintenance-smoke-token-2026-08-26-repository-source";
     const { database, env } = fixture("production", token);
     database.prepare(`UPDATE formal_mutation_controls
-      SET reason='architecture-reset-maintenance'
+      SET reason='repository-source-truth-cutover'
       WHERE environment='production'`).run();
     const authorized = new Request("https://wasm-oj.example/api/submissions", {
       headers: { [MAINTENANCE_SMOKE_HEADER]: token },

@@ -61,15 +61,15 @@ function fixture(
       UNIQUE (submission_id, event_key)
     ) STRICT;
     CREATE TABLE workflow_outbox (
-      id TEXT PRIMARY KEY, catalog_validation_job_id TEXT, catalog_publish_job_id TEXT,
-      submission_id TEXT, state TEXT NOT NULL, attempts INTEGER NOT NULL,
+      id TEXT PRIMARY KEY, catalog_sync_job_id TEXT, submission_id TEXT,
+      state TEXT NOT NULL, attempts INTEGER NOT NULL,
       last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, settled_at TEXT
     ) STRICT;`);
   database.prepare("INSERT INTO submissions VALUES ('submission', 'preparing', NULL, NULL, NULL, ?, NULL)")
     .run("2026-08-12T00:00:00.000Z");
   database.prepare("INSERT INTO submission_attempts VALUES ('submission', 'created', NULL, NULL)").run();
   database.prepare(`INSERT INTO workflow_outbox
-      VALUES ('outbox', NULL, NULL, 'submission', 'pending', 20, NULL, ?, ?, NULL)`)
+      VALUES ('outbox', NULL, 'submission', 'pending', 20, NULL, ?, ?, NULL)`)
     .run("2026-08-12T00:00:00.000Z", "2026-08-12T00:00:00.000Z");
   return {
     database,

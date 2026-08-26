@@ -16,7 +16,7 @@ interface PublicProfile {
   readonly avatarUrl: string;
   readonly verifiedSolvedCount: number;
   readonly verifiedSolves: readonly {
-    readonly problemVersionId: string;
+    readonly problemId: string;
     readonly problemSlug: string;
     readonly title: Record<string, string>;
     readonly score: number;
@@ -47,7 +47,7 @@ export function ProfileView({ login }: { readonly login: string }) {
     <header className="product-page-header"><span className="product-eyebrow">{text.eyebrow}</span><h1>{profile?.displayName ?? login}</h1></header>
     <RemoteStateView state={state} loadingLabel={text.loading} retryLabel={text.retry} empty={null} isEmpty={() => false}>{(current) => <>
       <section className="public-profile-card"><Image src={current.avatarUrl} alt="" width={88} height={88} unoptimized /><div><h2>{current.displayName}</h2><p>@{current.login} · {current.verifiedSolvedCount} {text.verified}</p>{current.bio && <p>{current.bio}</p>}{current.websiteUrl && <a href={current.websiteUrl} rel="noopener noreferrer">{current.websiteUrl}</a>}</div></section>
-      <section className="organizer-product-section"><h2>{text.solves}</h2><div className="profile-solve-list">{current.verifiedSolves.map((solve) => <Link href={`/problems/${encodeURIComponent(solve.problemVersionId)}`} key={solve.problemVersionId}><div><strong>{solve.title[locale] ?? solve.title.en ?? solve.title["zh-TW"] ?? solve.problemSlug}</strong><span>{new Date(solve.solvedAt).toLocaleDateString(locale)}</span></div><b>{solve.score}</b></Link>)}</div>{current.verifiedSolves.length === 0 && <p className="product-empty">{text.empty}</p>}</section>
+      <section className="organizer-product-section"><h2>{text.solves}</h2><div className="profile-solve-list">{current.verifiedSolves.map((solve) => <Link href={`/problems/${encodeURIComponent(solve.problemId)}`} key={solve.problemId}><div><strong>{solve.title[locale] ?? solve.title.en ?? solve.title["zh-TW"] ?? solve.problemSlug}</strong><span>{new Date(solve.solvedAt).toLocaleDateString(locale)}</span></div><b>{solve.score}</b></Link>)}</div>{current.verifiedSolves.length === 0 && <p className="product-empty">{text.empty}</p>}</section>
     </>}</RemoteStateView>
   </main>;
 }

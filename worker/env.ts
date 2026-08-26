@@ -16,8 +16,7 @@ export interface WasmOjWorkerEnv {
   readonly GITHUB_APP_SLUG: string;
   readonly GITHUB_APP_PRIVATE_KEY: string;
   readonly GITHUB_WEBHOOK_SECRET: string;
-  readonly WASM_OJ_RELEASE_ID: string;
-  readonly WASM_OJ_RELEASE_MANIFEST_SHA256: string;
+  readonly WASM_OJ_BUILD_ID: string;
   readonly PUBLIC_ORIGIN: string;
   readonly ENVIRONMENT: WasmOjEnvironment;
   readonly STAGING_ALLOWED_GITHUB_USER_IDS: string;

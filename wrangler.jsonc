@@ -15,8 +15,7 @@
   "vars": {
     "ENVIRONMENT": "development",
     "PUBLIC_ORIGIN": "http://localhost:3000",
-    "WASM_OJ_RELEASE_ID": "01988dc1-5c00-7000-8000-000000000000",
-    "WASM_OJ_RELEASE_MANIFEST_SHA256": "875b9380866e9d56e7110b0ee310962c16d9d4ae103f829d62bdffd2cbe7c61d",
+    "WASM_OJ_BUILD_ID": "0000000000000000000000000000000000000000",
     "GITHUB_OAUTH_CLIENT_ID": "development-only",
     "GITHUB_APP_ID": "development-only",
     "GITHUB_APP_SLUG": "development-only",

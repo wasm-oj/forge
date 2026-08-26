@@ -2,14 +2,15 @@ import { parseSubmissionAttemptToken } from "./submission-workflow-identity";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
+const BUILD_ID = /^[0-9a-f]{40}$/;
+const VERSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,511}$/;
 
 interface ContainerJobBase {
   readonly jobId: string;
   readonly attempt: number;
   readonly attemptToken: string;
-  readonly expectedReleaseId: string;
-  readonly expectedManifestSha256: string;
-  readonly expectedContainerIdentitySha256: string;
+  readonly expectedBuildId: string;
+  readonly expectedWorkerVersionId: string;
 }
 
 export type SubmissionExecuteRequest = ContainerJobBase & {
@@ -19,7 +20,7 @@ export type SubmissionExecuteRequest = ContainerJobBase & {
   readonly sourceR2Key: string;
   readonly sourceSha256: string;
   readonly judgeR2Key: string;
-  readonly executionSemanticSha256: string;
+  readonly judgeDigest: string;
 };
 
 export type ExecuteRequest = SubmissionExecuteRequest;
@@ -45,9 +46,8 @@ function base(value: Record<string, unknown>): ContainerJobBase {
     jobId,
     attempt: value.attempt as number,
     attemptToken: parseSubmissionAttemptToken(value.attemptToken),
-    expectedReleaseId: patterned(value.expectedReleaseId, UUID, "container expectedReleaseId", 36),
-    expectedManifestSha256: patterned(value.expectedManifestSha256, DIGEST, "container expectedManifestSha256", 64),
-    expectedContainerIdentitySha256: patterned(value.expectedContainerIdentitySha256, DIGEST, "container expectedContainerIdentitySha256", 64),
+    expectedBuildId: patterned(value.expectedBuildId, BUILD_ID, "container expectedBuildId", 40),
+    expectedWorkerVersionId: patterned(value.expectedWorkerVersionId, VERSION_ID, "container expectedWorkerVersionId", 512),
   };
 }
 
@@ -55,22 +55,17 @@ export function parseExecuteRequest(value: unknown): ExecuteRequest {
   const input = object(value, "container job");
   if (input.kind !== "submission") throw new TypeError("container job kind is unsupported.");
   exact(input, [
-    "attempt", "attemptToken", "executionSemanticSha256", "expectedContainerIdentitySha256",
-    "expectedManifestSha256", "expectedReleaseId", "jobId", "judgeR2Key", "kind",
-    "sourceId", "sourceR2Key", "sourceSha256", "submissionId",
+    "attempt", "attemptToken", "expectedBuildId", "expectedWorkerVersionId", "jobId",
+    "judgeDigest", "judgeR2Key", "kind", "sourceId", "sourceR2Key", "sourceSha256", "submissionId",
   ], "submission container job");
   const parsedBase = base(input);
   const submissionId = patterned(input.submissionId, UUID, "container submissionId", 36);
   if (submissionId !== parsedBase.jobId) throw new TypeError("container submission identity is inconsistent.");
   const sourceId = patterned(input.sourceId, UUID, "container sourceId", 36);
-  if (input.sourceR2Key !== `submission-sources/v2/${sourceId}`) {
-    throw new TypeError("container source key is not bound to its source identity.");
-  }
+  if (input.sourceR2Key !== `submission-sources/v2/${sourceId}`) throw new TypeError("container source key is not bound to its source identity.");
   const sourceSha256 = patterned(input.sourceSha256, DIGEST, "container sourceSha256", 64);
-  const executionSemanticSha256 = patterned(input.executionSemanticSha256, DIGEST, "container executionSemanticSha256", 64);
-  if (input.judgeR2Key !== `judge-packages/v2/${executionSemanticSha256}`) {
-    throw new TypeError("container judge key is not bound to its execution semantic digest.");
-  }
+  const judgeDigest = patterned(input.judgeDigest, DIGEST, "container judgeDigest", 64);
+  if (input.judgeR2Key !== `judge-packages/v2/${judgeDigest}`) throw new TypeError("container judge key is not bound to its digest.");
   return {
     ...parsedBase,
     kind: "submission",
@@ -79,6 +74,6 @@ export function parseExecuteRequest(value: unknown): ExecuteRequest {
     sourceR2Key: input.sourceR2Key as string,
     sourceSha256,
     judgeR2Key: input.judgeR2Key as string,
-    executionSemanticSha256,
+    judgeDigest,
   };
 }

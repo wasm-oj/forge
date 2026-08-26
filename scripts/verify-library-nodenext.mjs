@@ -202,18 +202,31 @@ if (
 async function packInstalledRuntimeDependencies() {
   const publicNames = new Set(PUBLIC_PACKAGES.map((definition) => definition.name));
   const queue = PUBLIC_PACKAGES.flatMap((definition) => (definition.runtimeDependencies ?? [])
-    .map((name) => ({ name, from: repositoryRoot })))
+    .map((name) => ({ name, from: repositoryRoot, optional: false })))
     .filter(({ name }) => !publicNames.has(name));
   const tarballs = new Map();
   while (queue.length > 0) {
-    const { name, from } = queue.shift();
+    const { name, from, optional } = queue.shift();
     if (tarballs.has(name)) continue;
-    const packageRoot = await resolvePackageRoot(name, from);
+    let packageRoot;
+    try {
+      packageRoot = await resolvePackageRoot(name, from);
+    } catch (error) {
+      if (optional) continue;
+      throw error;
+    }
     const manifest = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
     if (manifest.name !== name) throw new Error(`Installed dependency '${name}' has package identity '${manifest.name}'.`);
     tarballs.set(name, await packPackage(packageRoot, name));
     for (const dependency of Object.keys(manifest.dependencies ?? {})) {
-      if (!publicNames.has(dependency) && !tarballs.has(dependency)) queue.push({ name: dependency, from: packageRoot });
+      if (!publicNames.has(dependency) && !tarballs.has(dependency)) {
+        queue.push({ name: dependency, from: packageRoot, optional: false });
+      }
+    }
+    for (const dependency of Object.keys(manifest.optionalDependencies ?? {})) {
+      if (!publicNames.has(dependency) && !tarballs.has(dependency)) {
+        queue.push({ name: dependency, from: packageRoot, optional: true });
+      }
     }
   }
   return tarballs;

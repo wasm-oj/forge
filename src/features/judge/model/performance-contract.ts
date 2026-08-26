@@ -51,7 +51,7 @@ export interface PerformanceEvolutionPoint {
 
 export interface ProblemPerformanceResponse {
   readonly context: {
-    readonly problemVersionId: string;
+    readonly problemId: string;
     readonly contestId: string | null;
     readonly frozen: boolean;
     readonly availableLanguages: readonly BuiltinLanguage[];
@@ -82,7 +82,7 @@ export interface SubmissionPolicySummaryResponse {
 }
 
 export interface ExpectedPerformanceContext {
-  readonly problemVersionId: string;
+  readonly problemId: string;
   readonly contestId?: string;
   readonly language: BuiltinLanguage | "all";
 }
@@ -256,11 +256,11 @@ export function parseProblemPerformanceResponse(value: unknown, expected: Expect
   exactKeys(root, ["context", "frontier", "myEvolution"], [], "Performance response");
   const context = record(root.context, "Performance context");
   exactKeys(context, [
-    "problemVersionId", "contestId", "frozen", "availableLanguages", "selectedLanguage", "myEvolutionTruncated",
+    "problemId", "contestId", "frozen", "availableLanguages", "selectedLanguage", "myEvolutionTruncated",
   ], [], "Performance context");
-  const problemVersionId = uuid(context.problemVersionId, "Performance context problemVersionId");
+  const problemId = uuid(context.problemId, "Performance context problemId");
   const contestId = context.contestId === null ? null : uuid(context.contestId, "Performance context contestId");
-  if (problemVersionId !== expected.problemVersionId || contestId !== (expected.contestId ?? null)) {
+  if (problemId !== expected.problemId || contestId !== (expected.contestId ?? null)) {
     throw new TypeError("Performance context does not match the requested problem.");
   }
   if (typeof context.frozen !== "boolean") throw new TypeError("Performance context frozen must be boolean.");
@@ -304,7 +304,7 @@ export function parseProblemPerformanceResponse(value: unknown, expected: Expect
   }
   return {
     context: {
-      problemVersionId,
+      problemId,
       contestId,
       frozen: context.frozen,
       availableLanguages,
@@ -380,7 +380,7 @@ export async function readSubmissionPolicySummaryResponse(response: Response, su
 }
 
 export function problemPerformanceApiPath(
-  problemVersionId: string,
+  problemId: string,
   languageFilter: BuiltinLanguage | "all",
   contestId?: string,
 ): string {
@@ -388,7 +388,7 @@ export function problemPerformanceApiPath(
   if (languageFilter !== "all") parameters.set("language", languageFilter);
   if (contestId) parameters.set("contestId", contestId);
   const query = parameters.toString();
-  return `/api/problems/${encodeURIComponent(problemVersionId)}/performance${query ? `?${query}` : ""}`;
+  return `/api/problems/${encodeURIComponent(problemId)}/performance${query ? `?${query}` : ""}`;
 }
 
 export function submissionPolicySummaryApiPath(submissionId: string): string {

@@ -40,8 +40,7 @@ RUN cargo build --locked --manifest-path crates/runtime-core/Cargo.toml --releas
 
 FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS judge
 
-ARG WASM_OJ_RELEASE_ID
-ARG WASM_OJ_GIT_COMMIT
+ARG WASM_OJ_BUILD_ID=0000000000000000000000000000000000000000
 
 RUN corepack enable \
   && useradd --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin --uid 10001 wasmoj
@@ -66,8 +65,7 @@ RUN mkdir -p /app/release \
   && chmod -R a+rX /app \
   && chmod -R a-w /app \
   && chmod u+w /app/release \
-  && WASM_OJ_RELEASE_ID="$WASM_OJ_RELEASE_ID" \
-    WASM_OJ_GIT_COMMIT="$WASM_OJ_GIT_COMMIT" \
+  && WASM_OJ_BUILD_ID="$WASM_OJ_BUILD_ID" \
     node /app/container/generate-identity.mjs \
   && chmod a-w /app/release /app/release/container-identity.json \
   && runuser -u wasmoj -- env HOME=/tmp NODE_ENV=production node --input-type=module -e "const dependencies = ['@wasm-oj/core', '@wasm-oj/server', '@wasm-oj/toolchain-clang', '@wasm-oj/toolchain-go', '@wasm-oj/toolchain-javascript', '@wasm-oj/toolchain-java', '@wasm-oj/toolchain-python', '@wasm-oj/toolchain-rust']; await Promise.all(dependencies.map((dependency) => import(dependency))); const { loadEmbeddedContainerIdentity } = await import('/app/container/identity.mjs'); await loadEmbeddedContainerIdentity();" \

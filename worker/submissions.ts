@@ -6,7 +6,6 @@ import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { ApiError, jsonResponse, readJsonBody } from "./http";
 import { requireOfficialSubmissionRiskTurnstile, requireStagingFormalAccess } from "./formal-access";
 import { requireFormalMutationsEnabled } from "./formal-mutations";
-import { assertActiveRelease } from "./release";
 import { prepareSubmissionEventInsert, replaySubmissionEvents } from "./submission-events";
 import { MAX_QUEUED_SUBMISSIONS, MAX_QUEUED_SUBMISSIONS_PER_USER, submissionCapacitySnapshot } from "./submission-capacity";
 import { deriveSubmissionAttemptToken } from "./submission-workflow-identity";
@@ -15,20 +14,21 @@ import { dispatchSubmissionJobs } from "./dispatcher";
 const SOURCE_MAX_BYTES = 2 * 1024 * 1024;
 const SOURCE_TOMBSTONE = new TextEncoder().encode('{"schema":"wasm-oj-platform/erased-submission-source/v1"}\n');
 
-interface ProblemVersionRow {
-  readonly id: string;
-  readonly problem_series_id: string;
+interface ActiveProblemRevisionRow {
+  readonly problem_id: string;
+  readonly commit_sha: string;
   readonly problem_slug: string;
-  readonly mode: "official-practice" | "contest";
-  readonly execution_semantic_sha256: string;
+  readonly practice_enabled: number;
+  readonly judge_digest: string;
   readonly allowed_profiles_json: string;
 }
 
 interface SubmissionRow {
   readonly id: string;
   readonly user_id: string;
-  readonly problem_version_id: string;
-  readonly problem_mode: "official-practice" | "contest";
+  readonly problem_id: string;
+  readonly catalog_commit: string;
+  readonly judge_digest: string;
   readonly contest_id: string | null;
   readonly source_id: string;
   readonly source_state: string;
@@ -36,8 +36,6 @@ interface SubmissionRow {
   readonly target: string;
   readonly optimization: string;
   readonly entry_path: string;
-  readonly wasm_oj_release_id: string;
-  readonly wasm_oj_manifest_sha256: string;
   readonly state: string;
   readonly verdict: SubmissionVerdict | null;
   readonly visibility: string;
@@ -55,6 +53,9 @@ interface SubmissionProductRow extends SubmissionRow {
   readonly title_json: string;
   readonly contest_record_id: string | null;
   readonly contest_title: string | null;
+  readonly stale: number;
+  readonly judged_commit: string;
+  readonly active_commit: string | null;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -62,11 +63,9 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 export const SUBMISSION_PRODUCT_SELECT_SQL = `SELECT
     origin.id,
     origin.user_id,
-    CASE WHEN origin.contest_id IS NOT NULL
-      THEN origin.problem_version_id
-      ELSE COALESCE(effective.effective_problem_version_id, origin.problem_version_id)
-    END AS problem_version_id,
-    versions.mode AS problem_mode,
+    origin.problem_id,
+    COALESCE(result.catalog_commit, origin.catalog_commit) AS catalog_commit,
+    COALESCE(result.judge_digest, origin.judge_digest) AS judge_digest,
     origin.contest_id,
     origin.source_id,
     sources.state AS source_state,
@@ -74,8 +73,6 @@ export const SUBMISSION_PRODUCT_SELECT_SQL = `SELECT
     origin.target,
     origin.optimization,
     origin.entry_path,
-    origin.wasm_oj_release_id,
-    origin.wasm_oj_manifest_sha256,
     CASE WHEN result.id IS NULL THEN origin.state ELSE result.state END AS state,
     CASE WHEN result.id IS NULL THEN origin.verdict ELSE result.verdict END AS verdict,
     origin.visibility,
@@ -86,22 +83,27 @@ export const SUBMISSION_PRODUCT_SELECT_SQL = `SELECT
     origin.created_at,
     CASE WHEN result.id IS NULL THEN origin.updated_at ELSE result.updated_at END AS updated_at,
     CASE WHEN result.id IS NULL THEN origin.completed_at ELSE result.completed_at END AS completed_at,
-    versions.problem_slug,
+    problems.slug AS problem_slug,
     versions.title_json,
     contests.id AS contest_record_id,
-    contests.title AS contest_title
+    contest_revisions.title AS contest_title,
+    COALESCE(effective.stale, 0) AS stale,
+    COALESCE(effective.judged_commit, origin.catalog_commit) AS judged_commit,
+    catalogs.active_commit_sha AS active_commit
   FROM submissions AS origin
   JOIN submission_sources AS sources ON sources.id=origin.source_id
   LEFT JOIN effective_submission_results AS effective
     ON effective.origin_submission_id=origin.id
   LEFT JOIN submissions AS result
     ON result.id=effective.effective_submission_id
-  JOIN problem_version_details AS versions
-    ON versions.id=CASE WHEN origin.contest_id IS NOT NULL
-      THEN origin.problem_version_id
-      ELSE COALESCE(effective.effective_problem_version_id, origin.problem_version_id)
-    END
-  LEFT JOIN contests ON contests.id=origin.contest_id`;
+  JOIN problem_series AS problems ON problems.id=origin.problem_id
+  JOIN catalogs ON catalogs.id=problems.catalog_id
+  JOIN problem_revisions AS versions
+    ON versions.problem_id=origin.problem_id
+   AND versions.commit_sha=COALESCE(result.catalog_commit, origin.catalog_commit)
+  LEFT JOIN contest_series AS contests ON contests.id=origin.contest_id
+  LEFT JOIN contest_revisions ON contest_revisions.contest_id=contests.id
+    AND contest_revisions.commit_sha=catalogs.active_commit_sha`;
 
 export interface SubmissionListQuery {
   readonly limit: number;
@@ -208,15 +210,17 @@ async function beginSourceErasure(env: WasmOjWorkerEnv, sourceId: string, now = 
     .bind(timestamp, timestamp, sourceId).run();
 }
 
-async function problemVersion(env: WasmOjWorkerEnv, id: string): Promise<ProblemVersionRow> {
-  const row = await env.DB.prepare(`SELECT versions.id, versions.problem_series_id, versions.problem_slug, versions.mode,
-      versions.execution_semantic_sha256, versions.allowed_profiles_json
-    FROM problem_version_details AS versions
-    JOIN judge_packages AS packages
-      ON packages.sha256=versions.execution_semantic_sha256 AND packages.state='ready'
-    WHERE versions.id=?`)
-    .bind(id).first<ProblemVersionRow>();
-  if (!row) throw new ApiError(404, "problem-version-not-found", "Problem version is not published.");
+async function activeProblemRevision(env: WasmOjWorkerEnv, id: string): Promise<ActiveProblemRevisionRow> {
+  const row = await env.DB.prepare(`SELECT revisions.problem_id, revisions.commit_sha,
+      problems.slug AS problem_slug, revisions.practice_enabled,
+      revisions.judge_digest, revisions.allowed_profiles_json
+    FROM problem_series AS problems
+    JOIN catalogs ON catalogs.id=problems.catalog_id
+    JOIN problem_revisions AS revisions
+      ON revisions.problem_id=problems.id AND revisions.commit_sha=catalogs.active_commit_sha
+    WHERE problems.id=?`)
+    .bind(id).first<ActiveProblemRevisionRow>();
+  if (!row) throw new ApiError(404, "problem-not-found", "Problem is not active.");
   return row;
 }
 
@@ -224,18 +228,24 @@ async function verifyContestAdmission(
   env: WasmOjWorkerEnv,
   session: AuthenticatedSession,
   contestId: string | undefined,
-  problemVersionId: string,
+  problemId: string,
+  catalogCommit: string,
 ): Promise<void> {
   if (!contestId) return;
-  const contest = await env.DB.prepare(`SELECT contests.starts_at, contests.ends_at, contests.status,
-      contests.access_mode, participants.user_id AS participant_user_id
-    FROM contests
-    JOIN contest_problems ON contest_problems.contest_id=contests.id
-      AND contest_problems.problem_version_id=?
+  const contest = await env.DB.prepare(`SELECT revisions.starts_at, revisions.ends_at, revisions.status,
+      revisions.access_mode, participants.user_id AS participant_user_id
+    FROM contest_series AS contests
+    JOIN catalogs ON catalogs.id=contests.catalog_id AND catalogs.active_commit_sha=?
+    JOIN contest_revisions AS revisions
+      ON revisions.contest_id=contests.id AND revisions.commit_sha=catalogs.active_commit_sha
+    JOIN contest_revision_problems AS contest_problems
+      ON contest_problems.contest_id=contests.id
+     AND contest_problems.commit_sha=revisions.commit_sha
+     AND contest_problems.problem_id=?
     LEFT JOIN contest_participants AS participants
       ON participants.contest_id=contests.id AND participants.user_id=?
     WHERE contests.id=?`)
-    .bind(problemVersionId, session.userId, contestId).first<{
+    .bind(catalogCommit, problemId, session.userId, contestId).first<{
       readonly starts_at: string;
       readonly ends_at: string;
       readonly status: string;
@@ -253,7 +263,6 @@ async function verifyContestAdmission(
 
 async function submissionForOwner(env: WasmOjWorkerEnv, submissionId: string, userId: string): Promise<SubmissionRow> {
   const row = await env.DB.prepare(`SELECT submissions.*,
-      CASE WHEN submissions.contest_id IS NULL THEN 'official-practice' ELSE 'contest' END AS problem_mode,
       sources.state AS source_state
     FROM submissions JOIN submission_sources AS sources ON sources.id=submissions.source_id
     WHERE submissions.id=? AND submissions.user_id=?
@@ -377,18 +386,21 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
   const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   const input = parseOfficialSubmissionRequest(await readJsonBody(request, SOURCE_MAX_BYTES));
-  const problem = await problemVersion(env, input.problemVersionId);
+  const problem = await activeProblemRevision(env, input.problemId);
+  if (problem.commit_sha !== input.catalogCommit) {
+    throw new ApiError(409, "problem-revision-stale", "The requested problem revision is no longer active.");
+  }
   const allowedProfiles = JSON.parse(problem.allowed_profiles_json) as unknown;
   const selectedProfile = allowedProfiles && typeof allowedProfiles === "object" && !Array.isArray(allowedProfiles)
     ? (allowedProfiles as Record<string, { target?: unknown; optimization?: unknown }>)[input.language]
     : undefined;
   if (selectedProfile?.target !== input.target || selectedProfile.optimization !== input.optimization) {
-    throw new ApiError(409, "compile-profile-not-allowed", "Language, target, or optimization is not allowed by this problem version.");
+    throw new ApiError(409, "compile-profile-not-allowed", "Language, target, or optimization is not allowed by this problem.");
   }
-  if ((input.contestId ? "contest" : "official-practice") !== problem.mode) {
-    throw new ApiError(409, "submission-context-invalid", "Problem version does not match the submission context.");
+  if (!input.contestId && problem.practice_enabled !== 1) {
+    throw new ApiError(409, "practice-disabled", "This problem is not enabled for practice submissions.");
   }
-  await verifyContestAdmission(env, session, input.contestId, input.problemVersionId);
+  await verifyContestAdmission(env, session, input.contestId, input.problemId, input.catalogCommit);
   const requestDigest = await sha256Hex(canonicalBytes(input));
   const existing = await env.DB.prepare("SELECT submission_id, request_digest FROM submission_idempotency WHERE user_id=? AND idempotency_key=?")
     .bind(session.userId, input.idempotencyKey).first<{ readonly submission_id: string; readonly request_digest: string }>();
@@ -402,7 +414,6 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
   const capacity = await submissionCapacitySnapshot(env, session.userId);
   if (capacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) throw new ApiError(429, "submission-queue-full", "This account already has three queued submissions.");
   if (capacity.globalQueued >= MAX_QUEUED_SUBMISSIONS) throw new ApiError(429, "submission-capacity", "The submission queue is temporarily full.");
-  const activeRelease = await assertActiveRelease(env.DB, env.ENVIRONMENT, env.WASM_OJ_RELEASE_ID, env.WASM_OJ_RELEASE_MANIFEST_SHA256);
   const user = await env.DB.prepare("SELECT erasure_epoch FROM users WHERE id=? AND status='active'")
     .bind(session.userId).first<{ readonly erasure_epoch: number }>();
   if (!user) throw new ApiError(409, "account-unavailable", "Account is not available for submission.");
@@ -431,28 +442,32 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
            AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=users.id)`)
         .bind(sourceId, sourceDigest, sourceBytes.byteLength, timestamp, session.userId, user.erasure_epoch),
       env.DB.prepare(`INSERT INTO submissions
-          (id, origin_submission_id, origin_submitted_at, user_id, problem_version_id, problem_series_id,
-           execution_semantic_sha256, contest_id,
-           source_id, language, target, optimization, entry_path, wasm_oj_release_id, wasm_oj_manifest_sha256,
+          (id, origin_submission_id, origin_submitted_at, user_id, problem_id,
+           catalog_commit, judge_digest, contest_id,
+           source_id, language, target, optimization, entry_path,
            state, visibility, admitted_at, created_at, updated_at)
-        SELECT ?, ?, ?, ?, versions.id, versions.problem_series_id,
-               versions.execution_semantic_sha256, ?, ?, ?, ?, ?, ?, ?, ?,
+        SELECT ?, ?, ?, ?, revisions.problem_id,
+               revisions.commit_sha, revisions.judge_digest, ?, ?, ?, ?, ?, ?,
                'admitting', 'private', ?, ?, ?
-          FROM problem_version_details AS versions
+          FROM problem_revisions AS revisions
+          JOIN problem_series AS problems ON problems.id=revisions.problem_id
+          JOIN catalogs ON catalogs.id=problems.catalog_id
           JOIN submission_sources AS sources ON sources.id=? AND sources.owner_user_id=? AND sources.state='reserved'
-         WHERE versions.id=? AND versions.execution_semantic_sha256=?
-           AND ((versions.mode='official-practice' AND ? IS NULL
-                 AND EXISTS (SELECT 1 FROM official_practice_heads WHERE problem_version_id=versions.id))
-             OR (versions.mode='contest' AND ? IS NOT NULL
-                 AND EXISTS (SELECT 1 FROM contest_problems WHERE contest_id=? AND problem_version_id=versions.id)))
+         WHERE revisions.problem_id=? AND revisions.commit_sha=?
+           AND catalogs.active_commit_sha=revisions.commit_sha
+           AND ((? IS NULL AND revisions.practice_enabled=1)
+             OR (? IS NOT NULL AND EXISTS (
+               SELECT 1 FROM contest_revision_problems
+                WHERE contest_id=? AND commit_sha=revisions.commit_sha
+                  AND problem_id=revisions.problem_id
+             )))
            AND (SELECT COUNT(*) FROM submissions WHERE state IN ('admitting','queued')) < ?
            AND (SELECT COUNT(*) FROM submissions WHERE user_id=? AND state IN ('admitting','queued')) < ?`)
         .bind(
           submissionId, submissionId, timestamp, session.userId, input.contestId ?? null, sourceId,
           input.language, input.target, input.optimization, input.entry,
-          activeRelease.releaseId, activeRelease.manifestSha256,
           timestamp, timestamp, timestamp,
-          sourceId, session.userId, input.problemVersionId, problem.execution_semantic_sha256,
+          sourceId, session.userId, input.problemId, input.catalogCommit,
           input.contestId ?? null, input.contestId ?? null, input.contestId ?? null,
           MAX_QUEUED_SUBMISSIONS, session.userId, MAX_QUEUED_SUBMISSIONS_PER_USER,
         ),
@@ -511,7 +526,9 @@ export function submissionMayBecomePublic(row: Pick<SubmissionRow, "state">): bo
 export function publicSubmissionProjection(row: SubmissionRow): Record<string, unknown> {
   return {
     id: row.id,
-    problemVersionId: row.problem_version_id,
+    problemId: row.problem_id,
+    catalogCommit: row.catalog_commit,
+    judgeDigest: row.judge_digest,
     contestId: row.contest_id,
     language: row.language,
     target: row.target,
@@ -535,6 +552,9 @@ function submissionProductProjection(row: SubmissionProductRow, viewerUserId?: s
     ...publicSubmissionProjection(row),
     owner: row.user_id === viewerUserId,
     sourceAvailable: row.source_state === "ready",
+    stale: row.stale === 1,
+    judgedCommit: row.judged_commit,
+    activeCommit: row.active_commit,
     problem: {
       slug: row.problem_slug,
       title: parseStoredProblemTitle(row.title_json),
@@ -655,7 +675,12 @@ export async function updateSubmissionVisibility(request: Request, env: WasmOjWo
   if (visibility !== "private" && visibility !== "public") throw new ApiError(400, "visibility-invalid", "Visibility must be private or public.");
   if (visibility === "public" && !submissionMayBecomePublic(row)) throw new ApiError(409, "submission-not-complete", "Only completed source can be made public.");
   if (visibility === "public" && row.contest_id) {
-    const contest = await env.DB.prepare("SELECT ends_at FROM contests WHERE id=?").bind(row.contest_id).first<{ readonly ends_at: string }>();
+    const contest = await env.DB.prepare(`SELECT revisions.ends_at
+      FROM contest_series AS contests
+      JOIN catalogs ON catalogs.id=contests.catalog_id
+      JOIN contest_revisions AS revisions
+        ON revisions.contest_id=contests.id AND revisions.commit_sha=catalogs.active_commit_sha
+      WHERE contests.id=?`).bind(row.contest_id).first<{ readonly ends_at: string }>();
     if (!contest || contest.ends_at > new Date().toISOString()) throw new ApiError(409, "contest-source-embargo", "Contest source remains private until the contest ends.");
   }
   await env.DB.prepare("UPDATE submissions SET visibility=?, updated_at=? WHERE id=?").bind(visibility, new Date().toISOString(), submissionId).run();
@@ -761,7 +786,7 @@ export function parseSubmissionPolicySummary(stored: string): SubmissionPolicySu
 export async function getSubmissionPolicySummary(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
   const session = await authenticatedSession(request, env);
   const row = await env.DB.prepare(`SELECT origin.user_id, origin.visibility, origin.contest_id,
-      contests.ends_at AS contest_ends_at,
+      contest_revisions.ends_at AS contest_ends_at,
       COALESCE(result.state, origin.state) AS state,
       COALESCE(result.policy_summary_json, origin.policy_summary_json) AS policy_summary_json
     FROM submissions AS requested
@@ -769,7 +794,10 @@ export async function getSubmissionPolicySummary(request: Request, env: WasmOjWo
     LEFT JOIN effective_submission_results AS effective
       ON effective.origin_submission_id=origin.id
     LEFT JOIN submissions AS result ON result.id=effective.effective_submission_id
-    LEFT JOIN contests ON contests.id=origin.contest_id
+    LEFT JOIN contest_series AS contests ON contests.id=origin.contest_id
+    LEFT JOIN catalogs ON catalogs.id=contests.catalog_id
+    LEFT JOIN contest_revisions ON contest_revisions.contest_id=contests.id
+      AND contest_revisions.commit_sha=catalogs.active_commit_sha
     WHERE requested.id=?`)
     .bind(submissionId).first<{
       readonly user_id: string;
@@ -792,34 +820,5 @@ export async function getSubmissionPolicySummary(request: Request, env: WasmOjWo
   return jsonResponse({ submissionId, policySummary: parseSubmissionPolicySummary(row.policy_summary_json) }, 200, {
     "cache-control": "private, no-store",
     vary: "Cookie",
-  });
-}
-
-export async function managedMatch(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
-  const url = new URL(request.url);
-  const repository = url.searchParams.get("repository");
-  const revision = url.searchParams.get("revision");
-  if (!repository || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) || !revision || !/^[0-9a-f]{64}$/.test(revision)) {
-    throw new ApiError(400, "managed-match-invalid", "repository and collection revision are required.");
-  }
-  const [owner, name] = repository.split("/");
-  const result = await env.DB.prepare(`SELECT publications.id AS publication_id, versions.problem_slug,
-      versions.id AS problem_version_id
-    FROM github_repositories AS repositories
-    JOIN problem_collections AS collections ON collections.github_repository_id=repositories.github_repository_id
-    JOIN collection_revisions AS revisions ON revisions.collection_id=collections.id
-    JOIN catalog_publications AS publications ON publications.collection_revision_id=revisions.id
-      AND publications.mode='official-practice'
-    JOIN problem_version_details AS versions ON versions.catalog_publication_id=publications.id
-    JOIN official_practice_heads AS heads ON heads.problem_version_id=versions.id
-    WHERE repositories.owner_login=? COLLATE NOCASE AND repositories.name=? COLLATE NOCASE
-      AND repositories.is_private=0 AND revisions.collection_revision_sha256=?
-    ORDER BY versions.problem_number`)
-    .bind(owner, name, revision).all<{ readonly publication_id: string; readonly problem_slug: string; readonly problem_version_id: string }>();
-  if (result.results.length === 0) return jsonResponse({ matched: false });
-  return jsonResponse({
-    matched: true,
-    publicationId: result.results[0]?.publication_id,
-    problems: Object.fromEntries(result.results.map((row) => [row.problem_slug, row.problem_version_id])),
   });
 }

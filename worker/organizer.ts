@@ -308,7 +308,7 @@ export async function githubWebhook(request: Request, env: WasmOjWorkerEnv): Pro
       }
     }
     // Push events intentionally have no product handler. Versions move only
-    // through explicit exact-commit validation and publication requests.
+    // through explicit exact-commit catalog synchronization.
     await env.DB.prepare(`UPDATE github_webhook_deliveries SET outcome='accepted', updated_at=?
       WHERE delivery_id=? AND event_name=? AND body_sha256=? AND outcome='processing'`)
       .bind(new Date().toISOString(), delivery.deliveryId, delivery.eventName, bodySha256).run();

@@ -6,7 +6,6 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
-const OCI_IMAGE = /^[a-z0-9][a-z0-9._/-]*:[A-Za-z0-9_][A-Za-z0-9._-]{0,127}@sha256:[0-9a-f]{64}$/u;
 const HEALTH_KEYS = ["active", "assigned", "healthy", "stopped", "failed", "scheduling", "starting"];
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1_000;
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
@@ -37,12 +36,11 @@ export function configuredContainerRolloutTarget(config) {
   if (typeof container.class_name !== "string" || container.class_name.length === 0) {
     throw new TypeError("Worker config Container class name is invalid.");
   }
-  if (typeof container.image !== "string" || !OCI_IMAGE.test(container.image)) {
-    throw new TypeError("Worker config Container image must be an exact tag@sha256 digest reference.");
+  if (container.image !== "./Dockerfile") {
+    throw new TypeError("Worker config Container image must be built from ./Dockerfile by Wrangler.");
   }
   return Object.freeze({
     className: container.class_name,
-    image: container.image,
     name: container.name,
   });
 }
@@ -89,8 +87,9 @@ export function assessContainerRollout(target, summaryValue, infoValue, instance
   const reasons = [];
   if (summary.name !== target.name || info.name !== target.name) reasons.push("application name does not match config");
   if (summary.id !== info.id) reasons.push("application ID changed between queries");
-  if (summary.image !== target.image || info.configuration?.image !== target.image) {
-    reasons.push("application image is not the exact configured digest reference");
+  if (typeof summary.image !== "string" || summary.image.length === 0
+    || typeof info.configuration?.image !== "string" || info.configuration.image.length === 0) {
+    reasons.push("deployed application image is missing");
   }
   if (!Number.isSafeInteger(summary.version) || summary.version <= 0) reasons.push("summary version is invalid");
   if (!Number.isSafeInteger(info.version) || info.version <= 0) reasons.push("info version is invalid");
@@ -225,7 +224,7 @@ export async function waitForContainerRollout({
       const observation = await inspect({ configPath, target, timeoutMs: remainingMs });
       const assessment = observation.assessment;
       if (assessment.ready) {
-        const key = `${assessment.applicationId}:${String(assessment.version)}:${assessment.image}`;
+        const key = `${assessment.applicationId}:${String(assessment.version)}`;
         stableCount = key === stableKey ? stableCount + 1 : 1;
         stableKey = key;
         lastFailure = `only ${String(stableCount)} of ${String(stableObservations)} stable ready observations completed`;

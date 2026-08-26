@@ -46,7 +46,7 @@ const LABELS = {
   en: {
     home: "Home", problems: "Problems", contests: "Contests", submissions: "Submissions", profile: "Profile",
     advanced: "Advanced", collections: "Custom collections", organizer: "Organizer", repositories: "Repositories",
-    collectionsAdmin: "Collections", contestAdmin: "Contests", rejudges: "Rejudges", applications: "Organizer applications", operations: "Production operations",
+    collectionsAdmin: "Catalog sync", contestAdmin: "Contests", rejudges: "Rejudges", applications: "Organizer applications", operations: "Production operations",
     applyOrganizer: "Apply for Organizer", primaryNavigation: "Primary navigation", skip: "Skip to main content",
     openMenu: "Open navigation", closeMenu: "Close navigation", collapseMenu: "Collapse navigation", expandMenu: "Expand navigation",
     signIn: "Sign in with GitHub", signOut: "Sign out", loadingSession: "Checking account…", sessionError: "Could not verify your account.", retry: "Retry",
@@ -55,7 +55,7 @@ const LABELS = {
   "zh-TW": {
     home: "首頁", problems: "題庫", contests: "競賽", submissions: "提交紀錄", profile: "個人檔案",
     advanced: "進階", collections: "自訂題庫", organizer: "Organizer", repositories: "Repositories",
-    collectionsAdmin: "Collections", contestAdmin: "Contests", rejudges: "Rejudges", applications: "Organizer 申請", operations: "正式環境操作",
+    collectionsAdmin: "題庫同步", contestAdmin: "競賽", rejudges: "重新判題", applications: "Organizer 申請", operations: "正式環境操作",
     applyOrganizer: "申請成為 Organizer", primaryNavigation: "主要導覽", skip: "跳至主要內容",
     openMenu: "開啟導覽", closeMenu: "關閉導覽", collapseMenu: "收合導覽", expandMenu: "展開導覽",
     signIn: "使用 GitHub 登入", signOut: "登出", loadingSession: "正在確認帳號…", sessionError: "無法確認帳號狀態。", retry: "重試",
@@ -235,7 +235,7 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
           <NavGroup icon={<CodeXml aria-hidden="true" size={17} />} label={text.organizer} expanded={organizerOpen} collapsed={collapsed} onClick={() => setOrganizerOpen((value) => !value)} />
           {organizerOpen && <div className="app-nav-sub">
             <NavItem href="/organizer/repositories" icon={<CodeXml aria-hidden="true" size={15} />} label={text.repositories} current={isCurrent("/organizer/repositories")} close={close} collapsed={collapsed} />
-            <NavItem href="/organizer/collections" icon={<BookOpen aria-hidden="true" size={15} />} label={text.collectionsAdmin} current={isCurrent("/organizer/collections")} close={close} collapsed={collapsed} />
+            <NavItem href="/organizer/catalogs" icon={<BookOpen aria-hidden="true" size={15} />} label={text.collectionsAdmin} current={isCurrent("/organizer/catalogs")} close={close} collapsed={collapsed} />
             <NavItem href="/organizer/contests" icon={<Trophy aria-hidden="true" size={15} />} label={text.contestAdmin} current={isCurrent("/organizer/contests")} close={close} collapsed={collapsed} />
             <NavItem href="/organizer/rejudges" icon={<ListChecks aria-hidden="true" size={15} />} label={text.rejudges} current={isCurrent("/organizer/rejudges")} close={close} collapsed={collapsed} />
           </div>}

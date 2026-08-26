@@ -11,7 +11,9 @@ const SUBMISSION_ID = "11111111-1111-4111-8111-111111111111";
 function submission(overrides: Partial<SubmissionSummary> = {}): SubmissionSummary {
   return {
     id: SUBMISSION_ID,
-    problemVersionId: "22222222-2222-4222-8222-222222222222",
+    problemId: "22222222-2222-4222-8222-222222222222",
+    catalogCommit: "a".repeat(40),
+    judgeDigest: "b".repeat(64),
     contestId: null,
     language: "rust",
     state: "running",
