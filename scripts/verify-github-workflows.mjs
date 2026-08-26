@@ -17,6 +17,7 @@ function forbidText(source, value, label) {
 for (const value of [
   "workflow_dispatch:",
   "environment: production",
+  "timeout-minutes: 60",
   "node-version: 24.18.0",
   "version: 10.34.5",
   "render-production-config.mjs",
@@ -25,6 +26,7 @@ for (const value of [
   "wait-container-rollout.mjs",
   "--capture-baseline",
   "--baseline",
+  "--timeout-seconds 1800",
   "/api/health/container",
   "/api/health/live",
   "/api/health/ready",

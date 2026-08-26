@@ -9,7 +9,7 @@ const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
 const CONTAINER_IMAGE = /^registry\.cloudflare\.com\/[^@\s]+@sha256:[0-9a-f]{64}$/u;
 const BASELINE_SCHEMA = "wasm-oj/container-rollout-baseline/v1";
 const HEALTH_KEYS = ["active", "assigned", "healthy", "stopped", "failed", "scheduling", "starting"];
-const DEFAULT_TIMEOUT_MS = 15 * 60 * 1_000;
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1_000;
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
 const REQUIRED_STABLE_OBSERVATIONS = 2;
 
@@ -338,7 +338,7 @@ async function writeReceipt(outputPath, value) {
 
 function usage() {
   return `Usage: node scripts/wait-container-rollout.mjs \\
-  --config <rendered-worker-config> [--timeout-seconds 900] [--poll-interval-seconds 5] \\
+  --config <rendered-worker-config> [--timeout-seconds 1800] [--poll-interval-seconds 5] \\
   (--capture-baseline <baseline.json> | --baseline <baseline.json> [--output <receipt.json>])`;
 }
 
@@ -352,7 +352,7 @@ async function main() {
       help: { type: "boolean", short: "h", default: false },
       output: { type: "string" },
       "poll-interval-seconds": { type: "string", default: "5" },
-      "timeout-seconds": { type: "string", default: "900" },
+      "timeout-seconds": { type: "string", default: "1800" },
     },
     strict: true,
   });
