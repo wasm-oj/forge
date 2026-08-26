@@ -89,6 +89,32 @@ test("baseline requires the deploy to advance the exact application and image", 
   assert.equal(advanced.ready, true);
 });
 
+test("baseline anchors an unhealthy prior version without accepting it as ready", () => {
+  const observation = readyFixture({
+    summary: { state: "provisioning" },
+    info: {
+      health: {
+        errors: [],
+        instances: { active: 0, assigned: 0, failed: 0, healthy: 6, scheduling: 0, starting: 1, stopped: 0 },
+      },
+    },
+  });
+  assert.equal(observation.assessment.ready, false);
+  assert.equal(observation.assessment.baselineValid, true);
+  assert.deepEqual(
+    parseContainerRolloutBaseline(target, containerRolloutBaseline(target, observation, "2026-08-26T00:00:00.000Z")),
+    { applicationId, image, version: 14 },
+  );
+});
+
+test("baseline rejects an active rollout or inconsistent application queries", () => {
+  const active = readyFixture({ info: { active_rollout_id: "79699b91-24b1-49d8-be4d-bb280af0b594" } });
+  assert.throws(() => containerRolloutBaseline(target, active, "2026-08-26T00:00:00.000Z"), /active rollout/u);
+
+  const inconsistent = readyFixture({ summary: { image: nextImage } });
+  assert.throws(() => containerRolloutBaseline(target, inconsistent, "2026-08-26T00:00:00.000Z"), /image changed between queries/u);
+});
+
 test("assessment rejects an active rollout and inconsistent image queries", () => {
   const result = readyFixture({
     info: { active_rollout_id: "79699b91-24b1-49d8-be4d-bb280af0b594" },
