@@ -86,63 +86,78 @@ export function assessContainerRollout(target, summaryValue, infoValue, instance
   const info = object(infoValue, "Cloudflare Container application info");
   if (!Array.isArray(instancesValue)) throw new TypeError("Cloudflare Container instances must be an array.");
 
-  const reasons = [];
-  if (summary.name !== target.name || info.name !== target.name) reasons.push("application name does not match config");
-  if (summary.id !== info.id) reasons.push("application ID changed between queries");
+  const baselineReasons = [];
+  if (summary.name !== target.name || info.name !== target.name) baselineReasons.push("application name does not match config");
+  if (typeof summary.id !== "string" || !UUID.test(summary.id)
+    || typeof info.id !== "string" || !UUID.test(info.id)) {
+    baselineReasons.push("application ID is invalid");
+  } else if (summary.id !== info.id) {
+    baselineReasons.push("application ID changed between queries");
+  }
   if (typeof summary.image !== "string" || !CONTAINER_IMAGE.test(summary.image)
     || typeof info.configuration?.image !== "string" || !CONTAINER_IMAGE.test(info.configuration.image)) {
-    reasons.push("deployed application image is missing");
+    baselineReasons.push("deployed application image is missing");
   } else if (summary.image !== info.configuration.image) {
-    reasons.push("application image changed between queries");
+    baselineReasons.push("application image changed between queries");
   }
-  if (!Number.isSafeInteger(summary.version) || summary.version <= 0) reasons.push("summary version is invalid");
-  if (!Number.isSafeInteger(info.version) || info.version <= 0) reasons.push("info version is invalid");
-  if (summary.version !== info.version) reasons.push("application version changed between queries");
+  if (!Number.isSafeInteger(summary.version) || summary.version <= 0) baselineReasons.push("summary version is invalid");
+  if (!Number.isSafeInteger(info.version) || info.version <= 0) baselineReasons.push("info version is invalid");
+  if (summary.version !== info.version) baselineReasons.push("application version changed between queries");
   if (info.active_rollout_id !== undefined && info.active_rollout_id !== null) {
-    reasons.push("application still has an active rollout");
+    baselineReasons.push("application still has an active rollout");
   }
+  if (!Number.isSafeInteger(summary.instances) || summary.instances <= 0
+    || !Number.isSafeInteger(info.instances) || info.instances <= 0) {
+    baselineReasons.push("application instance count is invalid");
+  } else if (summary.instances !== info.instances) {
+    baselineReasons.push("instance count changed between queries");
+  }
+
+  const readinessReasons = [];
   if (baseline !== null) {
-    if (info.id !== baseline.applicationId) reasons.push("application ID does not match the pre-deploy baseline");
+    if (info.id !== baseline.applicationId) readinessReasons.push("application ID does not match the pre-deploy baseline");
     if (Number.isSafeInteger(info.version) && info.version <= baseline.version) {
-      reasons.push(`application version ${String(info.version)} has not advanced past baseline ${String(baseline.version)}`);
+      readinessReasons.push(`application version ${String(info.version)} has not advanced past baseline ${String(baseline.version)}`);
     }
-    if (info.configuration?.image === baseline.image) reasons.push("application image has not changed from the pre-deploy baseline");
+    if (info.configuration?.image === baseline.image) readinessReasons.push("application image has not changed from the pre-deploy baseline");
   }
-  if (summary.state !== "ready") reasons.push(`application state is ${JSON.stringify(summary.state)}, not ready`);
+  if (summary.state !== "ready") readinessReasons.push(`application state is ${JSON.stringify(summary.state)}, not ready`);
 
   const health = info.health;
   const counters = health?.instances;
-  if (!Array.isArray(health?.errors) || health.errors.length !== 0) reasons.push("application health contains errors");
+  if (!Array.isArray(health?.errors) || health.errors.length !== 0) readinessReasons.push("application health contains errors");
   if (counters === null || typeof counters !== "object" || Array.isArray(counters)) {
-    reasons.push("application health counters are missing");
+    readinessReasons.push("application health counters are missing");
   } else {
     for (const key of HEALTH_KEYS) {
-      if (!Number.isSafeInteger(counters[key]) || counters[key] < 0) reasons.push(`health counter ${key} is invalid`);
+      if (!Number.isSafeInteger(counters[key]) || counters[key] < 0) readinessReasons.push(`health counter ${key} is invalid`);
     }
     if (!Number.isSafeInteger(info.instances) || info.instances <= 0) {
-      reasons.push("application has no configured healthy instances");
+      readinessReasons.push("application has no configured healthy instances");
     } else if (counters.healthy !== info.instances) {
-      reasons.push(`healthy instance count ${String(counters.healthy)} does not equal application count ${String(info.instances)}`);
+      readinessReasons.push(`healthy instance count ${String(counters.healthy)} does not equal application count ${String(info.instances)}`);
     }
     for (const key of HEALTH_KEYS.filter((key) => key !== "healthy")) {
-      if (counters[key] !== 0) reasons.push(`health counter ${key} is not terminal (${String(counters[key])})`);
+      if (counters[key] !== 0) readinessReasons.push(`health counter ${key} is not terminal (${String(counters[key])})`);
     }
   }
-  if (summary.instances !== info.instances) reasons.push("instance count changed between queries");
 
   for (const [index, instanceValue] of instancesValue.entries()) {
     const instance = object(instanceValue, `Cloudflare Container instance ${index}`);
     if (instance.state === "inactive") continue;
     if (instance.state !== "running") {
-      reasons.push(`live instance ${String(instance.id)} state is ${JSON.stringify(instance.state)}, not running`);
+      readinessReasons.push(`live instance ${String(instance.id)} state is ${JSON.stringify(instance.state)}, not running`);
     }
     if (instance.version !== info.version) {
-      reasons.push(`live instance ${String(instance.id)} version ${String(instance.version)} is not target ${String(info.version)}`);
+      readinessReasons.push(`live instance ${String(instance.id)} version ${String(instance.version)} is not target ${String(info.version)}`);
     }
   }
 
+  const reasons = [...baselineReasons, ...readinessReasons];
   return Object.freeze({
     applicationId: typeof info.id === "string" ? info.id : null,
+    baselineReasons: Object.freeze(baselineReasons),
+    baselineValid: baselineReasons.length === 0,
     healthyInstances: Number.isSafeInteger(counters?.healthy) ? counters.healthy : null,
     image: typeof info.configuration?.image === "string" ? info.configuration.image : null,
     ready: reasons.length === 0,
@@ -285,8 +300,8 @@ function receipt(target, observation, observedAt) {
 
 export function containerRolloutBaseline(target, observation, observedAt) {
   const assessment = observation.assessment;
-  if (!assessment.ready) {
-    throw new Error(`Cannot capture a non-ready Container baseline: ${assessment.reasons.join("; ")}.`);
+  if (!assessment.baselineValid) {
+    throw new Error(`Cannot capture Container baseline: ${assessment.baselineReasons.join("; ")}.`);
   }
   return {
     schema: BASELINE_SCHEMA,
