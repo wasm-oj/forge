@@ -8,6 +8,15 @@ import { parseArgs } from "node:util";
 import { rowsFromWranglerJson } from "./architecture-reset-safety.mjs";
 
 const MIGRATION_NAME = /^\d{4}_[a-z0-9_]+\.sql$/;
+export const HISTORICAL_PRODUCTION_MIGRATIONS = Object.freeze([
+  "0007_staging_acceptance.sql",
+  "0008_staging_acceptance_controls.sql",
+  "0009_release_drain_evidence.sql",
+  "0011_release_transition_drain_nonce.sql",
+  "0014_release_package_active_root.sql",
+  "0015_release_package_mutation_lease.sql",
+  "0016_staging_acceptance_fixture.sql",
+]);
 export const REPOSITORY_CUTOVER_MIGRATION = "0019_repository_source_truth.sql";
 export const PAUSE_REPOSITORY_CUTOVER_SQL = `UPDATE formal_mutation_controls
   SET formal_mutations_enabled=0, reason='repository-source-truth-cutover',
@@ -36,7 +45,8 @@ export function pendingMigrationNames(localNames, appliedNames) {
 
 export function assertNoUnknownAppliedMigrations(localNames, appliedNames) {
   const local = new Set(localNames);
-  const unknown = appliedNames.filter((name) => !local.has(name));
+  const historical = new Set(HISTORICAL_PRODUCTION_MIGRATIONS);
+  const unknown = appliedNames.filter((name) => !local.has(name) && !historical.has(name));
   if (unknown.length !== 0) throw new Error(`Production D1 contains migrations absent from this checkout: ${JSON.stringify(unknown)}.`);
 }
 
