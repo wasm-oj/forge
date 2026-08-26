@@ -6,7 +6,8 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
-const OCI_IMAGE = /^[a-z0-9][a-z0-9._/-]*:[A-Za-z0-9_][A-Za-z0-9._-]{0,127}@sha256:[0-9a-f]{64}$/u;
+const CONTAINER_IMAGE = /^registry\.cloudflare\.com\/[^@\s]+@sha256:[0-9a-f]{64}$/u;
+const BASELINE_SCHEMA = "wasm-oj/container-rollout-baseline/v1";
 const HEALTH_KEYS = ["active", "assigned", "healthy", "stopped", "failed", "scheduling", "starting"];
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1_000;
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
@@ -37,12 +38,11 @@ export function configuredContainerRolloutTarget(config) {
   if (typeof container.class_name !== "string" || container.class_name.length === 0) {
     throw new TypeError("Worker config Container class name is invalid.");
   }
-  if (typeof container.image !== "string" || !OCI_IMAGE.test(container.image)) {
-    throw new TypeError("Worker config Container image must be an exact tag@sha256 digest reference.");
+  if (container.image !== "./Dockerfile") {
+    throw new TypeError("Worker config Container image must be built from ./Dockerfile by Wrangler.");
   }
   return Object.freeze({
     className: container.class_name,
-    image: container.image,
     name: container.name,
   });
 }
@@ -81,7 +81,7 @@ function parseInstancesPage(value) {
   return { instances: page.instances, nextPageToken };
 }
 
-export function assessContainerRollout(target, summaryValue, infoValue, instancesValue) {
+export function assessContainerRollout(target, summaryValue, infoValue, instancesValue, baseline = null) {
   const summary = object(summaryValue, "Cloudflare Container application summary");
   const info = object(infoValue, "Cloudflare Container application info");
   if (!Array.isArray(instancesValue)) throw new TypeError("Cloudflare Container instances must be an array.");
@@ -89,12 +89,25 @@ export function assessContainerRollout(target, summaryValue, infoValue, instance
   const reasons = [];
   if (summary.name !== target.name || info.name !== target.name) reasons.push("application name does not match config");
   if (summary.id !== info.id) reasons.push("application ID changed between queries");
-  if (summary.image !== target.image || info.configuration?.image !== target.image) {
-    reasons.push("application image is not the exact configured digest reference");
+  if (typeof summary.image !== "string" || !CONTAINER_IMAGE.test(summary.image)
+    || typeof info.configuration?.image !== "string" || !CONTAINER_IMAGE.test(info.configuration.image)) {
+    reasons.push("deployed application image is missing");
+  } else if (summary.image !== info.configuration.image) {
+    reasons.push("application image changed between queries");
   }
   if (!Number.isSafeInteger(summary.version) || summary.version <= 0) reasons.push("summary version is invalid");
   if (!Number.isSafeInteger(info.version) || info.version <= 0) reasons.push("info version is invalid");
   if (summary.version !== info.version) reasons.push("application version changed between queries");
+  if (info.active_rollout_id !== undefined && info.active_rollout_id !== null) {
+    reasons.push("application still has an active rollout");
+  }
+  if (baseline !== null) {
+    if (info.id !== baseline.applicationId) reasons.push("application ID does not match the pre-deploy baseline");
+    if (Number.isSafeInteger(info.version) && info.version <= baseline.version) {
+      reasons.push(`application version ${String(info.version)} has not advanced past baseline ${String(baseline.version)}`);
+    }
+    if (info.configuration?.image === baseline.image) reasons.push("application image has not changed from the pre-deploy baseline");
+  }
   if (summary.state !== "ready") reasons.push(`application state is ${JSON.stringify(summary.state)}, not ready`);
 
   const health = info.health;
@@ -159,7 +172,7 @@ async function defaultWranglerJson(args, { configPath, timeoutMs }) {
 
 export async function inspectContainerRollout(
   target,
-  { configPath, now = Date.now, timeoutMs, wranglerJson = defaultWranglerJson },
+  { baseline = null, configPath, now = Date.now, timeoutMs, wranglerJson = defaultWranglerJson },
 ) {
   const deadline = now() + positiveInteger(timeoutMs, "timeoutMs");
   const queryTimeout = () => {
@@ -184,7 +197,7 @@ export async function inspectContainerRollout(
     }
     if (pageToken !== null) seenPageTokens.add(pageToken);
   } while (pageToken !== null);
-  return { assessment: assessContainerRollout(target, summary, info, instances), info, instances, summary };
+  return { assessment: assessContainerRollout(target, summary, info, instances, baseline), info, instances, summary };
 }
 
 function delay(milliseconds) {
@@ -225,7 +238,7 @@ export async function waitForContainerRollout({
       const observation = await inspect({ configPath, target, timeoutMs: remainingMs });
       const assessment = observation.assessment;
       if (assessment.ready) {
-        const key = `${assessment.applicationId}:${String(assessment.version)}:${assessment.image}`;
+        const key = `${assessment.applicationId}:${String(assessment.version)}`;
         stableCount = key === stableKey ? stableCount + 1 : 1;
         stableKey = key;
         lastFailure = `only ${String(stableCount)} of ${String(stableObservations)} stable ready observations completed`;
@@ -270,6 +283,52 @@ function receipt(target, observation, observedAt) {
   };
 }
 
+export function containerRolloutBaseline(target, observation, observedAt) {
+  const assessment = observation.assessment;
+  if (!assessment.ready) {
+    throw new Error(`Cannot capture a non-ready Container baseline: ${assessment.reasons.join("; ")}.`);
+  }
+  return {
+    schema: BASELINE_SCHEMA,
+    observedAt,
+    application: {
+      id: assessment.applicationId,
+      name: target.name,
+      version: assessment.version,
+      image: assessment.image,
+    },
+  };
+}
+
+export function parseContainerRolloutBaseline(target, value) {
+  const baseline = object(value, "Container rollout baseline");
+  if (baseline.schema !== BASELINE_SCHEMA) throw new TypeError("Container rollout baseline schema is invalid.");
+  const application = object(baseline.application, "Container rollout baseline application");
+  if (application.name !== target.name) throw new TypeError("Container rollout baseline application name does not match config.");
+  if (typeof application.id !== "string" || !UUID.test(application.id)) {
+    throw new TypeError("Container rollout baseline application ID is invalid.");
+  }
+  if (!Number.isSafeInteger(application.version) || application.version <= 0) {
+    throw new TypeError("Container rollout baseline application version is invalid.");
+  }
+  if (typeof application.image !== "string" || !CONTAINER_IMAGE.test(application.image)) {
+    throw new TypeError("Container rollout baseline application image is invalid.");
+  }
+  return Object.freeze({
+    applicationId: application.id,
+    image: application.image,
+    version: application.version,
+  });
+}
+
+async function readContainerRolloutBaseline(target, baselinePath) {
+  try {
+    return parseContainerRolloutBaseline(target, JSON.parse(await readFile(baselinePath, "utf8")));
+  } catch (error) {
+    throw new TypeError(`Cannot read Container rollout baseline ${baselinePath}.`, { cause: error });
+  }
+}
+
 async function writeReceipt(outputPath, value) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   const temporaryPath = `${outputPath}.${String(process.pid)}.tmp`;
@@ -280,7 +339,7 @@ async function writeReceipt(outputPath, value) {
 function usage() {
   return `Usage: node scripts/wait-container-rollout.mjs \\
   --config <rendered-worker-config> [--timeout-seconds 900] [--poll-interval-seconds 5] \\
-  [--output <receipt.json>]`;
+  (--capture-baseline <baseline.json> | --baseline <baseline.json> [--output <receipt.json>])`;
 }
 
 async function main() {
@@ -288,6 +347,8 @@ async function main() {
     allowPositionals: false,
     options: {
       config: { type: "string", default: "wrangler.quick-production.jsonc" },
+      baseline: { type: "string" },
+      "capture-baseline": { type: "string" },
       help: { type: "boolean", short: "h", default: false },
       output: { type: "string" },
       "poll-interval-seconds": { type: "string", default: "5" },
@@ -313,9 +374,21 @@ async function main() {
 
   const configPath = path.resolve(values.config);
   const target = await readContainerRolloutTarget(configPath);
+  if (values["capture-baseline"] !== undefined) {
+    if (values.baseline !== undefined || values.output !== undefined) {
+      throw new TypeError("capture-baseline cannot be combined with baseline or output.");
+    }
+    const observation = await inspectContainerRollout(target, { configPath, timeoutMs: timeoutSeconds * 1_000 });
+    const value = containerRolloutBaseline(target, observation, new Date().toISOString());
+    await writeReceipt(path.resolve(values["capture-baseline"]), value);
+    console.log(JSON.stringify(value));
+    return;
+  }
+  if (values.baseline === undefined) throw new TypeError("baseline is required when waiting for a Container rollout.");
+  const baseline = await readContainerRolloutBaseline(target, path.resolve(values.baseline));
   const observation = await waitForContainerRollout({
     configPath,
-    inspect: ({ timeoutMs }) => inspectContainerRollout(target, { configPath, timeoutMs }),
+    inspect: ({ timeoutMs }) => inspectContainerRollout(target, { baseline, configPath, timeoutMs }),
     pollIntervalMs: pollIntervalSeconds * 1_000,
     target,
     timeoutMs: timeoutSeconds * 1_000,

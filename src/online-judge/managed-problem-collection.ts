@@ -16,8 +16,7 @@ import {
   type OfficialSubmissionRequest,
 } from "./contracts";
 import {
-  parseManagedPublicProblemProjection,
-  type ManagedPublicProjectionMode,
+  parseContestPublicProblemProjection,
 } from "./public-projection";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -26,16 +25,19 @@ const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const JSON_CONTENT_TYPE = /^application\/json(?:\s*;\s*charset=utf-8)?$/i;
 const MAX_METADATA_BYTES = 64 * 1024;
 const MAX_PUBLIC_CONTENT_BYTES = 8 * 1024 * 1024;
-const METADATA_SCHEMA = "wasm-oj-platform/problem-content-pointer/v2";
+const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
+const METADATA_SCHEMA = "wasm-oj-platform/problem-content-pointer/v1";
+type ManagedPublicProjectionMode = "official-practice" | "contest";
 
 export interface ManagedProblemContext {
-  readonly problemVersionId: string;
+  readonly problemId: string;
   readonly contestId?: string;
 }
 
 export interface ManagedProblemCollectionSource extends ManagedProblemContext {
   readonly provider: "managed";
   readonly mode: ManagedPublicProjectionMode;
+  readonly catalogCommit: string;
   readonly metadataUrl: string;
   readonly contentUrl: string;
   readonly contentSha256: string;
@@ -82,22 +84,16 @@ export interface OfficialSubmissionSourceInput {
 }
 
 interface ManagedProblemContentPointer {
-  readonly problemVersionId: string;
-  readonly problemSeriesId: string;
-  readonly catalogPublicationId: string;
-  readonly mode: ManagedPublicProjectionMode;
+  readonly problemId: string;
+  readonly catalogCommit: string;
   readonly problemSlug: string;
   readonly problemNumber: number;
   readonly title: Readonly<Record<"zh-TW" | "en", string>>;
-  readonly difficulty: "easy" | "medium" | "hard";
-  readonly tags: readonly string[];
-  readonly trackId: string;
-  readonly track: Readonly<Record<"zh-TW" | "en", string>>;
   readonly allowedProfiles: JudgeAllowedProfiles;
   readonly maximumScore: 100;
-  readonly executionSemanticDigest: string;
+  readonly judgeDigest: string;
   readonly content: {
-    readonly role: "practice" | "contest-public";
+    readonly role: "practice" | "contest";
     readonly bytes: number;
     readonly sha256: string;
     readonly url: string;
@@ -119,43 +115,46 @@ export function normalizeManagedProblemContext(value: unknown): ManagedProblemCo
   if (!isRecord(value)) throw configurationError("Managed problem context must be an object.");
   const keys = Object.keys(value).sort();
   const expected = Object.hasOwn(value, "contestId")
-    ? ["contestId", "problemVersionId"]
-    : ["problemVersionId"];
+    ? ["contestId", "problemId"]
+    : ["problemId"];
   if (!sameStrings(keys, expected)) throw configurationError("Managed problem context has an invalid shape.");
-  const problemVersionId = uuid(value.problemVersionId, "problemVersionId");
+  const problemId = uuid(value.problemId, "problemId");
   const contestId = Object.hasOwn(value, "contestId") ? uuid(value.contestId, "contestId") : undefined;
-  return { problemVersionId, ...(contestId ? { contestId } : {}) };
+  return { problemId, ...(contestId ? { contestId } : {}) };
 }
 
 export function managedProblemMetadataApiPath(contextValue: ManagedProblemContext): string {
   const context = normalizeManagedProblemContext(contextValue);
-  const path = `/api/problems/${encodeURIComponent(context.problemVersionId)}`;
+  const path = `/api/problems/${encodeURIComponent(context.problemId)}`;
   if (!context.contestId) return path;
   return `${path}?${new URLSearchParams({ contestId: context.contestId })}`;
 }
 
-export function managedProblemContentApiPath(contextValue: ManagedProblemContext): string {
+export function managedProblemContentApiPath(contextValue: ManagedProblemContext, catalogCommit: string): string {
   const context = normalizeManagedProblemContext(contextValue);
-  const role = context.contestId ? "contest-public" : "practice";
-  const parameters = new URLSearchParams({ role });
+  if (!COMMIT_PATTERN.test(catalogCommit)) throw configurationError("catalogCommit must be an exact lowercase Git commit.");
+  const role = context.contestId ? "contest" : "practice";
+  const parameters = new URLSearchParams({ role, commit: catalogCommit });
   if (context.contestId) parameters.set("contestId", context.contestId);
-  return `/api/problems/${encodeURIComponent(context.problemVersionId)}/content?${parameters}`;
+  return `/api/problems/${encodeURIComponent(context.problemId)}/content?${parameters}`;
 }
 
 export function managedProblemWorkspacePath(contextValue: ManagedProblemContext): string {
   const context = normalizeManagedProblemContext(contextValue);
   return context.contestId
-    ? `/contests/${encodeURIComponent(context.contestId)}/problems/${encodeURIComponent(context.problemVersionId)}`
-    : `/problems/${encodeURIComponent(context.problemVersionId)}`;
+    ? `/contests/${encodeURIComponent(context.contestId)}/problems/${encodeURIComponent(context.problemId)}`
+    : `/problems/${encodeURIComponent(context.problemId)}`;
 }
 
 export function createOfficialSubmissionRequest(
-  contextValue: ManagedProblemContext,
+  contextValue: ManagedProblemContext & { readonly catalogCommit: string },
   source: OfficialSubmissionSourceInput,
 ): OfficialSubmissionRequest {
-  const context = normalizeManagedProblemContext(contextValue);
+  const context = normalizeManagedProblemContext({ problemId: contextValue.problemId, ...(contextValue.contestId ? { contestId: contextValue.contestId } : {}) });
+  if (!COMMIT_PATTERN.test(contextValue.catalogCommit)) throw configurationError("catalogCommit must be an exact lowercase Git commit.");
   return parseOfficialSubmissionRequest({
-    problemVersionId: context.problemVersionId,
+    problemId: context.problemId,
+    catalogCommit: contextValue.catalogCommit,
     ...(context.contestId ? { contestId: context.contestId } : {}),
     language: source.language,
     target: source.target,
@@ -173,13 +172,12 @@ export async function loadManagedProblemCollection(
   const context = normalizeManagedProblemContext(contextValue);
   const mode: ManagedPublicProjectionMode = context.contestId ? "contest" : "official-practice";
   const metadataUrl = managedProblemMetadataApiPath(context);
-  const expectedContentUrl = managedProblemContentApiPath(context);
   const fetchImplementation = options.fetch ?? globalThis.fetch;
   if (!fetchImplementation) throw new ManagedProblemCollectionError("Fetch is unavailable in this browser.", "network");
 
   const metadataResponse = await fetchJson(fetchImplementation, metadataUrl, options.signal, "metadata");
   const metadataBytes = await readBoundedBody(metadataResponse, MAX_METADATA_BYTES, undefined, "metadata");
-  const metadata = parseContentPointer(parseUtf8Json(metadataBytes, "metadata"), context, mode, expectedContentUrl);
+  const metadata = parseContentPointer(parseUtf8Json(metadataBytes, "metadata"), context);
 
   const contentResponse = await fetchJson(fetchImplementation, metadata.content.url, options.signal, "content");
   const contentBytes = await readBoundedBody(
@@ -198,8 +196,7 @@ export async function loadManagedProblemCollection(
     if (mode === "official-practice") {
       problem = parseStandaloneProblemBundle(contentValue);
     } else {
-      const embeddedDigest = projectionDigest(contentValue);
-      problem = parseManagedPublicProblemProjection(contentValue, mode, embeddedDigest).problem;
+      problem = parseContestPublicProblemProjection(contentValue).problem;
     }
   } catch (error) {
     throw new ManagedProblemCollectionError(
@@ -228,7 +225,8 @@ export async function loadManagedProblemCollection(
   const source: ManagedProblemCollectionSource = {
     provider: "managed",
     mode,
-    problemVersionId: context.problemVersionId,
+    problemId: context.problemId,
+    catalogCommit: metadata.catalogCommit,
     ...(context.contestId ? { contestId: context.contestId } : {}),
     metadataUrl,
     contentUrl: metadata.content.url,
@@ -236,8 +234,8 @@ export async function loadManagedProblemCollection(
     allowedProfiles: metadata.allowedProfiles,
   };
   const sourceKey = context.contestId
-    ? `managed:contest:${context.contestId}:${context.problemVersionId}:${metadata.content.sha256}`
-    : `managed:official-practice:${context.problemVersionId}:${metadata.content.sha256}`;
+    ? `repository:contest:${context.contestId}:${context.problemId}:${metadata.catalogCommit}:${metadata.content.sha256}`
+    : `repository:practice:${context.problemId}:${metadata.catalogCommit}:${metadata.content.sha256}`;
 
   return {
     source,
@@ -345,46 +343,30 @@ async function readBoundedBody(
 function parseContentPointer(
   value: unknown,
   context: ManagedProblemContext,
-  mode: ManagedPublicProjectionMode,
-  expectedContentUrl: string,
 ): ManagedProblemContentPointer {
   const pointer = exactRecord(value, [
-    "allowedProfiles", "catalogPublicationId", "content", "difficulty", "executionSemanticDigest",
-    "maximumScore", "mode", "problemNumber", "problemSeriesId", "problemSlug", "problemVersionId",
-    "schema", "tags", "title", "track", "trackId",
+    "allowedProfiles", "catalogCommit", "content", "judgeDigest", "maximumScore", "problemId",
+    "problemNumber", "problemSlug", "practiceEnabled", "schema", "summary", "title",
   ], "managed problem metadata");
   if (pointer.schema !== METADATA_SCHEMA) schemaFailure(`Managed problem metadata schema must be '${METADATA_SCHEMA}'.`);
-  if (pointer.problemVersionId !== context.problemVersionId || !UUID_PATTERN.test(String(pointer.problemVersionId))) {
-    schemaFailure("Managed problem metadata has the wrong problem version identity.");
-  }
-  if (typeof pointer.problemSeriesId !== "string" || !UUID_PATTERN.test(pointer.problemSeriesId)
-    || typeof pointer.catalogPublicationId !== "string" || !UUID_PATTERN.test(pointer.catalogPublicationId)) {
-    schemaFailure("Managed problem metadata contains an invalid management identity.");
-  }
-  if (pointer.mode !== mode) schemaFailure("Managed problem metadata has the wrong semantic mode.");
+  if (pointer.problemId !== context.problemId || !UUID_PATTERN.test(String(pointer.problemId))) schemaFailure("Managed problem metadata has the wrong problem identity.");
+  if (typeof pointer.catalogCommit !== "string" || !COMMIT_PATTERN.test(pointer.catalogCommit)) schemaFailure("Managed problem metadata has an invalid catalog commit.");
   if (typeof pointer.problemSlug !== "string" || !SLUG_PATTERN.test(pointer.problemSlug)
     || !Number.isSafeInteger(pointer.problemNumber) || (pointer.problemNumber as number) < 1) {
     schemaFailure("Managed problem metadata contains an invalid problem identity.");
   }
   const title = localized(pointer.title, "title");
-  if (pointer.difficulty !== "easy" && pointer.difficulty !== "medium" && pointer.difficulty !== "hard") {
-    schemaFailure("Managed problem metadata difficulty is invalid.");
-  }
-  if (!Array.isArray(pointer.tags) || pointer.tags.some((tag) => typeof tag !== "string")) {
-    schemaFailure("Managed problem metadata tags are invalid.");
-  }
-  if (typeof pointer.trackId !== "string" || !SLUG_PATTERN.test(pointer.trackId)) {
-    schemaFailure("Managed problem metadata track identity is invalid.");
-  }
-  const track = localized(pointer.track, "track");
+  localized(pointer.summary, "summary");
+  if (typeof pointer.practiceEnabled !== "boolean") schemaFailure("Managed problem metadata practiceEnabled is invalid.");
   let allowedProfiles: JudgeAllowedProfiles;
   try { allowedProfiles = parseJudgeAllowedProfiles(pointer.allowedProfiles, "managed problem metadata allowedProfiles"); }
   catch (error) { throw new ManagedProblemCollectionError(error instanceof Error ? error.message : "Allowed profiles are invalid.", "schema", { cause: error }); }
-  if (pointer.maximumScore !== 100 || typeof pointer.executionSemanticDigest !== "string" || !SHA256_PATTERN.test(pointer.executionSemanticDigest)) {
+  if (pointer.maximumScore !== 100 || typeof pointer.judgeDigest !== "string" || !SHA256_PATTERN.test(pointer.judgeDigest)) {
     schemaFailure("Managed problem metadata execution identity is invalid.");
   }
   const content = exactRecord(pointer.content, ["bytes", "role", "sha256", "url"], "managed problem content pointer");
-  const expectedRole = context.contestId ? "contest-public" : "practice";
+  const expectedRole = context.contestId ? "contest" : "practice";
+  const expectedContentUrl = managedProblemContentApiPath(context, pointer.catalogCommit);
   if (content.role !== expectedRole || content.url !== expectedContentUrl) {
     schemaFailure("Managed problem content pointer does not match its authorized context.");
   }
@@ -393,20 +375,14 @@ function parseContentPointer(
     schemaFailure("Managed problem content pointer size or digest is invalid.");
   }
   return {
-    problemVersionId: pointer.problemVersionId as string,
-    problemSeriesId: pointer.problemSeriesId,
-    catalogPublicationId: pointer.catalogPublicationId,
-    mode,
+    problemId: pointer.problemId as string,
+    catalogCommit: pointer.catalogCommit,
     problemSlug: pointer.problemSlug,
     problemNumber: pointer.problemNumber as number,
     title,
-    difficulty: pointer.difficulty,
-    tags: [...pointer.tags] as string[],
-    trackId: pointer.trackId,
-    track,
     allowedProfiles,
     maximumScore: 100,
-    executionSemanticDigest: pointer.executionSemanticDigest,
+    judgeDigest: pointer.judgeDigest,
     content: {
       role: expectedRole,
       bytes: content.bytes as number,
@@ -422,11 +398,7 @@ function assertMetadataMatchesProblem(metadata: ManagedProblemContentPointer, pr
   if (
     problem.id !== metadata.problemSlug
     || problem.number !== metadata.problemNumber
-    || problem.difficulty !== metadata.difficulty
-    || problem.trackId !== metadata.trackId
     || !sameLocalizedText(problem.title, metadata.title)
-    || !sameLocalizedText(problem.track, metadata.track)
-    || JSON.stringify(problem.tags) !== JSON.stringify(metadata.tags)
     || metadataLanguages.some((language) => (
       !problemLanguages.has(language) || typeof problem.scoring.calibration.profiles[language] !== "string"
     ))
@@ -457,13 +429,6 @@ function exactRecord(value: unknown, expectedKeys: readonly string[], label: str
     schemaFailure(`${label} has an invalid shape.`);
   }
   return value as Record<string, unknown>;
-}
-
-function projectionDigest(value: unknown): string {
-  if (!isRecord(value) || typeof value.digest !== "string" || !SHA256_PATTERN.test(value.digest)) {
-    throw new ManagedProblemCollectionError("The contest-public content digest binding is invalid.", "schema");
-  }
-  return value.digest;
 }
 
 function parseUtf8Json(bytes: Uint8Array, label: "metadata" | "content"): unknown {

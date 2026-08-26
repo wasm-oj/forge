@@ -18,10 +18,10 @@ type ProblemLeaderboardLoadState =
   | { readonly key: string; readonly response: ProblemLeaderboardResponse }
   | { readonly key: string; readonly error: string };
 
-export function problemLeaderboardApiPath(problemVersionId: string, language: BuiltinLanguage | "all"): string {
+export function problemLeaderboardApiPath(problemId: string, language: BuiltinLanguage | "all"): string {
   const parameters = new URLSearchParams({ limit: "100" });
   if (language !== "all") parameters.set("language", language);
-  return `/api/problems/${encodeURIComponent(problemVersionId)}/leaderboard?${parameters.toString()}`;
+  return `/api/problems/${encodeURIComponent(problemId)}/leaderboard?${parameters.toString()}`;
 }
 
 export function ProblemLeaderboardView({
@@ -70,21 +70,21 @@ export function ProblemLeaderboardView({
 }
 
 export function ProblemLeaderboard({
-  problemVersionId,
+  problemId,
   locale,
   refreshKey,
 }: {
-  readonly problemVersionId: string;
+  readonly problemId: string;
   readonly locale: ProblemLocale;
   readonly refreshKey?: string;
 }) {
   const [language, setLanguage] = useState<BuiltinLanguage | "all">("all");
   const [loadState, setLoadState] = useState<ProblemLeaderboardLoadState>();
-  const requestKey = `${problemVersionId}:${language}:${refreshKey ?? "initial"}`;
+  const requestKey = `${problemId}:${language}:${refreshKey ?? "initial"}`;
 
   useEffect(() => {
     const controller = new AbortController();
-    void wasmOjJson<ProblemLeaderboardResponse>(problemLeaderboardApiPath(problemVersionId, language), {
+    void wasmOjJson<ProblemLeaderboardResponse>(problemLeaderboardApiPath(problemId, language), {
       signal: controller.signal,
     }).then((value) => {
       if (controller.signal.aborted) return;
@@ -94,7 +94,7 @@ export function ProblemLeaderboard({
       setLoadState({ key: requestKey, error: reason instanceof Error ? reason.message : String(reason) });
     });
     return () => controller.abort();
-  }, [language, problemVersionId, requestKey]);
+  }, [language, problemId, requestKey]);
 
   const current = loadState?.key === requestKey ? loadState : undefined;
 

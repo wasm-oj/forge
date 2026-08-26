@@ -4,17 +4,61 @@ import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import test from "node:test";
-import {
-  LEGACY_ERASURE_RECEIPT_SCHEMA,
-  buildLegacyErasureReceiptStageSql,
-  parseExactLegacyErasureReceipt,
-} from "./architecture-reset-preflight.mjs";
-
 const MIGRATION = "0017_architecture_reset.sql";
 const NOW = "2026-08-12T00:00:00.000Z";
+const LEGACY_ERASURE_RECEIPT_SCHEMA = "forge-account-erasure-receipt-v1";
 const uuid = (suffix) => `00000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`;
 const digest = (character) => character.repeat(64);
 const gitSha = (character) => character.repeat(40);
+
+function sqlString(value) {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function parseExactLegacyErasureReceipt(row, bytesValue) {
+  const bytes = Buffer.from(bytesValue);
+  if (createHash("sha256").update(bytes).digest("hex") !== row.receipt_sha256) {
+    throw new Error("Legacy erasure receipt bytes do not match the D1 SHA-256.");
+  }
+  const receiptJson = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  const receipt = JSON.parse(receiptJson);
+  if (receiptJson !== `${JSON.stringify(receipt)}\n`
+    || receipt.schema !== LEGACY_ERASURE_RECEIPT_SCHEMA
+    || receipt.anonymousUserId !== row.anonymous_user_id
+    || receipt.erasedAt !== row.erased_at
+    || (row.record_kind === "job" && receipt.jobId !== row.record_id)) {
+    throw new Error("Legacy erasure receipt does not match its exact D1 identity.");
+  }
+  return Object.freeze({ ...row, receipt_json: receiptJson });
+}
+
+function buildLegacyErasureReceiptStageSql(records) {
+  return `DROP TABLE IF EXISTS architecture_reset_erasure_receipts;
+CREATE TABLE architecture_reset_erasure_receipts (
+  record_kind TEXT NOT NULL CHECK (record_kind IN ('job', 'tombstone')),
+  record_id TEXT NOT NULL,
+  anonymous_user_id TEXT NOT NULL,
+  erased_at TEXT NOT NULL,
+  receipt_r2_key TEXT NOT NULL,
+  receipt_json TEXT NOT NULL CHECK (
+    json_valid(receipt_json)
+    AND substr(receipt_json, -1) = char(10)
+    AND json_extract(receipt_json, '$.schema') IS 'forge-account-erasure-receipt-v1'
+    AND json_extract(receipt_json, '$.anonymousUserId') IS anonymous_user_id
+    AND json_extract(receipt_json, '$.erasedAt') IS erased_at
+    AND (record_kind <> 'job' OR json_extract(receipt_json, '$.jobId') IS record_id)
+  ),
+  receipt_sha256 TEXT NOT NULL,
+  PRIMARY KEY (record_kind, record_id)
+) STRICT;
+${records.map((record) => `INSERT INTO architecture_reset_erasure_receipts (
+  record_kind, record_id, anonymous_user_id, erased_at, receipt_r2_key,
+  receipt_json, receipt_sha256
+) VALUES (${sqlString(record.record_kind)}, ${sqlString(record.record_id)},
+  ${sqlString(record.anonymous_user_id)}, ${sqlString(record.erased_at)},
+  ${sqlString(record.receipt_r2_key)}, ${sqlString(record.receipt_json)},
+  ${sqlString(record.receipt_sha256)});`).join("\n")}`;
+}
 
 function apply(database, filename) {
   database.exec(readFileSync(path.join(process.cwd(), "migrations/core", filename), "utf8"));
@@ -860,4 +904,140 @@ test("architecture reset preserves authority state and enforces the v2 consisten
     .run(anonymousUser, uuid(1));
   assert.equal(database.prepare("SELECT user_id FROM rejudge_jobs WHERE id=?").get(job).user_id, anonymousUser);
   assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
+});
+
+test("repository-source cutover preserves terminal practice history and removes release/publication authority", () => {
+  const database = legacyDatabase();
+  seedPreservedIdentity(database);
+  apply(database, MIGRATION);
+  apply(database, "0018_cli_auth.sql");
+  const ids = seedCatalog(database);
+  const emptyDuplicateCollection = uuid(304);
+  database.prepare(`INSERT INTO problem_collections (
+    id, organizer_user_id, github_repository_id, index_path, created_at, updated_at
+  ) VALUES (?, ?, 11, 'collection/unused.json', ?, ?)`)
+    .run(emptyDuplicateCollection, uuid(1), NOW, NOW);
+  const source = uuid(301);
+  const submission = uuid(302);
+  insertSource(database, source);
+  insertSubmission(database, {
+    id: submission,
+    problem: ids.problemA,
+    series: ids.series,
+    semantic: digest("a"),
+    source,
+    release: ids.release,
+  });
+  database.prepare(`INSERT INTO submission_attempts
+    (submission_id, attempt, token_hash, state, started_at, finished_at)
+    VALUES (?, 1, ?, 'succeeded', ?, ?)`).run(submission, digest("e"), NOW, NOW);
+
+  apply(database, "0019_repository_source_truth.sql");
+
+  assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
+  assert.deepEqual({ ...database.prepare("SELECT active_commit_sha FROM catalogs WHERE id=?").get(ids.collection) }, {
+    active_commit_sha: gitSha("b"),
+  });
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM catalogs").get().count, 1);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM catalogs WHERE id=?").get(emptyDuplicateCollection).count, 0);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM problem_revisions WHERE problem_id=?").get(ids.series).count, 2);
+  assert.deepEqual({ ...database.prepare(`SELECT problem_id, catalog_commit, judge_digest
+    FROM submissions WHERE id=?`).get(submission) }, {
+    problem_id: ids.series,
+    catalog_commit: gitSha("a"),
+    judge_digest: digest("a"),
+  });
+  assert.deepEqual({ ...database.prepare(`SELECT runtime_build_id, worker_version_id
+    FROM submission_attempts WHERE submission_id=? AND attempt=1`).get(submission) }, {
+    runtime_build_id: gitSha("9"),
+    worker_version_id: null,
+  });
+  assert.deepEqual({ ...database.prepare(`SELECT stale, judged_commit, active_commit
+    FROM effective_submission_results WHERE origin_submission_id=?`).get(submission) }, {
+    stale: 1,
+    judged_commit: gitSha("a"),
+    active_commit: gitSha("b"),
+  });
+  database.prepare(`INSERT INTO problem_revisions (
+      problem_id, commit_sha, ordinal, title_json, summary_json, practice_enabled,
+      practice_bundle_path, practice_bundle_bytes, practice_bundle_sha256,
+      contest_bundle_path, contest_bundle_bytes, contest_bundle_sha256,
+      judge_package_path, judge_package_bytes, judge_digest, allowed_profiles_json, created_at
+    )
+    SELECT problem_id, ?, ordinal, title_json, summary_json, practice_enabled,
+      practice_bundle_path, practice_bundle_bytes, practice_bundle_sha256,
+      contest_bundle_path, contest_bundle_bytes, contest_bundle_sha256,
+      judge_package_path, judge_package_bytes, judge_digest, allowed_profiles_json, created_at
+    FROM problem_revisions WHERE problem_id=? AND commit_sha=?`)
+    .run(gitSha("c"), ids.series, gitSha("a"));
+  database.prepare("UPDATE catalogs SET active_commit_sha=? WHERE id=?").run(gitSha("c"), ids.collection);
+  assert.deepEqual({ ...database.prepare(`SELECT stale, judged_commit, active_commit
+    FROM effective_submission_results WHERE origin_submission_id=?`).get(submission) }, {
+    stale: 0,
+    judged_commit: gitSha("a"),
+    active_commit: gitSha("c"),
+  });
+  database.prepare("UPDATE catalogs SET active_commit_sha=? WHERE id=?").run(gitSha("b"), ids.collection);
+  const removed = new Set([
+    "wasm_oj_releases", "wasm_oj_active_releases", "collection_revisions",
+    "catalog_publications", "catalog_publish_jobs", "problem_versions",
+    "official_practice_heads", "judge_packages", "problem_version_lineages",
+  ]);
+  const tables = new Set(database.prepare("SELECT name FROM sqlite_schema WHERE type='table'").all().map((row) => row.name));
+  for (const table of removed) assert.equal(tables.has(table), false, `retained ${table}`);
+});
+
+test("repository-source cutover uses only Cloudflare D1 persistent schemas", () => {
+  const source = readFileSync(
+    path.join(process.cwd(), "migrations/core/0019_repository_source_truth.sql"),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /\bCREATE\s+TEMP(?:ORARY)?\s+TABLE\b/iu);
+  assert.doesNotMatch(source, /\bPRAGMA\s+optimize\b/iu);
+  for (const table of [
+    "repository_cutover_version_map",
+    "repository_cutover_active_commits",
+    "repository_cutover_kept_revisions",
+    "repository_cutover_effective",
+  ]) {
+    assert.match(source, new RegExp(`CREATE TABLE ${table}\\b`, "u"));
+    assert.match(source, new RegExp(`DROP TABLE ${table}\\b`, "u"));
+  }
+});
+
+test("repository-source cutover aborts when any contest exists", () => {
+  const database = legacyDatabase();
+  seedPreservedIdentity(database);
+  apply(database, MIGRATION);
+  apply(database, "0018_cli_auth.sql");
+  const ids = seedCatalog(database);
+  database.prepare(`INSERT INTO contests (
+    id, organizer_user_id, catalog_publication_id, title, description, access_mode,
+    starts_at, ends_at, status, created_at, updated_at
+  ) VALUES (?, ?, ?, 'Existing contest', '', 'public', ?, '2026-08-13T00:00:00.000Z',
+    'draft', ?, ?)`).run(uuid(303), uuid(1), ids.contestPublicationA, NOW, NOW, NOW);
+  assert.throws(() => apply(database, "0019_repository_source_truth.sql"), /CHECK constraint failed/);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM contests").get().count, 1);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM sqlite_schema WHERE name='catalogs'").get().count, 0);
+});
+
+test("repository-source cutover aborts instead of merging two material catalogs", () => {
+  const database = legacyDatabase();
+  seedPreservedIdentity(database);
+  apply(database, MIGRATION);
+  apply(database, "0018_cli_auth.sql");
+  seedCatalog(database);
+  const secondCollection = uuid(305);
+  database.prepare(`INSERT INTO problem_collections (
+    id, organizer_user_id, github_repository_id, index_path, created_at, updated_at
+  ) VALUES (?, ?, 11, 'collection/second.json', ?, ?)`)
+    .run(secondCollection, uuid(1), NOW, NOW);
+  database.prepare(`INSERT INTO problem_series (
+    id, collection_id, problem_slug, created_at
+  ) VALUES (?, ?, 'second-problem', ?)`)
+    .run(uuid(306), secondCollection, NOW);
+
+  assert.throws(() => apply(database, "0019_repository_source_truth.sql"), /CHECK constraint failed/);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM problem_collections").get().count, 2);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM sqlite_schema WHERE name='catalogs'").get().count, 0);
 });

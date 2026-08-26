@@ -7,8 +7,6 @@ import { workflowStatusOrUnknown } from "./workflow-instance-status";
 
 interface ClaimedSubmission {
   readonly id: string;
-  readonly wasm_oj_release_id: string;
-  readonly wasm_oj_manifest_sha256: string;
   readonly attempt: number;
 }
 
@@ -44,7 +42,7 @@ const CLAIM_OLDEST_SUBMISSION_SQL = `UPDATE submissions
      SELECT COUNT(*) FROM submissions
       WHERE state IN ('preparing','compiling','running','finalizing')
    ) < ${capacity.submission.globalActive}
- RETURNING id, wasm_oj_release_id, wasm_oj_manifest_sha256,
+ RETURNING id,
    (SELECT MAX(attempt) FROM submission_attempts WHERE submission_id=submissions.id) AS attempt`;
 
 export async function claimOldestSubmission(env: WasmOjWorkerEnv, now = new Date()): Promise<ClaimedSubmission | null> {
@@ -56,8 +54,6 @@ async function deliverClaimedSubmission(env: WasmOjWorkerEnv, claimed: ClaimedSu
   const parameters = {
     submissionId: claimed.id,
     attempt: claimed.attempt,
-    expectedReleaseId: claimed.wasm_oj_release_id,
-    expectedManifestSha256: claimed.wasm_oj_manifest_sha256,
   } satisfies SubmissionWorkflowParameters;
   const timestamp = now.toISOString();
   const recordDeferred = async (error: unknown, incrementAttempts: boolean): Promise<void> => {
@@ -132,8 +128,7 @@ export async function dispatchSubmissionJobs(env: WasmOjWorkerEnv, maximum = cap
 }
 
 export async function redeliverClaimedSubmission(env: WasmOjWorkerEnv, submissionId: string): Promise<boolean> {
-  const claimed = await env.DB.prepare(`SELECT submissions.id, submissions.wasm_oj_release_id,
-      submissions.wasm_oj_manifest_sha256,
+  const claimed = await env.DB.prepare(`SELECT submissions.id,
       (SELECT MAX(attempt) FROM submission_attempts WHERE submission_id=submissions.id) AS attempt
     FROM submissions
     JOIN workflow_outbox ON workflow_outbox.submission_id=submissions.id

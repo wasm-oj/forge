@@ -151,7 +151,7 @@ function PerformancePlot({
       const rightAttempt = Number(right.label.slice(1));
       return leftAttempt - rightAttempt;
     });
-  const arrowId = `performance-arrow-${response.context.problemVersionId.replaceAll("-", "")}`;
+  const arrowId = `performance-arrow-${response.context.problemId.replaceAll("-", "")}`;
   const innerWidth = CHART.width - CHART.left - CHART.right;
   const innerHeight = CHART.height - CHART.top - CHART.bottom;
   const ticks = [0, 0.25, 0.5, 0.75, 1] as const;
@@ -379,12 +379,12 @@ export function PerformanceLabView({
 }
 
 function PerformanceLabController({
-  problemVersionId,
+  problemId,
   contestId,
   locale,
   refreshKey,
 }: {
-  readonly problemVersionId: string;
+  readonly problemId: string;
   readonly contestId?: string;
   readonly locale: ProblemLocale;
   readonly refreshKey?: string;
@@ -393,12 +393,12 @@ function PerformanceLabController({
   const [loadState, setLoadState] = useState<PerformanceLoadState>();
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string>();
   const [policyState, setPolicyState] = useState<PolicyLoadState>();
-  const requestKey = `${problemVersionId}:${contestId ?? "practice"}:${language}:${refreshKey ?? "initial"}`;
+  const requestKey = `${problemId}:${contestId ?? "practice"}:${language}:${refreshKey ?? "initial"}`;
 
   useEffect(() => {
     const controller = new AbortController();
-    void wasmOjJson<unknown>(problemPerformanceApiPath(problemVersionId, language, contestId), { signal: controller.signal })
-      .then((value) => parseProblemPerformanceResponse(value, { problemVersionId, contestId, language }))
+    void wasmOjJson<unknown>(problemPerformanceApiPath(problemId, language, contestId), { signal: controller.signal })
+      .then((value) => parseProblemPerformanceResponse(value, { problemId, contestId, language }))
       .then((response) => {
         if (controller.signal.aborted) return;
         setLoadState({ key: requestKey, response });
@@ -418,7 +418,7 @@ function PerformanceLabController({
         setLoadState({ key: requestKey, error: reason instanceof Error ? reason.message : String(reason) });
       });
     return () => controller.abort();
-  }, [contestId, language, problemVersionId, refreshKey, requestKey]);
+  }, [contestId, language, problemId, refreshKey, requestKey]);
 
   const current = loadState?.key === requestKey ? loadState : undefined;
   const response = current && "response" in current ? current.response : undefined;
@@ -462,15 +462,15 @@ function PerformanceLabController({
 }
 
 export function PerformanceLab(props: {
-  readonly problemVersionId: string;
+  readonly problemId: string;
   readonly contestId?: string;
   readonly locale: ProblemLocale;
   readonly refreshKey?: string;
 }) {
-  const identity = performanceLabIdentity(props.problemVersionId, props.contestId);
+  const identity = performanceLabIdentity(props.problemId, props.contestId);
   return <PerformanceLabController key={identity} {...props} />;
 }
 
-export function performanceLabIdentity(problemVersionId: string, contestId?: string): string {
-  return `${problemVersionId}:${contestId ?? "practice"}`;
+export function performanceLabIdentity(problemId: string, contestId?: string): string {
+  return `${problemId}:${contestId ?? "practice"}`;
 }

@@ -3,18 +3,15 @@ import type { JudgeProblem } from "../judge/problem-model.ts";
 
 export const CONTEST_PUBLIC_PROJECTION_SCHEMA = "wasm-oj-platform/contest-public-problem-projection/v1";
 
-const SHA256 = /^[0-9a-f]{64}$/;
-
 export interface ContestPublicProjection {
   readonly schema: typeof CONTEST_PUBLIC_PROJECTION_SCHEMA;
   readonly problem: JudgeProblem;
-  readonly digest: string;
 }
 
 /**
- * The bundle referenced by collection/index.json is safe to fetch for every
- * practice visitor. Hidden cases and their expected answers exist only in the
- * immutable judge package built from the authoring source.
+ * The repository practice bundle is safe to fetch for every practice visitor.
+ * Hidden cases and their expected answers exist only in the immutable judge
+ * package built from the authoring source.
  */
 export function derivePracticePublic(authored: JudgeProblem): JudgeProblem {
   return {
@@ -39,17 +36,13 @@ export function deriveContestPublic(practice: JudgeProblem): JudgeProblem {
   };
 }
 
-export function createContestPublicProjection(practice: JudgeProblem, problemBundleSha256: string): ContestPublicProjection {
-  if (typeof problemBundleSha256 !== "string" || !SHA256.test(problemBundleSha256)) {
-    throw new TypeError("Contest-public projection digest must be a lowercase SHA-256 digest.");
-  }
+export function createContestPublicProjection(practice: JudgeProblem): ContestPublicProjection {
   return {
     schema: CONTEST_PUBLIC_PROJECTION_SCHEMA,
     problem: deriveContestPublic(practice),
-    digest: problemBundleSha256,
   };
 }
 
-export function contestPublicProjectionBytes(practice: JudgeProblem, problemBundleSha256: string): Uint8Array {
-  return canonicalJsonBytes(createContestPublicProjection(practice, problemBundleSha256));
+export function contestPublicProjectionBytes(practice: JudgeProblem): Uint8Array {
+  return canonicalJsonBytes(createContestPublicProjection(practice));
 }

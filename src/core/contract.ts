@@ -27,7 +27,6 @@ export const WASM_OJ_SCHEMAS = Object.freeze({
   objectCache: `${WASM_OJ_CONTRACT_ID}/object-cache`,
   pythonToolchain: `${WASM_OJ_CONTRACT_ID}/python-toolchain`,
   replayBundle: `${WASM_OJ_CONTRACT_ID}/replay-bundle`,
-  releaseManifest: `${WASM_OJ_CONTRACT_ID}/release-manifest`,
   rustToolchain: `${WASM_OJ_CONTRACT_ID}/rust-toolchain`,
   runRequest: `${WASM_OJ_CONTRACT_ID}/run-request`,
   runtimeBundle: `${WASM_OJ_CONTRACT_ID}/runtime-bundle`,

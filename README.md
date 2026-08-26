@@ -40,7 +40,7 @@ browser server  organizer
 | `@wasm-oj/core` | Host-neutral `Engine`, compiler and runner contracts, judge, dependency, replay, and conformance logic |
 | `@wasm-oj/browser` | Browser Workers, IndexedDB/Cache Storage adapters, and `createBrowserEngine()` |
 | `@wasm-oj/server` | Node.js/Wasmer adapters, filesystem storage, native runtime processes, and `createServerEngine()` |
-| `@wasm-oj/organizer` | Static collection and immutable judge-package validation/publication; never compiles or runs reference solutions |
+| `@wasm-oj/organizer` | Repository manifest, public projection, and immutable judge-package validation; never compiles or runs reference solutions |
 | `@wasm-oj/cli` | The local-first `woj` Student/Organizer interface; explicit local runtime/toolchain commands and authenticated remote resource commands |
 | `@wasm-oj/sdk` | Convenience entrypoints that re-export the packages above without embedding duplicate copies |
 
@@ -80,7 +80,7 @@ separate and explicit in either form.
 ## Browser host
 
 Deploy each installed toolchain package's exported `assets/` directory to an HTTP directory. A
-single directory may contain all five packages when filenames remain unchanged.
+single directory may contain every toolchain package when filenames remain unchanged.
 
 ```ts
 import { createBrowserEngine } from "@wasm-oj/browser";
@@ -119,6 +119,19 @@ if (build.artifact) {
 
 engine.dispose();
 ```
+
+`@wasm-oj/browser` resolves its own workers and WebAssembly modules at runtime through
+`new URL("../assets/", import.meta.url)`, so a bundler cannot see them and will not emit them.
+Copy the installed package's `dist/assets/` directory into the `assets/` directory beside the
+built entry chunk:
+
+```sh
+cp node_modules/@wasm-oj/browser/dist/assets/* dist/assets/
+```
+
+Without this the page loads and then fails on the first compile with
+`failed to fetch Wasm: 404 Not Found`. Vite reports the same requirement at build time as a
+`doesn't exist at build time, it will remain unchanged to be resolved at runtime` warning.
 
 The page must be cross-origin isolated. Serve documents with COOP `same-origin`, COEP
 `require-corp`, and CORP `same-origin`; CSP must permit `worker-src 'self' blob:`. Toolchain
@@ -173,20 +186,21 @@ pnpm add -D @wasm-oj/cli
 pnpm exec woj organizer collection build .
 pnpm exec woj organizer collection verify .
 pnpm exec woj auth login
-pnpm exec woj organizer collection validate <collection-id> --ref <branch-tag-or-commit> --wait
+pnpm exec woj organizer catalog connect --repo <numeric-repository-id>
+pnpm exec woj organizer catalog sync <catalog-id> --ref <branch-tag-or-commit> --wait
 ```
 
-`build` and `verify` are deterministic local preflight. Remote `validate` resolves the requested ref
-once and statically validates that immutable commit; it never compiles or runs a reference
-solution. Publication and official-practice activation are separate explicit commands. See the
+`build` and `verify` are deterministic local preflight. Remote `sync` resolves the requested ref
+once, validates that immutable commit, repairs missing judge cache objects, and atomically changes
+the catalog's active commit. It never compiles or runs a reference solution. See the
 [CLI journey](docs/cli.md) for the complete command tree and stable exit-code contract.
 
-The Organizer boundary checks canonical schema, normalized paths, bounded byte lengths, digests,
+The Organizer boundary checks UTF-8 JSON schemas, normalized paths, bounded byte lengths, digests,
 and deployable `WOJJDG02` judge packages. Reference solutions remain author-owned input;
 Organizer does not compile, execute, score, benchmark, or decide whether they are correct.
 
 Official Submit is the execution boundary. It compiles a user's source inside a one-shot Container
-and judges it against the already published immutable package with no public dependency network.
+and judges it against the already synchronized immutable package with no public dependency network.
 
 ## Compatibility contract
 
@@ -253,8 +267,8 @@ Local Build, Run, and Judge remain browser-only. Official Submit accepts canonic
 rebuilds them in a one-shot Container, and scores them against immutable judge data. The server
 ignores client artifacts, limits, verdicts, and hidden-data claims.
 
-Catalog import and publication are static Organizer operations. They validate exact-commit schema,
-paths, sizes, digests, canonical encoding, redaction, and judge-package deployability. They do not
+Catalog build and exact-commit sync are static Organizer operations. They validate schema, paths,
+sizes, digests, UTF-8 JSON, redaction, and judge-package deployability. They do not
 start a Container or evaluate reference solutions. See the [Cloudflare Online Judge](docs/cloudflare-online-judge.md)
 and [production deployment](docs/cloudflare-deployment-plan.md) guides.
 

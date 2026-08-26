@@ -1,16 +1,16 @@
 name: Verify WASM-OJ problem collection
-description: Verify canonical collection schema, byte lengths, digests, revision, and publication output.
+description: Verify repository manifests, public projections, digests, and deployable judge packages.
 inputs:
   version:
     description: Exact @wasm-oj/cli release containing the collection contract.
     required: false
     default: 0.2.0
   root:
-    description: Repository root containing collection/index.json.
+    description: Repository root containing wasm-oj.json.
     required: false
     default: .
-  managed:
-    description: Optional managed contract path; use collection/managed.json for publishable collections.
+  source:
+    description: Optional repository authoring input path.
     required: false
     default: ""
 runs:
@@ -21,10 +21,10 @@ runs:
       env:
         WASM_OJ_ACTION_PACKAGE: "@wasm-oj/cli@${{ inputs.version }}"
         WASM_OJ_ACTION_ROOT: "${{ inputs.root }}"
-        WASM_OJ_ACTION_MANAGED: "${{ inputs.managed }}"
+        WASM_OJ_ACTION_SOURCE: "${{ inputs.source }}"
       run: |
         arguments=(organizer collection verify "$WASM_OJ_ACTION_ROOT")
-        if [[ -n "$WASM_OJ_ACTION_MANAGED" ]]; then
-          arguments+=(--managed "$WASM_OJ_ACTION_MANAGED")
+        if [[ -n "$WASM_OJ_ACTION_SOURCE" ]]; then
+          arguments+=(--source "$WASM_OJ_ACTION_SOURCE")
         fi
         npx --yes --package "$WASM_OJ_ACTION_PACKAGE" -- woj "${arguments[@]}"

@@ -8,7 +8,7 @@ export interface LeaderboardEntryRow {
   readonly achievedAt: string;
   readonly attemptedProblems?: number;
   readonly problemResults?: readonly {
-    readonly problemVersionId: string;
+    readonly problemId: string;
     readonly score: number;
     readonly fullyPassedCases: number;
   }[];
@@ -59,12 +59,12 @@ function entry(row: ProblemLeaderboardRow): LeaderboardEntryRow {
 export async function queryProblemLeaderboard(
   database: D1Database,
   input: {
-    readonly problemVersionId: string;
+    readonly problemId: string;
     readonly language?: string;
     readonly limit: number;
   },
 ): Promise<readonly LeaderboardEntryRow[]> {
-  const bindings: unknown[] = [input.problemVersionId];
+  const bindings: unknown[] = [input.problemId];
   if (input.language) bindings.push(input.language);
   bindings.push(input.limit);
   const rows = await database.prepare(`WITH candidates AS (
@@ -79,7 +79,7 @@ export async function queryProblemLeaderboard(
       FROM effective_submission_results AS effective
       JOIN submissions AS origin ON origin.id=effective.origin_submission_id
       JOIN submissions AS result ON result.id=effective.effective_submission_id
-      WHERE effective.effective_problem_version_id=?
+      WHERE effective.problem_id=?
         AND origin.contest_id IS NULL
         AND ${COMPLETE_RESULT_METRICS}
         ${input.language ? "AND result.language=?" : ""}
@@ -104,10 +104,10 @@ export async function queryProblemLeaderboard(
 }
 
 /**
- * Aggregates contest results by the versions captured in contest_problems.
+ * Aggregates results only for problems in the catalog's active contest revision.
  * The view may point at a later rejudge child, but the public breakdown keeps
- * the contest's immutable version IDs. Freeze eligibility is bound to the
- * immutable origin submission time, never delayed judge completion.
+ * the contest's stable problem IDs. Freeze eligibility is bound to the immutable
+ * origin submission time, never delayed judge completion.
  */
 export async function queryContestLeaderboard(
   database: D1Database,
@@ -121,7 +121,7 @@ export async function queryContestLeaderboard(
       SELECT result.id AS submission_id,
         origin.user_id,
         contest_problem.ordinal,
-        contest_problem.problem_version_id,
+        contest_problem.problem_id,
         result.score,
         result.fully_passed_cases,
         result.deterministic_cost,
@@ -130,16 +130,19 @@ export async function queryContestLeaderboard(
       FROM effective_submission_results AS effective
       JOIN submissions AS origin ON origin.id=effective.origin_submission_id
       JOIN submissions AS result ON result.id=effective.effective_submission_id
-      JOIN contest_problems AS contest_problem
+      JOIN contest_series AS contest ON contest.id=origin.contest_id
+      JOIN catalogs ON catalogs.id=contest.catalog_id
+      JOIN contest_revision_problems AS contest_problem
         ON contest_problem.contest_id=origin.contest_id
-       AND contest_problem.problem_series_id=origin.problem_series_id
+       AND contest_problem.commit_sha=catalogs.active_commit_sha
+       AND contest_problem.problem_id=origin.problem_id
       WHERE origin.contest_id=?
         AND ${COMPLETE_RESULT_METRICS}
         ${input.submittedAtOrBefore ? "AND origin.origin_submitted_at<=?" : ""}
     ), ranked AS (
       SELECT candidates.*,
         ROW_NUMBER() OVER (
-          PARTITION BY user_id, problem_version_id
+          PARTITION BY user_id, problem_id
           ORDER BY score DESC, fully_passed_cases DESC, deterministic_cost ASC,
             peak_memory_bytes ASC, achieved_at ASC, submission_id ASC
         ) AS candidate_rank
@@ -159,12 +162,12 @@ export async function queryContestLeaderboard(
     )
     SELECT aggregates.*,
       (SELECT json_group_array(json_object(
-          'problemVersionId', ordered.problem_version_id,
+          'problemId', ordered.problem_id,
           'score', ordered.score,
           'fullyPassedCases', ordered.fully_passed_cases
         ))
         FROM (
-          SELECT problem_version_id, score, fully_passed_cases
+          SELECT problem_id, score, fully_passed_cases
           FROM effective_results
           WHERE effective_results.user_id=aggregates.user_id
           ORDER BY ordinal
@@ -179,7 +182,7 @@ export async function queryContestLeaderboard(
   return rows.results.map((row) => {
     const problemResults = JSON.parse(row.problem_results_json) as Array<Record<string, unknown>>;
     if (!Array.isArray(problemResults) || problemResults.some((result) => (
-      typeof result.problemVersionId !== "string"
+      typeof result.problemId !== "string"
       || typeof result.score !== "number"
       || !Number.isFinite(result.score)
       || !Number.isSafeInteger(result.fullyPassedCases)
@@ -193,7 +196,7 @@ export async function queryContestLeaderboard(
       achievedAt: row.achieved_at,
       attemptedProblems: row.attempted_problems,
       problemResults: problemResults.map((result) => ({
-        problemVersionId: result.problemVersionId as string,
+        problemId: result.problemId as string,
         score: result.score as number,
         fullyPassedCases: result.fullyPassedCases as number,
       })),

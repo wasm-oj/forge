@@ -6,14 +6,14 @@ import { CliError, usageError } from "./errors";
 import { canonicalizeSystemTemporaryPrefix } from "../path-safety";
 import { atomicWriteFile } from "./files";
 
-export const WOJ_WORKSPACE_SCHEMA = "wasm-oj-cli-workspace-v1";
+export const WOJ_WORKSPACE_SCHEMA = "wasm-oj-cli-workspace-v2";
 export const WORKSPACE_FILE = "woj.json";
 export const LANGUAGES = ["c", "cpp", "rust", "go", "python", "javascript", "typescript"] as const;
 export type WorkspaceLanguage = typeof LANGUAGES[number];
 
 export interface PinnedProblem {
-  readonly problemVersionId: string;
-  readonly catalogPublicationId: string;
+  readonly problemId: string;
+  readonly catalogCommit: string;
   readonly serverOrigin: string;
   readonly contentUrl: string;
   readonly contentSha256: string;
@@ -76,10 +76,10 @@ function parseWorkspaceInternal(value: unknown): WojWorkspace {
   let problem: PinnedProblem | undefined;
   if (workspace.problem !== undefined) {
     const pinned = record(workspace.problem, "Pinned problem");
-    exactKeys(pinned, ["problemVersionId", "catalogPublicationId", "serverOrigin", "contentUrl", "contentSha256", "contentFile", "locale", ...(pinned.contestId === undefined ? [] : ["contestId"])], "Pinned problem");
+    exactKeys(pinned, ["problemId", "catalogCommit", "serverOrigin", "contentUrl", "contentSha256", "contentFile", "locale", ...(pinned.contestId === undefined ? [] : ["contestId"])], "Pinned problem");
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-    if (typeof pinned.problemVersionId !== "string" || !uuid.test(pinned.problemVersionId)) throw new CliError("Pinned problem version ID is invalid.");
-    if (typeof pinned.catalogPublicationId !== "string" || !uuid.test(pinned.catalogPublicationId)) throw new CliError("Pinned catalog publication ID is invalid.");
+    if (typeof pinned.problemId !== "string" || !uuid.test(pinned.problemId)) throw new CliError("Pinned problem ID is invalid.");
+    if (typeof pinned.catalogCommit !== "string" || !/^[0-9a-f]{40}$/.test(pinned.catalogCommit)) throw new CliError("Pinned catalog commit is invalid.");
     let serverOrigin: string;
     try { serverOrigin = new URL(String(pinned.serverOrigin)).origin; } catch { throw new CliError("Pinned server origin is invalid."); }
     if (serverOrigin !== pinned.serverOrigin) throw new CliError("Pinned server origin must be canonical.");
@@ -89,8 +89,8 @@ function parseWorkspaceInternal(value: unknown): WojWorkspace {
     if (pinned.locale !== "zh-TW" && pinned.locale !== "en") throw new CliError("Pinned problem locale is invalid.");
     if (pinned.contestId !== undefined && (typeof pinned.contestId !== "string" || !uuid.test(pinned.contestId))) throw new CliError("Pinned contest ID is invalid.");
     problem = {
-      problemVersionId: pinned.problemVersionId,
-      catalogPublicationId: pinned.catalogPublicationId,
+      problemId: pinned.problemId,
+      catalogCommit: pinned.catalogCommit,
       serverOrigin,
       contentUrl: pinned.contentUrl,
       contentSha256: pinned.contentSha256,

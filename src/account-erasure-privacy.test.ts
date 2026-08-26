@@ -36,6 +36,11 @@ describe("account erasure privacy boundaries", () => {
     expect(erasure).toContain("receipt_sha256");
     expect(erasure).toMatch(/eraseAccount[\s\S]*requireBrowserMutationSession[\s\S]*requireFormalMutationsEnabled[\s\S]*env\.DB\.batch/);
     expect(erasure).toContain("content_sha256=NULL, bytes=NULL");
+    expect(erasure).toContain("UPDATE catalog_sync_jobs");
+    expect(erasure).toContain("catalog_sync_job_id IN");
+    expect(erasure).toContain("UPDATE catalog_sync_jobs SET requested_by=? WHERE requested_by=?");
+    expect(erasure).not.toContain("catalog_validation_jobs");
+    expect(erasure).not.toContain("catalog_publish_jobs");
     expect(erasure).not.toContain("deletion_receipt_r2_key");
     expect(erasure).not.toContain("account-erasure/");
     expect(submissions).toContain("JUDGE_BUCKET.put(key, SOURCE_TOMBSTONE");

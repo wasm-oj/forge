@@ -6,12 +6,10 @@ import {
 } from "./submission-workflow-identity";
 
 const SUBMISSION_ID = "0198dbd3-5c00-7000-8000-000000000301";
-const RELEASE_ID = "0198dbd3-5c00-7000-8000-000000000305";
-const DIGEST = "a".repeat(64);
 const SECRET = "submission-workflow-test-secret-32-bytes-minimum";
 
 function parameters(): SubmissionWorkflowParameters {
-  return { submissionId: SUBMISSION_ID, attempt: 1, expectedReleaseId: RELEASE_ID, expectedManifestSha256: DIGEST };
+  return { submissionId: SUBMISSION_ID, attempt: 1 };
 }
 
 describe("opaque submission Workflow identity", () => {
@@ -23,5 +21,6 @@ describe("opaque submission Workflow identity", () => {
     expect(parseSubmissionWorkflowParameters(parameters())).toEqual(parameters());
     expect(() => parseSubmissionWorkflowParameters({ ...parameters(), attemptToken: token })).toThrow("Workflow reference is invalid");
     expect(() => parseSubmissionWorkflowParameters({ ...parameters(), sourceR2Key: "sources/private" })).toThrow("Workflow reference is invalid");
+    expect(() => parseSubmissionWorkflowParameters({ ...parameters(), expectedBuildId: "a".repeat(40) })).toThrow("Workflow reference is invalid");
   });
 });

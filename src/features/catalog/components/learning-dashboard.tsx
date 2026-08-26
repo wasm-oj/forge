@@ -23,9 +23,9 @@ export function ProblemRow({ problem, collection, locale, localSamplesPassed = f
   return <Link className="problem-row" href={`/problems/${encodeURIComponent(problem.id)}`}>
     <span className={problem.solved ? "problem-status is-solved" : "problem-status"}>{problem.solved ? <CheckCircle2 size={17} /> : <CircleDot size={17} />}</span>
     <span className="problem-number">{String(problem.number).padStart(2, "0")}</span>
-    <span className="problem-title-cell"><strong>{localized(problem.title, locale, problem.slug)}</strong><small>{localized(problem.track, locale, problem.trackId)}{localSamplesPassed && <span className="local-samples-label"> · {locale === "zh-TW" ? "本機範例通過" : "Samples passed locally"}</span>}</small></span>
-    <span className={`difficulty-pill difficulty-${problem.difficulty}`}>{problem.difficulty}</span>
-    <span className="problem-tags">{problem.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</span>
+    <span className="problem-title-cell"><strong>{localized(problem.title, locale, problem.slug)}</strong><small>{localized(problem.summary, locale, problem.slug)}{localSamplesPassed && <span className="local-samples-label"> · {locale === "zh-TW" ? "本機範例通過" : "Samples passed locally"}</span>}</small></span>
+    <span className="difficulty-pill">practice</span>
+    <span className="problem-tags"><span>{problem.judgeDigest.slice(0, 10)}</span></span>
     <span className="problem-score">{problem.bestScore ?? (problem.solved ? problem.maximumScore : "—")}</span>
     <ChevronRight size={16} />
     <span className="sr-only">{collection.repository.owner}/{collection.repository.name}</span>

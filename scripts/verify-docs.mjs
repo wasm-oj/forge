@@ -188,11 +188,12 @@ for (const entry of await readdir(path.join(root, "public/toolchains"), { withFi
 const problemCatalog = await readFile(path.join(root, "docs/problem-catalog.md"), "utf8");
 for (const required of [
   "woj organizer collection build",
-  "woj organizer collection validate",
+  "woj organizer catalog sync",
   ".github/actions/woj/action.yml",
   "@wasm-oj/cli@0.2.0",
-  "wasm-oj-platform/managed-collection-source/v1",
-  "wasm-oj-platform/managed-collection/v2",
+  "wasm-oj-platform/repository/v1",
+  "wasm-oj-platform/problems/v1",
+  "wasm-oj-platform/contests/v1",
   "WOJJDG02",
 ]) {
   if (!problemCatalog.includes(required)) {
@@ -245,18 +246,12 @@ for (const required of [
   "X-WASM-OJ-CSRF: $WASM_OJ_CUTOVER_ADMIN_CSRF",
   "wasm_oj_session=$WASM_OJ_CUTOVER_ADMIN_SESSION",
   "wasm_oj_csrf=$WASM_OJ_CUTOVER_ADMIN_CSRF",
-  "X-WASM-OJ-Maintenance-Smoke-Token",
-  "WASM_OJ_ARCHITECTURE_RESET_TOKEN",
-  "WASM_OJ_PRODUCTION_RELEASE_REQUEST_BASE64",
-  "WASM_OJ_V2_ACTIVATION_REQUEST_BASE64",
-  "scripts/generate-production-release-inputs.mjs",
-  "scripts/prepare-production-release.mjs",
-  "scripts/verify-oci-release-image.mjs",
-  "scripts/configure-production-release.mjs",
+  "Authorization: Bearer $MAINTENANCE_SMOKE_TOKEN",
+  "scripts/render-production-config.mjs",
+  "scripts/production-migrations.mjs",
   "scripts/wait-container-rollout.mjs",
-  "wasm_oj_active_releases",
-  "architecture-v2-production-smoke-passed",
-  "enabled: true",
+  "repository-source-truth-production-smoke-passed",
+  "0019_repository_source_truth.sql",
 ]) {
   if (!deploymentPlan.includes(required)) {
     throw new Error(`docs/cloudflare-deployment-plan.md does not document the executable cutover contract '${required}'.`);

@@ -72,7 +72,8 @@ export interface OfficialSourceFile {
 }
 
 export interface OfficialSubmissionRequest {
-  readonly problemVersionId: string;
+  readonly problemId: string;
+  readonly catalogCommit: string;
   readonly contestId?: string;
   readonly language: BuiltinLanguage;
   readonly target: TargetAbi;
@@ -176,7 +177,8 @@ function decodedSourceBytes(file: OfficialSourceFile): number {
 export function parseOfficialSubmissionRequest(value: unknown): OfficialSubmissionRequest {
   if (!isRecord(value)) throw new TypeError("Submission request must be an object.");
   exactKeys(value, [
-    "problemVersionId",
+    "problemId",
+    "catalogCommit",
     "language",
     "target",
     "optimization",
@@ -184,7 +186,10 @@ export function parseOfficialSubmissionRequest(value: unknown): OfficialSubmissi
     "sourceFiles",
     "idempotencyKey",
   ], ["contestId"], "Submission request");
-  const problemVersionId = uuid(value.problemVersionId, "problemVersionId");
+  const problemId = uuid(value.problemId, "problemId");
+  if (typeof value.catalogCommit !== "string" || !/^[0-9a-f]{40}$/.test(value.catalogCommit)) {
+    throw new TypeError("catalogCommit must be a 40-character lowercase Git commit SHA.");
+  }
   const contestId = value.contestId === undefined ? undefined : uuid(value.contestId, "contestId");
   assertLanguageIdentifier(value.language);
   if (!isBuiltinLanguage(value.language)) throw new TypeError("language is unsupported for official judging.");
@@ -217,7 +222,8 @@ export function parseOfficialSubmissionRequest(value: unknown): OfficialSubmissi
     throw new TypeError("idempotencyKey is invalid.");
   }
   return {
-    problemVersionId,
+    problemId,
+    catalogCommit: value.catalogCommit,
     ...(contestId ? { contestId } : {}),
     language,
     target: value.target,

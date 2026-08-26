@@ -20,8 +20,10 @@ coverage/
 **/.wasm-oj-toolchain-*/
 .*-candidate-worker.tar
 output/
+release-tarballs/
 **/target/
 __pycache__/
 *.pyc
 *.tsbuildinfo
+*.shadow.md
 .DS_Store

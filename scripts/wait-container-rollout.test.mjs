@@ -3,13 +3,16 @@ import test from "node:test";
 
 import {
   assessContainerRollout,
+  containerRolloutBaseline,
   configuredContainerRolloutTarget,
   inspectContainerRollout,
+  parseContainerRolloutBaseline,
   waitForContainerRollout,
 } from "./wait-container-rollout.mjs";
 
-const image = `registry.cloudflare.com/account/submission:release-1@sha256:${"a".repeat(64)}`;
-const target = Object.freeze({ className: "SubmissionJudgeContainer", image, name: "submission-production" });
+const image = `registry.cloudflare.com/account/submission@sha256:${"a".repeat(64)}`;
+const nextImage = `registry.cloudflare.com/account/submission@sha256:${"b".repeat(64)}`;
+const target = Object.freeze({ className: "SubmissionJudgeContainer", name: "submission-production" });
 const applicationId = "a0341d3a-33dc-469a-a7ac-26061efd46db";
 
 function readyFixture(overrides = {}) {
@@ -38,18 +41,23 @@ function readyFixture(overrides = {}) {
     { id: "historical", state: "inactive", version: null },
     { id: "current", state: "running", version: 14 },
   ];
-  return { assessment: assessContainerRollout(target, summary, info, instances), info, instances, summary };
+  return {
+    assessment: assessContainerRollout(target, summary, info, instances, overrides.baseline ?? null),
+    info,
+    instances,
+    summary,
+  };
 }
 
-test("configured target requires the one exact tag@digest Container", () => {
+test("configured target requires one repository-built Container", () => {
   assert.deepEqual(configuredContainerRolloutTarget({ containers: [{
     class_name: target.className,
-    image,
+    image: "./Dockerfile",
     name: target.name,
   }] }), target);
   assert.throws(
     () => configuredContainerRolloutTarget({ containers: [{ ...target, class_name: target.className, image: "repo:latest" }] }),
-    /exact tag@sha256 digest/u,
+    /built from \.\/Dockerfile/u,
   );
   assert.throws(() => configuredContainerRolloutTarget({ containers: [] }), /exactly one/u);
 });
@@ -62,7 +70,36 @@ test("ready assessment accepts inactive history and exact live version", () => {
   assert.deepEqual(result.reasons, []);
 });
 
-test("assessment rejects non-terminal health, image drift, and an old live instance", () => {
+test("baseline requires the deploy to advance the exact application and image", () => {
+  const captured = containerRolloutBaseline(target, readyFixture(), "2026-08-26T00:00:00.000Z");
+  const baseline = parseContainerRolloutBaseline(target, captured);
+  assert.deepEqual(baseline, { applicationId, image, version: 14 });
+
+  const unchanged = readyFixture({ baseline }).assessment;
+  assert.equal(unchanged.ready, false);
+  assert.match(unchanged.reasons.join("\n"), /has not advanced past baseline 14/u);
+  assert.match(unchanged.reasons.join("\n"), /image has not changed/u);
+
+  const advanced = readyFixture({
+    baseline,
+    info: { configuration: { image: nextImage }, version: 15 },
+    instances: [{ id: "current", state: "running", version: 15 }],
+    summary: { image: nextImage, version: 15 },
+  }).assessment;
+  assert.equal(advanced.ready, true);
+});
+
+test("assessment rejects an active rollout and inconsistent image queries", () => {
+  const result = readyFixture({
+    info: { active_rollout_id: "79699b91-24b1-49d8-be4d-bb280af0b594" },
+    summary: { image: nextImage },
+  }).assessment;
+  assert.equal(result.ready, false);
+  assert.match(result.reasons.join("\n"), /image changed between queries/u);
+  assert.match(result.reasons.join("\n"), /still has an active rollout/u);
+});
+
+test("assessment rejects non-terminal health and an old live instance", () => {
   const result = readyFixture({
     summary: { image: image.replace(/a{64}$/u, "b".repeat(64)), state: "active" },
     info: {
@@ -74,7 +111,6 @@ test("assessment rejects non-terminal health, image drift, and an old live insta
     instances: [{ id: "old", state: "running", version: 13 }],
   }).assessment;
   assert.equal(result.ready, false);
-  assert.match(result.reasons.join("\n"), /exact configured digest/u);
   assert.match(result.reasons.join("\n"), /not ready/u);
   assert.match(result.reasons.join("\n"), /health contains errors/u);
   assert.match(result.reasons.join("\n"), /healthy instance count 6/u);

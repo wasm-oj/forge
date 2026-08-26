@@ -25,8 +25,7 @@ import {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const TERMINAL_SUBMISSION_STATES = new Set(["completed", "compile-error", "judge-error", "infrastructure-error", "cancelled"]);
-const TERMINAL_VALIDATION_STATES = new Set(["valid", "invalid", "infrastructure-error"]);
-const TERMINAL_PUBLICATION_STATES = new Set(["published", "failed"]);
+const TERMINAL_SYNC_STATES = new Set(["succeeded", "failed"]);
 const TERMINAL_REJUDGE_STATES = new Set(["effective", "failed", "cancelled"]);
 
 export interface CommandDependencies {
@@ -87,12 +86,6 @@ async function runInput(command: ParsedCommand, cwd: string): Promise<string | u
   const bytes = new Uint8Array(await readFile(file));
   try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
   catch (error) { throw new CliError("--input is not valid UTF-8.", { exitCode: 7, code: "input-file-invalid", cause: error }); }
-}
-
-function canonicalTimestamp(value: string | undefined, label: string): string | undefined {
-  if (value === undefined) return undefined;
-  if (Number.isNaN(Date.parse(value)) || new Date(value).toISOString() !== value) throw usageError(`--${label} must be a canonical ISO timestamp.`);
-  return value;
 }
 
 function canonicalCursorTimestamp(value: string, label: string): string {
@@ -267,15 +260,18 @@ async function retryTurnstile<T>(action: () => Promise<T>, dependencies: Command
   throw new CliError("Browser verification did not complete before the CLI deadline.", { exitCode: 3, code: "turnstile-expired" });
 }
 
-async function exactPublicProblem(client: RemoteClient, problemVersionId: string, contestId?: string): Promise<{
+async function exactPublicProblem(client: RemoteClient, problemId: string, contestId?: string): Promise<{
   readonly metadata: Record<string, unknown>;
   readonly content: Record<string, unknown>;
   readonly bytes: Uint8Array;
   readonly problem: ReturnType<typeof parsePublicProblem>;
 }> {
-  const metadataPath = `/api/problems/${problemVersionId}${query({ contestId })}`;
+  const metadataPath = `/api/problems/${problemId}${query({ contestId })}`;
   const metadata = object(await client.request(metadataPath, { authenticated: contestId ? true : "optional" }), "problem metadata");
-  if (metadata.problemVersionId !== problemVersionId || metadata.schema !== "wasm-oj-platform/problem-content-pointer/v2") throw new CliError("Problem metadata identity is invalid.", { exitCode: 4 });
+  if (metadata.problemId !== problemId || metadata.schema !== "wasm-oj-platform/problem-content-pointer/v1"
+    || typeof metadata.catalogCommit !== "string" || !/^[0-9a-f]{40}$/.test(metadata.catalogCommit)) {
+    throw new CliError("Problem metadata identity is invalid.", { exitCode: 4 });
+  }
   const content = object(metadata.content, "problem content pointer");
   const contentUrl = field(content, "url", "problem content URL");
   const contentSha256 = field(content, "sha256", "problem content digest");
@@ -287,7 +283,7 @@ async function exactPublicProblem(client: RemoteClient, problemVersionId: string
 
 function localizedList(value: unknown, locale: "zh-TW" | "en"): unknown {
   const response = object(value, "problem list");
-  const collections = array(response.collections, "problem collections").map((collectionValue) => {
+  const catalogs = array(response.catalogs, "problem catalogs").map((collectionValue) => {
     const collection = object(collectionValue, "problem collection");
     const problems = array(collection.problems, "collection problems").map((problemValue) => {
       const problem = object(problemValue, "problem summary");
@@ -298,20 +294,20 @@ function localizedList(value: unknown, locale: "zh-TW" | "en"): unknown {
     });
     return { ...collection, problems };
   });
-  return { ...response, locale, collections };
+  return { ...response, locale, catalogs };
 }
 
 async function problemPull(command: ParsedCommand, dependencies: CommandDependencies, client: RemoteClient): Promise<CommandOutcome> {
-  const [problemVersionId, directory = "."] = exactPositionals(command, 1, 2);
-  uuid(problemVersionId!, "problem-version-id");
+  const [problemId, directory = "."] = exactPositionals(command, 1, 2);
+  uuid(problemId!, "problem-id");
   const contestId = stringOption(command, "contest");
   if (contestId) uuid(contestId, "contest");
   const locale = localeOption(command);
   const language = stringOption(command, "language");
   if (!language || !LANGUAGES.includes(language as WorkspaceLanguage)) throw usageError("problem pull requires a supported --language.");
-  const downloaded = await exactPublicProblem(client, problemVersionId!, contestId);
+  const downloaded = await exactPublicProblem(client, problemId!, contestId);
   const { metadata, content, bytes, problem } = downloaded;
-  const catalogPublicationId = serverUuid(metadata, "catalogPublicationId", "catalogPublicationId");
+  const catalogCommit = field(metadata, "catalogCommit", "catalogCommit");
   const contentUrl = field(content, "url", "problem content URL");
   const contentSha256 = field(content, "sha256", "problem content digest");
   const allowedProfiles = object(metadata.allowedProfiles, "allowedProfiles");
@@ -340,12 +336,12 @@ async function problemPull(command: ParsedCommand, dependencies: CommandDependen
     entry: template.entry,
     sources: Object.keys(template.files).sort(),
     problem: {
-      problemVersionId: problemVersionId!, catalogPublicationId, serverOrigin: client.origin,
+      problemId: problemId!, catalogCommit, serverOrigin: client.origin,
       contentUrl, contentSha256, contentFile: "problem.json", locale,
       ...(contestId ? { contestId } : {}),
     },
   });
-  return { value: { directory: root, problemVersionId, catalogPublicationId, contentSha256, language, target: profile.target, optimization: profile.optimization }, exitCode: 0 };
+  return { value: { directory: root, problemId, catalogCommit, contentSha256, language, target: profile.target, optimization: profile.optimization }, exitCode: 0 };
 }
 
 async function submit(command: ParsedCommand, dependencies: CommandDependencies, client: RemoteClient): Promise<CommandOutcome> {
@@ -368,7 +364,8 @@ async function submit(command: ParsedCommand, dependencies: CommandDependencies,
   if (contestId !== workspace.problem.contestId) throw new CliError("Official Submit contest context must match the pinned workspace.", { exitCode: 5 });
   const sources = await readWorkspaceSources(dependencies.cwd, workspace);
   const body = {
-    problemVersionId: workspace.problem.problemVersionId,
+    problemId: workspace.problem.problemId,
+    catalogCommit: workspace.problem.catalogCommit,
     ...(contestId ? { contestId } : {}),
     language, target, optimization, entry,
     sourceFiles: Object.entries(sources).sort(([left], [right]) => left.localeCompare(right)).map(([filePath, content]) => ({ path: filePath, encoding: "utf8", content })),
@@ -380,65 +377,14 @@ async function submit(command: ParsedCommand, dependencies: CommandDependencies,
   return submissionWatch(client, id, 2_000, dependencies.sleep);
 }
 
-async function currentContestDraft(client: RemoteClient, id: string): Promise<{ readonly body: Record<string, unknown>; readonly current: Record<string, unknown> }> {
-  const value = object(await client.request(`/api/organizer/contests/${id}`), "Organizer contest");
-  const contest = object(value.contest, "contest");
-  const problems = array(value.problems, "contest problems");
-  const freezeAt = contest.freezeAt;
-  if (freezeAt !== null && freezeAt !== undefined && typeof freezeAt !== "string") {
-    throw new CliError("Organizer contest freezeAt has an invalid shape.", { exitCode: 6, code: "server-response-invalid" });
-  }
-  return {
-    current: value,
-    body: {
-      title: contest.title,
-      description: contest.description,
-      accessMode: contest.accessMode,
-      startsAt: contest.startsAt,
-      endsAt: contest.endsAt,
-      ...(typeof freezeAt === "string" ? { freezeAt } : {}),
-      problemVersionIds: problems.map((problem) => field(object(problem, "contest problem"), "problemVersionId")),
-    },
-  };
-}
-
-async function contestBody(command: ParsedCommand, cwd: string, base: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  const body: Record<string, unknown> = { ...base };
-  const mapping = { title: "title", description: "description", access: "accessMode", starts: "startsAt", ends: "endsAt", freeze: "freezeAt" } as const;
-  for (const [option, key] of Object.entries(mapping)) {
-    const value = stringOption(command, option);
-    if (value !== undefined) body[key] = value;
-  }
-  const inviteCode = await readProtectedTextFile(cwd, stringOption(command, "invite-code-file"), "--invite-code-file");
-  if (inviteCode !== undefined) body.inviteCode = inviteCode;
-  const problems = repeatableOption(command, "problem");
-  if (problems.length) body.problemVersionIds = problems.map((id) => uuid(id, "problem"));
-  if (typeof body.title === "string" && (!body.title.trim() || body.title.length > 120)) throw usageError("--title must contain 1–120 characters.");
-  if (typeof body.description === "string" && body.description.length > 10_000) throw usageError("--description must contain at most 10,000 characters.");
-  if (Array.isArray(body.problemVersionIds) && (body.problemVersionIds.length < 1 || body.problemVersionIds.length > 100 || new Set(body.problemVersionIds).size !== body.problemVersionIds.length)) {
-    throw usageError("Contest problem IDs must be unique and contain 1–100 values.");
-  }
-  if (body.accessMode !== "public" && body.accessMode !== "invite") throw usageError("--access must be public or invite.");
-  const invite = body.inviteCode;
-  if (invite !== undefined && (typeof invite !== "string" || invite.length < 16 || invite.length > 128)) throw usageError("--invite-code-file must contain 16–128 characters.");
-  if (body.accessMode === "public" && invite !== undefined) throw usageError("--invite-code-file cannot be used with --access public.");
-  const startsAt = canonicalTimestamp(typeof body.startsAt === "string" ? body.startsAt : undefined, "starts");
-  const endsAt = canonicalTimestamp(typeof body.endsAt === "string" ? body.endsAt : undefined, "ends");
-  const freezeAt = canonicalTimestamp(typeof body.freezeAt === "string" ? body.freezeAt : undefined, "freeze");
-  if (startsAt !== undefined && endsAt !== undefined && (endsAt <= startsAt || (freezeAt !== undefined && (freezeAt <= startsAt || freezeAt >= endsAt)))) {
-    throw usageError("Contest timestamps must satisfy starts < freeze < ends (freeze is optional).");
-  }
-  return body;
-}
-
 async function createCollectionSkeleton(root: string, force: boolean): Promise<CommandOutcome> {
   const file = path.join(root, "collection", "source.json");
   await assertSafeFileDestinations(root, ["collection/source.json"], force);
   await mkdir(path.dirname(file), { recursive: true });
   await atomicWriteFile(file, `${JSON.stringify({
-    schema: "wasm-oj-browser-collection-source-v1",
-    localization: { defaultLocale: "zh-TW", supportedLocales: ["zh-TW", "en"] },
+    schema: "wasm-oj-platform/repository-authoring/v1",
     problems: [],
+    contests: [],
   }, null, 2)}\n`);
   return { value: { directory: root, source: file }, exitCode: 0 };
 }
@@ -553,8 +499,8 @@ export async function dispatchCommand(command: ParsedCommand, dependencies: Comm
   if (key === "organizer collection build" || key === "organizer collection verify") {
     const [directory = "."] = exactPositionals(command, 0, 1);
     const arguments_: string[] = [key.endsWith("build") ? "build" : "verify", path.resolve(dependencies.cwd, directory!)];
-    for (const name of ["index", "source", "managed", "managed-source"] as const) { const value = stringOption(command, name); if (value !== undefined) arguments_.push(`--${name}`, normalizedRelativePath(value, `--${name}`)); }
-    if (key.endsWith("build") && stringOption(command, "managed") !== undefined && stringOption(command, "managed-source") === undefined) throw usageError("--managed requires --managed-source when building.");
+    const source = stringOption(command, "source");
+    if (source !== undefined) arguments_.push("--source", normalizedRelativePath(source, "--source"));
     try { await dependencies.collectionCli(arguments_); }
     catch (error) { throw new CliError(error instanceof Error ? error.message : "Collection operation failed.", { exitCode: 4, code: "collection-invalid", cause: error }); }
     return { value: { command: arguments_[0], directory: arguments_[1] }, exitCode: 0 };
@@ -582,10 +528,10 @@ export async function dispatchCommand(command: ParsedCommand, dependencies: Comm
   }
   if (key === "problem list") { exactPositionals(command, 0); const locale = localeOption(command); return { value: localizedList(await client.request("/api/problems", { authenticated: "optional" }), locale), exitCode: 0 }; }
   if (key === "problem show") {
-    const [id] = exactPositionals(command, 1); uuid(id!, "problem-version-id"); const contestId = stringOption(command, "contest"); if (contestId) uuid(contestId, "contest");
+    const [id] = exactPositionals(command, 1); uuid(id!, "problem-id"); const contestId = stringOption(command, "contest"); if (contestId) uuid(contestId, "contest");
     const locale = localeOption(command); const downloaded = await exactPublicProblem(client, id!, contestId); const problem = downloaded.problem;
     return { value: {
-      problemVersionId: id, catalogPublicationId: downloaded.metadata.catalogPublicationId, content: downloaded.metadata.content,
+      problemId: id, catalogCommit: downloaded.metadata.catalogCommit, judgeDigest: downloaded.metadata.judgeDigest, content: downloaded.metadata.content,
       locale, title: problem.title[locale], track: problem.track[locale], difficulty: problem.difficulty, tags: problem.tags,
       statement: problem.statement[locale], editorial: problem.editorial[locale],
       samples: problem.judgeCases.filter((testCase) => testCase.kind === "sample"),
@@ -605,7 +551,7 @@ export async function dispatchCommand(command: ParsedCommand, dependencies: Comm
   if (key === "contest join") { const [id] = exactPositionals(command, 1); uuid(id!, "contest-id"); const code = await readProtectedTextFile(dependencies.cwd, stringOption(command, "code-file"), "--code-file"); if (code !== undefined && (code.length < 16 || code.length > 128)) throw usageError("--code-file must contain 16–128 characters."); return { value: await client.request(`/api/contests/${id}/join`, { method: "POST", body: { ...(code ? { inviteCode: code } : {}) } }), exitCode: 0 }; }
   if (key === "contest standings") { const [id] = exactPositionals(command, 1); uuid(id!, "contest-id"); return { value: await client.request(`/api/contests/${id}/leaderboard${query({ limit: boundedIntegerOption(command, "limit", 100) })}`, { authenticated: "optional" }), exitCode: 0 }; }
   if (key === "performance frontier" || key === "performance evolution") {
-    const [id] = exactPositionals(command, 1); uuid(id!, "problem-version-id");
+    const [id] = exactPositionals(command, 1); uuid(id!, "problem-id");
     const language = stringOption(command, "language");
     if (language !== undefined && !LANGUAGES.includes(language as WorkspaceLanguage)) throw usageError("--language must name a supported language.");
     const contestId = stringOption(command, "contest");
@@ -626,56 +572,34 @@ export async function dispatchCommand(command: ParsedCommand, dependencies: Comm
     if (!repository) throw new CliError(`Repository '${id}' is not in your Organizer scope.`, { exitCode: 5 });
     return { value: { repository }, exitCode: 0 };
   }
-  if (key === "organizer collection list") { exactPositionals(command, 0); return { value: await client.request("/api/organizer/collections"), exitCode: 0 }; }
-  if (key === "organizer collection show") { const [id] = exactPositionals(command, 1); uuid(id!, "collection-id"); return { value: await client.request(`/api/organizer/collections/${id}`), exitCode: 0 }; }
-  if (key === "organizer collection create") {
-    exactPositionals(command, 0); const repository = stringOption(command, "repo"); const index = stringOption(command, "index") ?? "collection/index.json";
+  if (key === "organizer catalog list") { exactPositionals(command, 0); return { value: await client.request("/api/organizer/catalogs"), exitCode: 0 }; }
+  if (key === "organizer catalog show") { const [id] = exactPositionals(command, 1); uuid(id!, "catalog-id"); return { value: await client.request(`/api/organizer/catalogs/${id}`), exitCode: 0 }; }
+  if (key === "organizer catalog connect") {
+    exactPositionals(command, 0); const repository = stringOption(command, "repo");
     if (!repository) throw usageError("--repo must be a GitHub numeric repository ID.");
     const repositoryId = positiveInteger(repository, 1, Number.MAX_SAFE_INTEGER, "--repo");
-    return { value: await client.request("/api/organizer/collections", { method: "POST", body: { githubRepositoryId: repositoryId, indexPath: normalizedRelativePath(index, "--index") } }), exitCode: 0 };
+    return { value: await client.request("/api/organizer/catalogs", { method: "POST", body: { githubRepositoryId: repositoryId } }), exitCode: 0 };
   }
-  if (key === "organizer collection validate") {
-    const [id] = exactPositionals(command, 1); uuid(id!, "collection-id"); const ref = stringOption(command, "ref");
+  if (key === "organizer catalog sync") {
+    const [id] = exactPositionals(command, 1); uuid(id!, "catalog-id"); const ref = stringOption(command, "ref");
     if (!ref || ref.length > 256 || /[\u0000-\u001f\u007f]/u.test(ref)) throw usageError("--ref must be a 1–256 character printable Git ref.");
-    const created = await client.request(`/api/organizer/collections/${id}/validations`, { method: "POST", body: { ref } });
+    const created = await client.request(`/api/organizer/catalogs/${id}/syncs`, { method: "POST", body: { ref, idempotencyKey: `woj-sync-${randomUUID()}` } });
     if (!booleanOption(command, "wait")) return { value: created, exitCode: 0 };
-    const validation = object(object(created, "validation creation").validation, "validation");
-    const initialState = field(validation, "state", "validation state");
-    if (TERMINAL_VALIDATION_STATES.has(initialState)) return { value: created, exitCode: initialState === "valid" ? 0 : 1 };
-    return watchResource({ client, path: `/api/organizer/validations/${serverUuid(validation, "id", "validation ID")}`, envelope: "validation", terminal: TERMINAL_VALIDATION_STATES, success: new Set(["valid"]), intervalMs: 2_000, sleep: dependencies.sleep });
+    const sync = object(object(created, "sync creation").sync, "sync");
+    const initialState = field(sync, "state", "sync state");
+    if (TERMINAL_SYNC_STATES.has(initialState)) return { value: created, exitCode: initialState === "succeeded" ? 0 : 1 };
+    return watchResource({ client, path: `/api/organizer/catalog-syncs/${serverUuid(sync, "id", "sync ID")}`, envelope: "sync", terminal: TERMINAL_SYNC_STATES, success: new Set(["succeeded"]), intervalMs: 2_000, sleep: dependencies.sleep });
   }
-  if (key === "organizer collection validation") { const [id] = exactPositionals(command, 1); uuid(id!, "validation-id"); if (!booleanOption(command, "watch")) return { value: await client.request(`/api/organizer/validations/${id}`), exitCode: 0 }; return watchResource({ client, path: `/api/organizer/validations/${id}`, envelope: "validation", terminal: TERMINAL_VALIDATION_STATES, success: new Set(["valid"]), intervalMs: positiveInteger(stringOption(command, "interval"), 2, 30, "interval") * 1_000, sleep: dependencies.sleep }); }
-  if (key === "organizer collection publish") {
-    const [id] = exactPositionals(command, 1); uuid(id!, "revision-id"); const mode = stringOption(command, "mode") ?? "official-practice"; if (mode !== "official-practice" && mode !== "contest") throw usageError("--mode must be official-practice or contest.");
-    const created = await client.request(`/api/organizer/revisions/${id}/publications`, { method: "POST", body: { mode, idempotencyKey: `woj-publish-${randomUUID()}` } });
-    if (!booleanOption(command, "wait")) return { value: created, exitCode: 0 }; const job = object(object(created, "publication creation").publicationJob, "publication job");
-    return watchResource({ client, path: `/api/organizer/publications/${serverUuid(job, "id", "publication job ID")}`, envelope: "publication", terminal: TERMINAL_PUBLICATION_STATES, success: new Set(["published"]), intervalMs: 2_000, sleep: dependencies.sleep });
-  }
-  if (key === "organizer collection publication") { const [id] = exactPositionals(command, 1); uuid(id!, "publication-job-id"); if (!booleanOption(command, "watch")) return { value: await client.request(`/api/organizer/publications/${id}`), exitCode: 0 }; return watchResource({ client, path: `/api/organizer/publications/${id}`, envelope: "publication", terminal: TERMINAL_PUBLICATION_STATES, success: new Set(["published"]), intervalMs: positiveInteger(stringOption(command, "interval"), 2, 30, "interval") * 1_000, sleep: dependencies.sleep }); }
-  if (key === "organizer collection activate") { const [id] = exactPositionals(command, 1); uuid(id!, "publication-id"); return { value: await client.request(`/api/organizer/publications/${id}/activate`, { method: "POST", body: {} }), exitCode: 0 }; }
+  if (key === "organizer catalog sync-show") { const [id] = exactPositionals(command, 1); uuid(id!, "sync-id"); if (!booleanOption(command, "watch")) return { value: await client.request(`/api/organizer/catalog-syncs/${id}`), exitCode: 0 }; return watchResource({ client, path: `/api/organizer/catalog-syncs/${id}`, envelope: "sync", terminal: TERMINAL_SYNC_STATES, success: new Set(["succeeded"]), intervalMs: positiveInteger(stringOption(command, "interval"), 2, 30, "interval") * 1_000, sleep: dependencies.sleep }); }
   if (key === "organizer contest list") { exactPositionals(command, 0); return { value: await client.request("/api/organizer/contests"), exitCode: 0 }; }
   if (key === "organizer contest show") { const [id] = exactPositionals(command, 1); uuid(id!, "contest-id"); return { value: await client.request(`/api/organizer/contests/${id}`), exitCode: 0 }; }
-  if (key === "organizer contest create") {
-    exactPositionals(command, 0); const body = await contestBody(command, dependencies.cwd); for (const name of ["title", "startsAt", "endsAt", "accessMode", "problemVersionIds"]) if (body[name] === undefined) throw usageError(`contest create requires ${name}.`); if (body.description === undefined) body.description = "";
-    if (body.accessMode === "invite" && body.inviteCode === undefined) throw usageError("Invite contests require --invite-code-file.");
-    const value = await client.request("/api/contests", { method: "POST", body }); return { value, exitCode: 0 };
-  }
-  if (key === "organizer contest update") {
-    const [contestId] = exactPositionals(command, 1); const id = uuid(contestId!, "contest-id"); const draft = await currentContestDraft(client, id);
-    return { value: await client.request(`/api/organizer/contests/${id}`, { method: "PUT", body: await contestBody(command, dependencies.cwd, draft.body) }), exitCode: 0 };
-  }
-  if (key === "organizer contest add-problem" || key === "organizer contest remove-problem") {
-    const [contestId, problemVersionId] = exactPositionals(command, 2); const id = uuid(contestId!, "contest-id"); const problem = uuid(problemVersionId!, "problem-version-id");
-    return { value: await client.request(`/api/organizer/contests/${id}/problems/${problem}`, { method: key.endsWith("add-problem") ? "POST" : "DELETE", body: {} }), exitCode: 0 };
-  }
-  if (key === "organizer contest publish") { const [id] = exactPositionals(command, 1); uuid(id!, "contest-id"); return { value: await client.request(`/api/contests/${id}/publish`, { method: "POST", body: {} }), exitCode: 0 }; }
-  if (key === "organizer contest archive") { const [id] = exactPositionals(command, 1); uuid(id!, "contest-id"); return { value: await client.request(`/api/organizer/contests/${id}/archive`, { method: "POST", body: {} }), exitCode: 0 }; }
+  if (key === "organizer contest invite-rotate") { const [id] = exactPositionals(command, 1); uuid(id!, "contest-id"); const inviteCode = await readProtectedTextFile(dependencies.cwd, stringOption(command, "code-file"), "--code-file"); if (!inviteCode || inviteCode.length < 16 || inviteCode.length > 128) throw usageError("invite-rotate requires --code-file containing 16–128 characters."); return { value: await client.request(`/api/organizer/contests/${id}/invite-code`, { method: "POST", body: { inviteCode } }), exitCode: 0 }; }
   if (key === "organizer contest participants") { const [id] = exactPositionals(command, 1); uuid(id!, "contest-id"); const next = cursor(stringOption(command, "cursor"), ["afterJoinedAt", "afterUserId"], "participant cursor"); if (next.afterJoinedAt) { canonicalCursorTimestamp(next.afterJoinedAt, "participant cursor"); uuid(next.afterUserId!, "participant cursor afterUserId"); } return { value: await client.request(`/api/organizer/contests/${id}/participants${query({ limit: boundedIntegerOption(command, "limit", 100), afterJoinedAt: next.afterJoinedAt, afterUserId: next.afterUserId })}`), exitCode: 0 }; }
   if (key === "organizer contest standings") { const [id] = exactPositionals(command, 1); uuid(id!, "contest-id"); return { value: await client.request(`/api/contests/${id}/leaderboard${query({ limit: boundedIntegerOption(command, "limit", 100) })}`), exitCode: 0 }; }
-  if (key === "organizer rejudge options") { const [source] = exactPositionals(command, 1); uuid(source!, "problem-version-id"); return { value: await client.request(`/api/organizer/rejudges/options${query({ source })}`), exitCode: 0 }; }
+  if (key === "organizer rejudge options") { const [problemId] = exactPositionals(command, 0, 1); const fromCommit = stringOption(command, "from"); if ((problemId === undefined) !== (fromCommit === undefined)) throw usageError("rejudge options requires both [problem-id] and --from, or neither."); if (problemId) uuid(problemId, "problem-id"); if (fromCommit && !/^[0-9a-f]{40}$/.test(fromCommit)) throw usageError("--from must be an exact lowercase Git commit."); return { value: await client.request(`/api/organizer/rejudges/options${query({ problemId, fromCommit })}`), exitCode: 0 }; }
   if (key === "organizer rejudge start") {
-    exactPositionals(command, 0); const from = stringOption(command, "from"); const to = stringOption(command, "to"); if (!from || !to) throw usageError("rejudge start requires --from and --to."); uuid(from, "from"); uuid(to, "to");
-    const created = await client.request("/api/organizer/rejudges", { method: "POST", body: { oldProblemVersionId: from, newProblemVersionId: to, idempotencyKey: `woj-rejudge-${randomUUID()}` } });
+    const [problemId] = exactPositionals(command, 1); uuid(problemId!, "problem-id"); const from = stringOption(command, "from"); const to = stringOption(command, "to"); if (!from || !to || !/^[0-9a-f]{40}$/.test(from) || !/^[0-9a-f]{40}$/.test(to)) throw usageError("rejudge start requires exact lowercase Git commits in --from and --to."); const contestId = stringOption(command, "contest"); if (contestId) uuid(contestId, "contest-id");
+    const created = await client.request("/api/organizer/rejudges", { method: "POST", body: { problemId, fromCommit: from, toCommit: to, ...(contestId ? { contestId } : {}), idempotencyKey: `woj-rejudge-${randomUUID()}` } });
     if (!booleanOption(command, "wait")) return { value: created, exitCode: 0 }; const id = serverUuid(object(created, "rejudge creation"), "rejudgeBatchId"); return watchResource({ client, path: `/api/organizer/rejudges/${id}`, envelope: "rejudgeBatch", terminal: TERMINAL_REJUDGE_STATES, success: new Set(["effective"]), intervalMs: 2_000, sleep: dependencies.sleep });
   }
   if (key === "organizer rejudge list") { exactPositionals(command, 0); return { value: await client.request(`/api/organizer/rejudges${query({ limit: boundedIntegerOption(command, "limit", 100) })}`), exitCode: 0 }; }

@@ -164,14 +164,14 @@ async function executeSubmission(job, identity) {
   }
   const [sourceBytes, judgeBytes] = await Promise.all([
     verifiedResponseBody(sourceResponse, job.sourceSha256, MAX_SOURCE_SNAPSHOT_BYTES, "source snapshot"),
-    verifiedResponseBody(judgeResponse, job.executionSemanticSha256, MAX_JUDGE_PACKAGE_BYTES, "judge package"),
+    verifiedResponseBody(judgeResponse, job.judgeDigest, MAX_JUDGE_PACKAGE_BYTES, "judge package"),
   ]);
   const source = parseJson(sourceBytes, "source snapshot");
   if (source?.schema !== "wasm-oj-platform/official-source/v1" || !source.request) {
     throw new ContainerProtocolError(400, "source-contract-invalid", "Submission source uses an unsupported schema.");
   }
   const judgePackage = await decodeJudgePackageForExecution(judgeBytes);
-  if (judgePackage.executionSemanticSha256 !== job.executionSemanticSha256) {
+  if (judgePackage.executionSemanticSha256 !== job.judgeDigest) {
     throw new ContainerProtocolError(409, "judge-package-identity", "Judge package identity does not match admission.");
   }
   const compileRequest = source.request;

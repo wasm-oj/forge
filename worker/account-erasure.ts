@@ -80,35 +80,26 @@ function cancellationStatements(
     env.DB.prepare(RECORD_ERASURE_CANCELLATION_EVENTS_SQL).bind(now, userId, anonymousUserId),
     env.DB.prepare(CANCEL_ERASURE_REJUDGE_WORK_SQL).bind(now, userId, anonymousUserId),
     env.DB.prepare(CANCEL_ERASURE_OUTBOX_SQL).bind(now, now, userId, anonymousUserId),
-    env.DB.prepare(`UPDATE catalog_validation_jobs
+    env.DB.prepare(`UPDATE catalog_sync_jobs
         SET state='running', started_at=?, updated_at=?
-      WHERE created_by IN (?, ?) AND state='queued'`)
+      WHERE requested_by IN (?, ?) AND state='queued'`)
       .bind(now, now, userId, anonymousUserId),
-    env.DB.prepare(`UPDATE catalog_validation_jobs
-        SET state='infrastructure-error', error_code='account-erasure',
+    env.DB.prepare(`UPDATE catalog_sync_jobs
+        SET state='failed', error_code='account-erasure',
             finished_at=?, updated_at=?
-      WHERE created_by IN (?, ?) AND state='running'`)
-      .bind(now, now, userId, anonymousUserId),
-    env.DB.prepare(`UPDATE catalog_publish_jobs
-        SET state='cancelled', finished_at=?, updated_at=?
-      WHERE requested_by IN (?, ?) AND state IN ('queued','materializing')`)
+      WHERE requested_by IN (?, ?) AND state='running'`)
       .bind(now, now, userId, anonymousUserId),
     env.DB.prepare(`UPDATE rejudge_batches
         SET state='cancelled', cancel_requested_at=?, failure_code='account-erasure', updated_at=?
       WHERE requested_by IN (?, ?) AND state IN ('queued','running','ready')`)
       .bind(now, now, userId, anonymousUserId),
     env.DB.prepare(`UPDATE workflow_outbox
-        SET state='cancelled', settled_at=?, last_error='account-erasure', updated_at=?
+      SET state='cancelled', settled_at=?, last_error='account-erasure', updated_at=?
       WHERE state='pending' AND (
-        catalog_validation_job_id IN (
-          SELECT id FROM catalog_validation_jobs WHERE created_by IN (?, ?)
+        catalog_sync_job_id IN (
+          SELECT id FROM catalog_sync_jobs WHERE requested_by IN (?, ?)
         )
-        OR catalog_publish_job_id IN (
-          SELECT id FROM catalog_publish_jobs WHERE requested_by IN (?, ?)
-        )
-      )`).bind(
-        now, now, userId, anonymousUserId, userId, anonymousUserId,
-      ),
+      )`).bind(now, now, userId, anonymousUserId),
     env.DB.prepare("DELETE FROM formal_risk_allowances WHERE user_id IN (?, ?)")
       .bind(userId, anonymousUserId),
   ];
@@ -229,21 +220,13 @@ async function finalizeAccountErasure(
     env.DB.prepare("DELETE FROM submission_idempotency WHERE user_id IN (?, ?)")
       .bind(job.user_id, job.anonymous_user_id),
     env.DB.prepare("DELETE FROM contest_participants WHERE user_id=?").bind(job.user_id),
-    env.DB.prepare("UPDATE problem_collections SET organizer_user_id=? WHERE organizer_user_id=?")
+    env.DB.prepare("UPDATE catalogs SET organizer_user_id=? WHERE organizer_user_id=?")
       .bind(job.anonymous_user_id, job.user_id),
-    env.DB.prepare("UPDATE catalog_validation_jobs SET created_by=? WHERE created_by=?")
+    env.DB.prepare("UPDATE catalog_sync_jobs SET requested_by=? WHERE requested_by=?")
       .bind(job.anonymous_user_id, job.user_id),
-    env.DB.prepare("UPDATE collection_revisions SET validated_by=? WHERE validated_by=?")
+    env.DB.prepare("UPDATE catalog_deployments SET synced_by=? WHERE synced_by=?")
       .bind(job.anonymous_user_id, job.user_id),
-    env.DB.prepare("UPDATE catalog_publish_jobs SET requested_by=? WHERE requested_by=?")
-      .bind(job.anonymous_user_id, job.user_id),
-    env.DB.prepare("UPDATE catalog_publications SET published_by=? WHERE published_by=?")
-      .bind(job.anonymous_user_id, job.user_id),
-    env.DB.prepare("UPDATE contests SET organizer_user_id=?, updated_at=? WHERE organizer_user_id=?")
-      .bind(job.anonymous_user_id, now, job.user_id),
     env.DB.prepare("UPDATE rejudge_batches SET requested_by=? WHERE requested_by=?")
-      .bind(job.anonymous_user_id, job.user_id),
-    env.DB.prepare("UPDATE wasm_oj_active_releases SET activated_by=? WHERE activated_by=?")
       .bind(job.anonymous_user_id, job.user_id),
     env.DB.prepare("DELETE FROM organizer_applications WHERE user_id=?").bind(job.user_id),
     env.DB.prepare("UPDATE organizer_applications SET reviewed_by=NULL WHERE reviewed_by=?").bind(job.user_id),

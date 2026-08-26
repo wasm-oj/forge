@@ -140,11 +140,6 @@ interface PanelResizeSession {
   startPointerY: number;
 }
 
-interface ManagedCollectionMatch {
-  readonly publicationId: string;
-  readonly problems: Readonly<Record<string, string>>;
-}
-
 export type JudgeWorkspaceCollection = LoadedProblemCollection | LoadedManagedProblemCollection;
 export type JudgeWorkspaceCollectionEntry = ProblemCollectionEntry | ManagedProblemCollectionEntry;
 
@@ -244,12 +239,12 @@ export function useJudgeSession({
   if (collection.source.provider === "managed") {
     if (
       !explicitManagedContext
-      || collection.source.problemVersionId !== explicitManagedContext.problemVersionId
+      || collection.source.problemId !== explicitManagedContext.problemId
       || collection.source.contestId !== explicitManagedContext.contestId
       || collection.source.mode !== (explicitManagedContext.contestId ? "contest" : "official-practice")
       || collection.source.metadataUrl !== managedProblemMetadataApiPath(explicitManagedContext)
     ) {
-      throw new Error("Managed JudgeWorkspace collection and managedContext must identify the same v2 content pointer.");
+      throw new Error("Managed JudgeWorkspace collection and managedContext must identify the same repository content pointer.");
     }
   } else if (explicitManagedContext) {
     throw new Error("managedContext requires a managed problem collection; GitHub collection identity cannot be substituted.");
@@ -309,8 +304,6 @@ export function useJudgeSession({
   const [location, setLocation] = useState({ line: 1, column: 1 });
   const [compileAhead, setCompileAhead] = useState<CompileAheadState>("idle");
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
-  const [managedMatch, setManagedMatch] = useState<ManagedCollectionMatch>();
-  const [managedMatchChecked, setManagedMatchChecked] = useState(Boolean(explicitManagedContext));
   const [officialSubmissionId, setOfficialSubmissionId] = useState<string>();
   const [officialSubmissionStatus, setOfficialSubmissionStatus] = useState<OfficialSubmissionStatus>();
   const compilerRef = useRef<BrowserCompiler | undefined>(undefined);
@@ -347,10 +340,8 @@ export function useJudgeSession({
     return entry;
   }, [activeProblem.id, problems]);
   const activeProgressId = judgeProblemProgressId(activeProblem.id, activeProblemEntry.bundle.sha256);
-  const matchedProblemVersionId = managedMatch?.problems[activeProblem.id];
-  const officialContext = explicitManagedContext
-    ?? (matchedProblemVersionId ? { problemVersionId: matchedProblemVersionId } : undefined);
-  const managedProblemVersionId = officialContext?.problemVersionId;
+  const officialContext = explicitManagedContext;
+  const managedProblemId = officialContext?.problemId;
   const officialContestId = officialContext?.contestId;
   // Managed GitHub content is public-only; complete judge data exists only in the immutable R2 package.
   const fullLocalJudgeAvailable = explicitManagedContext === undefined;
@@ -505,38 +496,6 @@ export function useJudgeSession({
       flush();
     };
   }, [draftPersistenceController]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setManagedMatch(undefined);
-    if (explicitManagedContext) {
-      setManagedMatchChecked(true);
-      return () => controller.abort();
-    }
-    if (collection.source.provider !== "github") {
-      setManagedMatchChecked(true);
-      return () => controller.abort();
-    }
-    setManagedMatchChecked(false);
-    const parameters = new URLSearchParams({
-      repository: `${collection.source.owner}/${collection.source.repository}`,
-      revision: collection.index.revision,
-    });
-    void fetch(`/api/collections/managed-match?${parameters}`, {
-      signal: controller.signal,
-      credentials: "same-origin",
-      headers: { accept: "application/json" },
-    }).then(async (response) => {
-      if (!response.ok) return;
-      const result = await response.json() as { matched?: unknown; publicationId?: unknown; problems?: unknown };
-      if (result.matched === true && typeof result.publicationId === "string" && result.problems && typeof result.problems === "object" && !Array.isArray(result.problems)) {
-        setManagedMatch({ publicationId: result.publicationId, problems: result.problems as Record<string, string> });
-      }
-    }).catch(() => undefined).finally(() => {
-      if (!controller.signal.aborted) setManagedMatchChecked(true);
-    });
-    return () => controller.abort();
-  }, [collection.index.revision, collection.source, explicitManagedContext]);
 
   useEffect(() => () => {
     officialRunRef.current += 1;
@@ -1088,13 +1047,13 @@ export function useJudgeSession({
     const expectedOutputs = new Map(samples.map((sample) => [sample.id, sample.expectedOutput] as const));
     const results = await doRunSelfTests(samples.map((sample) => sample.id), samples, expectedOutputs);
     if (
-      managedProblemVersionId
+      managedProblemId
       && results?.length === samples.length
       && results.every((result) => result.matchesExpected === true)
     ) {
-      recordLocalSamplesPassed(localStorage, managedProblemVersionId, activeProblemEntry.bundle.sha256);
+      recordLocalSamplesPassed(localStorage, managedProblemId, activeProblemEntry.bundle.sha256);
     }
-  }, [activeProblem, activeProblemEntry.bundle.sha256, doRunSelfTests, managedProblemVersionId, text]);
+  }, [activeProblem, activeProblemEntry.bundle.sha256, doRunSelfTests, managedProblemId, text]);
 
   const doJudge = useCallback(async () => {
     if (!fullLocalJudgeAvailable) {
@@ -1247,7 +1206,7 @@ export function useJudgeSession({
   }, [activeProblem, activeProgressId, addLog, artifact, doBuild, fullLocalJudgeAvailable, project, projectLanguage, text.official.contestSamplesOnly]);
 
   const doOfficialSubmit = useCallback(async () => {
-    if (!managedProblemVersionId) return;
+    if (!managedProblemId || !managedSource) return;
     setMobileWorkspaceTab("result");
     const runIdentity = officialRunRef.current + 1;
     officialRunRef.current = runIdentity;
@@ -1274,7 +1233,8 @@ export function useJudgeSession({
       if (!csrf) throw new Error(text.official.csrfMissing);
       addLog("system", text.official.admitting);
       const requestBody = JSON.stringify(createOfficialSubmissionRequest({
-        problemVersionId: managedProblemVersionId,
+        problemId: managedProblemId,
+        catalogCommit: managedSource.catalogCommit,
         ...(officialContestId ? { contestId: officialContestId } : {}),
       }, {
         language: projectLanguage,
@@ -1376,7 +1336,7 @@ export function useJudgeSession({
         setBusy(undefined);
       }
     }
-  }, [addLog, managedProblemVersionId, officialContestId, project, projectLanguage, text]);
+  }, [addLog, managedProblemId, managedSource, officialContestId, project, projectLanguage, text]);
 
   const cancelOfficialSubmission = useCallback(async () => {
     if (officialCancelPendingRef.current) return;
@@ -1572,8 +1532,6 @@ export function useJudgeSession({
     location,
     compileAhead,
     shareState,
-    managedMatch,
-    managedMatchChecked,
     officialSubmissionStatus,
     draftPersistenceController,
     draftPersistence,
@@ -1584,7 +1542,7 @@ export function useJudgeSession({
     text,
     activeProblemText,
     activeProblemEntry,
-    managedProblemVersionId,
+    managedProblemId,
     fullLocalJudgeAvailable,
     editorialAvailable,
     activeBaseline,

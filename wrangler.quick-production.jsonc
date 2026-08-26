@@ -30,8 +30,7 @@
   "vars": {
     "ENVIRONMENT": "production",
     "PUBLIC_ORIGIN": "https://wasm-oj-forge-production.jacob.workers.dev",
-    "WASM_OJ_RELEASE_ID": "__WASM_OJ_RELEASE_ID__",
-    "WASM_OJ_RELEASE_MANIFEST_SHA256": "__WASM_OJ_RELEASE_MANIFEST_SHA256__",
+    "WASM_OJ_BUILD_ID": "__WASM_OJ_BUILD_ID__",
     "GITHUB_OAUTH_CLIENT_ID": "Ov23limRaIiQdRQ3xoyd",
     "GITHUB_APP_ID": "4536310",
     "GITHUB_APP_SLUG": "wasm-oj-forge-production-import",
@@ -99,7 +98,7 @@
     {
       "name": "wasm-oj-submission-production",
       "class_name": "SubmissionJudgeContainer",
-      "image": "registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-judge-production:__WASM_OJ_RELEASE_ID__@__WASM_OJ_CONTAINER_IMAGE_DIGEST__",
+      "image": "./Dockerfile",
       "instance_type": "standard-2",
       "max_instances": 50,
       "ssh": { "enabled": false }
