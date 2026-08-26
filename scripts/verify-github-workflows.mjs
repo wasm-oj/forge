@@ -65,8 +65,9 @@ for (const value of ordered) {
 if (productionSource.split("__WASM_OJ_BUILD_ID__").length - 1 !== 1
   || productionConfig.vars?.WASM_OJ_BUILD_ID !== "__WASM_OJ_BUILD_ID__"
   || productionConfig.containers?.length !== 1
-  || productionConfig.containers[0]?.image !== "./Dockerfile") {
-  throw new Error("Production config must contain one Worker build placeholder and a repository Dockerfile Container.");
+  || productionConfig.containers[0]?.image !== "./Dockerfile"
+  || productionConfig.containers[0]?.rollout_step_percentage !== 100) {
+  throw new Error("Production config must contain one Worker build placeholder and a repository Dockerfile Container with one-step rollout.");
 }
 if (developmentConfig.vars?.WASM_OJ_BUILD_ID !== "0".repeat(40)
   || developmentConfig.containers?.[0]?.image !== "./Dockerfile") {
