@@ -48,6 +48,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/production-migrations.mjs apply --database DB --config wrangler.quick-production.jsonc
+      - name: Capture current Container rollout baseline
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          node scripts/wait-container-rollout.mjs
+          --config wrangler.quick-production.jsonc
+          --capture-baseline "$RUNNER_TEMP/container-rollout-baseline.json"
       - name: Build, push, and deploy Worker plus Container
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
@@ -57,7 +65,10 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/wait-container-rollout.mjs --config wrangler.quick-production.jsonc
+        run: >-
+          node scripts/wait-container-rollout.mjs
+          --config wrangler.quick-production.jsonc
+          --baseline "$RUNNER_TEMP/container-rollout-baseline.json"
       - name: Probe Container build and protocol
         env:
           MAINTENANCE_SMOKE_TOKEN: ${{ secrets.WASM_OJ_MAINTENANCE_SMOKE_TOKEN }}

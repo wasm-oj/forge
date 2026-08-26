@@ -3,12 +3,15 @@ import test from "node:test";
 
 import {
   assessContainerRollout,
+  containerRolloutBaseline,
   configuredContainerRolloutTarget,
   inspectContainerRollout,
+  parseContainerRolloutBaseline,
   waitForContainerRollout,
 } from "./wait-container-rollout.mjs";
 
-const image = "registry.cloudflare.com/account/submission:generated-by-wrangler";
+const image = `registry.cloudflare.com/account/submission@sha256:${"a".repeat(64)}`;
+const nextImage = `registry.cloudflare.com/account/submission@sha256:${"b".repeat(64)}`;
 const target = Object.freeze({ className: "SubmissionJudgeContainer", name: "submission-production" });
 const applicationId = "a0341d3a-33dc-469a-a7ac-26061efd46db";
 
@@ -38,7 +41,12 @@ function readyFixture(overrides = {}) {
     { id: "historical", state: "inactive", version: null },
     { id: "current", state: "running", version: 14 },
   ];
-  return { assessment: assessContainerRollout(target, summary, info, instances), info, instances, summary };
+  return {
+    assessment: assessContainerRollout(target, summary, info, instances, overrides.baseline ?? null),
+    info,
+    instances,
+    summary,
+  };
 }
 
 test("configured target requires one repository-built Container", () => {
@@ -60,6 +68,35 @@ test("ready assessment accepts inactive history and exact live version", () => {
   assert.equal(result.version, 14);
   assert.equal(result.healthyInstances, 7);
   assert.deepEqual(result.reasons, []);
+});
+
+test("baseline requires the deploy to advance the exact application and image", () => {
+  const captured = containerRolloutBaseline(target, readyFixture(), "2026-08-26T00:00:00.000Z");
+  const baseline = parseContainerRolloutBaseline(target, captured);
+  assert.deepEqual(baseline, { applicationId, image, version: 14 });
+
+  const unchanged = readyFixture({ baseline }).assessment;
+  assert.equal(unchanged.ready, false);
+  assert.match(unchanged.reasons.join("\n"), /has not advanced past baseline 14/u);
+  assert.match(unchanged.reasons.join("\n"), /image has not changed/u);
+
+  const advanced = readyFixture({
+    baseline,
+    info: { configuration: { image: nextImage }, version: 15 },
+    instances: [{ id: "current", state: "running", version: 15 }],
+    summary: { image: nextImage, version: 15 },
+  }).assessment;
+  assert.equal(advanced.ready, true);
+});
+
+test("assessment rejects an active rollout and inconsistent image queries", () => {
+  const result = readyFixture({
+    info: { active_rollout_id: "79699b91-24b1-49d8-be4d-bb280af0b594" },
+    summary: { image: nextImage },
+  }).assessment;
+  assert.equal(result.ready, false);
+  assert.match(result.reasons.join("\n"), /image changed between queries/u);
+  assert.match(result.reasons.join("\n"), /still has an active rollout/u);
 });
 
 test("assessment rejects non-terminal health and an old live instance", () => {
