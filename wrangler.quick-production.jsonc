@@ -92,6 +92,11 @@
       "name": "wasm-oj-catalog-production",
       "binding": "CATALOG_WORKFLOW",
       "class_name": "CatalogWorkflow"
+    },
+    {
+      "name": "wasm-oj-prompt-attempt-production",
+      "binding": "PROMPT_ATTEMPT_WORKFLOW",
+      "class_name": "PromptAttemptWorkflow"
     }
   ],
   "containers": [

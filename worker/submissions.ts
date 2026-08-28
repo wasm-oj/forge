@@ -1,4 +1,4 @@
-import { parseOfficialSubmissionRequest, type SubmissionVerdict } from "../src/online-judge/contracts";
+import { parseOfficialSubmissionRequest, type ContestSubmissionContext, type SubmissionVerdict } from "../src/online-judge/contracts";
 import { parseStoredProblemTitle } from "../src/online-judge/stored-problem-title";
 import { authenticatedSession, requireBrowserMutationSession, requireBrowserOrBearerMutationSession, requireSession } from "./auth";
 import { sha256Hex } from "./crypto";
@@ -10,13 +10,51 @@ import { prepareSubmissionEventInsert, replaySubmissionEvents } from "./submissi
 import { MAX_QUEUED_SUBMISSIONS, MAX_QUEUED_SUBMISSIONS_PER_USER, submissionCapacitySnapshot } from "./submission-capacity";
 import { deriveSubmissionAttemptToken } from "./submission-workflow-identity";
 import { dispatchSubmissionJobs } from "./dispatcher";
+import { loadContestRuntimeSnapshot, type ContestAdmissionFence } from "./contest-runtime";
+import {
+  reconcilePromptAttemptProduct,
+  type PromptAttemptHost,
+  type PromptGeneratedSubmissionRequest,
+  type PromptGeneratedSubmissionResult,
+} from "./prompt-attempts";
 
 const SOURCE_MAX_BYTES = 2 * 1024 * 1024;
 const SOURCE_TOMBSTONE = new TextEncoder().encode('{"schema":"wasm-oj-platform/erased-submission-source/v1"}\n');
+const CONTEST_CURRENT_LOGICAL_SQL = `CAST(MIN(rule_revision.duration_seconds,
+  CASE WHEN rule_revision.clock_kind='global'
+    THEN runtime.logical_anchor_seconds
+      + CAST(MAX(0, ROUND((julianday(admission_clock.admitted_at)
+        - julianday(runtime.wall_anchor_at))*86400000))/1000 AS INTEGER)
+    ELSE entrant.individual_logical_anchor_seconds
+      + CAST(MAX(0, ROUND((julianday(admission_clock.admitted_at)
+        - julianday(entrant.individual_wall_anchor_at))*86400000))/1000 AS INTEGER)
+  END) AS INTEGER)`;
 
-interface ActiveProblemRevisionRow {
+function unadvancedDueCheckpointSql(logicalSecondsSql: string): string {
+  return `EXISTS (
+    SELECT 1 FROM contest_rule_checkpoints AS checkpoint
+    WHERE checkpoint.contest_id=runtime.contest_id
+      AND checkpoint.rules_commit=runtime.active_rules_commit
+      AND checkpoint.at_seconds<=${logicalSecondsSql}
+      AND NOT EXISTS (
+        SELECT 1 FROM contest_checkpoint_runs AS checkpoint_run
+        JOIN contest_checkpoint_decisions AS checkpoint_decision
+          ON checkpoint_decision.checkpoint_run_id=checkpoint_run.id
+         AND checkpoint_decision.entrant_id=entrant.id
+         AND checkpoint_decision.decision='advanced'
+        WHERE checkpoint_run.contest_id=checkpoint.contest_id
+          AND checkpoint_run.checkpoint_id=checkpoint.checkpoint_id
+          AND checkpoint_run.timeline_generation=runtime.timeline_generation
+          AND checkpoint_run.rules_epoch=runtime.rules_epoch
+          AND checkpoint_run.state IN ('provisional','final')
+      )
+  )`;
+}
+
+export interface SubmissionProblemRevisionForAdmission {
   readonly problem_id: string;
   readonly commit_sha: string;
+  readonly active_commit_sha: string | null;
   readonly problem_slug: string;
   readonly practice_enabled: number;
   readonly judge_digest: string;
@@ -86,7 +124,7 @@ export const SUBMISSION_PRODUCT_SELECT_SQL = `SELECT
     problems.slug AS problem_slug,
     versions.title_json,
     contests.id AS contest_record_id,
-    contest_revisions.title AS contest_title,
+    contest_rules.title AS contest_title,
     COALESCE(effective.stale, 0) AS stale,
     COALESCE(effective.judged_commit, origin.catalog_commit) AS judged_commit,
     catalogs.active_commit_sha AS active_commit
@@ -102,8 +140,11 @@ export const SUBMISSION_PRODUCT_SELECT_SQL = `SELECT
     ON versions.problem_id=origin.problem_id
    AND versions.commit_sha=COALESCE(result.catalog_commit, origin.catalog_commit)
   LEFT JOIN contest_series AS contests ON contests.id=origin.contest_id
-  LEFT JOIN contest_revisions ON contest_revisions.contest_id=contests.id
-    AND contest_revisions.commit_sha=catalogs.active_commit_sha`;
+  LEFT JOIN contest_runtimes AS contest_runtime ON contest_runtime.contest_id=contests.id
+  LEFT JOIN contest_rule_revisions AS contest_rules
+    ON contest_rules.contest_id=contest_runtime.contest_id
+   AND contest_rules.rules_commit=contest_runtime.active_rules_commit
+   AND contest_rules.rules_sha256=contest_runtime.active_rules_sha256`;
 
 export interface SubmissionListQuery {
   readonly limit: number;
@@ -137,6 +178,24 @@ function canonicalValue(value: unknown): unknown {
 
 function canonicalBytes(value: unknown): Uint8Array {
   return new TextEncoder().encode(`${JSON.stringify(canonicalValue(value))}\n`);
+}
+
+export async function encodeOfficialSourceDocument(request: {
+  readonly language: string;
+  readonly target: string;
+  readonly optimization: string;
+  readonly entry: string;
+  readonly sourceFiles: readonly {
+    readonly path: string;
+    readonly encoding: "utf8" | "base64";
+    readonly content: string;
+  }[];
+}): Promise<Uint8Array> {
+  return canonicalBytes({
+    schema: "wasm-oj-platform/official-source/v1",
+    sourceDigest: await sha256Hex(canonicalBytes(request)),
+    request,
+  });
 }
 
 function digestBytes(digest: string): Uint8Array {
@@ -175,6 +234,14 @@ async function putSourceConditional(
   ) throw new ApiError(409, "source-object-conflict", "Submission source identity is already tombstoned or bound to different bytes.");
 }
 
+function deterministicUuid(digest: string): string {
+  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+}
+
+async function promptProductId(attemptId: string, kind: "source" | "submission"): Promise<string> {
+  return deterministicUuid(await sha256Hex(`wasm-oj-prompt-product-v1\0${kind}\0${attemptId}`));
+}
+
 export async function tombstoneSubmissionSource(env: WasmOjWorkerEnv, sourceId: string): Promise<void> {
   const key = submissionSourceKey(sourceId);
   const digest = await sha256Hex(SOURCE_TOMBSTONE);
@@ -210,55 +277,103 @@ async function beginSourceErasure(env: WasmOjWorkerEnv, sourceId: string, now = 
     .bind(timestamp, timestamp, sourceId).run();
 }
 
-async function activeProblemRevision(env: WasmOjWorkerEnv, id: string): Promise<ActiveProblemRevisionRow> {
+export async function loadSubmissionProblemRevisionForAdmission(
+  env: WasmOjWorkerEnv,
+  id: string,
+  commit: string,
+  contextKind: "practice" | "contest",
+): Promise<SubmissionProblemRevisionForAdmission> {
   const row = await env.DB.prepare(`SELECT revisions.problem_id, revisions.commit_sha,
+      catalogs.active_commit_sha,
       problems.slug AS problem_slug, revisions.practice_enabled,
       revisions.judge_digest, revisions.allowed_profiles_json
     FROM problem_series AS problems
     JOIN catalogs ON catalogs.id=problems.catalog_id
     JOIN problem_revisions AS revisions
-      ON revisions.problem_id=problems.id AND revisions.commit_sha=catalogs.active_commit_sha
+      ON revisions.problem_id=problems.id AND revisions.commit_sha=?
     WHERE problems.id=?`)
-    .bind(id).first<ActiveProblemRevisionRow>();
-  if (!row) throw new ApiError(404, "problem-not-found", "Problem is not active.");
+    .bind(commit, id).first<SubmissionProblemRevisionForAdmission>();
+  if (!row) {
+    const exists = await env.DB.prepare("SELECT 1 FROM problem_series WHERE id=?").bind(id).first();
+    if (!exists) throw new ApiError(404, "problem-not-found", "Problem does not exist.");
+    throw new ApiError(409, "problem-revision-stale", "The requested problem revision is unavailable.");
+  }
+  if (contextKind === "practice" && row.active_commit_sha !== commit) {
+    throw new ApiError(409, "problem-revision-stale", "The requested practice revision is no longer active.");
+  }
   return row;
 }
 
 async function verifyContestAdmission(
   env: WasmOjWorkerEnv,
   session: AuthenticatedSession,
-  contestId: string | undefined,
-  problemId: string,
-  catalogCommit: string,
-): Promise<void> {
-  if (!contestId) return;
-  const contest = await env.DB.prepare(`SELECT revisions.starts_at, revisions.ends_at, revisions.status,
-      revisions.access_mode, participants.user_id AS participant_user_id
-    FROM contest_series AS contests
-    JOIN catalogs ON catalogs.id=contests.catalog_id AND catalogs.active_commit_sha=?
-    JOIN contest_revisions AS revisions
-      ON revisions.contest_id=contests.id AND revisions.commit_sha=catalogs.active_commit_sha
-    JOIN contest_revision_problems AS contest_problems
-      ON contest_problems.contest_id=contests.id
-     AND contest_problems.commit_sha=revisions.commit_sha
-     AND contest_problems.problem_id=?
-    LEFT JOIN contest_participants AS participants
-      ON participants.contest_id=contests.id AND participants.user_id=?
-    WHERE contests.id=?`)
-    .bind(catalogCommit, problemId, session.userId, contestId).first<{
-      readonly starts_at: string;
-      readonly ends_at: string;
-      readonly status: string;
-      readonly access_mode: string;
-      readonly participant_user_id: string | null;
-    }>();
-  const now = new Date().toISOString();
-  if (!contest || contest.status !== "published" || now < contest.starts_at || now >= contest.ends_at) {
-    throw new ApiError(409, "contest-not-running", "Contest is not accepting submissions.");
+  context: ContestSubmissionContext,
+): Promise<ContestAdmissionFence> {
+  const snapshot = await loadContestRuntimeSnapshot(env, context.contestId, session);
+  if (!snapshot.entrant) throw new ApiError(409, "contest-not-joined", "Join this contest before submitting.");
+  if (snapshot.rules.officialTrack.kind !== "code") {
+    throw new ApiError(409, "contest-track-prompt-only", "This contest accepts official Prompt Program attempts, not editable source.");
   }
-  if (contest.access_mode === "invite" && contest.participant_user_id !== session.userId) {
-    throw new ApiError(403, "contest-invite-required", "Join this invite-only contest before submitting.");
+  if (snapshot.epochs.timelineGeneration !== context.timelineGeneration
+    || snapshot.epochs.ruleEpoch !== context.ruleEpoch) {
+    throw new ApiError(409, "contest-admission-stale", "Contest timeline or rules changed; reload the problem.");
   }
+  const epoch = snapshot.problems.find((problem) => problem.problemId === context.problemId);
+  if (!epoch || epoch.problemEpoch !== context.problemEpoch || epoch.contentCommit !== context.contentCommit) {
+    throw new ApiError(409, "contest-problem-epoch-stale", "Contest problem content or judge changed; reload the problem.");
+  }
+  const decision = snapshot.rules.problems.find((problem) => problem.slug === epoch.problemSlug);
+  const projected = snapshot.projection.problems.find((problem) => problem.slug === epoch.problemSlug);
+  if (!decision || !projected || projected.availability !== "open" || projected.attemptsRemaining < 1) {
+    const reason = projected?.availability === "locked" ? "contest-problem-locked"
+      : projected?.availability === "closed" ? "contest-problem-closed"
+        : projected?.attemptsRemaining === 0 ? "contest-attempt-limit" : "contest-not-eligible";
+    throw new ApiError(409, reason, "Contest rules do not admit this submission.");
+  }
+  if (snapshot.state === "paused") throw new ApiError(409, "contest-paused", "The contest is paused.");
+  if (snapshot.projection.logicalSeconds === null) throw new ApiError(409, "contest-not-started", "The contest clock has not started.");
+  return {
+    contestId: context.contestId,
+    entrantId: snapshot.entrant.entrantId,
+    problemId: context.problemId,
+    timelineGeneration: context.timelineGeneration,
+    ruleEpoch: context.ruleEpoch,
+    problemEpoch: context.problemEpoch,
+    contentCommit: context.contentCommit,
+    logicalSeconds: snapshot.projection.logicalSeconds,
+  };
+}
+
+async function hasUnadvancedDueCheckpoint(
+  env: WasmOjWorkerEnv,
+  fence: ContestAdmissionFence,
+  admittedAt: string,
+): Promise<boolean> {
+  const row = await env.DB.prepare(`WITH admission_clock(admitted_at) AS (VALUES (?))
+    SELECT 1
+    FROM contest_runtimes AS runtime
+    JOIN contest_rule_revisions AS rule_revision
+      ON rule_revision.contest_id=runtime.contest_id
+     AND rule_revision.rules_commit=runtime.active_rules_commit
+     AND rule_revision.rules_sha256=runtime.active_rules_sha256
+    JOIN contest_entrants AS entrant
+      ON entrant.id=? AND entrant.contest_id=runtime.contest_id
+    CROSS JOIN admission_clock
+    WHERE runtime.contest_id=? AND runtime.state='running'
+      AND runtime.timeline_generation=? AND runtime.rules_epoch=?
+      AND entrant.state='active'
+      AND entrant.state_timeline_generation=runtime.timeline_generation
+      AND ${unadvancedDueCheckpointSql(CONTEST_CURRENT_LOGICAL_SQL)}
+    LIMIT 1`)
+    .bind(
+      admittedAt,
+      fence.entrantId,
+      fence.contestId,
+      fence.timelineGeneration,
+      fence.ruleEpoch,
+    )
+    .first();
+  return Boolean(row);
 }
 
 async function submissionForOwner(env: WasmOjWorkerEnv, submissionId: string, userId: string): Promise<SubmissionRow> {
@@ -325,6 +440,234 @@ async function finalizeSourceAdmission(
   return Boolean(exact && exact.state !== "admitting" && exact.source_state === "ready" && exact.attempt_state && exact.outbox_state);
 }
 
+/**
+ * Production host for the provider-neutral Prompt Program service. Model output
+ * becomes the same immutable official-source object used by ordinary code
+ * submissions; the only additional fact is `source_kind='prompt-generated'`.
+ */
+export function createPromptAttemptHost(env: WasmOjWorkerEnv): PromptAttemptHost {
+  return {
+    async loadPublicContext(request) {
+      const object = await env.JUDGE_BUCKET.get(request.storageKey);
+      if (!object || object.size < 1) throw new Error("Prompt public context object is unavailable.");
+      const bytes = new Uint8Array(await object.arrayBuffer());
+      const digest = await sha256Hex(bytes);
+      if (digest !== request.sha256) throw new Error("Prompt public context object failed its digest fence.");
+      let content: string;
+      try { content = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+      catch (error) { throw new Error("Prompt public context object is not UTF-8.", { cause: error }); }
+      return { content, sha256: digest };
+    },
+
+    async admitGeneratedSource(request): Promise<PromptGeneratedSubmissionResult> {
+      return admitPromptGeneratedSubmission(env, request);
+    },
+  };
+}
+
+export async function admitPromptGeneratedSubmission(
+  env: WasmOjWorkerEnv,
+  request: PromptGeneratedSubmissionRequest,
+): Promise<PromptGeneratedSubmissionResult> {
+  const compileRequest = {
+    language: request.generatedSource.output.language,
+    target: request.generatedSource.output.target,
+    optimization: request.generatedSource.output.optimization,
+    entry: request.generatedSource.entry,
+    sourceFiles: request.generatedSource.sourceFiles.map(({ path, encoding, content }) => ({
+      path,
+      encoding,
+      content,
+    })),
+  };
+  const sourceBytes = await encodeOfficialSourceDocument(compileRequest);
+  const sourceSha256 = await sha256Hex(sourceBytes);
+  const [sourceId, submissionId] = await Promise.all([
+    promptProductId(request.attemptId, "source"),
+    promptProductId(request.attemptId, "submission"),
+  ]);
+  const now = new Date().toISOString();
+  const user = await env.DB.prepare(`SELECT erasure_epoch FROM users
+    WHERE id=? AND status='active'
+      AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=users.id)`)
+    .bind(request.ownerUserId).first<{ readonly erasure_epoch: number }>();
+  if (!user) throw new Error("Prompt submission owner is unavailable.");
+
+  const existing = await env.DB.prepare(`SELECT submissions.id, submissions.source_id,
+      sources.content_sha256, sources.source_kind
+    FROM submissions JOIN submission_sources AS sources ON sources.id=submissions.source_id
+    WHERE submissions.id=? AND submissions.user_id=? AND submissions.contest_id=?
+      AND submissions.problem_id=?`)
+    .bind(submissionId, request.ownerUserId, request.contestId, request.problemId)
+    .first<{
+      readonly id: string;
+      readonly source_id: string;
+      readonly content_sha256: string | null;
+      readonly source_kind: string;
+    }>();
+  if (existing && (existing.source_id !== sourceId
+    || existing.content_sha256 !== sourceSha256
+    || existing.source_kind !== "prompt-generated")) {
+    throw new Error("Prompt attempt is already bound to a different official source product.");
+  }
+  if (!existing) {
+    const capacity = await submissionCapacitySnapshot(env, request.ownerUserId);
+    if (capacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER || capacity.globalQueued >= MAX_QUEUED_SUBMISSIONS) {
+      throw new Error("Prompt submission queue capacity is unavailable.");
+    }
+  }
+
+  const expectedEvidence = request.evidenceAt === "input-admitted"
+    ? request.admittedLogicalSeconds
+    : request.evidenceAt === "generated-source-ready"
+      ? request.sourceReadyLogicalSeconds
+      : null;
+  const [sourceInsert, submissionInsert, recordInsert] = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO submission_sources
+        (id, owner_user_id, content_sha256, bytes, state, source_kind,
+         admission_erasure_epoch, created_at)
+      SELECT ?, users.id, ?, ?, 'reserved', 'prompt-generated', users.erasure_epoch, ?
+      FROM users JOIN prompt_attempts AS attempts ON attempts.id=?
+      JOIN prompt_attempt_quota AS quota ON quota.prompt_attempt_id=attempts.id
+      WHERE users.id=? AND users.status='active' AND users.erasure_epoch=?
+        AND attempts.contest_id=? AND attempts.entrant_id=? AND attempts.problem_id=?
+        AND attempts.timeline_generation=? AND attempts.rules_epoch=? AND attempts.problem_epoch=?
+        AND attempts.content_epoch=? AND attempts.judge_epoch=?
+        AND attempts.state='generating'
+        AND ((?='current' AND attempts.eligibility='eligible' AND quota.state='consumed')
+          OR (?='invalid-history' AND attempts.eligibility='invalid' AND quota.state='invalid'
+            AND attempts.invalidated_at IS ? AND attempts.invalidation_reason IS ?))
+        AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=users.id)
+      ON CONFLICT(id) DO NOTHING`)
+      .bind(
+        sourceId, sourceSha256, sourceBytes.byteLength, now, request.attemptId,
+        request.ownerUserId, user.erasure_epoch, request.contestId, request.entrantId,
+        request.problemId, request.timelineGeneration, request.rulesEpoch,
+        request.problemEpoch, request.contentEpoch, request.judgeEpoch,
+        request.timelineDisposition, request.timelineDisposition,
+        request.invalidatedAt, request.invalidationReason,
+      ),
+    env.DB.prepare(`INSERT INTO submissions
+        (id, origin_submission_id, origin_submitted_at, user_id, problem_id,
+         catalog_commit, judge_digest, contest_id, source_id, language, target,
+         optimization, entry_path, state, visibility, admitted_at, created_at, updated_at)
+      SELECT ?, ?, attempts.created_at, entrants.owner_user_id, revisions.problem_id,
+        revisions.commit_sha, revisions.judge_digest, attempts.contest_id, sources.id,
+        rule_problem.output_language, rule_problem.output_target,
+        rule_problem.output_optimization, rule_problem.output_entry_path,
+        'admitting', 'private', attempts.created_at, attempts.created_at, ?
+      FROM prompt_attempts AS attempts
+      JOIN prompt_attempt_quota AS quota ON quota.prompt_attempt_id=attempts.id
+      JOIN contest_entrants AS entrants
+        ON entrants.id=attempts.entrant_id AND entrants.contest_id=attempts.contest_id
+      JOIN contest_rule_epochs AS rule_epoch
+        ON rule_epoch.contest_id=attempts.contest_id AND rule_epoch.rules_epoch=attempts.rules_epoch
+      JOIN contest_rule_revisions AS rule_revision
+        ON rule_revision.contest_id=rule_epoch.contest_id
+       AND rule_revision.rules_commit=rule_epoch.rules_commit
+      JOIN contest_rule_problems AS rule_problem
+        ON rule_problem.contest_id=attempts.contest_id
+       AND rule_problem.rules_commit=rule_epoch.rules_commit
+       AND rule_problem.problem_id=attempts.problem_id
+      JOIN contest_problem_epochs AS problem_epoch
+       ON problem_epoch.contest_id=attempts.contest_id
+       AND problem_epoch.problem_id=attempts.problem_id
+       AND problem_epoch.problem_epoch=attempts.problem_epoch
+       AND problem_epoch.content_epoch=attempts.content_epoch
+       AND problem_epoch.judge_epoch=attempts.judge_epoch
+      JOIN problem_revisions AS revisions
+        ON revisions.problem_id=attempts.problem_id
+       AND revisions.commit_sha=problem_epoch.content_commit
+       AND revisions.judge_digest=problem_epoch.judge_digest
+      JOIN submission_sources AS sources
+        ON sources.id=? AND sources.owner_user_id=entrants.owner_user_id
+       AND sources.content_sha256=? AND sources.source_kind='prompt-generated'
+      JOIN contest_runtimes AS runtime ON runtime.contest_id=attempts.contest_id
+      WHERE attempts.id=? AND attempts.state='generating'
+        AND attempts.contest_id=? AND attempts.entrant_id=? AND attempts.problem_id=?
+        AND attempts.timeline_generation=?
+        AND attempts.rules_epoch=? AND attempts.problem_epoch=?
+        AND attempts.content_epoch=? AND attempts.judge_epoch=?
+        AND ((?='current' AND attempts.eligibility='eligible' AND quota.state='consumed'
+              AND runtime.timeline_generation=attempts.timeline_generation)
+          OR (?='invalid-history' AND attempts.eligibility='invalid' AND quota.state='invalid'
+              AND attempts.invalidated_at IS ? AND attempts.invalidation_reason IS ?))
+        AND rule_revision.official_track='prompt-program'
+        AND rule_problem.output_language=? AND rule_problem.output_target=?
+        AND rule_problem.output_optimization=? AND rule_problem.output_entry_path=?
+        AND (SELECT COUNT(*) FROM submissions WHERE state IN ('admitting','queued')) < ?
+        AND (SELECT COUNT(*) FROM submissions
+          WHERE user_id=entrants.owner_user_id AND state IN ('admitting','queued')) < ?
+      ON CONFLICT(id) DO NOTHING`)
+      .bind(
+        submissionId, submissionId, now, sourceId, sourceSha256,
+        request.attemptId, request.contestId, request.entrantId, request.problemId,
+        request.timelineGeneration, request.rulesEpoch, request.problemEpoch,
+        request.contentEpoch, request.judgeEpoch,
+        request.timelineDisposition, request.timelineDisposition,
+        request.invalidatedAt, request.invalidationReason,
+        request.generatedSource.output.language, request.generatedSource.output.target,
+        request.generatedSource.output.optimization, request.generatedSource.entry,
+        MAX_QUEUED_SUBMISSIONS, MAX_QUEUED_SUBMISSIONS_PER_USER,
+      ),
+    env.DB.prepare(`INSERT INTO contest_submission_records
+        (submission_id, contest_id, entrant_id, timeline_generation, rules_epoch,
+         content_epoch, judge_epoch, admitted_logical_seconds, evidence_at,
+         evidence_logical_seconds, eligibility, invalidated_at, invalidation_reason,
+         created_at, prompt_attempt_id)
+      SELECT submissions.id, attempts.contest_id, attempts.entrant_id,
+        attempts.timeline_generation, attempts.rules_epoch, attempts.content_epoch,
+        attempts.judge_epoch, attempts.admitted_logical_seconds, ?, ?, ?, ?, ?, ?, attempts.id
+      FROM prompt_attempts AS attempts
+      JOIN submissions ON submissions.id=? AND submissions.source_id=?
+      WHERE attempts.id=? AND attempts.contest_id=? AND attempts.entrant_id=?
+        AND attempts.problem_id=? AND attempts.timeline_generation=?
+        AND attempts.rules_epoch=? AND attempts.problem_epoch=?
+        AND attempts.content_epoch=? AND attempts.judge_epoch=?
+      ON CONFLICT(submission_id) DO NOTHING`)
+      .bind(
+        request.evidenceAt, expectedEvidence, request.eligibility,
+        request.invalidatedAt, request.invalidationReason, now,
+        submissionId, sourceId, request.attemptId, request.contestId,
+        request.entrantId, request.problemId, request.timelineGeneration,
+        request.rulesEpoch, request.problemEpoch, request.contentEpoch, request.judgeEpoch,
+      ),
+  ]);
+  if ((!existing && (sourceInsert?.meta.changes !== 1
+    || submissionInsert?.meta.changes !== 1
+    || recordInsert?.meta.changes !== 1))) {
+    throw new Error("Prompt submission lost its atomic admission fence.");
+  }
+  const exact = await env.DB.prepare(`SELECT 1 AS valid
+    FROM submissions JOIN submission_sources AS sources ON sources.id=submissions.source_id
+    JOIN contest_submission_records AS records ON records.submission_id=submissions.id
+    WHERE submissions.id=? AND submissions.source_id=? AND submissions.user_id=?
+      AND submissions.contest_id=? AND submissions.problem_id=?
+      AND sources.source_kind='prompt-generated' AND sources.content_sha256=?
+      AND records.timeline_generation=? AND records.rules_epoch=?
+      AND records.content_epoch=? AND records.judge_epoch=?
+      AND records.eligibility=? AND records.prompt_attempt_id=?`)
+    .bind(
+      submissionId, sourceId, request.ownerUserId, request.contestId,
+      request.problemId, sourceSha256, request.timelineGeneration,
+      request.rulesEpoch, request.contentEpoch, request.judgeEpoch, request.eligibility,
+      request.attemptId,
+    ).first<{ readonly valid: number }>();
+  if (!exact) throw new Error("Prompt submission admission did not create its exact product.");
+
+  await putSourceConditional(env, sourceId, sourceBytes, sourceSha256);
+  if (!await finalizeSourceAdmission(env, {
+    sourceId,
+    submissionId,
+    userId: request.ownerUserId,
+    erasureEpoch: user.erasure_epoch,
+  })) {
+    throw new Error("Prompt generated source could not enter the official submission queue.");
+  }
+  await dispatchSubmissionJobs(env);
+  return { sourceId, sourceSha256, submissionId };
+}
+
 export async function reconcileAdmittingSubmission(env: WasmOjWorkerEnv, submissionId: string, now = new Date()): Promise<boolean> {
   const row = await env.DB.prepare(`SELECT submissions.id, submissions.user_id, submissions.source_id,
       submissions.state, submissions.updated_at, sources.content_sha256, sources.bytes,
@@ -359,6 +702,7 @@ export async function reconcileAdmittingSubmission(env: WasmOjWorkerEnv, submiss
       userId: row.user_id,
       erasureEpoch: row.admission_erasure_epoch,
     })) {
+      await reconcilePromptAttemptProduct(env.DB, row.id, now);
       await dispatchSubmissionJobs(env);
       return true;
     }
@@ -386,10 +730,10 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
   const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   const input = parseOfficialSubmissionRequest(await readJsonBody(request, SOURCE_MAX_BYTES));
-  const problem = await activeProblemRevision(env, input.problemId);
-  if (problem.commit_sha !== input.catalogCommit) {
-    throw new ApiError(409, "problem-revision-stale", "The requested problem revision is no longer active.");
-  }
+  const problemId = input.context.problemId;
+  const catalogCommit = input.context.kind === "practice" ? input.context.catalogCommit : input.context.contentCommit;
+  const contestId = input.context.kind === "contest" ? input.context.contestId : undefined;
+  const problem = await loadSubmissionProblemRevisionForAdmission(env, problemId, catalogCommit, input.context.kind);
   const allowedProfiles = JSON.parse(problem.allowed_profiles_json) as unknown;
   const selectedProfile = allowedProfiles && typeof allowedProfiles === "object" && !Array.isArray(allowedProfiles)
     ? (allowedProfiles as Record<string, { target?: unknown; optimization?: unknown }>)[input.language]
@@ -397,10 +741,12 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
   if (selectedProfile?.target !== input.target || selectedProfile.optimization !== input.optimization) {
     throw new ApiError(409, "compile-profile-not-allowed", "Language, target, or optimization is not allowed by this problem.");
   }
-  if (!input.contestId && problem.practice_enabled !== 1) {
+  if (!contestId && problem.practice_enabled !== 1) {
     throw new ApiError(409, "practice-disabled", "This problem is not enabled for practice submissions.");
   }
-  await verifyContestAdmission(env, session, input.contestId, input.problemId, input.catalogCommit);
+  const contestFence = input.context.kind === "contest"
+    ? await verifyContestAdmission(env, session, input.context)
+    : null;
   const requestDigest = await sha256Hex(canonicalBytes(input));
   const existing = await env.DB.prepare("SELECT submission_id, request_digest FROM submission_idempotency WHERE user_id=? AND idempotency_key=?")
     .bind(session.userId, input.idempotencyKey).first<{ readonly submission_id: string; readonly request_digest: string }>();
@@ -412,7 +758,7 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
   const formalRiskRequestKey = await sha256Hex(canonicalBytes({ idempotencyKey: input.idempotencyKey, requestDigest }));
   await requireOfficialSubmissionRiskTurnstile(request, env, session.userId, formalRiskRequestKey);
   const capacity = await submissionCapacitySnapshot(env, session.userId);
-  if (capacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) throw new ApiError(429, "submission-queue-full", "This account already has three queued submissions.");
+  if (capacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) throw new ApiError(429, "submission-queue-full", "This account already has eight queued submissions.");
   if (capacity.globalQueued >= MAX_QUEUED_SUBMISSIONS) throw new ApiError(429, "submission-capacity", "The submission queue is temporarily full.");
   const user = await env.DB.prepare("SELECT erasure_epoch FROM users WHERE id=? AND status='active'")
     .bind(session.userId).first<{ readonly erasure_epoch: number }>();
@@ -424,11 +770,7 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
     entry: input.entry,
     sourceFiles: input.sourceFiles,
   };
-  const sourceBytes = canonicalBytes({
-    schema: "wasm-oj-platform/official-source/v1",
-    sourceDigest: await sha256Hex(canonicalBytes(compileRequest)),
-    request: compileRequest,
-  });
+  const sourceBytes = await encodeOfficialSourceDocument(compileRequest);
   const sourceDigest = await sha256Hex(sourceBytes);
   const sourceId = crypto.randomUUID();
   const submissionId = crypto.randomUUID();
@@ -441,7 +783,8 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
          WHERE id=? AND status='active' AND erasure_epoch=?
            AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=users.id)`)
         .bind(sourceId, sourceDigest, sourceBytes.byteLength, timestamp, session.userId, user.erasure_epoch),
-      env.DB.prepare(`INSERT INTO submissions
+      env.DB.prepare(`WITH admission_clock(admitted_at) AS (VALUES (?))
+        INSERT INTO submissions
           (id, origin_submission_id, origin_submitted_at, user_id, problem_id,
            catalog_commit, judge_digest, contest_id,
            source_id, language, target, optimization, entry_path,
@@ -453,23 +796,95 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
           JOIN problem_series AS problems ON problems.id=revisions.problem_id
           JOIN catalogs ON catalogs.id=problems.catalog_id
           JOIN submission_sources AS sources ON sources.id=? AND sources.owner_user_id=? AND sources.state='reserved'
+         CROSS JOIN admission_clock
          WHERE revisions.problem_id=? AND revisions.commit_sha=?
-           AND catalogs.active_commit_sha=revisions.commit_sha
-           AND ((? IS NULL AND revisions.practice_enabled=1)
+           AND ((? IS NULL AND revisions.practice_enabled=1
+                 AND catalogs.active_commit_sha=revisions.commit_sha)
              OR (? IS NOT NULL AND EXISTS (
-               SELECT 1 FROM contest_revision_problems
-                WHERE contest_id=? AND commit_sha=revisions.commit_sha
-                  AND problem_id=revisions.problem_id
+               SELECT 1 FROM contest_runtimes AS runtime
+               JOIN contest_rule_revisions AS rule_revision
+                 ON rule_revision.contest_id=runtime.contest_id
+                AND rule_revision.rules_commit=runtime.active_rules_commit
+                AND rule_revision.rules_sha256=runtime.active_rules_sha256
+               JOIN contest_rule_problems AS rule_problem
+                 ON rule_problem.contest_id=runtime.contest_id
+                AND rule_problem.rules_commit=runtime.active_rules_commit
+                AND rule_problem.problem_id=revisions.problem_id
+               JOIN contest_entrants AS entrant
+                 ON entrant.id=? AND entrant.contest_id=runtime.contest_id
+               JOIN contest_problem_epochs AS problem_epoch
+                 ON problem_epoch.contest_id=runtime.contest_id
+                AND problem_epoch.problem_id=revisions.problem_id
+                AND problem_epoch.problem_epoch=? AND problem_epoch.state='effective'
+               WHERE runtime.contest_id=? AND runtime.state='running'
+                 AND runtime.timeline_generation=? AND runtime.rules_epoch=?
+                 AND rule_revision.status='published' AND rule_revision.official_track='code'
+                 AND entrant.state='active' AND entrant.state_timeline_generation=runtime.timeline_generation
+                 AND problem_epoch.content_commit=revisions.commit_sha
+                 AND ${CONTEST_CURRENT_LOGICAL_SQL}>=rule_problem.release_after_seconds
+                 AND ${CONTEST_CURRENT_LOGICAL_SQL}<rule_problem.submission_closes_after_seconds
+                 AND NOT ${unadvancedDueCheckpointSql(CONTEST_CURRENT_LOGICAL_SQL)}
+                 AND (SELECT COUNT(*) FROM contest_submission_records AS prior
+                      JOIN submissions AS prior_submission ON prior_submission.id=prior.submission_id
+                      WHERE prior.contest_id=runtime.contest_id AND prior.entrant_id=entrant.id
+                        AND prior_submission.problem_id=revisions.problem_id
+                        AND prior.eligibility='eligible'
+                        AND prior_submission.origin_submission_id=prior_submission.id) < rule_problem.attempt_limit
              )))
            AND (SELECT COUNT(*) FROM submissions WHERE state IN ('admitting','queued')) < ?
            AND (SELECT COUNT(*) FROM submissions WHERE user_id=? AND state IN ('admitting','queued')) < ?`)
         .bind(
-          submissionId, submissionId, timestamp, session.userId, input.contestId ?? null, sourceId,
+          timestamp,
+          submissionId, submissionId, timestamp, session.userId, contestId ?? null, sourceId,
           input.language, input.target, input.optimization, input.entry,
           timestamp, timestamp, timestamp,
-          sourceId, session.userId, input.problemId, input.catalogCommit,
-          input.contestId ?? null, input.contestId ?? null, input.contestId ?? null,
+          sourceId, session.userId, problemId, catalogCommit,
+          contestId ?? null, contestId ?? null,
+          contestFence?.entrantId ?? null,
+          contestFence?.problemEpoch ?? null,
+          contestFence?.contestId ?? null,
+          contestFence?.timelineGeneration ?? null,
+          contestFence?.ruleEpoch ?? null,
           MAX_QUEUED_SUBMISSIONS, session.userId, MAX_QUEUED_SUBMISSIONS_PER_USER,
+        ),
+      env.DB.prepare(`WITH admission_clock(admitted_at) AS (VALUES (?))
+        INSERT INTO contest_submission_records
+          (submission_id, contest_id, entrant_id, timeline_generation, rules_epoch,
+           content_epoch, judge_epoch, admitted_logical_seconds, evidence_at,
+           evidence_logical_seconds, eligibility, created_at)
+        SELECT submissions.id, runtime.contest_id, entrant.id, runtime.timeline_generation,
+          runtime.rules_epoch, problem_epoch.content_epoch, problem_epoch.judge_epoch,
+          ${CONTEST_CURRENT_LOGICAL_SQL}, rule_revision.evidence_at,
+          CASE WHEN rule_revision.evidence_at='input-admitted' THEN ${CONTEST_CURRENT_LOGICAL_SQL} ELSE NULL END,
+          'eligible', admission_clock.admitted_at
+        FROM submissions
+        CROSS JOIN admission_clock
+        JOIN contest_runtimes AS runtime ON runtime.contest_id=submissions.contest_id
+        JOIN contest_rule_revisions AS rule_revision
+          ON rule_revision.contest_id=runtime.contest_id
+         AND rule_revision.rules_commit=runtime.active_rules_commit
+         AND rule_revision.rules_sha256=runtime.active_rules_sha256
+        JOIN contest_rule_problems AS rule_problem
+          ON rule_problem.contest_id=runtime.contest_id
+         AND rule_problem.rules_commit=runtime.active_rules_commit
+         AND rule_problem.problem_id=submissions.problem_id
+        JOIN contest_entrants AS entrant
+          ON entrant.id=? AND entrant.contest_id=runtime.contest_id
+        JOIN contest_problem_epochs AS problem_epoch
+          ON problem_epoch.contest_id=runtime.contest_id
+         AND problem_epoch.problem_id=submissions.problem_id
+         AND problem_epoch.problem_epoch=? AND problem_epoch.state='effective'
+        WHERE submissions.id=? AND ? IS NOT NULL
+          AND runtime.timeline_generation=? AND runtime.rules_epoch=? AND runtime.state='running'
+          AND entrant.state='active' AND entrant.state_timeline_generation=runtime.timeline_generation`)
+        .bind(
+          timestamp,
+          contestFence?.entrantId ?? null,
+          contestFence?.problemEpoch ?? null,
+          submissionId,
+          contestFence?.contestId ?? null,
+          contestFence?.timelineGeneration ?? null,
+          contestFence?.ruleEpoch ?? null,
         ),
       env.DB.prepare(`INSERT INTO submission_idempotency
           (user_id, idempotency_key, request_digest, submission_id, created_at)
@@ -482,10 +897,24 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
     if (winner?.request_digest === requestDigest) return submissionCreatedResponse(request, env, winner.submission_id, true);
     const currentCapacity = await submissionCapacitySnapshot(env, session.userId);
     if (currentCapacity.userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) {
-      throw new ApiError(429, "submission-queue-full", "This account already has three queued submissions.");
+      throw new ApiError(429, "submission-queue-full", "This account already has eight queued submissions.");
     }
     if (currentCapacity.globalQueued >= MAX_QUEUED_SUBMISSIONS) {
       throw new ApiError(429, "submission-capacity", "The submission queue is temporarily full.");
+    }
+    if (contestFence && input.context.kind === "contest") {
+      const failureObservedAt = new Date().toISOString();
+      if (await hasUnadvancedDueCheckpoint(env, contestFence, failureObservedAt)) {
+        throw new ApiError(
+          409,
+          "contest-checkpoint-not-advanced",
+          "A due contest checkpoint has not advanced this entrant.",
+        );
+      }
+      // Re-evaluate every public contest rule after a failed atomic write so a
+      // pause, rewind, epoch change, elimination, or closing boundary is
+      // returned as its typed admission error instead of a storage exception.
+      await verifyContestAdmission(env, session, input.context);
     }
     throw error;
   }
@@ -675,13 +1104,9 @@ export async function updateSubmissionVisibility(request: Request, env: WasmOjWo
   if (visibility !== "private" && visibility !== "public") throw new ApiError(400, "visibility-invalid", "Visibility must be private or public.");
   if (visibility === "public" && !submissionMayBecomePublic(row)) throw new ApiError(409, "submission-not-complete", "Only completed source can be made public.");
   if (visibility === "public" && row.contest_id) {
-    const contest = await env.DB.prepare(`SELECT revisions.ends_at
-      FROM contest_series AS contests
-      JOIN catalogs ON catalogs.id=contests.catalog_id
-      JOIN contest_revisions AS revisions
-        ON revisions.contest_id=contests.id AND revisions.commit_sha=catalogs.active_commit_sha
-      WHERE contests.id=?`).bind(row.contest_id).first<{ readonly ends_at: string }>();
-    if (!contest || contest.ends_at > new Date().toISOString()) throw new ApiError(409, "contest-source-embargo", "Contest source remains private until the contest ends.");
+    const contest = await env.DB.prepare("SELECT state FROM contest_runtimes WHERE contest_id=?")
+      .bind(row.contest_id).first<{ readonly state: string }>();
+    if (!contest || contest.state !== "ended") throw new ApiError(409, "contest-source-embargo", "Contest source remains private until the contest ends.");
   }
   await env.DB.prepare("UPDATE submissions SET visibility=?, updated_at=? WHERE id=?").bind(visibility, new Date().toISOString(), submissionId).run();
   return jsonResponse({ submissionId, visibility });
@@ -786,7 +1211,7 @@ export function parseSubmissionPolicySummary(stored: string): SubmissionPolicySu
 export async function getSubmissionPolicySummary(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
   const session = await authenticatedSession(request, env);
   const row = await env.DB.prepare(`SELECT origin.user_id, origin.visibility, origin.contest_id,
-      contest_revisions.ends_at AS contest_ends_at,
+      contest_runtime.state AS contest_state,
       COALESCE(result.state, origin.state) AS state,
       COALESCE(result.policy_summary_json, origin.policy_summary_json) AS policy_summary_json
     FROM submissions AS requested
@@ -795,15 +1220,13 @@ export async function getSubmissionPolicySummary(request: Request, env: WasmOjWo
       ON effective.origin_submission_id=origin.id
     LEFT JOIN submissions AS result ON result.id=effective.effective_submission_id
     LEFT JOIN contest_series AS contests ON contests.id=origin.contest_id
-    LEFT JOIN catalogs ON catalogs.id=contests.catalog_id
-    LEFT JOIN contest_revisions ON contest_revisions.contest_id=contests.id
-      AND contest_revisions.commit_sha=catalogs.active_commit_sha
+    LEFT JOIN contest_runtimes AS contest_runtime ON contest_runtime.contest_id=contests.id
     WHERE requested.id=?`)
     .bind(submissionId).first<{
       readonly user_id: string;
       readonly visibility: string;
       readonly contest_id: string | null;
-      readonly contest_ends_at: string | null;
+      readonly contest_state: string | null;
       readonly state: string;
       readonly policy_summary_json: string | null;
     }>();
@@ -811,7 +1234,7 @@ export async function getSubmissionPolicySummary(request: Request, env: WasmOjWo
     throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   }
   if (row.user_id !== session?.userId && row.contest_id !== null
-    && (row.contest_ends_at === null || row.contest_ends_at > new Date().toISOString())) {
+    && row.contest_state !== "ended") {
     throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   }
   if (row.state !== "completed" || row.policy_summary_json === null) {

@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     environment: "node",
     fileParallelism: false,
-    include: ["src/**/*.test.ts", "worker/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}", "worker/**/*.test.ts"],
   },
 });

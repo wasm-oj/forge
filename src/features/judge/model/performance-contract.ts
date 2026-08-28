@@ -47,6 +47,8 @@ export interface PerformanceEvolutionPoint {
   readonly createdAt: string;
   readonly completedAt: string | null;
   readonly policySummaryAvailable: boolean;
+  readonly eligible: boolean;
+  readonly invalidationReason: string | null;
 }
 
 export interface ProblemPerformanceResponse {
@@ -54,6 +56,7 @@ export interface ProblemPerformanceResponse {
     readonly problemId: string;
     readonly contestId: string | null;
     readonly frozen: boolean;
+    readonly hidden: boolean;
     readonly availableLanguages: readonly BuiltinLanguage[];
     readonly selectedLanguage: BuiltinLanguage | null;
     readonly myEvolutionTruncated: boolean;
@@ -201,6 +204,7 @@ function evolutionPoint(value: unknown, index: number): PerformanceEvolutionPoin
   exactKeys(item, [
     "submissionId", "attemptNumber", "language", "state", "verdict", "score", "fullyPassedCases",
     "deterministicCost", "peakMemoryBytes", "createdAt", "completedAt", "policySummaryAvailable",
+    "eligible", "invalidationReason",
   ], [], label);
   if (typeof item.state !== "string" || !(SUBMISSION_STATES as readonly string[]).includes(item.state)) {
     throw new TypeError(`${label}.state is invalid.`);
@@ -209,6 +213,11 @@ function evolutionPoint(value: unknown, index: number): PerformanceEvolutionPoin
     throw new TypeError(`${label}.verdict is invalid.`);
   }
   if (typeof item.policySummaryAvailable !== "boolean") throw new TypeError(`${label}.policySummaryAvailable must be boolean.`);
+  if (typeof item.eligible !== "boolean") throw new TypeError(`${label}.eligible must be boolean.`);
+  const invalidationReason = item.invalidationReason === null
+    ? null
+    : boundedText(item.invalidationReason, 160, `${label}.invalidationReason`);
+  if (item.eligible !== (invalidationReason === null)) throw new TypeError(`${label} eligibility and invalidation reason disagree.`);
   const completedAt = item.completedAt === null ? null : timestamp(item.completedAt, `${label}.completedAt`);
   const attemptNumber = nonnegativeInteger(item.attemptNumber, Number.MAX_SAFE_INTEGER, `${label}.attemptNumber`);
   if (attemptNumber < 1) throw new TypeError(`${label}.attemptNumber must be positive.`);
@@ -242,6 +251,8 @@ function evolutionPoint(value: unknown, index: number): PerformanceEvolutionPoin
     createdAt: timestamp(item.createdAt, `${label}.createdAt`),
     completedAt,
     policySummaryAvailable: item.policySummaryAvailable,
+    eligible: item.eligible,
+    invalidationReason,
   };
 }
 
@@ -256,7 +267,7 @@ export function parseProblemPerformanceResponse(value: unknown, expected: Expect
   exactKeys(root, ["context", "frontier", "myEvolution"], [], "Performance response");
   const context = record(root.context, "Performance context");
   exactKeys(context, [
-    "problemId", "contestId", "frozen", "availableLanguages", "selectedLanguage", "myEvolutionTruncated",
+    "problemId", "contestId", "frozen", "hidden", "availableLanguages", "selectedLanguage", "myEvolutionTruncated",
   ], [], "Performance context");
   const problemId = uuid(context.problemId, "Performance context problemId");
   const contestId = context.contestId === null ? null : uuid(context.contestId, "Performance context contestId");
@@ -264,6 +275,7 @@ export function parseProblemPerformanceResponse(value: unknown, expected: Expect
     throw new TypeError("Performance context does not match the requested problem.");
   }
   if (typeof context.frozen !== "boolean") throw new TypeError("Performance context frozen must be boolean.");
+  if (typeof context.hidden !== "boolean") throw new TypeError("Performance context hidden must be boolean.");
   if (typeof context.myEvolutionTruncated !== "boolean") throw new TypeError("Performance context myEvolutionTruncated must be boolean.");
   if (!Array.isArray(context.availableLanguages) || context.availableLanguages.length > 7) {
     throw new TypeError("Performance context languages are invalid.");
@@ -307,6 +319,7 @@ export function parseProblemPerformanceResponse(value: unknown, expected: Expect
       problemId,
       contestId,
       frozen: context.frozen,
+      hidden: context.hidden,
       availableLanguages,
       selectedLanguage,
       myEvolutionTruncated: context.myEvolutionTruncated,

@@ -22,6 +22,31 @@ function problem(slug = "sum"): Record<string, unknown> {
   };
 }
 
+function codeRules(problemSlugs = ["sum"]): Record<string, unknown> {
+  return {
+    clock: {
+      kind: "global",
+      registrationOpensAt: "2025-12-01T00:00:00Z",
+      registrationClosesAt: "2026-01-01T00:00:00Z",
+      startsAt: "2026-01-01T00:00:00Z",
+      durationSeconds: 3_600,
+    },
+    officialTrack: { kind: "code", aiAssist: "allowed" },
+    evidenceAt: "input-admitted",
+    problems: problemSlugs.map((slug) => ({
+      slug,
+      batch: 1,
+      releaseAfterSeconds: 0,
+      submissionClosesAfterSeconds: 3_600,
+      points: 100,
+      attemptLimit: 10,
+    })),
+    scoring: { kind: "score", tieBreaks: ["deterministic-cost", "final-best-achieved-at"] },
+    checkpoints: [],
+    leaderboard: { kind: "live" },
+  };
+}
+
 it("accepts ordinary non-canonical UTF-8 JSON", () => {
   expect(parseRepositoryRoot(new TextEncoder().encode(`{\n  "problems": "collection/problems.json",\n  "schema": "wasm-oj-platform/repository/v1",\n  "contests": "collection/contests.json"\n}`))).toEqual({
     schema: "wasm-oj-platform/repository/v1",
@@ -45,13 +70,23 @@ describe("repository catalog validation", () => {
     const root = parseRepositoryRoot(new TextEncoder().encode(JSON.stringify({ schema: "wasm-oj-platform/repository/v1", problems: "collection/problems.json", contests: "collection/contests.json" })));
     const problems = parseRepositoryProblemsValue({ schema: "wasm-oj-platform/problems/v1", problems: [problem()] });
     const contests = parseRepositoryContestsValue({
-      schema: "wasm-oj-platform/contests/v1",
+      schema: "wasm-oj-platform/contests/v2",
       contests: [{
         slug: "weekly-1", status: "published", title: "Weekly 1", description: "",
-        accessMode: "public", startsAt: "2026-01-01T00:00:00Z", endsAt: "2026-01-01T01:00:00Z",
-        freezeAt: null, problems: ["missing"],
+        accessMode: "public", rules: codeRules(["missing"]),
       }],
     });
     expect(() => validateRepositoryCatalog(root, problems, contests)).toThrow("unknown problem");
+  });
+
+  it("accepts only the exact contests/v2 shape", () => {
+    expect(() => parseRepositoryContestsValue({ schema: "wasm-oj-platform/contests/v1", contests: [] })).toThrow("contests/v2");
+    expect(() => parseRepositoryContestsValue({
+      schema: "wasm-oj-platform/contests/v2",
+      contests: [{
+        slug: "weekly-1", status: "published", title: "Weekly 1", description: "", accessMode: "public",
+        rules: codeRules(), startsAt: "2026-01-01T00:00:00Z",
+      }],
+    })).toThrow("invalid shape");
   });
 });

@@ -20,6 +20,7 @@ import {
   readWorkspace,
   readWorkspaceSources,
   writeWorkspace,
+  type PinnedProblem,
   type WorkspaceLanguage,
 } from "./workspace";
 
@@ -265,20 +266,36 @@ async function exactPublicProblem(client: RemoteClient, problemId: string, conte
   readonly content: Record<string, unknown>;
   readonly bytes: Uint8Array;
   readonly problem: ReturnType<typeof parsePublicProblem>;
+  readonly submissionContext: PinnedProblem["context"];
 }> {
   const metadataPath = `/api/problems/${problemId}${query({ contestId })}`;
   const metadata = object(await client.request(metadataPath, { authenticated: contestId ? true : "optional" }), "problem metadata");
-  if (metadata.problemId !== problemId || metadata.schema !== "wasm-oj-platform/problem-content-pointer/v1"
+  if (metadata.problemId !== problemId || metadata.schema !== "wasm-oj-platform/problem-content-pointer/v2"
     || typeof metadata.catalogCommit !== "string" || !/^[0-9a-f]{40}$/.test(metadata.catalogCommit)) {
     throw new CliError("Problem metadata identity is invalid.", { exitCode: 4 });
   }
   const content = object(metadata.content, "problem content pointer");
   const contentUrl = field(content, "url", "problem content URL");
   const contentSha256 = field(content, "sha256", "problem content digest");
+  const submissionContext: PinnedProblem["context"] = contestId
+    ? (() => {
+        const admission = object(metadata.contestAdmission, "contest admission");
+        for (const key of ["timelineGeneration", "ruleEpoch", "problemEpoch"] as const) {
+          if (!Number.isSafeInteger(admission[key]) || (admission[key] as number) < 1) throw new CliError(`Contest admission ${key} is invalid.`, { exitCode: 4 });
+        }
+        return {
+          kind: "contest" as const,
+          contestId,
+          timelineGeneration: admission.timelineGeneration as number,
+          ruleEpoch: admission.ruleEpoch as number,
+          problemEpoch: admission.problemEpoch as number,
+        };
+      })()
+    : { kind: "practice" as const };
   if (!/^[0-9a-f]{64}$/.test(contentSha256) || !Number.isSafeInteger(content.bytes) || (content.bytes as number) < 1) throw new CliError("Problem content pointer is invalid.", { exitCode: 4 });
   const bytes = await client.requestBytes(contentUrl, { authenticated: contestId ? true : "optional" });
   if (bytes.byteLength !== content.bytes || createHash("sha256").update(bytes).digest("hex") !== contentSha256) throw new CliError("Downloaded problem bytes disagree with their immutable pointer.", { exitCode: 4, code: "problem-content-integrity" });
-  return { metadata, content, bytes, problem: parsePublicProblem(bytes) };
+  return { metadata, content, bytes, problem: parsePublicProblem(bytes), submissionContext };
 }
 
 function localizedList(value: unknown, locale: "zh-TW" | "en"): unknown {
@@ -306,7 +323,7 @@ async function problemPull(command: ParsedCommand, dependencies: CommandDependen
   const language = stringOption(command, "language");
   if (!language || !LANGUAGES.includes(language as WorkspaceLanguage)) throw usageError("problem pull requires a supported --language.");
   const downloaded = await exactPublicProblem(client, problemId!, contestId);
-  const { metadata, content, bytes, problem } = downloaded;
+  const { metadata, content, bytes, problem, submissionContext } = downloaded;
   const catalogCommit = field(metadata, "catalogCommit", "catalogCommit");
   const contentUrl = field(content, "url", "problem content URL");
   const contentSha256 = field(content, "sha256", "problem content digest");
@@ -338,7 +355,7 @@ async function problemPull(command: ParsedCommand, dependencies: CommandDependen
     problem: {
       problemId: problemId!, catalogCommit, serverOrigin: client.origin,
       contentUrl, contentSha256, contentFile: "problem.json", locale,
-      ...(contestId ? { contestId } : {}),
+      context: submissionContext,
     },
   });
   return { value: { directory: root, problemId, catalogCommit, contentSha256, language, target: profile.target, optimization: profile.optimization }, exitCode: 0 };
@@ -359,14 +376,23 @@ async function submit(command: ParsedCommand, dependencies: CommandDependencies,
   normalizedRelativePath(entry, "--entry");
   if (!workspace.sources.includes(entry)) throw usageError("--entry must identify a source pinned in woj.json.");
   if (language !== workspace.language || target !== workspace.target || optimization !== workspace.optimization) throw new CliError("Official Submit must use the exact compile profile pinned by problem pull.", { exitCode: 5, code: "profile-pin-mismatch" });
-  const contestId = stringOption(command, "contest") ?? workspace.problem.contestId;
+  const pinnedContestId = workspace.problem.context.kind === "contest" ? workspace.problem.context.contestId : undefined;
+  const contestId = stringOption(command, "contest") ?? pinnedContestId;
   if (contestId !== undefined) uuid(contestId, "contest");
-  if (contestId !== workspace.problem.contestId) throw new CliError("Official Submit contest context must match the pinned workspace.", { exitCode: 5 });
+  if (contestId !== pinnedContestId) throw new CliError("Official Submit contest context must match the pinned workspace.", { exitCode: 5 });
   const sources = await readWorkspaceSources(dependencies.cwd, workspace);
   const body = {
-    problemId: workspace.problem.problemId,
-    catalogCommit: workspace.problem.catalogCommit,
-    ...(contestId ? { contestId } : {}),
+    context: workspace.problem.context.kind === "contest"
+      ? {
+          kind: "contest",
+          contestId: workspace.problem.context.contestId,
+          problemId: workspace.problem.problemId,
+          contentCommit: workspace.problem.catalogCommit,
+          timelineGeneration: workspace.problem.context.timelineGeneration,
+          ruleEpoch: workspace.problem.context.ruleEpoch,
+          problemEpoch: workspace.problem.context.problemEpoch,
+        }
+      : { kind: "practice", problemId: workspace.problem.problemId, catalogCommit: workspace.problem.catalogCommit },
     language, target, optimization, entry,
     sourceFiles: Object.entries(sources).sort(([left], [right]) => left.localeCompare(right)).map(([filePath, content]) => ({ path: filePath, encoding: "utf8", content })),
     idempotencyKey: `woj-submit-${randomUUID()}`,

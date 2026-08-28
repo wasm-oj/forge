@@ -6,7 +6,7 @@ import { CliError, usageError } from "./errors";
 import { canonicalizeSystemTemporaryPrefix } from "../path-safety";
 import { atomicWriteFile } from "./files";
 
-export const WOJ_WORKSPACE_SCHEMA = "wasm-oj-cli-workspace-v2";
+export const WOJ_WORKSPACE_SCHEMA = "wasm-oj-cli-workspace-v3";
 export const WORKSPACE_FILE = "woj.json";
 export const LANGUAGES = ["c", "cpp", "rust", "go", "python", "javascript", "typescript"] as const;
 export type WorkspaceLanguage = typeof LANGUAGES[number];
@@ -19,7 +19,15 @@ export interface PinnedProblem {
   readonly contentSha256: string;
   readonly contentFile: "problem.json";
   readonly locale: "zh-TW" | "en";
-  readonly contestId?: string;
+  readonly context:
+    | { readonly kind: "practice" }
+    | {
+        readonly kind: "contest";
+        readonly contestId: string;
+        readonly timelineGeneration: number;
+        readonly ruleEpoch: number;
+        readonly problemEpoch: number;
+      };
 }
 
 export interface WojWorkspace {
@@ -76,7 +84,7 @@ function parseWorkspaceInternal(value: unknown): WojWorkspace {
   let problem: PinnedProblem | undefined;
   if (workspace.problem !== undefined) {
     const pinned = record(workspace.problem, "Pinned problem");
-    exactKeys(pinned, ["problemId", "catalogCommit", "serverOrigin", "contentUrl", "contentSha256", "contentFile", "locale", ...(pinned.contestId === undefined ? [] : ["contestId"])], "Pinned problem");
+    exactKeys(pinned, ["problemId", "catalogCommit", "serverOrigin", "contentUrl", "contentSha256", "contentFile", "context", "locale"], "Pinned problem");
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
     if (typeof pinned.problemId !== "string" || !uuid.test(pinned.problemId)) throw new CliError("Pinned problem ID is invalid.");
     if (typeof pinned.catalogCommit !== "string" || !/^[0-9a-f]{40}$/.test(pinned.catalogCommit)) throw new CliError("Pinned catalog commit is invalid.");
@@ -87,7 +95,18 @@ function parseWorkspaceInternal(value: unknown): WojWorkspace {
     if (typeof pinned.contentSha256 !== "string" || !/^[0-9a-f]{64}$/.test(pinned.contentSha256)) throw new CliError("Pinned problem digest is invalid.");
     if (pinned.contentFile !== "problem.json") throw new CliError("Pinned problem content file is invalid.");
     if (pinned.locale !== "zh-TW" && pinned.locale !== "en") throw new CliError("Pinned problem locale is invalid.");
-    if (pinned.contestId !== undefined && (typeof pinned.contestId !== "string" || !uuid.test(pinned.contestId))) throw new CliError("Pinned contest ID is invalid.");
+    const context = record(pinned.context, "Pinned problem context");
+    if (context.kind === "practice") {
+      exactKeys(context, ["kind"], "Pinned practice context");
+    } else if (context.kind === "contest") {
+      exactKeys(context, ["contestId", "kind", "problemEpoch", "ruleEpoch", "timelineGeneration"], "Pinned contest context");
+      if (typeof context.contestId !== "string" || !uuid.test(context.contestId)) throw new CliError("Pinned contest ID is invalid.");
+      for (const key of ["timelineGeneration", "ruleEpoch", "problemEpoch"] as const) {
+        if (!Number.isSafeInteger(context[key]) || (context[key] as number) < 1) throw new CliError(`Pinned contest ${key} is invalid.`);
+      }
+    } else {
+      throw new CliError("Pinned problem context kind is invalid.");
+    }
     problem = {
       problemId: pinned.problemId,
       catalogCommit: pinned.catalogCommit,
@@ -96,7 +115,15 @@ function parseWorkspaceInternal(value: unknown): WojWorkspace {
       contentSha256: pinned.contentSha256,
       contentFile: "problem.json",
       locale: pinned.locale,
-      ...(pinned.contestId ? { contestId: pinned.contestId } : {}),
+      context: context.kind === "practice"
+        ? { kind: "practice" }
+        : {
+            kind: "contest",
+            contestId: context.contestId as string,
+            timelineGeneration: context.timelineGeneration as number,
+            ruleEpoch: context.ruleEpoch as number,
+            problemEpoch: context.problemEpoch as number,
+          },
     };
   }
   return {

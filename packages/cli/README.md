@@ -14,3 +14,8 @@ woj submit --wait
 ```
 
 Run `woj --help` to see the complete role-based command tree.
+
+`woj organizer collection build` materializes strict
+`wasm-oj-platform/contests/v2` manifests. Contest workspaces pin timeline, rule, and problem epoch
+tokens and send them through the contest Official Submit context; Prompt Program is a separate
+prompt-attempt workflow, not a compiler language.

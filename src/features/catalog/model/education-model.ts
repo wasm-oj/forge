@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SubmissionState, SubmissionVerdict } from "../../../online-judge/contracts";
+import type { ContestProjection } from "../../contests/model/contest-projection";
 import type { ProductLocale } from "../../platform/components/app-shell";
 import { wasmOjJson } from "../../platform/api/online-api";
 
@@ -29,18 +30,7 @@ export interface CatalogCollection {
   readonly problems: readonly CatalogProblem[];
 }
 
-export interface ContestSummary {
-  readonly id: string;
-  readonly title: string;
-  readonly description: string;
-  readonly accessMode: "public" | "invite";
-  readonly startsAt: string;
-  readonly endsAt: string;
-  readonly phase: "upcoming" | "running" | "ended";
-  readonly joined: boolean;
-  readonly organizer: boolean;
-  readonly organizerProfile: { readonly login: string; readonly displayName: string } | null;
-}
+export type ContestSummary = ContestProjection;
 
 export interface SubmissionSummary {
   readonly id: string;

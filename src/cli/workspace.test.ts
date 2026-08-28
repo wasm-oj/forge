@@ -35,6 +35,7 @@ describe("woj workspace pins", () => {
         contentUrl: "/api/problems/11111111-1111-4111-8111-111111111111/content?role=practice",
         contentSha256: "a".repeat(64),
         contentFile: "problem.json",
+        context: { kind: "practice" },
         locale: "zh-TW",
       },
     });

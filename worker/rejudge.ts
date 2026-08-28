@@ -51,6 +51,9 @@ export interface RejudgeBatchRow {
   readonly created_at: string;
   readonly updated_at: string;
   readonly effective_at: string | null;
+  readonly purpose?: "manual" | "contest-judge-rollout";
+  readonly rollout_attempt?: number | null;
+  readonly snapshot_timeline_generation?: number | null;
 }
 
 const REJUDGE_BATCH_SELECT_SQL = `SELECT batches.*,
@@ -66,6 +69,7 @@ interface MaterializationCandidate {
   readonly origin_submission_id: string;
   readonly predecessor_submission_id: string;
   readonly user_id: string;
+  readonly prompt_rollout?: number;
 }
 
 const ELIGIBLE_ORIGINS_SQL = `FROM effective_submission_results AS effective
@@ -79,6 +83,53 @@ const ELIGIBLE_ORIGINS_SQL = `FROM effective_submission_results AS effective
    AND source.state='ready' AND source.owner_user_id=predecessor.user_id
    AND source.admission_erasure_epoch=users.erasure_epoch AND users.status='active'
    AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=predecessor.user_id)`;
+
+const ROLLOUT_MATERIALIZATION_CANDIDATES_SQL = `FROM contest_judge_rollout_origins AS snapshot
+  JOIN rejudge_batches AS batch ON batch.id=snapshot.rejudge_batch_id
+  JOIN problem_revisions AS rollout_source
+    ON rollout_source.problem_id=batch.problem_id
+   AND rollout_source.commit_sha=batch.from_commit
+  JOIN effective_submission_results AS effective
+    ON effective.origin_submission_id=snapshot.origin_submission_id
+   AND effective.problem_id=batch.problem_id
+   AND effective.judged_digest=rollout_source.judge_digest
+  JOIN submissions AS origin ON origin.id=effective.origin_submission_id
+  JOIN submissions AS predecessor ON predecessor.id=effective.effective_submission_id
+  JOIN submission_sources AS source ON source.id=predecessor.source_id
+  JOIN users ON users.id=predecessor.user_id
+ WHERE snapshot.rejudge_batch_id=? AND snapshot.state='included'
+   AND batch.purpose='contest-judge-rollout'
+   AND origin.contest_id=batch.contest_id
+   AND predecessor.origin_submission_id=origin.id
+   AND predecessor.problem_id=batch.problem_id
+   AND predecessor.judge_digest=rollout_source.judge_digest
+   AND predecessor.state IN (${REJUDGEABLE_STATES})
+   AND source.state='ready' AND source.owner_user_id=predecessor.user_id
+   AND source.admission_erasure_epoch=users.erasure_epoch AND users.status='active'
+   AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=predecessor.user_id)`;
+
+const IN_FLIGHT_PROMPT_ROLLOUT_CANDIDATES_SQL = `FROM contest_judge_rollout_prompt_attempts AS membership
+  JOIN rejudge_batches AS batch ON batch.id=membership.rejudge_batch_id
+  JOIN prompt_attempts AS attempts ON attempts.id=membership.prompt_attempt_id
+  JOIN contest_judge_rollout_origins AS snapshot
+    ON snapshot.rejudge_batch_id=membership.rejudge_batch_id
+   AND snapshot.origin_submission_id=membership.origin_submission_id
+   AND snapshot.state='included'
+  JOIN submissions AS origin
+    ON origin.id=membership.origin_submission_id
+   AND origin.id=attempts.submission_id
+   AND origin.origin_submission_id=origin.id
+  JOIN submission_sources AS source ON source.id=origin.source_id
+  JOIN users ON users.id=origin.user_id
+ WHERE membership.rejudge_batch_id=? AND membership.state='promoted'
+   AND batch.purpose='contest-judge-rollout'
+   AND batch.state IN ('queued','running')
+   AND origin.contest_id=batch.contest_id AND origin.problem_id=batch.problem_id
+   AND source.state='ready' AND source.owner_user_id=origin.user_id
+   AND source.admission_erasure_epoch=users.erasure_epoch AND users.status='active'
+   AND NOT EXISTS (SELECT 1 FROM account_erasure_jobs WHERE user_id=origin.user_id)
+   AND NOT EXISTS (SELECT 1 FROM rejudge_jobs AS jobs
+     WHERE jobs.rejudge_batch_id=batch.id AND jobs.origin_submission_id=origin.id)`;
 
 export function rejudgeWorkflowNeedsInfrastructureRepair(input: {
   readonly status: string;
@@ -156,21 +207,20 @@ async function assertContestScope(
   env: WasmOjWorkerEnv,
   revision: ProblemRevisionRow,
   contestId: string | undefined,
-  now: string,
 ): Promise<void> {
   if (!contestId) return;
-  const contest = await env.DB.prepare(`SELECT revisions.ends_at
+  const contest = await env.DB.prepare(`SELECT runtime.state
     FROM contest_series AS contests
-    JOIN contest_revisions AS revisions
-      ON revisions.contest_id=contests.id AND revisions.commit_sha=?
-    JOIN contest_revision_problems AS problems
-      ON problems.contest_id=contests.id AND problems.commit_sha=revisions.commit_sha
+    JOIN contest_runtimes AS runtime ON runtime.contest_id=contests.id
+    JOIN contest_rule_problems AS problems
+      ON problems.contest_id=runtime.contest_id
+     AND problems.rules_commit=runtime.active_rules_commit
      AND problems.problem_id=?
     WHERE contests.id=? AND contests.catalog_id=?`)
-    .bind(revision.commit_sha, revision.problem_id, contestId, revision.catalog_id)
-    .first<{ readonly ends_at: string }>();
+    .bind(revision.problem_id, contestId, revision.catalog_id)
+    .first<{ readonly state: string }>();
   if (!contest) throw new ApiError(409, "rejudge-contest-mismatch", "Contest does not contain the target problem revision.");
-  if (contest.ends_at > now) throw new ApiError(409, "rejudge-contest-running", "A contest cannot be rejudged before it ends.");
+  if (contest.state !== "ended") throw new ApiError(409, "rejudge-contest-running", "A contest cannot be manually rejudged before it ends.");
 }
 
 async function assertNoUnsettledOrigins(
@@ -232,7 +282,7 @@ export async function createRejudgeBatch(request: Request, env: WasmOjWorkerEnv)
   if (!fromRevision || !toRevision) throw new ApiError(404, "rejudge-revision-not-found", "Problem revisions were not found.");
   assertRevisionAuthorization(session, fromRevision, toRevision);
   const now = new Date().toISOString();
-  await assertContestScope(env, fromRevision, input.contestId, now);
+  await assertContestScope(env, fromRevision, input.contestId);
   await assertNoUnsettledOrigins(env, input.problemId, input.fromCommit, input.contestId);
   await requireFormalMutationsEnabled(env, request);
   const noOp = fromRevision.judge_digest === toRevision.judge_digest;
@@ -339,6 +389,9 @@ function batchProjection(row: RejudgeBatchRow): Record<string, unknown> {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     effectiveAt: row.effective_at,
+    purpose: row.purpose ?? "manual",
+    rolloutAttempt: row.rollout_attempt ?? null,
+    snapshotTimelineGeneration: row.snapshot_timeline_generation ?? null,
   };
 }
 
@@ -416,6 +469,8 @@ SELECT ?, origin.id, origin.origin_submitted_at, predecessor.user_id, batch.prob
   FROM rejudge_batches AS batch
   JOIN problem_revisions AS target
     ON target.problem_id=batch.problem_id AND target.commit_sha=batch.to_commit
+  JOIN problem_revisions AS rollout_source
+    ON rollout_source.problem_id=batch.problem_id AND rollout_source.commit_sha=batch.from_commit
   JOIN submissions AS predecessor ON predecessor.id=?
   JOIN submissions AS origin ON origin.id=? AND origin.origin_submission_id=origin.id
   JOIN submission_sources AS source ON source.id=predecessor.source_id
@@ -423,8 +478,27 @@ SELECT ?, origin.id, origin.origin_submitted_at, predecessor.user_id, batch.prob
  WHERE batch.id=? AND batch.state IN ('queued','running')
    AND predecessor.origin_submission_id=origin.id
    AND predecessor.problem_id=batch.problem_id
-   AND predecessor.catalog_commit=batch.from_commit
-   AND predecessor.state IN (${REJUDGEABLE_STATES})
+   AND ((batch.purpose='contest-judge-rollout'
+       AND predecessor.judge_digest=rollout_source.judge_digest)
+     OR (batch.purpose<>'contest-judge-rollout'
+       AND predecessor.catalog_commit=batch.from_commit))
+   AND (
+     (predecessor.state IN (${REJUDGEABLE_STATES}) AND EXISTS (
+       SELECT 1 FROM effective_submission_results AS effective
+        WHERE effective.origin_submission_id=origin.id
+          AND effective.effective_submission_id=predecessor.id
+          AND effective.problem_id=batch.problem_id
+          AND ((batch.purpose='contest-judge-rollout'
+              AND effective.judged_digest=rollout_source.judge_digest)
+            OR (batch.purpose<>'contest-judge-rollout'
+              AND effective.judged_commit=batch.from_commit))
+     ))
+     OR (batch.purpose='contest-judge-rollout' AND predecessor.id=origin.id
+       AND EXISTS (SELECT 1 FROM contest_judge_rollout_prompt_attempts AS membership
+         WHERE membership.rejudge_batch_id=batch.id
+           AND membership.origin_submission_id=origin.id
+           AND membership.state='promoted'))
+   )
    AND origin.contest_id IS batch.contest_id
    AND source.state='ready' AND source.owner_user_id=predecessor.user_id
    AND source.admission_erasure_epoch=users.erasure_epoch AND users.status='active'
@@ -432,13 +506,7 @@ SELECT ?, origin.id, origin.origin_submitted_at, predecessor.user_id, batch.prob
    AND (SELECT COUNT(*) FROM submissions WHERE state IN ('admitting','queued')) < ${MAX_QUEUED_SUBMISSIONS}
    AND (SELECT COUNT(*) FROM submissions WHERE user_id=predecessor.user_id
          AND state IN ('admitting','queued')) < ${MAX_QUEUED_SUBMISSIONS_PER_USER}
-   AND EXISTS (
-     SELECT 1 FROM effective_submission_results AS effective
-      WHERE effective.origin_submission_id=origin.id
-        AND effective.effective_submission_id=predecessor.id
-        AND effective.problem_id=batch.problem_id
-        AND effective.judged_commit=batch.from_commit
-   )`;
+  `;
 
 export const MATERIALIZE_REJUDGE_ATTEMPT_SQL = `INSERT OR IGNORE INTO submission_attempts
   (submission_id, attempt, token_hash, state)
@@ -476,20 +544,45 @@ async function materializationCandidates(env: WasmOjWorkerEnv, batch: RejudgeBat
     FROM submissions WHERE state IN ('admitting','queued')`).first<{ readonly available: number }>();
   const available = Math.max(0, Math.min(MATERIALIZATION_PAGE_SIZE, capacity?.available ?? 0));
   if (available === 0) return [];
-  const candidates = await env.DB.prepare(`SELECT effective.origin_submission_id,
-      effective.effective_submission_id AS predecessor_submission_id, predecessor.user_id
-    ${ELIGIBLE_ORIGINS_SQL}
-      AND NOT EXISTS (SELECT 1 FROM rejudge_jobs
-        WHERE rejudge_batch_id=? AND origin_submission_id=effective.origin_submission_id)
-    ORDER BY origin.origin_submitted_at, origin.id LIMIT 100`)
-    .bind(batch.problem_id, batch.from_commit, batch.contest_id, batch.id)
-    .all<MaterializationCandidate>();
+  let candidateRows: readonly MaterializationCandidate[];
+  if (batch.purpose === "contest-judge-rollout") {
+    const [terminal, prompt] = await Promise.all([
+      env.DB.prepare(`SELECT effective.origin_submission_id,
+          effective.effective_submission_id AS predecessor_submission_id, predecessor.user_id
+        ${ROLLOUT_MATERIALIZATION_CANDIDATES_SQL}
+          AND NOT EXISTS (SELECT 1 FROM rejudge_jobs
+            WHERE rejudge_batch_id=batch.id
+              AND origin_submission_id=effective.origin_submission_id)
+        ORDER BY origin.origin_submitted_at, origin.id LIMIT 100`)
+        .bind(batch.id).all<MaterializationCandidate>(),
+      env.DB.prepare(`SELECT origin.id AS origin_submission_id,
+          origin.id AS predecessor_submission_id, origin.user_id, 1 AS prompt_rollout
+        ${IN_FLIGHT_PROMPT_ROLLOUT_CANDIDATES_SQL}
+        ORDER BY origin.origin_submitted_at, origin.id LIMIT 100`)
+        .bind(batch.id).all<MaterializationCandidate>(),
+    ]);
+    const unique = new Map<string, MaterializationCandidate>();
+    for (const candidate of [...prompt.results, ...terminal.results]) {
+      if (!unique.has(candidate.origin_submission_id)) unique.set(candidate.origin_submission_id, candidate);
+    }
+    candidateRows = [...unique.values()].slice(0, 100);
+  } else {
+    const manual = await env.DB.prepare(`SELECT effective.origin_submission_id,
+          effective.effective_submission_id AS predecessor_submission_id, predecessor.user_id
+        ${ELIGIBLE_ORIGINS_SQL}
+          AND NOT EXISTS (SELECT 1 FROM rejudge_jobs
+            WHERE rejudge_batch_id=? AND origin_submission_id=effective.origin_submission_id)
+        ORDER BY origin.origin_submitted_at, origin.id LIMIT 100`)
+      .bind(batch.problem_id, batch.from_commit, batch.contest_id, batch.id)
+      .all<MaterializationCandidate>();
+    candidateRows = manual.results;
+  }
   const queuedRows = await env.DB.prepare(`SELECT user_id, COUNT(*) AS count FROM submissions
       WHERE state IN ('admitting','queued') GROUP BY user_id`)
     .all<{ readonly user_id: string; readonly count: number }>();
   const queued = new Map(queuedRows.results.map((row) => [row.user_id, row.count]));
   const selected: MaterializationCandidate[] = [];
-  for (const candidate of candidates.results) {
+  for (const candidate of candidateRows) {
     const userQueued = queued.get(candidate.user_id) ?? 0;
     if (userQueued >= MAX_QUEUED_SUBMISSIONS_PER_USER) continue;
     selected.push(candidate);
@@ -611,6 +704,23 @@ export async function repairDispatchedRejudgeJobs(env: WasmOjWorkerEnv): Promise
 }
 
 async function remainingEligibleOrigins(env: WasmOjWorkerEnv, batch: RejudgeBatchRow): Promise<number> {
+  if (batch.purpose === "contest-judge-rollout") {
+    const row = await env.DB.prepare(`SELECT COUNT(*) AS count
+      FROM (
+        SELECT snapshot.origin_submission_id AS member_id
+        FROM contest_judge_rollout_origins AS snapshot
+        WHERE snapshot.rejudge_batch_id=? AND snapshot.state='included'
+          AND NOT EXISTS (SELECT 1 FROM rejudge_jobs AS jobs
+            WHERE jobs.rejudge_batch_id=snapshot.rejudge_batch_id
+              AND jobs.origin_submission_id=snapshot.origin_submission_id)
+        UNION ALL
+        SELECT membership.prompt_attempt_id AS member_id
+        FROM contest_judge_rollout_prompt_attempts AS membership
+        WHERE membership.rejudge_batch_id=? AND membership.state='included'
+      ) AS remaining`)
+      .bind(batch.id, batch.id).first<{ readonly count: number }>();
+    return row?.count ?? 0;
+  }
   const row = await env.DB.prepare(`SELECT COUNT(*) AS count ${ELIGIBLE_ORIGINS_SQL}
       AND NOT EXISTS (SELECT 1 FROM rejudge_jobs
         WHERE rejudge_batch_id=? AND origin_submission_id=effective.origin_submission_id)`)
@@ -624,16 +734,48 @@ export async function makeReadyBatchEffective(env: WasmOjWorkerEnv, batch: Rejud
   const [madeEffective] = await env.DB.batch([
     env.DB.prepare(`UPDATE rejudge_batches SET state='effective', effective_at=?, updated_at=?
       WHERE id=? AND state='ready'
-        AND (SELECT COUNT(*) FROM rejudge_jobs WHERE rejudge_batch_id=rejudge_batches.id)=expected_count
-        AND (SELECT COUNT(*) FROM rejudge_jobs
-          WHERE rejudge_batch_id=rejudge_batches.id AND state='ready')=expected_count`)
+        AND (SELECT COUNT(*) FROM rejudge_jobs AS jobs
+          WHERE jobs.rejudge_batch_id=rejudge_batches.id
+            AND (rejudge_batches.purpose<>'contest-judge-rollout' OR EXISTS (
+              SELECT 1 FROM contest_judge_rollout_origins AS snapshot
+              WHERE snapshot.rejudge_batch_id=jobs.rejudge_batch_id
+                AND snapshot.origin_submission_id=jobs.origin_submission_id
+                AND snapshot.state='included'
+            )))=expected_count
+        AND (SELECT COUNT(*) FROM rejudge_jobs AS jobs
+          WHERE jobs.rejudge_batch_id=rejudge_batches.id AND jobs.state='ready'
+            AND (rejudge_batches.purpose<>'contest-judge-rollout' OR EXISTS (
+              SELECT 1 FROM contest_judge_rollout_origins AS snapshot
+              WHERE snapshot.rejudge_batch_id=jobs.rejudge_batch_id
+                AND snapshot.origin_submission_id=jobs.origin_submission_id
+                AND snapshot.state='included'
+            )))=expected_count
+        AND (purpose<>'contest-judge-rollout' OR EXISTS (
+          SELECT 1 FROM contest_problem_epochs AS target_epoch
+          JOIN problem_revisions AS target_revision
+            ON target_revision.problem_id=target_epoch.problem_id
+           AND target_revision.commit_sha=rejudge_batches.to_commit
+          WHERE target_epoch.contest_id=rejudge_batches.contest_id
+            AND target_epoch.problem_id=rejudge_batches.problem_id
+            AND target_epoch.rollout_batch_id=rejudge_batches.id
+            AND target_epoch.state='effective'
+            AND target_epoch.judge_commit=rejudge_batches.to_commit
+            AND target_epoch.judge_digest=target_revision.judge_digest
+        ))`)
       .bind(now, now, batch.id),
     env.DB.prepare(`INSERT INTO effective_rejudges
         (origin_submission_id, effective_submission_id, rejudge_batch_id, became_effective_at)
       SELECT origin_submission_id, new_submission_id, rejudge_batch_id, ?
-        FROM rejudge_jobs
-       WHERE rejudge_batch_id=? AND state='ready'
-         AND EXISTS (SELECT 1 FROM rejudge_batches WHERE id=? AND state='effective')
+        FROM rejudge_jobs AS jobs
+       WHERE jobs.rejudge_batch_id=? AND jobs.state='ready'
+         AND EXISTS (SELECT 1 FROM rejudge_batches AS batch
+           WHERE batch.id=? AND batch.state='effective'
+             AND (batch.purpose<>'contest-judge-rollout' OR EXISTS (
+               SELECT 1 FROM contest_judge_rollout_origins AS snapshot
+               WHERE snapshot.rejudge_batch_id=jobs.rejudge_batch_id
+                 AND snapshot.origin_submission_id=jobs.origin_submission_id
+                 AND snapshot.state='included'
+             )))
       ON CONFLICT(origin_submission_id) DO UPDATE SET
         effective_submission_id=excluded.effective_submission_id,
         rejudge_batch_id=excluded.rejudge_batch_id,
@@ -661,10 +803,16 @@ export async function refreshRejudgeBatches(env: WasmOjWorkerEnv): Promise<numbe
       if (await failBatch(env, batch, batch.failure_code ?? "rejudge-cancelled")) changed += 1;
       continue;
     }
+    const activeRolloutMember = batch.purpose === "contest-judge-rollout"
+      ? `AND EXISTS (SELECT 1 FROM contest_judge_rollout_origins AS snapshot
+          WHERE snapshot.rejudge_batch_id=jobs.rejudge_batch_id
+            AND snapshot.origin_submission_id=jobs.origin_submission_id
+            AND snapshot.state='included')`
+      : "";
     const aggregate = await env.DB.prepare(`SELECT COUNT(*) AS total,
         SUM(CASE WHEN state='ready' THEN 1 ELSE 0 END) AS ready,
         SUM(CASE WHEN state IN ('failed','cancelled') THEN 1 ELSE 0 END) AS failed
-      FROM rejudge_jobs WHERE rejudge_batch_id=?`)
+      FROM rejudge_jobs AS jobs WHERE rejudge_batch_id=? ${activeRolloutMember}`)
       .bind(batch.id).first<{ readonly total: number; readonly ready: number | null; readonly failed: number | null }>();
     const total = aggregate?.total ?? 0;
     const ready = aggregate?.ready ?? 0;

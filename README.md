@@ -202,6 +202,14 @@ Organizer does not compile, execute, score, benchmark, or decide whether they ar
 Official Submit is the execution boundary. It compiles a user's source inside a one-shot Container
 and judges it against the already synchronized immutable package with no public dependency network.
 
+Contest repositories use strict `wasm-oj-platform/contests/v2` rules: global or individual logical
+clocks, code or Prompt Program tracks, staged problem windows, typed scoring/checkpoints, pause,
+atomic judge rollout, and whole-contest rewind. Authoring presets expand to canonical rules before
+synchronization; repository v1 is rejected. A public GitHub repository can provide UI-timed reveal
+but cannot guarantee that staged files remain secret. See the
+[contest rule contract](docs/contest-rules.md) and
+[repository authoring guide](docs/problem-catalog.md).
+
 ## Compatibility contract
 
 All active wire and storage identities use contract 2:

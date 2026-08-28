@@ -3,6 +3,8 @@ import { redeliverClaimedCatalogJob, dispatchCatalogJobs } from "./catalog-dispa
 import { dispatchSubmissionJobs, redeliverClaimedSubmission } from "./dispatcher";
 import type { WasmOjWorkerEnv } from "./env";
 import { resumeAccountErasure } from "./account-erasure";
+import { reconcileContestCheckpoints, type ContestCheckpointReconciliation } from "./contest-checkpoints";
+import { reconcileContestJudgeRolloutSnapshots } from "./contest-judge-rollout";
 import {
   materializePendingRejudgeBatches,
   repairDispatchedRejudgeJobs,
@@ -13,6 +15,7 @@ import { operationalLog } from "./structured-log";
 import { prepareSubmissionEventInsert } from "./submission-events";
 import { reconcileAdmittingSubmission, tombstoneSubmissionSource } from "./submissions";
 import { workflowStatusOrUnknown } from "./workflow-instance-status";
+import { reconcilePromptAttemptDispatches } from "./prompt-dispatcher";
 
 const HOUR_MS = 60 * 60 * 1_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -560,26 +563,39 @@ export async function reconcileRetention(env: WasmOjWorkerEnv, now: Date): Promi
 export async function reconcile(env: WasmOjWorkerEnv, now = new Date()): Promise<{
   readonly dispatched: { readonly submission: number; readonly catalog: number };
   readonly outbox: number;
+  readonly promptDispatches: number;
   readonly workflowFailures: number;
   readonly admissions: number;
   readonly erasures: number;
   readonly tombstones: number;
   readonly rejudge: {
+    readonly excludedSnapshots: number;
     readonly materialized: number;
     readonly settled: number;
     readonly repaired: number;
     readonly refreshed: number;
   };
+  readonly checkpoints: ContestCheckpointReconciliation;
   readonly retention: RetentionCounts;
 }> {
   const erasures = await reconcilePhase("account-erasure-phase", 0, () => reconcileAccountErasures(env));
   const tombstones = await reconcilePhase("source-tombstone-phase", 0, () => reconcileSourceTombstones(env, now));
   const admissions = await reconcilePhase("submission-admission-phase", 0, () => reconcileStrandedAdmissions(env, now));
+  const promptDispatches = await reconcilePhase(
+    "prompt-attempt-dispatch-phase",
+    0,
+    () => reconcilePromptAttemptDispatches(env, now),
+  );
   const outbox = await reconcilePhase("workflow-outbox-phase", 0, () => reconcilePendingOutbox(env));
   const workflowFailures = await reconcilePhase(
     "submission-workflow-terminal-phase",
     0,
     () => reconcileTerminalWorkflowFailures(env, now),
+  );
+  const excludedSnapshots = await reconcilePhase(
+    "contest-judge-rollout-snapshot-phase",
+    0,
+    () => reconcileContestJudgeRolloutSnapshots(env, now),
   );
   const materialized = await reconcilePhase(
     "rejudge-materialization-phase",
@@ -589,17 +605,24 @@ export async function reconcile(env: WasmOjWorkerEnv, now = new Date()): Promise
   const settled = await reconcilePhase("rejudge-result-phase", 0, () => settleTerminalRejudgeJobs(env));
   const repaired = await reconcilePhase("rejudge-repair-phase", 0, () => repairDispatchedRejudgeJobs(env));
   const refreshed = await reconcilePhase("rejudge-refresh-phase", 0, () => refreshRejudgeBatches(env));
+  const checkpoints = await reconcilePhase(
+    "contest-checkpoint-phase",
+    { visited: 0, created: 0, provisional: 0, finalized: 0, eliminated: 0, paused: 0, resumed: 0 },
+    () => reconcileContestCheckpoints(env, now),
+  );
   const submission = await reconcilePhase("submission-dispatch-phase", 0, () => dispatchSubmissionJobs(env));
   const catalog = await reconcilePhase("catalog-dispatch-phase", 0, () => dispatchCatalogJobs(env));
   const retention = await reconcileRetention(env, now);
   return {
     dispatched: { submission, catalog },
     outbox,
+    promptDispatches,
     workflowFailures,
     admissions,
     erasures,
     tombstones,
-    rejudge: { materialized, settled, repaired, refreshed },
+    rejudge: { excludedSnapshots, materialized, settled, repaired, refreshed },
+    checkpoints,
     retention,
   };
 }

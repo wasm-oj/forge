@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { workflowInstanceNotFound, workflowStatusOrUnknown } from "./workflow-instance-status";
+import {
+  lookupWorkflowInstance,
+  workflowInstanceNotFound,
+  workflowStatusOrUnknown,
+} from "./workflow-instance-status";
 
 describe("Cloudflare Workflow instance status", () => {
   it("recognizes only the exact missing-instance error", () => {
@@ -17,6 +21,16 @@ describe("Cloudflare Workflow instance status", () => {
     await expect(workflowStatusOrUnknown({
       get: async () => ({ status: async () => { throw missing; } }),
     }, "missing-at-status")).resolves.toEqual({ status: "unknown" });
+  });
+
+  it("preserves the exact found versus not-found distinction for durable dispatch", async () => {
+    const missing = new Error("(instance.not_found) Instance not found");
+    await expect(lookupWorkflowInstance({
+      get: async () => { throw missing; },
+    }, "missing")).resolves.toEqual({ found: false });
+    await expect(lookupWorkflowInstance({
+      get: async () => ({ status: async () => ({ status: "running" }) }),
+    }, "present")).resolves.toEqual({ found: true, status: "running" });
   });
 
   it("preserves every other status error", async () => {

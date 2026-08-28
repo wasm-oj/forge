@@ -14,6 +14,7 @@ import {
   parseOfficialSubmissionRequest,
   type OfficialSourceFile,
   type OfficialSubmissionRequest,
+  type ContestSubmissionContext,
 } from "./contracts";
 import {
   parseContestPublicProblemProjection,
@@ -26,7 +27,7 @@ const JSON_CONTENT_TYPE = /^application\/json(?:\s*;\s*charset=utf-8)?$/i;
 const MAX_METADATA_BYTES = 64 * 1024;
 const MAX_PUBLIC_CONTENT_BYTES = 8 * 1024 * 1024;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
-const METADATA_SCHEMA = "wasm-oj-platform/problem-content-pointer/v1";
+const METADATA_SCHEMA = "wasm-oj-platform/problem-content-pointer/v2";
 type ManagedPublicProjectionMode = "official-practice" | "contest";
 
 export interface ManagedProblemContext {
@@ -42,6 +43,10 @@ export interface ManagedProblemCollectionSource extends ManagedProblemContext {
   readonly contentUrl: string;
   readonly contentSha256: string;
   readonly allowedProfiles: JudgeAllowedProfiles;
+  readonly aiAssistAvailable: boolean;
+  readonly assistContextSha256: string | null;
+  readonly contestAdmission?: Pick<ContestSubmissionContext, "timelineGeneration" | "ruleEpoch" | "problemEpoch">;
+  readonly promptContextSha256?: string;
 }
 
 export interface ManagedProblemCollectionEntry extends JudgeProblemSummary {
@@ -92,6 +97,10 @@ interface ManagedProblemContentPointer {
   readonly allowedProfiles: JudgeAllowedProfiles;
   readonly maximumScore: 100;
   readonly judgeDigest: string;
+  readonly aiAssistAvailable: boolean;
+  readonly assistContextSha256: string | null;
+  readonly contestAdmission?: Pick<ContestSubmissionContext, "timelineGeneration" | "ruleEpoch" | "problemEpoch">;
+  readonly promptContextSha256?: string;
   readonly content: {
     readonly role: "practice" | "contest";
     readonly bytes: number;
@@ -147,15 +156,27 @@ export function managedProblemWorkspacePath(contextValue: ManagedProblemContext)
 }
 
 export function createOfficialSubmissionRequest(
-  contextValue: ManagedProblemContext & { readonly catalogCommit: string },
+  contextValue: ManagedProblemContext & {
+    readonly catalogCommit: string;
+    readonly contestAdmission?: Pick<ContestSubmissionContext, "timelineGeneration" | "ruleEpoch" | "problemEpoch">;
+  },
   source: OfficialSubmissionSourceInput,
 ): OfficialSubmissionRequest {
   const context = normalizeManagedProblemContext({ problemId: contextValue.problemId, ...(contextValue.contestId ? { contestId: contextValue.contestId } : {}) });
   if (!COMMIT_PATTERN.test(contextValue.catalogCommit)) throw configurationError("catalogCommit must be an exact lowercase Git commit.");
+  if (context.contestId && !contextValue.contestAdmission) {
+    throw configurationError("Contest admission epochs are unavailable; reload the contest problem before submitting.");
+  }
   return parseOfficialSubmissionRequest({
-    problemId: context.problemId,
-    catalogCommit: contextValue.catalogCommit,
-    ...(context.contestId ? { contestId: context.contestId } : {}),
+    context: context.contestId
+      ? {
+          kind: "contest",
+          contestId: context.contestId,
+          problemId: context.problemId,
+          contentCommit: contextValue.catalogCommit,
+          ...contextValue.contestAdmission!,
+        }
+      : { kind: "practice", problemId: context.problemId, catalogCommit: contextValue.catalogCommit },
     language: source.language,
     target: source.target,
     optimization: source.optimization,
@@ -232,6 +253,10 @@ export async function loadManagedProblemCollection(
     contentUrl: metadata.content.url,
     contentSha256: metadata.content.sha256,
     allowedProfiles: metadata.allowedProfiles,
+    aiAssistAvailable: metadata.aiAssistAvailable,
+    assistContextSha256: metadata.assistContextSha256,
+    ...(metadata.contestAdmission ? { contestAdmission: metadata.contestAdmission } : {}),
+    ...(metadata.promptContextSha256 ? { promptContextSha256: metadata.promptContextSha256 } : {}),
   };
   const sourceKey = context.contestId
     ? `repository:contest:${context.contestId}:${context.problemId}:${metadata.catalogCommit}:${metadata.content.sha256}`
@@ -344,9 +369,12 @@ function parseContentPointer(
   value: unknown,
   context: ManagedProblemContext,
 ): ManagedProblemContentPointer {
+  const hasPromptContext = isRecord(value) && Object.hasOwn(value, "promptContextSha256");
   const pointer = exactRecord(value, [
-    "allowedProfiles", "catalogCommit", "content", "judgeDigest", "maximumScore", "problemId",
+    "aiAssistAvailable", "allowedProfiles", "assistContextSha256", "catalogCommit", "content", "judgeDigest", "maximumScore", "problemId",
     "problemNumber", "problemSlug", "practiceEnabled", "schema", "summary", "title",
+    ...(context.contestId ? ["contestAdmission"] : []),
+    ...(hasPromptContext ? ["promptContextSha256"] : []),
   ], "managed problem metadata");
   if (pointer.schema !== METADATA_SCHEMA) schemaFailure(`Managed problem metadata schema must be '${METADATA_SCHEMA}'.`);
   if (pointer.problemId !== context.problemId || !UUID_PATTERN.test(String(pointer.problemId))) schemaFailure("Managed problem metadata has the wrong problem identity.");
@@ -363,6 +391,31 @@ function parseContentPointer(
   catch (error) { throw new ManagedProblemCollectionError(error instanceof Error ? error.message : "Allowed profiles are invalid.", "schema", { cause: error }); }
   if (pointer.maximumScore !== 100 || typeof pointer.judgeDigest !== "string" || !SHA256_PATTERN.test(pointer.judgeDigest)) {
     schemaFailure("Managed problem metadata execution identity is invalid.");
+  }
+  if (typeof pointer.aiAssistAvailable !== "boolean"
+    || (pointer.assistContextSha256 !== null
+      && (typeof pointer.assistContextSha256 !== "string" || !SHA256_PATTERN.test(pointer.assistContextSha256)))
+    || (pointer.aiAssistAvailable && pointer.assistContextSha256 === null)
+    || (!pointer.aiAssistAvailable && pointer.assistContextSha256 !== null)) {
+    schemaFailure("Managed problem metadata Prompt Assist availability is invalid.");
+  }
+  let contestAdmission: ManagedProblemContentPointer["contestAdmission"];
+  if (context.contestId) {
+    const admission = exactRecord(pointer.contestAdmission, ["problemEpoch", "ruleEpoch", "timelineGeneration"], "contest admission");
+    const values = [admission.timelineGeneration, admission.ruleEpoch, admission.problemEpoch];
+    if (values.some((candidate) => !Number.isSafeInteger(candidate) || (candidate as number) < 1)) {
+      schemaFailure("Contest admission epochs must be positive integers.");
+    }
+    contestAdmission = {
+      timelineGeneration: admission.timelineGeneration as number,
+      ruleEpoch: admission.ruleEpoch as number,
+      problemEpoch: admission.problemEpoch as number,
+    };
+  }
+  if (hasPromptContext && (!context.contestId
+    || typeof pointer.promptContextSha256 !== "string"
+    || !SHA256_PATTERN.test(pointer.promptContextSha256))) {
+    schemaFailure("Managed problem metadata prompt context identity is invalid.");
   }
   const content = exactRecord(pointer.content, ["bytes", "role", "sha256", "url"], "managed problem content pointer");
   const expectedRole = context.contestId ? "contest" : "practice";
@@ -383,6 +436,10 @@ function parseContentPointer(
     allowedProfiles,
     maximumScore: 100,
     judgeDigest: pointer.judgeDigest,
+    aiAssistAvailable: pointer.aiAssistAvailable,
+    assistContextSha256: pointer.assistContextSha256 as string | null,
+    ...(contestAdmission ? { contestAdmission } : {}),
+    ...(hasPromptContext ? { promptContextSha256: pointer.promptContextSha256 as string } : {}),
     content: {
       role: expectedRole,
       bytes: content.bytes as number,

@@ -3,7 +3,7 @@
     "globalActive": 50,
     "globalQueued": 500,
     "perUserActive": 1,
-    "perUserQueued": 3,
+    "perUserQueued": 8,
     "rejudgeActive": 10
   },
   "catalog": {

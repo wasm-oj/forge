@@ -15,6 +15,7 @@ import { requireStagingFormalAccess } from "./formal-access";
 import { requireFormalMutationsEnabled } from "./formal-mutations";
 import { requireOrganizer } from "./github";
 import { ApiError, jsonResponse, readJsonBody } from "./http";
+import { loadContestRuntimeSnapshot } from "./contest-runtime";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const COMMIT = /^[0-9a-f]{40}$/;
@@ -35,14 +36,6 @@ interface PublicContentPointer {
   readonly path: string;
   readonly bytes: number;
   readonly sha256: string;
-}
-
-interface ContestContentPointer extends PublicContentPointer {
-  readonly organizer_user_id: string;
-  readonly access_mode: "public" | "invite";
-  readonly contest_status: "draft" | "published" | "archived";
-  readonly starts_at: string;
-  readonly participant_user_id: string | null;
 }
 
 function exactRecord(value: unknown, keys: readonly string[], label: string): Record<string, unknown> {
@@ -246,28 +239,46 @@ async function contentPointer(
   const contestId = url.searchParams.get("contestId");
   if (!contestId || !UUID.test(contestId)) throw new ApiError(400, "contest-id-invalid", "contestId is required for contest content.");
   const session = await authenticatedSession(request, env);
+  const snapshot = await loadContestRuntimeSnapshot(env, contestId, session ?? null);
+  const organizerRow = await env.DB.prepare(`SELECT catalogs.organizer_user_id
+    FROM contest_series JOIN catalogs ON catalogs.id=contest_series.catalog_id
+    WHERE contest_series.id=?`).bind(contestId).first<{ readonly organizer_user_id: string }>();
+  const organizer = organizerRow?.organizer_user_id === session?.userId;
+  const epoch = snapshot.problems.find((problem) => problem.problemId === problemId && problem.contentCommit === commit);
+  const projected = epoch && snapshot.projection.problems.find((problem) => problem.slug === epoch.problemSlug);
+  let granted = false;
+  if (snapshot.entrant && epoch) {
+    granted = Boolean(await env.DB.prepare(`SELECT 1 FROM contest_reveal_grants
+      WHERE contest_id=? AND entrant_id=? AND problem_id=? AND timeline_generation=?
+        AND eligibility='eligible'`)
+      .bind(contestId, snapshot.entrant.entrantId, problemId, snapshot.epochs.timelineGeneration).first());
+  }
+  if (!epoch || (!organizer && (!snapshot.entrant
+    || (!granted && (snapshot.state === "paused" || projected?.availability === "locked"))))) {
+    throw new ApiError(404, "contest-problem-not-found", "Authorized contest problem was not found.");
+  }
+  if (!organizer && !granted && snapshot.entrant && snapshot.projection.logicalSeconds !== null) {
+    await env.DB.prepare(`INSERT INTO contest_reveal_grants
+      (contest_id, entrant_id, problem_id, timeline_generation, rules_epoch,
+       content_epoch, granted_logical_seconds, granted_at, eligibility)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'eligible')
+      ON CONFLICT(contest_id, entrant_id, problem_id, timeline_generation) DO NOTHING`)
+      .bind(
+        contestId, snapshot.entrant.entrantId, problemId, snapshot.epochs.timelineGeneration,
+        snapshot.epochs.ruleEpoch, epoch.contentEpoch, snapshot.projection.logicalSeconds,
+        new Date().toISOString(),
+      ).run();
+  }
   const row = await env.DB.prepare(`SELECT catalogs.github_repository_id, revisions.commit_sha,
       revisions.contest_bundle_path AS path, revisions.contest_bundle_bytes AS bytes,
-      revisions.contest_bundle_sha256 AS sha256, contests.organizer_user_id,
-      contest_revisions.access_mode, contest_revisions.status AS contest_status,
-      contest_revisions.starts_at, participants.user_id AS participant_user_id
-    FROM contest_series AS contests
-    JOIN catalogs ON catalogs.id=contests.catalog_id
-    JOIN contest_revisions ON contest_revisions.contest_id=contests.id
-      AND contest_revisions.commit_sha=catalogs.active_commit_sha
-    JOIN contest_revision_problems AS selected ON selected.contest_id=contests.id
-      AND selected.commit_sha=contest_revisions.commit_sha
-    JOIN problem_revisions AS revisions ON revisions.problem_id=selected.problem_id
-      AND revisions.commit_sha=selected.commit_sha
-    LEFT JOIN contest_participants AS participants ON participants.contest_id=contests.id AND participants.user_id=?
-    WHERE contests.id=? AND revisions.problem_id=? AND revisions.commit_sha=?`)
-    .bind(session?.userId ?? "", contestId, problemId, commit).first<ContestContentPointer>();
-  const organizer = row?.organizer_user_id === session?.userId;
-  const visible = row && (organizer || (
-    row.contest_status === "published" && row.starts_at <= new Date().toISOString()
-    && (row.access_mode === "public" || row.participant_user_id === session?.userId)
-  ));
-  if (!visible) throw new ApiError(404, "contest-problem-not-found", "Authorized contest problem was not found.");
+      revisions.contest_bundle_sha256 AS sha256
+    FROM problem_revisions AS revisions
+    JOIN problem_series AS problems ON problems.id=revisions.problem_id
+    JOIN catalogs ON catalogs.id=problems.catalog_id
+    JOIN contest_series ON contest_series.catalog_id=catalogs.id
+    WHERE contest_series.id=? AND revisions.problem_id=? AND revisions.commit_sha=?`)
+    .bind(contestId, problemId, commit).first<PublicContentPointer>();
+  if (!row) throw new ApiError(404, "contest-problem-not-found", "Authorized contest problem was not found.");
   return { role, pointer: row };
 }
 
