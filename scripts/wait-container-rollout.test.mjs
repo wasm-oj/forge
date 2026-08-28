@@ -12,6 +12,8 @@ import {
 
 const image = `registry.cloudflare.com/account/submission@sha256:${"a".repeat(64)}`;
 const nextImage = `registry.cloudflare.com/account/submission@sha256:${"b".repeat(64)}`;
+const taggedImage = `registry.cloudflare.com/b1c3d1b89f9131a84a0f1f6a973232f1/wasm-oj-submission-production:${"a".repeat(40)}`;
+const nextTaggedImage = taggedImage.replace(/a{40}$/u, "b".repeat(40));
 const target = Object.freeze({ className: "SubmissionJudgeContainer", name: "submission-production" });
 const applicationId = "a0341d3a-33dc-469a-a7ac-26061efd46db";
 
@@ -113,6 +115,34 @@ test("baseline anchors an unhealthy prior version without accepting it as ready"
     parseContainerRolloutBaseline(target, containerRolloutBaseline(target, observation, "2026-08-26T00:00:00.000Z")),
     { applicationId, image, version: 14 },
   );
+});
+
+test("baseline accepts the exact production Git tag returned by Cloudflare", () => {
+  const observation = readyFixture({
+    info: { configuration: { image: taggedImage } },
+    summary: { image: taggedImage },
+  });
+  assert.equal(observation.assessment.baselineValid, true);
+  assert.deepEqual(
+    parseContainerRolloutBaseline(target, containerRolloutBaseline(target, observation, "2026-08-26T00:00:00.000Z")),
+    { applicationId, image: taggedImage, version: 14 },
+  );
+
+  const advanced = readyFixture({
+    baseline: { applicationId, image: taggedImage, version: 14 },
+    info: { configuration: { image: nextTaggedImage }, version: 15 },
+    instances: [{ id: "current", state: "running", version: 15 }],
+    summary: { image: nextTaggedImage, version: 15 },
+  });
+  assert.equal(advanced.assessment.ready, true);
+
+  const mutableTag = taggedImage.replace(/a{40}$/u, "latest");
+  const mutable = readyFixture({
+    info: { configuration: { image: mutableTag } },
+    summary: { image: mutableTag },
+  });
+  assert.equal(mutable.assessment.baselineValid, false);
+  assert.match(mutable.assessment.baselineReasons.join("\n"), /image is missing/u);
 });
 
 test("baseline rejects an active rollout or inconsistent application queries", () => {

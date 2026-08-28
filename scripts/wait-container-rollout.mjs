@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
-const CONTAINER_IMAGE = /^registry\.cloudflare\.com\/[^@\s]+@sha256:[0-9a-f]{64}$/u;
+const DIGEST_CONTAINER_IMAGE = /^registry\.cloudflare\.com\/[^@\s]+@sha256:[0-9a-f]{64}$/u;
 const CONFIGURED_CONTAINER_IMAGE = /^registry\.cloudflare\.com\/b1c3d1b89f9131a84a0f1f6a973232f1\/wasm-oj-submission-production:[0-9a-f]{40}$/u;
 const BASELINE_SCHEMA = "wasm-oj/container-rollout-baseline/v1";
 const HEALTH_KEYS = ["active", "assigned", "healthy", "stopped", "failed", "scheduling", "starting"];
@@ -24,6 +24,11 @@ function object(value, label) {
 function positiveInteger(value, label) {
   if (!Number.isSafeInteger(value) || value <= 0) throw new TypeError(`${label} must be a positive integer.`);
   return value;
+}
+
+function deployedContainerImage(value) {
+  return typeof value === "string"
+    && (DIGEST_CONTAINER_IMAGE.test(value) || CONFIGURED_CONTAINER_IMAGE.test(value));
 }
 
 export function configuredContainerRolloutTarget(config) {
@@ -95,8 +100,7 @@ export function assessContainerRollout(target, summaryValue, infoValue, instance
   } else if (summary.id !== info.id) {
     baselineReasons.push("application ID changed between queries");
   }
-  if (typeof summary.image !== "string" || !CONTAINER_IMAGE.test(summary.image)
-    || typeof info.configuration?.image !== "string" || !CONTAINER_IMAGE.test(info.configuration.image)) {
+  if (!deployedContainerImage(summary.image) || !deployedContainerImage(info.configuration?.image)) {
     baselineReasons.push("deployed application image is missing");
   } else if (summary.image !== info.configuration.image) {
     baselineReasons.push("application image changed between queries");
@@ -327,7 +331,7 @@ export function parseContainerRolloutBaseline(target, value) {
   if (!Number.isSafeInteger(application.version) || application.version <= 0) {
     throw new TypeError("Container rollout baseline application version is invalid.");
   }
-  if (typeof application.image !== "string" || !CONTAINER_IMAGE.test(application.image)) {
+  if (!deployedContainerImage(application.image)) {
     throw new TypeError("Container rollout baseline application image is invalid.");
   }
   return Object.freeze({
