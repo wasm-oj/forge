@@ -19,6 +19,7 @@ import {
   type JudgePackageInput,
 } from "@wasm-oj/core";
 import { contestPublicProjectionBytes } from "./online-judge/contest-public";
+import { expandContestRulesPreset, parseContestRules, parseContestRulesPreset } from "./online-judge/contest-rules";
 import { parseContestPublicProblemProjection } from "./online-judge/public-projection";
 import { parseRepositoryAuthoringJudges, type RepositorySourceJudge, type RepositorySourceObject } from "./online-judge/repository-authoring";
 import {
@@ -203,9 +204,19 @@ function parseAuthoringSource(value: unknown): AuthoringSource {
       judge: parsedJudge.judge,
     };
   });
-  const contests = parseRepositoryContestsValue({ schema: "wasm-oj-platform/contests/v1", contests: source.contests }).contests;
+  if (!Array.isArray(source.contests)) fail("repository authoring source contests must be an array.");
+  const authoredContests = source.contests.map((candidate, index) => {
+    const contest = record(candidate, `authoring contest ${index + 1}`);
+    exact(contest, ["accessMode", "description", "rules", "slug", "status", "title"], `authoring contest ${index + 1}`);
+    const rulesInput = record(contest.rules, `authoring contest ${index + 1} rules`);
+    const rules = Object.hasOwn(rulesInput, "preset")
+      ? expandContestRulesPreset(parseContestRulesPreset(rulesInput, `authoring contest ${index + 1} rules`))
+      : parseContestRules(rulesInput, `authoring contest ${index + 1} rules`);
+    return { ...contest, rules };
+  });
+  const contests = parseRepositoryContestsValue({ schema: "wasm-oj-platform/contests/v2", contests: authoredContests }).contests;
   const known = new Set(problems.map((problem) => problem.slug));
-  for (const contest of contests) for (const slug of contest.problems) if (!known.has(slug)) fail(`contest '${contest.slug}' references unknown problem '${slug}'.`);
+  for (const contest of contests) for (const problem of contest.rules.problems) if (!known.has(problem.slug)) fail(`contest '${contest.slug}' references unknown problem '${problem.slug}'.`);
   return { problems, contests };
 }
 
@@ -259,7 +270,7 @@ async function build(options: Options): Promise<number> {
   }
   const problemManifest = { schema: "wasm-oj-platform/problems/v1", problems };
   parseRepositoryProblemsValue(problemManifest);
-  const contestManifest = { schema: "wasm-oj-platform/contests/v1", contests: source.contests };
+  const contestManifest = { schema: "wasm-oj-platform/contests/v2", contests: source.contests };
   parseRepositoryContestsValue(contestManifest);
   const root = { schema: "wasm-oj-platform/repository/v1", problems: PROBLEMS_PATH, contests: CONTESTS_PATH };
   parseRepositoryRootValue(root);
@@ -283,7 +294,7 @@ async function verify(options: Options): Promise<number> {
   const problems = parseRepositoryProblemsValue(parseJson(await readFile(options.root, root.problems, JSON_MAX_BYTES), root.problems));
   const contests = parseRepositoryContestsValue(parseJson(await readFile(options.root, root.contests, JSON_MAX_BYTES), root.contests));
   const known = new Set(problems.problems.map((problem) => problem.slug));
-  for (const contest of contests.contests) for (const slug of contest.problems) if (!known.has(slug)) fail(`contest '${contest.slug}' references unknown problem '${slug}'.`);
+  for (const contest of contests.contests) for (const problem of contest.rules.problems) if (!known.has(problem.slug)) fail(`contest '${contest.slug}' references unknown problem '${problem.slug}'.`);
   for (const problem of problems.problems) {
     const practiceBytes = await verifiedObject(options.root, problem.practiceBundle, PUBLIC_MAX_BYTES);
     const practice = parseStandaloneProblemBundle(parseJson(practiceBytes, problem.practiceBundle.path));

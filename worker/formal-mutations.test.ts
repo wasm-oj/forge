@@ -125,7 +125,7 @@ describe("D1 formal mutation control", () => {
     const rejudge = readFileSync(path.join(process.cwd(), "worker/rejudge.ts"), "utf8");
     expect(submissions).toMatch(/createSubmission[\s\S]*requireFormalMutationsEnabled\(env, request\)[\s\S]*INSERT INTO submission_sources/);
     expect(submissions).toMatch(/updateSubmissionVisibility[\s\S]*requireFormalMutationsEnabled\(env, request\)[\s\S]*UPDATE submissions SET visibility/);
-    expect(product).toMatch(/joinContest[\s\S]*requireFormalMutationsEnabled\(env, request\)[\s\S]*INSERT OR IGNORE INTO contest_participants/);
+    expect(product).toMatch(/joinContest[\s\S]*requireFormalMutationsEnabled\(env, request\)[\s\S]*INSERT OR IGNORE INTO contest_entrants/);
     expect(erasure).toMatch(/eraseAccount[\s\S]*requireFormalMutationsEnabled\(env, request\)[\s\S]*INSERT INTO account_erasure_jobs/);
     expect(catalog).toMatch(/organizerMutation[\s\S]*requireFormalMutationsEnabled\(env, request\)/);
     expect(rejudge).toMatch(/createRejudgeBatch[\s\S]*requireFormalMutationsEnabled\(env, request\)/);

@@ -41,7 +41,8 @@
   ],
   "workflows": [
     { "name": "wasm-oj-submission-development", "binding": "SUBMISSION_WORKFLOW", "class_name": "SubmissionWorkflow" },
-    { "name": "wasm-oj-catalog-development", "binding": "CATALOG_WORKFLOW", "class_name": "CatalogWorkflow" }
+    { "name": "wasm-oj-catalog-development", "binding": "CATALOG_WORKFLOW", "class_name": "CatalogWorkflow" },
+    { "name": "wasm-oj-prompt-attempt-development", "binding": "PROMPT_ATTEMPT_WORKFLOW", "class_name": "PromptAttemptWorkflow" }
   ],
   "containers": [
     { "name": "wasm-oj-submission-development", "class_name": "SubmissionJudgeContainer", "image": "./Dockerfile", "instance_type": "standard-2", "max_instances": 50, "ssh": { "enabled": false } }

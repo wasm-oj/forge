@@ -10,6 +10,7 @@ import { submissionCostPresentation } from "../../submissions/model/submission-c
 import { hasMatchingLocalSamplesPassed, readLocalSamplesPassed, type LocalSamplesPassedRecord } from "../../../judge/local-practice-progress";
 import { listProjects } from "../../../storage/database";
 import { copy, draftLink, formatDate, localized, type CatalogCollection, type CatalogProblem, type ContestSummary, type SubmissionSummary, useCatalog } from "../model/education-model";
+import { contestCatalogGroup, contestPrimaryWallTime } from "../../contests/model/contest-projection";
 
 function hasCurrentLocalSamplesPassed(records: ReadonlyMap<string, LocalSamplesPassedRecord>, problem: CatalogProblem): boolean {
   return hasMatchingLocalSamplesPassed(records, problem.id, problem.contentDigest);
@@ -82,7 +83,7 @@ export function LearningDashboard() {
   const total = collections.reduce((sum, collection) => sum + collection.problems.length, 0);
   const localPassed = collections.flatMap((collection) => collection.problems).filter((problem) => hasCurrentLocalSamplesPassed(localSamplesPassed, problem)).length;
   const featured = official?.problems.slice(0, 5) ?? [];
-  const activeContests = contests.filter((contest) => contest.phase !== "ended").slice(0, 3);
+  const activeContests = contests.filter((contest) => contestCatalogGroup(contest.phase) !== "ended").slice(0, 3);
   const draftSlug = /^judge-\d+-(.+)$/.exec(draft?.name ?? "")?.[1];
   const draftProblem = draftSlug ? collections.flatMap((collection) => collection.problems).find((problem) => problem.slug === draftSlug) : undefined;
   const storedDraftLink = draft ? draftLink(draft.id) : undefined;
@@ -111,7 +112,7 @@ export function LearningDashboard() {
     </section>
 
     <div className="dashboard-columns">
-      <section className="product-section"><SectionHeading title={text.contests} detail={text.upcoming} href="/contests" />{contestRequest === "loading" && <Empty>{locale === "zh-TW" ? "正在載入競賽…" : "Loading contests…"}</Empty>}{contestRequest === "error" && <div className="product-error" role="alert"><span>{locale === "zh-TW" ? "無法載入競賽。" : "Could not load contests."}</span><button type="button" onClick={() => void loadContests()}>{locale === "zh-TW" ? "重試" : "Retry"}</button></div>}{contestRequest === "ready" && activeContests.map((contest) => <Link className="dashboard-list-item" key={contest.id} href={`/contests/${contest.id}`}><span className={`contest-dot ${contest.phase}`} /><div><strong>{contest.title}</strong><small>{formatDate(contest.startsAt, locale)}</small></div><ChevronRight size={15} /></Link>)}{contestRequest === "ready" && activeContests.length === 0 && <Empty>{locale === "zh-TW" ? "目前沒有進行中或即將開始的競賽。" : "No active contests."}</Empty>}</section>
+      <section className="product-section"><SectionHeading title={text.contests} detail={text.upcoming} href="/contests" />{contestRequest === "loading" && <Empty>{locale === "zh-TW" ? "正在載入競賽…" : "Loading contests…"}</Empty>}{contestRequest === "error" && <div className="product-error" role="alert"><span>{locale === "zh-TW" ? "無法載入競賽。" : "Could not load contests."}</span><button type="button" onClick={() => void loadContests()}>{locale === "zh-TW" ? "重試" : "Retry"}</button></div>}{contestRequest === "ready" && activeContests.map((contest) => <Link className="dashboard-list-item" key={contest.id} href={`/contests/${contest.id}`}><span className={`contest-dot ${contestCatalogGroup(contest.phase)}`} /><div><strong>{contest.title}</strong><small>{formatDate(contestPrimaryWallTime(contest), locale)} · {contest.phase}</small></div><ChevronRight size={15} /></Link>)}{contestRequest === "ready" && activeContests.length === 0 && <Empty>{locale === "zh-TW" ? "目前沒有進行中或即將開始的競賽。" : "No active contests."}</Empty>}</section>
       <section className="product-section"><SectionHeading title={text.recent} href="/submissions" />{session?.authenticated && submissionRequest === "loading" && <Empty>{locale === "zh-TW" ? "正在載入提交紀錄…" : "Loading submissions…"}</Empty>}{session?.authenticated && submissionRequest === "error" && <div className="product-error" role="alert"><span>{locale === "zh-TW" ? "無法載入提交紀錄。" : "Could not load submissions."}</span><button type="button" onClick={() => void loadSubmissions()}>{locale === "zh-TW" ? "重試" : "Retry"}</button></div>}{session?.authenticated && submissionRequest === "ready" ? submissions.slice(0, 4).map((submission) => {
         const cost = submissionCostPresentation(submission, locale);
         return <Link className="dashboard-list-item" key={submission.id} href={`/submissions/${submission.id}`}><span className={`submission-dot state-${submission.state}`} /><div><strong>{localized(submission.problem?.title, locale, submission.problem?.slug)}</strong><small>{submission.state} · {cost.label}: {cost.value} · {formatDate(submission.createdAt, locale)}</small></div><span>{submission.score ?? "—"}</span></Link>;

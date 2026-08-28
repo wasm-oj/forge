@@ -68,12 +68,29 @@ import { cancelRejudgeBatch, createRejudgeBatch, getRejudgeBatch, listRejudgeBat
 import { withSecurityHeaders } from "./security-headers";
 import { TURNSTILE_CHALLENGE_PATH, turnstileChallengeResponse } from "./turnstile-challenge";
 import { approveCliOfficialSubmissionRisk } from "./formal-access";
+import {
+  activatePendingContestRules,
+  pauseContest,
+  previewPendingContestRules,
+  resumeContest,
+  rewindContest,
+  startContestEntrant,
+} from "./contest-runtime";
+import {
+  createPromptAttempt,
+  getPromptAttempt,
+  getPromptAttemptEvents,
+  listPromptAttempts,
+} from "./prompt-api";
+import { createPromptAssistDraft } from "./prompt-assist";
+import { promptContestGallery } from "./prompt-gallery";
 
 export { withSecurityHeaders } from "./security-headers";
 
 export { SubmissionJudgeContainer } from "./judge-container";
 export { SubmissionWorkflow } from "./workflows";
 export { CatalogWorkflow } from "./catalog-workflows";
+export { PromptAttemptWorkflow } from "./prompt-workflows";
 export { ContainerProxy } from "@cloudflare/containers";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
@@ -143,6 +160,16 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   if (request.method === "POST" && rotateContestInviteId) return rotateContestInviteCode(request, env, rotateContestInviteId);
   const participantContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/participants$`));
   if (request.method === "GET" && participantContestId) return listOrganizerContestParticipants(request, env, participantContestId);
+  const pauseOperationalContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/pause$`));
+  if (request.method === "POST" && pauseOperationalContestId) return pauseContest(request, env, pauseOperationalContestId);
+  const resumeOperationalContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/resume$`));
+  if (request.method === "POST" && resumeOperationalContestId) return resumeContest(request, env, resumeOperationalContestId);
+  const rewindOperationalContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/rewind$`));
+  if (request.method === "POST" && rewindOperationalContestId) return rewindContest(request, env, rewindOperationalContestId);
+  const pendingRulesContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/pending-rules$`));
+  if (request.method === "GET" && pendingRulesContestId) return previewPendingContestRules(request, env, pendingRulesContestId);
+  const applyPendingRulesContestId = identifier(pathname, new RegExp(`^/api/organizer/contests/(${UUID})/pending-rules/apply$`));
+  if (request.method === "POST" && applyPendingRulesContestId) return activatePendingContestRules(request, env, applyPendingRulesContestId);
   if (request.method === "GET" && pathname === "/api/organizer/rejudges/options") return rejudgeOptions(request, env);
   if (request.method === "GET" && pathname === "/api/organizer/rejudges") return listRejudgeBatches(request, env);
   if (request.method === "POST" && pathname === "/api/organizer/rejudges") return createRejudgeBatch(request, env);
@@ -164,6 +191,13 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   if (request.method === "GET" && sourceSubmissionId) return publicSubmissionSource(request, env, sourceSubmissionId);
   const policySummarySubmissionId = identifier(pathname, new RegExp(`^/api/submissions/(${UUID})/policy-summary$`));
   if (request.method === "GET" && policySummarySubmissionId) return getSubmissionPolicySummary(request, env, policySummarySubmissionId);
+  if (request.method === "POST" && pathname === "/api/prompt-attempts") return createPromptAttempt(request, env);
+  if (request.method === "GET" && pathname === "/api/prompt-attempts") return listPromptAttempts(request, env);
+  const promptAttemptId = identifier(pathname, new RegExp(`^/api/prompt-attempts/(${UUID})$`));
+  if (request.method === "GET" && promptAttemptId) return getPromptAttempt(request, env, promptAttemptId);
+  const promptAttemptEventsId = identifier(pathname, new RegExp(`^/api/prompt-attempts/(${UUID})/events$`));
+  if (request.method === "GET" && promptAttemptEventsId) return getPromptAttemptEvents(request, env, promptAttemptEventsId);
+  if (request.method === "POST" && pathname === "/api/prompt-assist") return createPromptAssistDraft(request, env);
   if (request.method === "GET" && pathname === "/api/profile") return currentProfile(request, env);
   if (request.method === "PATCH" && pathname === "/api/profile") return updateProfile(request, env);
   const profileLogin = identifier(pathname, /^\/api\/profiles\/([A-Za-z0-9-]{1,39})$/);
@@ -182,8 +216,12 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   if (request.method === "GET" && contestId) return getContest(request, env, contestId);
   const joinContestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})/join$`));
   if (request.method === "POST" && joinContestId) return joinContest(request, env, joinContestId);
+  const startContestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})/start$`));
+  if (request.method === "POST" && startContestId) return startContestEntrant(request, env, startContestId);
   const leaderboardContestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})/leaderboard$`));
   if (request.method === "GET" && leaderboardContestId) return contestLeaderboard(request, env, leaderboardContestId);
+  const promptGalleryContestId = identifier(pathname, new RegExp(`^/api/contests/(${UUID})/prompt-gallery$`));
+  if (request.method === "GET" && promptGalleryContestId) return promptContestGallery(request, env, promptGalleryContestId);
 
   return jsonResponse({ error: { code: "api-route-not-found", message: "API route was not found." } }, 404);
 }

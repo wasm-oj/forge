@@ -84,6 +84,43 @@ The maintenance Container probe uses `Authorization: Bearer $MAINTENANCE_SMOKE_T
 is configured as `MAINTENANCE_SMOKE_TOKEN` in the Worker environment and is never returned by an
 untrusted route.
 
+## One-time contest v2 cutover
+
+Migration `0020_contest_v2_runtime.sql` is a one-way rules/runtime cutover. Schedule it only after
+formal mutations are paused and there are no running or paused contests, pending contest rule
+operations, nonterminal contest submissions, prompt attempts, checkpoint settlements, or judge
+rollouts. Do not start a v2 contest in the same deployment window until these checks complete.
+
+The SQL phase retains the legacy rows as immutable source evidence and records one durable cutover
+item per contest. The deployment tool then performs the bounded application phase because SQLite
+does not provide the SHA-256 primitive needed by the repository contract. It deterministically
+materializes every legacy revision as a classic code snapshot: global clock, simultaneous release
+(split into batches of at most eight), 100 points per problem, the former leaderboard tie-breaks,
+no checkpoints, and an effectively unbounded typed attempt limit. It also maps participants and
+public-contest submitters to account entrants and attaches every terminal origin submission to the
+new official timeline without modifying its source or submission row. Unrepresentable clocks,
+missing commit/problem facts, or nonterminal work fail closed; no digest is guessed.
+
+After applying and translating, the activation preflight is:
+
+```sql
+SELECT blocker_kind, blocker_key
+FROM contest_v2_preflight_blockers
+ORDER BY blocker_kind, blocker_key;
+```
+
+Any returned row blocks contest v2 activation. The runtime never reads `contest_revisions`,
+`contest_revision_problems`, or `contest_participants` as a fallback.
+
+Before restoring formal mutations for new contests, synchronize every catalog that was active at
+cutover from an exact commit whose `collection/contests.json` declares
+`wasm-oj-platform/contests/v2`. Each successful strict-v2 sync atomically clears that catalog's
+`catalog_contest_v2_resync_requirements` row; D1 fences global and individual Start while it remains
+pending. Repository v1 is rejected even when its contest list is empty. Confirm that contest projections expose a timeline
+generation, rule/problem epochs, logical time, next boundary, problem lock state, entrant state,
+and `promptCompilerAvailable`. A public repository staged contest must also expose the UI-only
+timing warning.
+
 ## Verification
 
 `pnpm run github:verify` checks migration fixtures, the renderer, Container build context and

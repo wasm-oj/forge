@@ -66,7 +66,16 @@ function fixture(): { database: DatabaseSync; env: WasmOjWorkerEnv; batch: Rejud
     ) STRICT;
     CREATE TABLE rejudge_batches (
       id TEXT PRIMARY KEY, state TEXT NOT NULL, expected_count INTEGER NOT NULL,
+      purpose TEXT NOT NULL, contest_id TEXT, problem_id TEXT NOT NULL, to_commit TEXT NOT NULL,
       effective_at TEXT, updated_at TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE contest_problem_epochs (
+      contest_id TEXT NOT NULL, problem_id TEXT NOT NULL, rollout_batch_id TEXT,
+      state TEXT NOT NULL, judge_commit TEXT NOT NULL, judge_digest TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE contest_judge_rollout_origins (
+      rejudge_batch_id TEXT NOT NULL, origin_submission_id TEXT NOT NULL,
+      state TEXT NOT NULL
     ) STRICT;
     CREATE TABLE rejudge_jobs (
       rejudge_batch_id TEXT NOT NULL, origin_submission_id TEXT NOT NULL,
@@ -100,12 +109,13 @@ function fixture(): { database: DatabaseSync; env: WasmOjWorkerEnv; batch: Rejud
     INSERT INTO problem_revisions VALUES ('${PROBLEM}', '${ACTIVE_COMMIT}', '${ACTIVE_JUDGE}');
     INSERT INTO submissions VALUES ('${ORIGIN}', '${ORIGIN}', '${USER}', '${PROBLEM}', '${OLD_COMMIT}', '${OLD_JUDGE}', NULL, '${SOURCE}', 'completed');
     INSERT INTO submissions VALUES ('${CHILD}', '${ORIGIN}', '${USER}', '${PROBLEM}', '${ACTIVE_COMMIT}', '${ACTIVE_JUDGE}', NULL, '${SOURCE}', 'completed');
-    INSERT INTO rejudge_batches VALUES ('${BATCH}', 'ready', 1, NULL, '${NOW}');
+    INSERT INTO rejudge_batches VALUES
+      ('${BATCH}', 'ready', 1, 'manual', NULL, '${PROBLEM}', '${ACTIVE_COMMIT}', NULL, '${NOW}');
     INSERT INTO rejudge_jobs VALUES ('${BATCH}', '${ORIGIN}', '${CHILD}', 'ready');
   `);
   const batch: RejudgeBatchRow = {
     id: BATCH, problem_id: PROBLEM, from_commit: OLD_COMMIT, to_commit: ACTIVE_COMMIT,
-    contest_id: null, requested_by: USER, state: "ready", expected_count: 1,
+    contest_id: null, requested_by: USER, purpose: "manual", state: "ready", expected_count: 1,
     completed_count: 1, ready_count: 1, failed_count: 0, failure_code: null,
     cancel_requested_at: null, created_at: NOW, updated_at: NOW, effective_at: null,
   };

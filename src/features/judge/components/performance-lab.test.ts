@@ -11,6 +11,7 @@ const response: ProblemPerformanceResponse = {
     problemId: "22222222-2222-4222-8222-222222222222",
     contestId: "33333333-3333-4333-8333-333333333333",
     frozen: true,
+    hidden: false,
     availableLanguages: ["rust", "python"],
     selectedLanguage: null,
     myEvolutionTruncated: true,
@@ -39,6 +40,8 @@ const response: ProblemPerformanceResponse = {
     createdAt: "2026-08-12T00:30:00.000Z",
     completedAt: "2026-08-12T00:30:04.000Z",
     policySummaryAvailable: true,
+    eligible: true,
+    invalidationReason: null,
   }, {
     submissionId: "55555555-5555-4555-8555-555555555555",
     attemptNumber: 41,
@@ -52,6 +55,8 @@ const response: ProblemPerformanceResponse = {
     createdAt: "2026-08-12T01:00:00.000Z",
     completedAt: "2026-08-12T01:00:02.000Z",
     policySummaryAvailable: false,
+    eligible: false,
+    invalidationReason: "timeline-rewind",
   }, {
     submissionId: SELECTED_ID,
     attemptNumber: 42,
@@ -65,6 +70,8 @@ const response: ProblemPerformanceResponse = {
     createdAt: "2026-08-12T02:00:00.000Z",
     completedAt: "2026-08-12T02:00:03.000Z",
     policySummaryAvailable: true,
+    eligible: true,
+    invalidationReason: null,
   }],
 };
 

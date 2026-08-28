@@ -61,11 +61,19 @@ import { useProduct } from "../../platform/components/app-shell";
 import { ProblemMarkdown } from "./problem-markdown";
 import { ProblemLeaderboard } from "./problem-leaderboard";
 import { PerformanceLab } from "./performance-lab";
+import { PromptProgramPanel } from "./prompt-program-panel";
+import { PromptAssistPanel } from "./prompt-assist-panel";
 import { EditorPanel } from "./editor-panel";
 import { ExecutionPanel } from "./execution-panel";
 import { JudgeOnboarding } from "./judge-onboarding";
 import { judgeUiText, toolchainNote } from "../model/judge-ui-i18n";
 import { MIN_BOTTOM_PANEL_HEIGHT } from "../model/judge-panel-layout";
+import type { ContestWorkspaceRuntime } from "../model/contest-workspace-runtime";
+import {
+  projectHasNonTemplateSources,
+  type PromptAssistWorkspaceContext,
+} from "../model/prompt-assist-contract";
+import { formatLogicalDuration, projectedLogicalSeconds } from "../../contests/model/contest-projection";
 import {
   formatBytes,
   formatDuration,
@@ -333,6 +341,8 @@ interface JudgeWorkspaceProps {
   onProblemCollectionSourceChange?(source: GithubProblemCollectionSource): void;
   managedContext?: ManagedProblemContext;
   contestNavigation?: ContestWorkspaceNavigation;
+  contestRuntime?: ContestWorkspaceRuntime;
+  promptAssistContext?: PromptAssistWorkspaceContext;
 }
 
 export interface ContestWorkspaceNavigation {
@@ -340,6 +350,43 @@ export interface ContestWorkspaceNavigation {
   readonly overviewHref: string;
   readonly previous?: { readonly href: string; readonly label: string };
   readonly next?: { readonly href: string; readonly label: string };
+}
+
+function ContestWorkspaceStatus({ runtime, locale }: { readonly runtime: ContestWorkspaceRuntime; readonly locale: ProblemLocale }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (runtime.runtimeState !== "running") return;
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [runtime.runtimeState]);
+  const zh = locale === "zh-TW";
+  const logical = projectedLogicalSeconds(runtime, runtime.fetchedAtMs, nowMs);
+  const duration = runtime.clock.durationSeconds;
+  const nextBoundary = logical === null || runtime.nextBoundarySeconds === null
+    ? null
+    : Math.max(0, runtime.nextBoundarySeconds - logical);
+  const mode = runtime.officialTrack.kind === "prompt-program" ? "Prompt Program" : "Code";
+  const assist = runtime.officialTrack.kind === "code"
+    ? runtime.aiAssistAvailable ? (zh ? "AI Assist 可用" : "AI Assist available") : null
+    : !runtime.promptCompilerAvailable
+      ? (zh ? "Prompt Compiler 未註冊" : "Prompt Compiler unavailable")
+      : null;
+  return (
+    <div className={`contest-workspace-status ${runtime.paused ? "is-paused" : ""}`} role="status">
+      <div className="contest-workspace-mode" role="group" aria-label={zh ? "官方作答模式" : "Official submission mode"} title={zh ? "官方模式由競賽規則固定" : "Official mode is fixed by contest rules"}>
+        <span className={mode === "Code" ? "active" : ""}>Code</span>
+        <span className={mode === "Prompt Program" ? "active" : ""}>Prompt Program</span>
+      </div>
+      <span><Clock3 size={13} />{logical === null ? "—" : `${formatLogicalDuration(logical)} / ${formatLogicalDuration(duration)}`}</span>
+      {nextBoundary !== null && <span>{zh ? `下一個邊界 ${formatLogicalDuration(nextBoundary)}` : `Next boundary ${formatLogicalDuration(nextBoundary)}`}</span>}
+      <span>{runtime.availability === "open" ? (zh ? "可提交" : "Open") : runtime.availability === "closed" ? (zh ? "已關閉" : "Closed") : (zh ? "未揭題" : "Locked")}</span>
+      {runtime.paused && <span className="contest-workspace-warning"><TriangleAlert size={12} />{zh ? "競賽暫停：不接受新官方輸入" : "Contest paused: new official input is blocked"}</span>}
+      {runtime.judgeProvisional && <span className="contest-workspace-warning">{zh ? "Judge rollout 暫定榜" : "Provisional judge rollout"}</span>}
+      {runtime.entrantState === "eliminated" && <span className="contest-workspace-danger">{zh ? "已淘汰 · 歷史唯讀" : "Eliminated · history is read-only"}</span>}
+      {assist && <span className="contest-workspace-note">{assist}</span>}
+      {runtime.publicRepositoryWarning && <span className="contest-workspace-warning"><TriangleAlert size={12} />{runtime.publicRepositoryWarning}</span>}
+    </div>
+  );
 }
 
 export function JudgeWorkspace({
@@ -350,6 +397,8 @@ export function JudgeWorkspace({
   onProblemCollectionSourceChange,
   managedContext,
   contestNavigation,
+  contestRuntime,
+  promptAssistContext,
 }: JudgeWorkspaceProps) {
   const {
     productTheme,
@@ -443,6 +492,7 @@ export function JudgeWorkspace({
     beforeEditorMount,
     onEditorMount,
     updateProject,
+    replaceWithPromptAssistDraft,
     updateRunConfig,
     updateActiveFile,
     openWorkspace,
@@ -507,7 +557,7 @@ export function JudgeWorkspace({
             </select>
             <ChevronDown size={12} />
           </label>
-          <label className="compact-select language-select">
+          {contestRuntime?.officialTrack.kind !== "prompt-program" && <label className="compact-select language-select">
             <span className={`language-dot ${languageTone(project.config.language)}`} />
             <select
               value={project.config.language}
@@ -518,14 +568,14 @@ export function JudgeWorkspace({
               {availableLanguages.map((language) => <option value={language} key={language}>{languageLabel(language)}</option>)}
             </select>
             <ChevronDown size={12} />
-          </label>
+          </label>}
           {busy ? (
             <button className="stop-button" onClick={cancel}><CircleStop size={14} /> {text.topbar.stop}</button>
           ) : explicitManagedContext ? (
             <>
               <button className="workspace-advanced-button" onClick={openSettings}><Settings2 size={14} />{problemLocale === "zh-TW" ? "測試 / 進階" : "Test / Advanced"}</button>
               <button className="workspace-run-button" onClick={() => void doRunSamples()} disabled={!runtimeReady}><Play size={14} />{text.topbar.runPublicSamples}</button>
-              <button className="workspace-submit-button" onClick={() => void doOfficialSubmit()}><Send size={14} />{text.topbar.officialSubmit}</button>
+              {contestRuntime?.officialTrack.kind !== "prompt-program" && <button className="workspace-submit-button" onClick={() => void doOfficialSubmit()}><Send size={14} />{text.topbar.officialSubmit}</button>}
             </>
           ) : (
             <>
@@ -550,7 +600,17 @@ export function JudgeWorkspace({
 
       <section className={`judge-workspace ${explicitManagedContext ? "managed-workspace" : "custom-judge-workspace"}`} data-drawer-background>
         {explicitManagedContext && <nav className="mobile-workspace-tabs" aria-label="Workspace"><button className={mobileWorkspaceTab === "problem" ? "active" : ""} onClick={() => setMobileWorkspaceTab("problem")}>Problem</button><button className={mobileWorkspaceTab === "code" ? "active" : ""} onClick={() => setMobileWorkspaceTab("code")}>Code</button><button className={mobileWorkspaceTab === "result" ? "active" : ""} onClick={() => setMobileWorkspaceTab("result")}>Result</button></nav>}
-        {explicitManagedContext && <div className="managed-capability" role="status"><ShieldCheck size={14} /> {explicitManagedContext.contestId ? (problemLocale === "zh-TW" ? "競賽題目 · 本機執行公開範例，提交後由 Server 正式判題" : "Contest problem · run public samples locally, then submit for the official verdict") : (problemLocale === "zh-TW" ? "官方練習 · 程式碼保存在瀏覽器，提交後取得驗證結果" : "Official practice · code stays in your browser until you submit")}</div>}
+        {explicitManagedContext && <div className="managed-capability" role="status"><ShieldCheck size={14} /> {contestRuntime?.officialTrack.kind === "prompt-program" ? (problemLocale === "zh-TW" ? "Prompt Program 競賽 · 編輯器僅供本機草稿；官方原始碼只由 pinned compiler 產生並鎖定" : "Prompt Program contest · the editor is local scratch only; official source is generated and locked by the pinned compiler") : explicitManagedContext.contestId ? (problemLocale === "zh-TW" ? "Code 競賽題目 · 本機執行公開範例，提交後由 Server 正式判題" : "Code contest problem · run public samples locally, then submit for the official verdict") : (problemLocale === "zh-TW" ? "官方練習 · 程式碼保存在瀏覽器，提交後取得驗證結果" : "Official practice · code stays in your browser until you submit")}</div>}
+        {contestRuntime && <ContestWorkspaceStatus runtime={contestRuntime} locale={problemLocale} />}
+        {promptAssistContext && <PromptAssistPanel
+          context={promptAssistContext}
+          language={projectLanguage}
+          entry={project.config.entry}
+          locale={problemLocale}
+          hasNonTemplateEdits={projectHasNonTemplateSources(project, activeProblem)}
+          onReplace={replaceWithPromptAssistDraft}
+        />}
+        {contestRuntime?.officialTrack.kind === "prompt-program" && <PromptProgramPanel runtime={contestRuntime} locale={problemLocale} />}
         {runtimeInitializationError && (
           <div className="official-submission-status connection-error" role="alert">
             <TriangleAlert size={14} />
@@ -676,7 +736,7 @@ export function JudgeWorkspace({
             {explicitManagedContext && <button className={problemPane === "performance" ? "active" : ""} onClick={() => setProblemPane("performance")}>
               {problemLocale === "zh-TW" ? "效能" : "Performance"}
             </button>}
-            <a
+            {!explicitManagedContext && <a
               className="ask-chatgpt-button"
               href={chatGptProblemUrl}
               target="_blank"
@@ -685,7 +745,7 @@ export function JudgeWorkspace({
             >
               <MessageCircle size={13} />
               {text.statement.askChatGpt}
-            </a>
+            </a>}
           </div>
           {problemPane === "leaderboard" && explicitManagedContext && !explicitManagedContext.contestId
             ? <ProblemLeaderboard

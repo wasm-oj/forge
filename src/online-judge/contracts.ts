@@ -71,10 +71,26 @@ export interface OfficialSourceFile {
   readonly content: string;
 }
 
-export interface OfficialSubmissionRequest {
+export interface PracticeSubmissionContext {
+  readonly kind: "practice";
   readonly problemId: string;
   readonly catalogCommit: string;
-  readonly contestId?: string;
+}
+
+export interface ContestSubmissionContext {
+  readonly kind: "contest";
+  readonly contestId: string;
+  readonly problemId: string;
+  readonly contentCommit: string;
+  readonly timelineGeneration: number;
+  readonly ruleEpoch: number;
+  readonly problemEpoch: number;
+}
+
+export type OfficialSubmissionContext = PracticeSubmissionContext | ContestSubmissionContext;
+
+export interface OfficialSubmissionRequest {
+  readonly context: OfficialSubmissionContext;
   readonly language: BuiltinLanguage;
   readonly target: TargetAbi;
   readonly optimization: OptimizationLevel;
@@ -177,20 +193,48 @@ function decodedSourceBytes(file: OfficialSourceFile): number {
 export function parseOfficialSubmissionRequest(value: unknown): OfficialSubmissionRequest {
   if (!isRecord(value)) throw new TypeError("Submission request must be an object.");
   exactKeys(value, [
-    "problemId",
-    "catalogCommit",
+    "context",
     "language",
     "target",
     "optimization",
     "entry",
     "sourceFiles",
     "idempotencyKey",
-  ], ["contestId"], "Submission request");
-  const problemId = uuid(value.problemId, "problemId");
-  if (typeof value.catalogCommit !== "string" || !/^[0-9a-f]{40}$/.test(value.catalogCommit)) {
-    throw new TypeError("catalogCommit must be a 40-character lowercase Git commit SHA.");
+  ], [], "Submission request");
+  if (!isRecord(value.context)) throw new TypeError("Submission context must be an object.");
+  let context: OfficialSubmissionContext;
+  if (value.context.kind === "practice") {
+    exactKeys(value.context, ["kind", "problemId", "catalogCommit"], [], "Practice submission context");
+    const problemId = uuid(value.context.problemId, "context.problemId");
+    if (typeof value.context.catalogCommit !== "string" || !/^[0-9a-f]{40}$/.test(value.context.catalogCommit)) {
+      throw new TypeError("context.catalogCommit must be a 40-character lowercase Git commit SHA.");
+    }
+    context = { kind: "practice", problemId, catalogCommit: value.context.catalogCommit };
+  } else if (value.context.kind === "contest") {
+    exactKeys(value.context, [
+      "kind", "contestId", "problemId", "contentCommit", "timelineGeneration", "ruleEpoch", "problemEpoch",
+    ], [], "Contest submission context");
+    const positiveEpoch = (candidate: unknown, label: string): number => {
+      if (!Number.isSafeInteger(candidate) || (candidate as number) < 1) throw new TypeError(`${label} must be a positive integer.`);
+      return candidate as number;
+    };
+    const contestId = uuid(value.context.contestId, "context.contestId");
+    const problemId = uuid(value.context.problemId, "context.problemId");
+    if (typeof value.context.contentCommit !== "string" || !/^[0-9a-f]{40}$/.test(value.context.contentCommit)) {
+      throw new TypeError("context.contentCommit must be a 40-character lowercase Git commit SHA.");
+    }
+    context = {
+      kind: "contest",
+      contestId,
+      problemId,
+      contentCommit: value.context.contentCommit,
+      timelineGeneration: positiveEpoch(value.context.timelineGeneration, "context.timelineGeneration"),
+      ruleEpoch: positiveEpoch(value.context.ruleEpoch, "context.ruleEpoch"),
+      problemEpoch: positiveEpoch(value.context.problemEpoch, "context.problemEpoch"),
+    };
+  } else {
+    throw new TypeError("Submission context kind must be practice or contest.");
   }
-  const contestId = value.contestId === undefined ? undefined : uuid(value.contestId, "contestId");
   assertLanguageIdentifier(value.language);
   if (!isBuiltinLanguage(value.language)) throw new TypeError("language is unsupported for official judging.");
   const language = value.language;
@@ -222,9 +266,7 @@ export function parseOfficialSubmissionRequest(value: unknown): OfficialSubmissi
     throw new TypeError("idempotencyKey is invalid.");
   }
   return {
-    problemId,
-    catalogCommit: value.catalogCommit,
-    ...(contestId ? { contestId } : {}),
+    context,
     language,
     target: value.target,
     optimization: value.optimization,
