@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BROWSER_PROBLEM_SCHEMA } from "./judge/problem-catalog-loader";
 import { PROBLEMS } from "./judge/problems";
 import { runCollectionCli } from "./collection-cli";
-import { parseRepositoryProblems, parseRepositoryRoot } from "./online-judge/repository-contract";
+import { parseRepositoryContests, parseRepositoryProblems, parseRepositoryRoot } from "./online-judge/repository-contract";
 
 const temporaryDirectories: string[] = [];
 
@@ -72,5 +72,41 @@ describe("repository collection authoring", () => {
     await runCollectionCli(["verify", root]);
     await writeFile(path.join(root, manifest.problems[0]!.practiceBundle.path), "tampered\n");
     await expect(runCollectionCli(["verify", root])).rejects.toThrow("invalid size");
+  });
+
+  it("materializes authoring presets into canonical contests/v2 rules", async () => {
+    const root = await repositoryFixture();
+    const sourcePath = path.join(root, "collection/source.json");
+    const source = JSON.parse(await readFile(sourcePath, "utf8")) as { contests: unknown[] };
+    source.contests = [{
+      slug: "classic",
+      status: "published",
+      title: "Classic",
+      description: "",
+      accessMode: "public",
+      rules: {
+        preset: "classic-score",
+        clock: {
+          kind: "global",
+          registrationOpensAt: "2026-01-01T00:00:00Z",
+          registrationClosesAt: "2026-01-02T00:00:00Z",
+          startsAt: "2026-01-02T00:00:00Z",
+          durationSeconds: 3_600,
+        },
+        problemSlugs: [PROBLEMS[0]!.id],
+        pointsPerProblem: 100,
+        attemptLimit: 10,
+        aiAssist: "allowed",
+        leaderboard: { kind: "live" },
+      },
+    }];
+    await writeFile(sourcePath, JSON.stringify(source));
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    await runCollectionCli(["build", root]);
+    const repository = parseRepositoryRoot(new Uint8Array(await readFile(path.join(root, "wasm-oj.json"))));
+    const contests = parseRepositoryContests(new Uint8Array(await readFile(path.join(root, repository.contests))));
+    expect(contests.schema).toBe("wasm-oj-platform/contests/v2");
+    expect(contests.contests[0]?.rules.officialTrack.kind).toBe("code");
+    expect("preset" in contests.contests[0]!.rules).toBe(false);
   });
 });

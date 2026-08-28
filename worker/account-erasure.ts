@@ -53,6 +53,39 @@ export const CANCEL_ERASURE_OUTBOX_SQL = `UPDATE workflow_outbox
  WHERE state='pending'
    AND submission_id IN (SELECT id FROM submissions WHERE user_id IN (?, ?))`;
 
+export const CANCEL_ERASURE_PROMPT_ATTEMPTS_SQL = `UPDATE prompt_attempts
+   SET state='cancelled', failure_code='account-erasure',
+       terminal_at=COALESCE(terminal_at, ?), eligibility='invalid',
+       invalidated_at=COALESCE(invalidated_at, ?),
+       invalidation_reason=COALESCE(invalidation_reason, 'account-erasure'), updated_at=?
+ WHERE entrant_id IN (
+   SELECT id FROM contest_entrants WHERE owner_user_id IN (?, ?)
+ ) AND state IN ('reserved','generating','source-ready')`;
+
+export const INVALIDATE_ERASURE_PROMPT_QUOTA_SQL = `UPDATE prompt_attempt_quota
+   SET state='invalid', settled_at=COALESCE(settled_at, ?), settlement_reason='account-erasure'
+ WHERE prompt_attempt_id IN (
+   SELECT attempts.id FROM prompt_attempts AS attempts
+   JOIN contest_entrants AS entrants ON entrants.id=attempts.entrant_id
+   WHERE entrants.owner_user_id IN (?, ?) AND attempts.state='cancelled'
+ ) AND state IN ('reserved','consumed')`;
+
+export const TOMBSTONE_ERASURE_PROMPTS_SQL = `UPDATE prompt_attempts
+   SET prompt_text=NULL, prompt_bytes=NULL, prompt_sha256=NULL,
+       generated_source_sha256=NULL,
+       erased_at=COALESCE(erased_at, ?), updated_at=?
+ WHERE entrant_id IN (
+   SELECT id FROM contest_entrants WHERE owner_user_id IN (?, ?)
+ ) AND erased_at IS NULL`;
+
+export const RECORD_ERASURE_PROMPT_EVENTS_SQL = `INSERT INTO prompt_attempt_events
+  (prompt_attempt_id, event_key, event_type, payload_json, created_at)
+SELECT attempts.id, 'privacy:erased', 'erased', '{}', ?
+  FROM prompt_attempts AS attempts
+  JOIN contest_entrants AS entrants ON entrants.id=attempts.entrant_id
+ WHERE entrants.owner_user_id IN (?, ?) AND attempts.erased_at IS NOT NULL
+ON CONFLICT(prompt_attempt_id, event_key) DO NOTHING`;
+
 export const ACCOUNT_ERASURE_WORKFLOW_SUBMISSION_IDS_SQL = `SELECT DISTINCT submissions.id
   FROM submissions
   JOIN submission_attempts ON submission_attempts.submission_id=submissions.id
@@ -68,6 +101,20 @@ export const BEGIN_SOURCE_ERASURE_SQL = `UPDATE submission_sources
        erasure_last_error=NULL
  WHERE owner_user_id=? AND state IN ('reserved','ready','erasing')`;
 
+function promptTombstoneStatements(
+  env: WasmOjWorkerEnv,
+  userId: string,
+  anonymousUserId: string,
+  now: string,
+): D1PreparedStatement[] {
+  return [
+    env.DB.prepare(TOMBSTONE_ERASURE_PROMPTS_SQL)
+      .bind(now, now, userId, anonymousUserId),
+    env.DB.prepare(RECORD_ERASURE_PROMPT_EVENTS_SQL)
+      .bind(now, userId, anonymousUserId),
+  ];
+}
+
 function cancellationStatements(
   env: WasmOjWorkerEnv,
   userId: string,
@@ -80,6 +127,11 @@ function cancellationStatements(
     env.DB.prepare(RECORD_ERASURE_CANCELLATION_EVENTS_SQL).bind(now, userId, anonymousUserId),
     env.DB.prepare(CANCEL_ERASURE_REJUDGE_WORK_SQL).bind(now, userId, anonymousUserId),
     env.DB.prepare(CANCEL_ERASURE_OUTBOX_SQL).bind(now, now, userId, anonymousUserId),
+    env.DB.prepare(CANCEL_ERASURE_PROMPT_ATTEMPTS_SQL)
+      .bind(now, now, now, userId, anonymousUserId),
+    env.DB.prepare(INVALIDATE_ERASURE_PROMPT_QUOTA_SQL)
+      .bind(now, userId, anonymousUserId),
+    ...promptTombstoneStatements(env, userId, anonymousUserId, now),
     env.DB.prepare(`UPDATE catalog_sync_jobs
         SET state='running', started_at=?, updated_at=?
       WHERE requested_by IN (?, ?) AND state='queued'`)
@@ -157,12 +209,37 @@ async function stopSubmissionWorkflows(env: WasmOjWorkerEnv, submissionIds: read
   }
 }
 
+async function ownedPromptAttemptIds(env: WasmOjWorkerEnv, job: ErasureJobRow): Promise<readonly string[]> {
+  const rows = await env.DB.prepare(`SELECT attempts.id
+    FROM prompt_attempts AS attempts
+    JOIN contest_entrants AS entrants ON entrants.id=attempts.entrant_id
+    WHERE entrants.owner_user_id IN (?, ?)
+    ORDER BY attempts.id`)
+    .bind(job.user_id, job.anonymous_user_id).all<{ readonly id: string }>();
+  return rows.results.map((row) => row.id);
+}
+
+async function stopPromptAttemptWorkflows(env: WasmOjWorkerEnv, attemptIds: readonly string[]): Promise<void> {
+  for (const attemptId of attemptIds) {
+    const status = await workflowStatusOrUnknown(env.PROMPT_ATTEMPT_WORKFLOW, attemptId);
+    if (TERMINAL_WORKFLOW_STATES.has(status.status)) continue;
+    try {
+      await (await env.PROMPT_ATTEMPT_WORKFLOW.get(attemptId)).terminate();
+    } catch (error) {
+      if (workflowInstanceNotFound(error)) continue;
+      throw error;
+    }
+    const terminal = await workflowStatusOrUnknown(env.PROMPT_ATTEMPT_WORKFLOW, attemptId);
+    if (!TERMINAL_WORKFLOW_STATES.has(terminal.status)) {
+      throw new Error("Prompt Attempt Workflow did not terminate before account erasure.");
+    }
+  }
+}
+
 async function ownedSources(env: WasmOjWorkerEnv, job: ErasureJobRow): Promise<readonly SourceRow[]> {
-  const rows = await env.DB.prepare(`SELECT DISTINCT sources.id, sources.state
-      FROM submissions
-      JOIN submission_sources AS sources ON sources.id=submissions.source_id
-     WHERE submissions.user_id IN (?, ?)
-     ORDER BY sources.id`)
+  const rows = await env.DB.prepare(`SELECT id, state FROM submission_sources
+     WHERE owner_user_id IN (?, ?)
+     ORDER BY id`)
     .bind(job.user_id, job.anonymous_user_id).all<SourceRow>();
   return rows.results;
 }
@@ -180,10 +257,7 @@ async function tombstoneOwnedSources(env: WasmOjWorkerEnv, job: ErasureJobRow): 
   }
   if (sources.length > 0) {
     const incomplete = await env.DB.prepare(`SELECT COUNT(*) AS count
-        FROM submission_sources
-       WHERE id IN (
-         SELECT DISTINCT source_id FROM submissions WHERE user_id IN (?, ?)
-      ) AND state<>'erased'`)
+        FROM submission_sources WHERE owner_user_id IN (?, ?) AND state<>'erased'`)
       .bind(job.user_id, job.anonymous_user_id).first<{ readonly count: number }>();
     if ((incomplete?.count ?? 0) !== 0) throw new Error("Submission source erasure did not reach its D1 fence.");
   }
@@ -220,6 +294,18 @@ async function finalizeAccountErasure(
     env.DB.prepare("DELETE FROM submission_idempotency WHERE user_id IN (?, ?)")
       .bind(job.user_id, job.anonymous_user_id),
     env.DB.prepare("DELETE FROM contest_participants WHERE user_id=?").bind(job.user_id),
+    env.DB.prepare(`UPDATE contest_rule_epochs SET activated_by=? WHERE activated_by=?`)
+      .bind(job.anonymous_user_id, job.user_id),
+    env.DB.prepare(`UPDATE contest_timeline_events SET actor_user_id=? WHERE actor_user_id=?`)
+      .bind(job.anonymous_user_id, job.user_id),
+    env.DB.prepare(`UPDATE contest_entrants
+        SET subject_key=?, account_user_id=?, owner_user_id=?, updated_at=?
+      WHERE kind='account' AND subject_key=? AND account_user_id=? AND owner_user_id=?`)
+      .bind(
+        job.anonymous_user_id, job.anonymous_user_id, job.anonymous_user_id, now,
+        job.user_id, job.user_id, job.user_id,
+      ),
+    ...promptTombstoneStatements(env, job.user_id, job.anonymous_user_id, now),
     env.DB.prepare("UPDATE catalogs SET organizer_user_id=? WHERE organizer_user_id=?")
       .bind(job.anonymous_user_id, job.user_id),
     env.DB.prepare("UPDATE catalog_sync_jobs SET requested_by=? WHERE requested_by=?")
@@ -266,11 +352,30 @@ async function finalizeAccountErasure(
       EXISTS(SELECT 1 FROM users WHERE id=?)
       + EXISTS(SELECT 1 FROM submissions WHERE user_id=?)
       + EXISTS(SELECT 1 FROM submission_sources WHERE owner_user_id=?)
+      + EXISTS(
+        SELECT 1 FROM prompt_attempts AS attempts
+        JOIN contest_entrants AS entrants ON entrants.id=attempts.entrant_id
+        WHERE entrants.owner_user_id IN (?, ?)
+          AND (
+            attempts.erased_at IS NULL
+            OR attempts.prompt_text IS NOT NULL
+            OR attempts.prompt_bytes IS NOT NULL
+            OR attempts.prompt_sha256 IS NOT NULL
+            OR attempts.generated_source_sha256 IS NOT NULL
+            OR NOT EXISTS (
+              SELECT 1 FROM prompt_attempt_events AS events
+              WHERE events.prompt_attempt_id=attempts.id
+                AND events.event_key='privacy:erased'
+                AND events.event_type='erased'
+            )
+          )
+      )
       + NOT EXISTS(SELECT 1 FROM account_erasure_jobs WHERE id=? AND status='completed' AND receipt_sha256=?)
       + NOT EXISTS(SELECT 1 FROM erased_user_tombstones WHERE anonymous_user_id=? AND receipt_sha256=?)
       AS violations`)
     .bind(
-      job.user_id, job.user_id, job.user_id, job.id, receiptSha256,
+      job.user_id, job.user_id, job.user_id, job.user_id, job.anonymous_user_id,
+      job.id, receiptSha256,
       job.anonymous_user_id, receiptSha256,
     ).first<{ readonly violations: number }>();
   if ((postcondition?.violations ?? 1) !== 0) throw new Error("Account erasure postcondition failed.");
@@ -296,7 +401,9 @@ export async function resumeAccountErasure(
       .bind(now, job.id).run();
     await cancelOwnerWork(env, job, now);
     const submissions = await ownedSubmissionIds(env, job);
+    const promptAttempts = await ownedPromptAttemptIds(env, job);
     await stopSubmissionWorkflows(env, submissions);
+    await stopPromptAttemptWorkflows(env, promptAttempts);
     await cancelOwnerWork(env, job, new Date().toISOString());
     const deletingAt = new Date().toISOString();
     await prepareSourcesForErasure(env, job, deletingAt);

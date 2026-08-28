@@ -101,6 +101,7 @@ import {
   type ManagedProblemContext,
 } from "../../../online-judge/managed-problem-collection";
 import type { OfficialSubmissionStatus } from "../../submissions/components/official-submission-result";
+import type { PromptAssistDraft } from "../../../online-judge/prompt-compiler";
 import { wasmOjMaintenanceSmokeHeaders } from "../../platform/api/online-api";
 import { useProduct } from "../../platform/components/app-shell";
 import { PLATFORM_BROWSER_TOOLCHAINS } from "../../platform/browser-toolchains";
@@ -119,6 +120,7 @@ import {
   executionTerminationLabel,
   judgeUiText,
 } from "../model/judge-ui-i18n";
+import { replaceProjectWithPromptAssistDraft } from "./prompt-assist-contract";
 import type {
   BottomTab,
   BusyAction,
@@ -855,6 +857,16 @@ export function useJudgeSession({
     }));
   }, [activeFile, updateProject]);
 
+  const replaceWithPromptAssistDraft = useCallback((draft: PromptAssistDraft) => {
+    compileCoordinatorRef.current?.restart();
+    runnerRef.current?.restart();
+    updateProject((current) => replaceProjectWithPromptAssistDraft(current, draft));
+    setDiagnostics([]);
+    setLogs([]);
+    setBottomTab("output");
+    addLog("system", "AI Assist draft replaced the editor. It remains editable and will submit as ordinary code.");
+  }, [addLog, updateProject]);
+
   const openWorkspace = useCallback(async (summary: JudgeWorkspaceCollectionEntry, language: BuiltinLanguage) => {
     if (busy || loadingProblemId) return;
     setLoadingProblemId(summary.id);
@@ -1236,6 +1248,7 @@ export function useJudgeSession({
         problemId: managedProblemId,
         catalogCommit: managedSource.catalogCommit,
         ...(officialContestId ? { contestId: officialContestId } : {}),
+        ...(managedSource.contestAdmission ? { contestAdmission: managedSource.contestAdmission } : {}),
       }, {
         language: projectLanguage,
         target: project.config.target,
@@ -1570,6 +1583,7 @@ export function useJudgeSession({
     beforeEditorMount,
     onEditorMount,
     updateProject,
+    replaceWithPromptAssistDraft,
     updateRunConfig,
     updateActiveFile,
     openWorkspace,

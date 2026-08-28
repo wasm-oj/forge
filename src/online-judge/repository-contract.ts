@@ -1,6 +1,8 @@
+import { parseContestRules, type ContestRules } from "./contest-rules";
+
 export const REPOSITORY_SCHEMA = "wasm-oj-platform/repository/v1";
 export const PROBLEMS_SCHEMA = "wasm-oj-platform/problems/v1";
-export const CONTESTS_SCHEMA = "wasm-oj-platform/contests/v1";
+export const CONTESTS_SCHEMA = "wasm-oj-platform/contests/v2";
 
 export const REPOSITORY_ROOT_PATH = "wasm-oj.json";
 export const MAX_REPOSITORY_MANIFEST_BYTES = 2 * 1024 * 1024;
@@ -54,10 +56,7 @@ export interface RepositoryContest {
   readonly title: string;
   readonly description: string;
   readonly accessMode: RepositoryContestAccessMode;
-  readonly startsAt: string;
-  readonly endsAt: string;
-  readonly freezeAt: string | null;
-  readonly problems: readonly string[];
+  readonly rules: ContestRules;
 }
 
 export interface RepositoryContestsManifest {
@@ -200,13 +199,6 @@ export function parseRepositoryProblems(bytes: Uint8Array): RepositoryProblemsMa
   return parseRepositoryProblemsValue(parseJsonBytes(bytes, "problems manifest"));
 }
 
-function timestamp(value: unknown, label: string): string {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) || Number.isNaN(Date.parse(value))) {
-    throw new TypeError(`${label} must be an RFC 3339 UTC timestamp.`);
-  }
-  return value;
-}
-
 export function parseRepositoryContestsValue(value: unknown): RepositoryContestsManifest {
   const input = record(value, "contests manifest");
   exact(input, ["contests", "schema"], "contests manifest");
@@ -215,18 +207,12 @@ export function parseRepositoryContestsValue(value: unknown): RepositoryContests
   const slugs = new Set<string>();
   const contests = input.contests.map((candidate, index): RepositoryContest => {
     const contest = record(candidate, `contest ${index + 1}`);
-    exact(contest, ["accessMode", "description", "endsAt", "freezeAt", "problems", "slug", "startsAt", "status", "title"], `contest ${index + 1}`);
+    exact(contest, ["accessMode", "description", "rules", "slug", "status", "title"], `contest ${index + 1}`);
     const contestSlug = slug(contest.slug, `contest ${index + 1}.slug`);
     if (slugs.has(contestSlug)) throw new TypeError(`Contest slug '${contestSlug}' is duplicated.`);
     if (contest.status !== "draft" && contest.status !== "published" && contest.status !== "archived") throw new TypeError(`Contest '${contestSlug}' status is invalid.`);
     if (contest.accessMode !== "public" && contest.accessMode !== "invite") throw new TypeError(`Contest '${contestSlug}' accessMode is invalid.`);
-    if (!Array.isArray(contest.problems) || contest.problems.length < 1 || contest.problems.length > 100) throw new TypeError(`Contest '${contestSlug}' must reference between 1 and 100 problems.`);
-    const problemSlugs = contest.problems.map((value, problemIndex) => slug(value, `contest '${contestSlug}' problem ${problemIndex + 1}`));
-    if (new Set(problemSlugs).size !== problemSlugs.length) throw new TypeError(`Contest '${contestSlug}' contains a duplicate problem.`);
-    const startsAt = timestamp(contest.startsAt, `contest '${contestSlug}' startsAt`);
-    const endsAt = timestamp(contest.endsAt, `contest '${contestSlug}' endsAt`);
-    const freezeAt = contest.freezeAt === null ? null : timestamp(contest.freezeAt, `contest '${contestSlug}' freezeAt`);
-    if (startsAt >= endsAt || (freezeAt !== null && (freezeAt <= startsAt || freezeAt >= endsAt))) throw new TypeError(`Contest '${contestSlug}' time range is invalid.`);
+    const rules = parseContestRules(contest.rules, `contest '${contestSlug}' rules`);
     slugs.add(contestSlug);
     return {
       slug: contestSlug,
@@ -234,10 +220,7 @@ export function parseRepositoryContestsValue(value: unknown): RepositoryContests
       title: boundedText(contest.title, `contest '${contestSlug}' title`, 4_096),
       description: boundedText(contest.description, `contest '${contestSlug}' description`, 65_536),
       accessMode: contest.accessMode,
-      startsAt,
-      endsAt,
-      freezeAt,
-      problems: problemSlugs,
+      rules,
     };
   });
   return { schema: CONTESTS_SCHEMA, contests };
@@ -254,8 +237,8 @@ export function validateRepositoryCatalog(
 ): RepositoryCatalog {
   const problemSlugs = new Set(problems.problems.map((problem) => problem.slug));
   for (const contest of contests.contests) {
-    for (const problemSlug of contest.problems) {
-      if (!problemSlugs.has(problemSlug)) throw new TypeError(`Contest '${contest.slug}' references unknown problem '${problemSlug}'.`);
+    for (const problem of contest.rules.problems) {
+      if (!problemSlugs.has(problem.slug)) throw new TypeError(`Contest '${contest.slug}' references unknown problem '${problem.slug}'.`);
     }
   }
   return { root, problems, contests };

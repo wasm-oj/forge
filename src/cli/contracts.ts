@@ -64,8 +64,8 @@ export const WOJ_COMMANDS: readonly CommandSpec[] = Object.freeze([
 
   remote("contest list", "List visible contests."),
   remote("contest show", "Show one contest.", "<contest-id>"),
-  remote("contest join", "Join an invite contest.", "<contest-id>", { "code-file": "string" }),
-  remote("contest problems", "List the active repository problems in a contest.", "<contest-id>"),
+  remote("contest join", "Join a contest; invite contests require --code-file.", "<contest-id>", { "code-file": "string" }),
+  remote("contest problems", "List projected locked, open, and closed contest problem states.", "<contest-id>"),
   remote("contest standings", "Show contest standings.", "<contest-id>", { limit: "string" }),
 
   remote("performance frontier", "Show the verified performance frontier.", "<problem-id>", { language: "string", contest: "string" }),
@@ -95,7 +95,7 @@ export const WOJ_COMMANDS: readonly CommandSpec[] = Object.freeze([
   remote("organizer contest list", "List contests you organize."),
   remote("organizer contest show", "Show one Organizer contest.", "<contest-id>"),
   remote("organizer contest invite-rotate", "Rotate an invite contest credential.", "<contest-id>", { "code-file": "string" }),
-  remote("organizer contest participants", "List contest participants.", "<contest-id>", paging),
+  remote("organizer contest participants", "List contest entrants.", "<contest-id>", paging),
   remote("organizer contest standings", "Show organizer-visible standings.", "<contest-id>", { limit: "string" }),
 
   remote("organizer rejudge options", "List known commits or valid targets for one problem revision.", "[problem-id]", { from: "string" }),

@@ -52,8 +52,9 @@ for (const filename of ["wrangler.jsonc", "wrangler.quick-production.jsonc"]) {
   if (JSON.stringify(workflows) !== JSON.stringify([
     ["SUBMISSION_WORKFLOW", "SubmissionWorkflow"],
     ["CATALOG_WORKFLOW", "CatalogWorkflow"],
+    ["PROMPT_ATTEMPT_WORKFLOW", "PromptAttemptWorkflow"],
   ])) {
-    throw new Error(`${filename} must bind only the submission and catalog Workflows.`);
+    throw new Error(`${filename} must bind the submission, catalog, and Prompt Program Workflows.`);
   }
 }
 

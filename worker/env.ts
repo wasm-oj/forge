@@ -1,5 +1,6 @@
 import type { SubmissionWorkflowParameters } from "./submission-workflow-identity";
 import type { CatalogWorkflowParameters } from "./catalog-workflow-identity";
+import type { PromptAttemptWorkflowParameters } from "./prompt-workflow-identity";
 
 export type WasmOjEnvironment = "development" | "staging" | "production";
 
@@ -10,6 +11,7 @@ export interface WasmOjWorkerEnv {
   readonly SUBMISSION_CONTAINER: DurableObjectNamespace;
   readonly SUBMISSION_WORKFLOW: Workflow<SubmissionWorkflowParameters>;
   readonly CATALOG_WORKFLOW: Workflow<CatalogWorkflowParameters>;
+  readonly PROMPT_ATTEMPT_WORKFLOW: Workflow<PromptAttemptWorkflowParameters>;
   readonly GITHUB_OAUTH_CLIENT_ID: string;
   readonly GITHUB_OAUTH_CLIENT_SECRET: string;
   readonly GITHUB_APP_ID: string;

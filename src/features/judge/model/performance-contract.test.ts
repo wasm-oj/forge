@@ -17,6 +17,7 @@ function performanceResponse() {
       problemId: PROBLEM_ID,
       contestId: CONTEST_ID,
       frozen: true,
+      hidden: false,
       availableLanguages: ["rust", "python"],
       selectedLanguage: null,
       myEvolutionTruncated: true,
@@ -45,6 +46,8 @@ function performanceResponse() {
       createdAt: "2026-08-12T01:00:00.000Z",
       completedAt: "2026-08-12T01:01:00.000Z",
       policySummaryAvailable: false,
+      eligible: false,
+      invalidationReason: "timeline-rewind",
     }],
   };
 }
@@ -74,9 +77,9 @@ describe("performance API contracts", () => {
       language: "all",
     });
 
-    expect(parsed.context).toMatchObject({ frozen: true, selectedLanguage: null, myEvolutionTruncated: true });
+    expect(parsed.context).toMatchObject({ frozen: true, hidden: false, selectedLanguage: null, myEvolutionTruncated: true });
     expect(parsed.frontier[0]).toMatchObject({ language: "rust", isPareto: true });
-    expect(parsed.myEvolution?.[0]).toMatchObject({ attemptNumber: 10_001, state: "compile-error" });
+    expect(parsed.myEvolution?.[0]).toMatchObject({ attemptNumber: 10_001, state: "compile-error", eligible: false, invalidationReason: "timeline-rewind" });
   });
 
   it("fails closed on extra keys, stale context, removed states, and bounded inventories", () => {

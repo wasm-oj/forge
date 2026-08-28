@@ -14,9 +14,12 @@ Submit execution.
 | Active repository revision | `catalogs.active_commit_sha` |
 | Problem identity | `problem_series(catalog_id, slug)` |
 | Problem projection | `problem_revisions(problem_id, commit_sha)` |
-| Contest identity/projection | `contest_series` and `contest_revisions` |
+| Contest identity and repository rules | `contest_series`, `contest_rule_revisions`, and `contest_rule_problems` |
+| Contest timeline and entrants | `contest_runtimes`, `contest_timeline_events`, and `contest_entrants` |
+| Contest epochs, reveal, and checkpoints | D1 v2 contest epoch/grant/decision tables |
+| Prompt provenance and quota | `prompt_public_contexts`, `prompt_attempts`, and `prompt_attempt_quota` |
 | Invite code | D1 HMAC only |
-| Participants, submissions, effective results | D1 operational tables |
+| Entrants, submissions, eligibility, and effective results | D1 operational tables |
 | Judge package | Immutable `judge-packages/v2/<sha256>` R2 object |
 | Public content cache | `public-content/v1/<sha256>` R2 object |
 
@@ -36,10 +39,19 @@ Problem list and detail APIs expose a stable `problemId`, `catalogCommit`, `judg
 content URL containing the commit. Public bundle reads use the descriptor's SHA-256 as the cache
 key and fetch only the exact GitHub commit on a miss.
 
-Official Submit sends `problemId` and `catalogCommit`. Admission requires that pair to equal the
-current active problem revision; otherwise it returns `409 problem-revision-stale`. The submission
-stores the stable problem ID, actual catalog commit, and judge digest permanently. The runtime
-build ID is recorded later on `submission_attempts`, when the attempt actually starts.
+Official Submit uses a discriminated context. Practice sends `kind: "practice"`, `problemId`, and
+`catalogCommit`; admission requires the pair to equal the current active problem revision or returns
+`409 problem-revision-stale`. Contest submission sends `kind: "contest"`, `contestId`, `problemId`,
+`contentCommit`, `timelineGeneration`, `ruleEpoch`, and `problemEpoch`. Its final INSERT fences those
+tokens together with entrant state, pause state, quota, the logical problem window, and every due
+checkpoint decision. Unlike practice, a contest `contentCommit` remains an admissible immutable
+revision when a metadata-only catalog sync moves the active commit without advancing its content
+epoch. A Prompt
+Program prompt uses the prompt-attempt API and is never encoded as a language value.
+
+The submission stores the stable problem ID, content commit, judge digest/epoch, and contest
+eligibility permanently. The runtime build ID is recorded later on `submission_attempts`, when the
+attempt actually starts.
 
 An effective historical result continues to rank. It is `stale` only when its `judgeDigest`
 differs from the active revision. APIs also expose `judgedCommit` and `activeCommit`; title,
@@ -47,10 +59,20 @@ statement, or contest-time edits alone do not make a result stale. A manual comm
 rejudge creates child submissions and atomically changes the effective result when all children
 reach deterministic terminal outcomes. The origin submission is never rewritten.
 
-Repository synchronization immediately controls contest status, metadata, problem membership,
-and order. Scores for a problem removed from the active contest projection no longer contribute to
-the current aggregate, but remain visible in personal history. Invite HMACs and participants are
-operational data and are never overwritten by a sync.
+Repository synchronization immediately controls content and judge epochs. Changes to schedule,
+membership, scoring, checkpoints, or limits become pending rules for a running contest and require
+a paused Organizer activation. Scores removed from the current official timeline remain visible as
+invalid history. Invite HMACs and entrants are operational data and are never overwritten by sync.
+
+Judge-package changes immediately bind new submissions to the new epoch and create a bounded
+rejudge rollout for existing timeline sources. The prior leaderboard remains effective and is
+marked provisional until all new results can switch atomically. Prompt Program rejudge reuses its
+locked generated source and never invokes the compiler adapter again.
+
+Prompt Program context is content-addressed from the exact public problem projection. A production
+deployment without a registered compiler adapter still serves the contest, with
+`promptCompilerAvailable: false`; prompt admission returns typed
+`503 prompt-compiler-unavailable` before quota reservation and does not select a fallback provider.
 
 ## Execution and event delivery
 
@@ -60,6 +82,9 @@ build ID, Worker version ID, container contract, and container protocol. Submiss
 persisted as append-only `submission_events`; clients resume with
 `events?after=<cursor>`. Reconciler and outbox processing repair bounded operational delivery, not
 catalog content history.
+
+One user may have at most eight queued submissions and one active submission. Eight is an
+admission ceiling, not reserved global capacity; a saturated global queue can still return 429.
 
 `formal_mutations_enabled` is the maintenance gate for catalog sync, submission, and rejudge
 mutations. Read-only product routes remain available while the gate is paused. Production exposes

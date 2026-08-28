@@ -10,6 +10,7 @@ import { dispatchSubmissionJobs } from "./dispatcher";
 import { operationalLog } from "./structured-log";
 import { classifyRejudgeChildState } from "../src/online-judge/rejudge";
 import { createRetryAttempt } from "./submission-retry";
+import { prepareJudgeTerminalEvidenceUpdates } from "./contest-evidence";
 
 export type { SubmissionWorkflowParameters } from "./submission-workflow-identity";
 
@@ -40,6 +41,7 @@ async function finalizeInfrastructureFailure(
         SET state='failed', finished_at=?, failure_code='container-failure'
       WHERE submission_id=? AND attempt=? AND state IN ('created','running')`)
       .bind(now, submission.submissionId, attempt),
+    ...prepareJudgeTerminalEvidenceUpdates(env.DB, submission.submissionId, now),
     prepareSubmissionEventInsert(env.DB, {
       submissionId: submission.submissionId,
       eventKey: `workflow:infrastructure-error:${attempt}`,
@@ -76,6 +78,7 @@ async function finalizeContainerResult(
     ),
     env.DB.prepare(FINALIZE_SUBMISSION_ATTEMPT_SQL)
       .bind(now, submission.submissionId, attempt, tokenHash, submission.submissionId, attempt, result.state),
+    ...prepareJudgeTerminalEvidenceUpdates(env.DB, submission.submissionId, now),
     prepareSubmissionEventInsert(env.DB, {
       submissionId: submission.submissionId,
       eventKey: `workflow:terminal:${attempt}`,

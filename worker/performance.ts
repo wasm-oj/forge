@@ -23,6 +23,8 @@ export interface PerformanceEvolutionRow {
   readonly createdAt: string;
   readonly completedAt: string | null;
   readonly policySummaryAvailable: boolean;
+  readonly eligible: boolean;
+  readonly invalidationReason: string | null;
 }
 
 interface FrontierDatabaseRow {
@@ -49,6 +51,8 @@ interface EvolutionDatabaseRow {
   readonly created_at: string;
   readonly completed_at: string | null;
   readonly policy_summary_available: number;
+  readonly eligibility: "eligible" | "invalid" | null;
+  readonly invalidation_reason: string | null;
 }
 
 function dominated(candidate: FrontierDatabaseRow, rows: readonly FrontierDatabaseRow[]): boolean {
@@ -91,7 +95,7 @@ export async function queryPerformanceFrontier(
     readonly problemId: string;
     readonly contestId?: string;
     readonly language?: string;
-    readonly submittedAtOrBefore?: string;
+    readonly evidenceLogicalAtOrBefore?: number;
   },
 ): Promise<readonly PerformanceFrontierRow[]> {
   const contest = input.contestId !== undefined;
@@ -99,7 +103,7 @@ export async function queryPerformanceFrontier(
     ? [input.contestId, input.problemId]
     : [input.problemId];
   if (input.language) bindings.push(input.language);
-  if (input.submittedAtOrBefore) bindings.push(input.submittedAtOrBefore);
+  if (input.evidenceLogicalAtOrBefore !== undefined) bindings.push(input.evidenceLogicalAtOrBefore);
   const rows = await database.prepare(`WITH candidates AS (
       SELECT result.id AS submission_id,
         origin.user_id,
@@ -112,11 +116,12 @@ export async function queryPerformanceFrontier(
       FROM effective_submission_results AS effective
       JOIN submissions AS origin ON origin.id=effective.origin_submission_id
       JOIN submissions AS result ON result.id=effective.effective_submission_id
-      ${contest ? `JOIN contest_series AS contest ON contest.id=origin.contest_id
-      JOIN catalogs ON catalogs.id=contest.catalog_id
-      JOIN contest_revision_problems AS contest_problem
+      ${contest ? `JOIN contest_submission_records AS contest_record
+        ON contest_record.submission_id=origin.id AND contest_record.eligibility='eligible'
+      JOIN contest_runtimes AS contest_runtime ON contest_runtime.contest_id=origin.contest_id
+      JOIN contest_rule_problems AS contest_problem
         ON contest_problem.contest_id=origin.contest_id
-       AND contest_problem.commit_sha=catalogs.active_commit_sha
+       AND contest_problem.rules_commit=contest_runtime.active_rules_commit
        AND contest_problem.problem_id=origin.problem_id` : ""}
       WHERE ${contest
         ? "origin.contest_id=? AND contest_problem.problem_id=?"
@@ -128,8 +133,30 @@ export async function queryPerformanceFrontier(
         AND result.peak_memory_bytes IS NOT NULL
         AND result.completed_at IS NOT NULL
         AND origin.origin_submitted_at IS NOT NULL
+        ${contest ? `AND NOT EXISTS (
+          SELECT 1 FROM contest_problem_epochs AS rollout_epoch
+          JOIN rejudge_batches AS rollout ON rollout.id=rollout_epoch.rollout_batch_id
+          WHERE rollout_epoch.contest_id=contest_record.contest_id
+            AND rollout_epoch.problem_id=origin.problem_id
+            AND rollout_epoch.judge_epoch=contest_record.judge_epoch
+            AND rollout_epoch.state='effective' AND rollout.state<>'effective'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM contest_judge_rollout_prompt_attempts AS prompt_membership
+          JOIN contest_problem_epochs AS prompt_target_epoch
+            ON prompt_target_epoch.contest_id=contest_record.contest_id
+           AND prompt_target_epoch.problem_id=origin.problem_id
+           AND prompt_target_epoch.judge_epoch=prompt_membership.target_judge_epoch
+           AND prompt_target_epoch.state='effective'
+          JOIN rejudge_batches AS prompt_rollout
+            ON prompt_rollout.id=prompt_target_epoch.rollout_batch_id
+          WHERE prompt_membership.prompt_attempt_id=contest_record.prompt_attempt_id
+            AND prompt_membership.state IN ('included','promoted')
+            AND prompt_rollout.purpose='contest-judge-rollout'
+            AND prompt_rollout.state<>'effective'
+        )` : ""}
         ${input.language ? "AND result.language=?" : ""}
-        ${input.submittedAtOrBefore ? "AND origin.origin_submitted_at<=?" : ""}
+        ${input.evidenceLogicalAtOrBefore !== undefined ? "AND contest_record.evidence_logical_seconds<=?" : ""}
     ), ranked AS (
       SELECT candidates.*,
         ROW_NUMBER() OVER (
@@ -175,11 +202,13 @@ export async function queryPerformanceEvolution(
       origin.created_at,
       CASE WHEN result.id IS NULL THEN origin.completed_at ELSE result.completed_at END AS completed_at,
       CASE WHEN result.id IS NULL THEN origin.policy_summary_json ELSE result.policy_summary_json END AS resolved_policy_summary
+      ${input.contestId ? ", contest_record.eligibility, contest_record.invalidation_reason" : ", NULL AS eligibility, NULL AS invalidation_reason"}
     FROM submissions AS origin
     LEFT JOIN effective_submission_results AS effective
       ON effective.origin_submission_id=origin.id
     LEFT JOIN submissions AS result
       ON result.id=effective.effective_submission_id
+    ${input.contestId ? "LEFT JOIN contest_submission_records AS contest_record ON contest_record.submission_id=origin.id" : ""}
     WHERE origin.origin_submission_id=origin.id
       AND origin.user_id=?
       AND origin.problem_id=?
@@ -197,7 +226,9 @@ export async function queryPerformanceEvolution(
       created_at,
       completed_at,
       CASE WHEN state='completed' AND resolved_policy_summary IS NOT NULL
-        THEN 1 ELSE 0 END AS policy_summary_available
+        THEN 1 ELSE 0 END AS policy_summary_available,
+      eligibility,
+      invalidation_reason
     FROM resolved
     ), filtered AS (
       SELECT * FROM numbered ${input.language ? "WHERE language=?" : ""}
@@ -220,5 +251,7 @@ export async function queryPerformanceEvolution(
     createdAt: row.created_at,
     completedAt: row.completed_at,
     policySummaryAvailable: row.policy_summary_available === 1,
+    eligible: row.eligibility !== "invalid",
+    invalidationReason: row.invalidation_reason,
   })) };
 }

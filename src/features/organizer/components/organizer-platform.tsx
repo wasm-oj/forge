@@ -7,15 +7,19 @@ import { wasmOjCsrfToken, wasmOjJson, wasmOjMutation } from "../../platform/api/
 import { useProduct } from "../../platform/components/app-shell";
 import { usePageTitle } from "../../platform/hooks/page-title";
 import { requestWasmOjTurnstileToken } from "../../../turnstile/client";
+import type { ContestProjection } from "../../contests/model/contest-projection";
+import {
+  OrganizerContestOperations,
+  type OrganizerParticipantRow,
+} from "./organizer-contest-operations";
 
 interface OrganizerApplication { readonly id: string; readonly status: "pending" | "approved" | "rejected"; readonly created_at: string; readonly reviewed_at: string | null; readonly review_note: string | null; }
 interface OrganizerStatus { readonly authenticated: boolean; readonly organizer: boolean; readonly access: "signed-out" | "eligible" | "pending" | "rejected" | "revoked" | "active"; readonly application: OrganizerApplication | null; }
 interface Repository { readonly github_repository_id: number; readonly owner_login: string; readonly name: string; readonly is_private: number; }
 interface Catalog { readonly id: string; readonly github_repository_id: number; readonly active_commit_sha: string | null; readonly owner_login: string; readonly name: string; readonly created_at: string; readonly updated_at: string; }
 interface CatalogSync { readonly id: string; readonly catalog_id: string; readonly requested_ref: string; readonly commit_sha: string; readonly state: "queued" | "running" | "succeeded" | "failed"; readonly error_code: string | null; readonly summary: { readonly problemCount: number; readonly contestCount: number } | null; readonly created_at: string; readonly updated_at: string; }
-interface OrganizerContest { readonly id: string; readonly slug: string; readonly catalogCommit: string; readonly title: string; readonly description: string; readonly accessMode: "public" | "invite"; readonly inviteCodeConfigured: boolean; readonly startsAt: string; readonly endsAt: string; readonly freezeAt: string | null; readonly status: "draft" | "published" | "archived"; readonly phase: "upcoming" | "running" | "ended"; readonly problemCount: number; }
-interface ContestProblem { readonly ordinal: number; readonly problemId: string; readonly problemSlug: string; readonly problemNumber: number; readonly title: Record<string, string>; }
-interface ParticipantRow { readonly participant: { readonly id: string; readonly label: string }; readonly joinedAt: string; }
+type OrganizerContest = ContestProjection & { readonly problemCount: number; readonly pendingRulesCommit: string | null };
+interface ContestProblem { readonly ordinal: number; readonly batch: number; readonly problemId: string; readonly problemSlug: string; readonly problemNumber: number; readonly title: Record<string, string>; readonly availability: "locked" | "open" | "closed"; readonly releaseAfterSeconds: number; readonly submissionClosesAfterSeconds: number; readonly points: number; readonly attemptLimit: number; readonly epochs: { readonly timelineGeneration: number; readonly ruleEpoch: number; readonly problemEpoch: number; readonly contentEpoch: number; readonly judgeEpoch: number }; readonly contentCommit: string; readonly judgeDigest: string; }
 interface RejudgeRevision { readonly problemId: string; readonly catalogCommit: string; readonly active: boolean; readonly judgeDigest: string; readonly slug: string; readonly order: number; readonly title: Record<string, string>; readonly repository: { readonly owner: string; readonly name: string }; }
 interface RejudgeBatch { readonly id: string; readonly problemId: string; readonly fromCommit: string; readonly toCommit: string; readonly contestId: string | null; readonly status: string; readonly expectedCount: number; readonly completedCount: number; readonly readyCount: number; readonly failedCount: number; readonly failureCode: string | null; readonly cancelRequestedAt: string | null; readonly createdAt: string; }
 
@@ -162,14 +166,14 @@ export function OrganizerContests() {
 function ContestsContent() {
   const [contests, setContests] = useState<readonly OrganizerContest[]>([]);
   const [selected, setSelected] = useState<{ readonly contest: OrganizerContest; readonly problems: readonly ContestProblem[] }>();
-  const [participants, setParticipants] = useState<readonly ParticipantRow[]>([]);
+  const [participants, setParticipants] = useState<readonly OrganizerParticipantRow[]>([]);
   const [inviteCode, setInviteCode] = useState("");
   const [message, setMessage] = useState("");
   const load = useCallback(async () => { const value = await wasmOjJson<{ contests: readonly OrganizerContest[] }>("/api/organizer/contests"); setContests(value.contests); }, []);
   const inspect = useCallback(async (contestId: string) => {
     const [detail, participantResult] = await Promise.all([
       wasmOjJson<{ contest: OrganizerContest; problems: readonly ContestProblem[] }>(`/api/organizer/contests/${encodeURIComponent(contestId)}`),
-      wasmOjJson<{ participants: readonly ParticipantRow[] }>(`/api/organizer/contests/${encodeURIComponent(contestId)}/participants`),
+      wasmOjJson<{ participants: readonly OrganizerParticipantRow[] }>(`/api/organizer/contests/${encodeURIComponent(contestId)}/participants`),
     ]);
     setSelected(detail); setParticipants(participantResult.participants);
   }, []);
@@ -179,7 +183,22 @@ function ContestsContent() {
     try { await wasmOjMutation(`/api/organizer/contests/${encodeURIComponent(selected.contest.id)}/invite-code`, { inviteCode }); setInviteCode(""); await load(); await inspect(selected.contest.id); setMessage("Invite credential rotated. Store the supplied code securely; the platform retains only its HMAC."); }
     catch (reason) { setMessage(reason instanceof Error ? reason.message : String(reason)); }
   }
-  return <main className="product-page" id="main-content"><header className="product-page-header"><span className="product-eyebrow"><Trophy size={14} /> Organizer</span><h1>Repository contests</h1><p>Contest status, schedule, metadata, problem membership, and order come exclusively from the active repository commit.</p></header><section className="organizer-product-section"><header className="organizer-actions"><h2>Current projection</h2><button type="button" onClick={() => void load()} aria-label="Refresh contests"><RefreshCw size={15} /></button></header>{contests.map((contest) => <article className="collection-summary" key={contest.id}><div><span>{contest.status} · {contest.phase} · {contest.accessMode}</span><strong>{contest.title}</strong><small>{contest.problemCount} problems · commit {contest.catalogCommit.slice(0, 12)}</small></div><div className="organizer-actions"><button type="button" onClick={() => void inspect(contest.id)}>Inspect</button><Link href={`/contests/${contest.id}`}>Preview</Link></div></article>)}{contests.length === 0 && <p className="product-empty">No contests exist in the active repository manifests.</p>}</section>{selected && <section className="organizer-panel"><h2>{selected.contest.title}</h2><p>{selected.contest.description}</p>{selected.problems.map((problem) => <div className="selected-problem" key={problem.problemId}><span>{problem.ordinal}</span><strong>{problem.title["zh-TW"] ?? problem.title.en ?? problem.problemSlug}</strong><small>{problem.problemId}</small></div>)}<h3>Participants</h3>{participants.map((row) => <p key={row.participant.id}>{row.participant.label} · {new Date(row.joinedAt).toLocaleString()}</p>)}{participants.length === 0 && <p>No participants.</p>}{selected.contest.accessMode === "invite" && <form className="organizer-product-form" onSubmit={(event) => void rotate(event)}><label>New invite credential<div className="organizer-actions"><input required minLength={16} maxLength={128} value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} /><button type="button" onClick={() => setInviteCode(generateContestInviteCode())}>Generate</button></div></label><button className="primary-action">Rotate invite</button></form>}</section>}{message && <output className="product-message">{message}</output>}</main>;
+  return <main className="product-page" id="main-content">
+    <header className="product-page-header"><span className="product-eyebrow"><Trophy size={14} /> Organizer</span><h1>Repository contests</h1><p>Rules remain repository-authored. This surface inspects the active projection and operates its official timeline.</p></header>
+    <section className="organizer-product-section">
+      <header className="organizer-actions"><h2>Current projection</h2><button type="button" onClick={() => void load()} aria-label="Refresh contests"><RefreshCw size={15} /></button></header>
+      {contests.map((contest) => <article className="collection-summary" key={contest.id}><div><span>{contest.status} · {contest.phase} · {contest.runtimeState}</span><strong>{contest.title}</strong><small>{contest.problemCount} problems · rules {contest.rulesCommit.slice(0, 12)} · timeline {contest.epochs.timelineGeneration} / rule {contest.epochs.ruleEpoch}</small></div><div className="organizer-actions"><button type="button" onClick={() => void inspect(contest.id)}>Inspect</button><Link href={`/contests/${contest.id}`}>Participant preview</Link></div></article>)}
+      {contests.length === 0 && <p className="product-empty">No contests exist in the active repository manifests.</p>}
+    </section>
+    {selected && <section className="organizer-panel organizer-contest-inspector">
+      <header><div><h2>{selected.contest.title}</h2><p>{selected.contest.description}</p></div><Link href={`/contests/${selected.contest.id}`}>Open participant preview</Link></header>
+      {selected.contest.publicRepositoryTimingWarning && <div className="contest-alert warning" role="note"><GitBranch size={17} /><div><strong>Public repository timing warning</strong><p>Scheduled reveal controls the platform UI only. GitHub content may be visible before its logical release.</p></div></div>}
+      <section className="organizer-problem-epochs" aria-labelledby="organizer-problem-epochs-heading"><h3 id="organizer-problem-epochs-heading">Problem epochs</h3>{selected.problems.map((problem) => <div className="selected-problem" key={problem.problemId}><span>{problem.ordinal}</span><strong>{problem.title["zh-TW"] ?? problem.title.en ?? problem.problemSlug}</strong><small>batch {problem.batch} · {problem.availability} · problem {problem.epochs.problemEpoch} / content {problem.epochs.contentEpoch} / judge {problem.epochs.judgeEpoch}</small></div>)}</section>
+      {selected.contest.accessMode === "invite" && <form className="organizer-product-form organizer-invite-rotation" onSubmit={(event) => void rotate(event)}><label>New invite credential<div className="organizer-actions"><input required minLength={16} maxLength={128} value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} /><button type="button" onClick={() => setInviteCode(generateContestInviteCode())}>Generate</button></div></label><button className="primary-action">Rotate invite</button></form>}
+      <OrganizerContestOperations contest={selected.contest} participants={participants} onRefresh={async () => { await Promise.all([load(), inspect(selected.contest.id)]); }} />
+    </section>}
+    {message && <output className="product-message">{message}</output>}
+  </main>;
 }
 
 export function OrganizerRejudges() {

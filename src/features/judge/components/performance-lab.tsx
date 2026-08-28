@@ -92,7 +92,7 @@ function chartPoints(response: ProblemPerformanceResponse): readonly ChartPoint[
     isPareto: point.isPareto,
   }));
   const evolution = (response.myEvolution ?? []).flatMap((point): ChartPoint[] => (
-    point.state !== "completed" || point.score === null || point.deterministicCost === null || point.peakMemoryBytes === null
+    !point.eligible || point.state !== "completed" || point.score === null || point.deterministicCost === null || point.peakMemoryBytes === null
       ? []
       : [{
         submissionId: point.submissionId,
@@ -239,6 +239,7 @@ function Participant({ point }: { readonly point: PerformanceFrontierPoint }) {
 }
 
 function statusLabel(point: PerformanceEvolutionPoint): string {
+  if (!point.eligible) return `invalid · ${point.invalidationReason ?? "superseded timeline"} · ${point.verdict ?? point.state}`;
   return point.verdict ?? point.state;
 }
 
@@ -271,7 +272,7 @@ export function PerformanceLabView({
 }) {
   const chinese = locale === "zh-TW";
   const selectedEvolution = response?.myEvolution?.find((point) => point.submissionId === selectedSubmissionId);
-  const errorAttempts = response?.myEvolution?.filter((point) => point.state !== "completed" && point.state !== "admitting" && point.state !== "queued" && point.state !== "preparing" && point.state !== "compiling" && point.state !== "running" && point.state !== "finalizing") ?? [];
+  const errorAttempts = response?.myEvolution?.filter((point) => !point.eligible || (point.state !== "completed" && point.state !== "admitting" && point.state !== "queued" && point.state !== "preparing" && point.state !== "compiling" && point.state !== "running" && point.state !== "finalizing")) ?? [];
 
   return <section className="performance-lab" aria-label={chinese ? "效能實驗室" : "Performance Lab"}>
     <div className="online-section-heading performance-heading">
@@ -305,6 +306,12 @@ export function PerformanceLabView({
         <span>{chinese
           ? "競賽封榜中：全域前緣只顯示 freeze 時點前的結果；你的演進紀錄仍保持完整。"
           : "Contest freeze is active: the global frontier stops at the freeze timestamp, while your own evolution remains complete."}</span>
+      </div>}
+      {response.context.hidden && <div className="performance-freeze-note" role="status">
+        <LockKeyhole size={14} />
+        <span>{chinese
+          ? "排行榜在競賽結束前隱藏；你的完整演進與被 rewind 失效的歷史仍可查看。"
+          : "The leaderboard is hidden until contest end; your own evolution and rewind-invalidated history remain visible."}</span>
       </div>}
 
       <div className="performance-legend" aria-label={chinese ? "語言圖例" : "Language legend"}>
@@ -356,7 +363,7 @@ export function PerformanceLabView({
             : <div className="performance-table-wrap"><table className="performance-table evolution-table">
               <caption>{chinese ? "我的提交時間序列" : "My submission timeline"}</caption>
               <thead><tr><th>#</th><th>{chinese ? "狀態" : "State"}</th><th>{chinese ? "語言" : "Language"}</th><th>{chinese ? "分數" : "Score"}</th><th>{chinese ? "成本" : "Cost"}</th><th>{chinese ? "記憶體" : "Memory"}</th><th>{chinese ? "時間" : "Time"}</th></tr></thead>
-              <tbody>{response.myEvolution.map((point) => <tr className={`${point.state !== "completed" ? "performance-event-error" : ""} ${point.submissionId === selectedSubmissionId ? "is-selected" : ""}`} key={point.submissionId}>
+              <tbody>{response.myEvolution.map((point) => <tr className={`${point.state !== "completed" || !point.eligible ? "performance-event-error" : ""} ${!point.eligible ? "is-invalid" : ""} ${point.submissionId === selectedSubmissionId ? "is-selected" : ""}`} key={point.submissionId}>
                 <td><button type="button" onClick={() => onSelect(point.submissionId)} aria-pressed={point.submissionId === selectedSubmissionId}>#{point.attemptNumber}</button></td>
                 <td><strong>{statusLabel(point)}</strong></td><td>{languageLabel(point.language)}</td><td>{point.score === null ? "—" : fullNumber(point.score, locale)}</td>
                 <td>{point.deterministicCost === null ? "—" : fullNumber(point.deterministicCost, locale)}</td><td>{point.peakMemoryBytes === null ? "—" : bytes(point.peakMemoryBytes, locale)}</td>

@@ -14,8 +14,7 @@ const catalogCommit = "a".repeat(40);
 describe("online judge contracts", () => {
   it("accepts only source-based official submissions", () => {
     const request = parseOfficialSubmissionRequest({
-      problemId,
-      catalogCommit,
+      context: { kind: "practice", problemId, catalogCommit },
       language: "c",
       target: "wasip1",
       optimization: "release",
@@ -30,8 +29,7 @@ describe("online judge contracts", () => {
 
   it("enforces source limits and normalized paths", () => {
     const base = {
-      problemId,
-      catalogCommit,
+      context: { kind: "practice", problemId, catalogCommit },
       language: "c",
       target: "wasip1",
       optimization: "release",
@@ -45,6 +43,31 @@ describe("online judge contracts", () => {
       entry: "main.c",
       sourceFiles: [{ path: "main.c", encoding: "utf8", content: "x".repeat(256 * 1024 + 1) }],
     })).toThrow("256 KiB");
+  });
+
+  it("requires fenced contest admission context", () => {
+    const request = parseOfficialSubmissionRequest({
+      context: {
+        kind: "contest",
+        contestId: "018f0d8a-7110-7cc8-9f08-15b28df8307c",
+        problemId,
+        contentCommit: catalogCommit,
+        timelineGeneration: 2,
+        ruleEpoch: 3,
+        problemEpoch: 4,
+      },
+      language: "c",
+      target: "wasip1",
+      optimization: "release",
+      entry: "main.c",
+      sourceFiles: [{ path: "main.c", encoding: "utf8", content: "int main(void){return 0;}" }],
+      idempotencyKey: "submission:018f0d8a-7110-7cc8",
+    });
+    expect(request.context).toMatchObject({ kind: "contest", timelineGeneration: 2, ruleEpoch: 3, problemEpoch: 4 });
+    expect(() => parseOfficialSubmissionRequest({
+      ...request,
+      context: { ...request.context, ruleEpoch: 0 },
+    })).toThrow("positive integer");
   });
 
   it("rejects state skips and hidden event fields", () => {

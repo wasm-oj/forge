@@ -100,7 +100,8 @@ for (const [name, config] of [["development", developmentConfig], ["production",
   if (JSON.stringify(config.r2_buckets?.map((bucket) => bucket.binding)) !== JSON.stringify(["JUDGE_BUCKET"])) throw new Error(`${name} must bind one judge bucket.`);
   if (JSON.stringify(config.workflows?.map((workflow) => [workflow.binding, workflow.class_name])) !== JSON.stringify([
     ["SUBMISSION_WORKFLOW", "SubmissionWorkflow"], ["CATALOG_WORKFLOW", "CatalogWorkflow"],
-  ])) throw new Error(`${name} must bind only submission and catalog workflows.`);
+    ["PROMPT_ATTEMPT_WORKFLOW", "PromptAttemptWorkflow"],
+  ])) throw new Error(`${name} must bind the submission, catalog, and Prompt Program workflows.`);
 }
 
 console.log("Verified repository-source production deployment workflow.");

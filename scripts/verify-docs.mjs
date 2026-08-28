@@ -193,11 +193,37 @@ for (const required of [
   "@wasm-oj/cli@0.2.0",
   "wasm-oj-platform/repository/v1",
   "wasm-oj-platform/problems/v1",
-  "wasm-oj-platform/contests/v1",
+  "wasm-oj-platform/contests/v2",
+  "blitz-batches",
+  "prompt-five-by-three",
+  "promptCompilerAvailable: false",
+  "prompt-compiler-unavailable",
   "WOJJDG02",
 ]) {
   if (!problemCatalog.includes(required)) {
     throw new Error(`docs/problem-catalog.md does not document '${required}'.`);
+  }
+}
+if (problemCatalog.includes("wasm-oj-platform/contests/v1")) {
+  throw new Error("docs/problem-catalog.md still presents the retired contests/v1 authoring contract.");
+}
+
+const contestRules = await readFile(path.join(root, "docs/contest-rules.md"), "utf8");
+for (const required of [
+  "wasm-oj-platform/contests/v2",
+  "classic-score",
+  "icpc",
+  "blitz-batches",
+  "prompt-five-by-three",
+  "generated-source-ready",
+  "pause-until-terminal",
+  "monotonic-recalculate",
+  "contest_v2_preflight_blockers",
+  "prompt-compiler-unavailable",
+  "UI timing only; GitHub content may be visible early.",
+]) {
+  if (!contestRules.includes(required)) {
+    throw new Error(`docs/contest-rules.md does not document '${required}'.`);
   }
 }
 
@@ -229,6 +255,11 @@ for (const required of [
   "formal_mutations_enabled",
   "SubmissionJudgeContainer",
   "Catalog Workflow",
+  "contest_runtimes",
+  "contest_entrants",
+  "timelineGeneration",
+  "promptCompilerAvailable: false",
+  "prompt-compiler-unavailable",
 ]) {
   if (!onlineJudge.includes(required)) {
     throw new Error(`docs/cloudflare-online-judge.md does not document '${required}'.`);
@@ -236,6 +267,9 @@ for (const required of [
 }
 if (onlineJudge.includes("ValidationJudgeContainer")) {
   throw new Error("docs/cloudflare-online-judge.md still documents the removed ValidationJudgeContainer.");
+}
+if (onlineJudge.includes("`contest_series` and `contest_revisions`")) {
+  throw new Error("docs/cloudflare-online-judge.md still assigns active contest projection authority to v1 tables.");
 }
 
 const deploymentPlan = await readFile(path.join(root, "docs/cloudflare-deployment-plan.md"), "utf8");
@@ -255,6 +289,9 @@ for (const required of [
   "rollout_step_percentage: 100",
   "repository-source-truth-production-smoke-passed",
   "0019_repository_source_truth.sql",
+  "0020_contest_v2_runtime.sql",
+  "contest_v2_preflight_blockers",
+  "wasm-oj-platform/contests/v2",
 ]) {
   if (!deploymentPlan.includes(required)) {
     throw new Error(`docs/cloudflare-deployment-plan.md does not document the executable cutover contract '${required}'.`);

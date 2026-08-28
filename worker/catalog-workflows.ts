@@ -101,6 +101,32 @@ export async function ensureJudgeCacheObject(
   assertJudgeObject(created ?? await env.JUDGE_BUCKET.head(key), descriptor);
 }
 
+/**
+ * Prompt compilers receive one exact public problem projection and nothing
+ * else: practice Assist uses the practice bundle, while contest Assist and
+ * Prompt Program use the contest bundle. Content addressing keeps each call
+ * reproducible without repository or judge-package access.
+ */
+export async function ensurePromptContextCacheObject(
+  env: WasmOjWorkerEnv,
+  descriptor: RepositoryObjectDescriptor,
+  bytes: Uint8Array,
+): Promise<void> {
+  const key = `prompt-contexts/v1/${descriptor.sha256}`;
+  const existing = await env.JUDGE_BUCKET.head(key);
+  if (existing) {
+    assertJudgeObject(existing, descriptor);
+    return;
+  }
+  const created = await env.JUDGE_BUCKET.put(key, bytes, {
+    onlyIf: { etagDoesNotMatch: "*" },
+    sha256: digestBytes(descriptor.sha256),
+    httpMetadata: { contentType: "application/json; charset=utf-8" },
+    customMetadata: { kind: "prompt-public-context", sha256: descriptor.sha256 },
+  });
+  assertJudgeObject(created ?? await env.JUDGE_BUCKET.head(key), descriptor);
+}
+
 async function readDescriptor(
   repository: AuthorizedCatalogRepository,
   tree: ReadonlyMap<string, ExactGitBlob>,
@@ -140,7 +166,11 @@ async function validateProblem(
   });
   const languages = Object.keys(validated.manifest.allowedProfiles).sort() as BuiltinLanguage[];
   assertJudgeDataMatchesPracticePublic(validated.judgeData, practice, languages);
-  await ensureJudgeCacheObject(env, problem.judgePackage, judgeBytes);
+  await Promise.all([
+    ensureJudgeCacheObject(env, problem.judgePackage, judgeBytes),
+    ensurePromptContextCacheObject(env, problem.practiceBundle, practiceBytes),
+    ensurePromptContextCacheObject(env, problem.contestBundle, contestBytes),
+  ]);
   return { source: problem, allowedProfilesJson: JSON.stringify(validated.manifest.allowedProfiles) };
 }
 

@@ -4,7 +4,11 @@ import test from "node:test";
 
 import {
   assertNoUnknownAppliedMigrations,
+  assertContestV2CutoverReady,
   assertRepositoryCutoverReady,
+  CONTEST_V2_CUTOVER_MIGRATION,
+  CONTEST_V2_CUTOVER_PREFLIGHT_SQL,
+  contestV2CutoverPreflightCounts,
   cutoverPreflightCounts,
   HISTORICAL_PRODUCTION_MIGRATIONS,
   PAUSE_REPOSITORY_CUTOVER_SQL,
@@ -19,12 +23,13 @@ const migrations = [
   "0017_architecture_reset.sql",
   "0018_cli_auth.sql",
   REPOSITORY_CUTOVER_MIGRATION,
+  CONTEST_V2_CUTOVER_MIGRATION,
 ];
 
 test("migration inventory is exact and ordered", () => {
   assert.deepEqual(
     pendingMigrationNames(migrations, migrations.slice(0, 3)),
-    [REPOSITORY_CUTOVER_MIGRATION],
+    [REPOSITORY_CUTOVER_MIGRATION, CONTEST_V2_CUTOVER_MIGRATION],
   );
   assert.doesNotThrow(() => assertNoUnknownAppliedMigrations(migrations, migrations.slice(0, 3)));
   assert.doesNotThrow(() => assertNoUnknownAppliedMigrations(
@@ -72,6 +77,26 @@ test("repository cutover accepts only an empty and fully drained operational bou
   );
 });
 
+test("contest v2 cutover permits terminal history but rejects running contests and contest work", () => {
+  const ready = contestV2CutoverPreflightCounts([
+    { formal_enabled: 0, running: 0, mutations: 0, outbox: 0 },
+  ]);
+  assert.doesNotThrow(() => assertContestV2CutoverReady(ready));
+  for (const key of ["formal_enabled", "running", "mutations", "outbox"]) {
+    assert.throws(
+      () => assertContestV2CutoverReady({ ...ready, [key]: 1 }),
+      /not drained/u,
+    );
+  }
+  assert.throws(() => contestV2CutoverPreflightCounts([]), /no exact row/u);
+  assert.throws(
+    () => contestV2CutoverPreflightCounts([
+      { formal_enabled: 0, running: 0, mutations: -1, outbox: 0 },
+    ]),
+    /invalid counts/u,
+  );
+});
+
 test("repository cutover SQL targets the real 0017 control and active-job schema", () => {
   const database = new DatabaseSync(":memory:");
   database.exec(`
@@ -109,4 +134,51 @@ test("repository cutover SQL targets the real 0017 control and active-job schema
     reason: "repository-source-truth-production-smoke-passed",
   });
   assert.equal(database.prepare(RESUME_REPOSITORY_CUTOVER_SQL).get(), undefined);
+});
+
+test("contest v2 preflight targets repository-v1 contest facts without requiring empty history", () => {
+  const database = new DatabaseSync(":memory:");
+  database.exec(`
+    CREATE TABLE formal_mutation_controls (
+      environment TEXT PRIMARY KEY, formal_mutations_enabled INTEGER NOT NULL,
+      reason TEXT NOT NULL, updated_at TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE catalogs (id TEXT PRIMARY KEY, active_commit_sha TEXT) STRICT;
+    CREATE TABLE contest_series (id TEXT PRIMARY KEY, catalog_id TEXT NOT NULL) STRICT;
+    CREATE TABLE contest_revisions (
+      contest_id TEXT NOT NULL, commit_sha TEXT NOT NULL, status TEXT NOT NULL,
+      starts_at TEXT NOT NULL, ends_at TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE catalog_sync_jobs (id TEXT PRIMARY KEY, state TEXT NOT NULL) STRICT;
+    CREATE TABLE submissions (
+      id TEXT PRIMARY KEY, contest_id TEXT, state TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE rejudge_batches (
+      id TEXT PRIMARY KEY, contest_id TEXT, state TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE workflow_outbox (
+      id TEXT PRIMARY KEY, catalog_sync_job_id TEXT, submission_id TEXT, state TEXT NOT NULL
+    ) STRICT;
+    INSERT INTO formal_mutation_controls VALUES (
+      'production', 0, 'repository-source-truth-cutover', '2026-08-26T00:00:00.000Z'
+    );
+    INSERT INTO catalogs VALUES ('catalog', '${"a".repeat(40)}');
+    INSERT INTO contest_series VALUES ('contest', 'catalog');
+    INSERT INTO contest_revisions VALUES (
+      'contest', '${"a".repeat(40)}', 'archived',
+      '2020-01-01T00:00:00.000Z', '2020-01-01T01:00:00.000Z'
+    );
+    INSERT INTO submissions VALUES ('terminal', 'contest', 'completed');
+  `);
+  const ready = contestV2CutoverPreflightCounts([
+    database.prepare(CONTEST_V2_CUTOVER_PREFLIGHT_SQL).get(),
+  ]);
+  assert.deepEqual({ ...ready }, { formal_enabled: 0, running: 0, outbox: 0, mutations: 0 });
+  assert.doesNotThrow(() => assertContestV2CutoverReady(ready));
+
+  database.prepare("INSERT INTO submissions VALUES ('pending', 'contest', 'running')").run();
+  assert.equal(database.prepare(CONTEST_V2_CUTOVER_PREFLIGHT_SQL).get().mutations, 1);
+  database.prepare("DELETE FROM submissions WHERE id='pending'").run();
+  database.prepare("INSERT INTO workflow_outbox VALUES ('outbox', NULL, 'terminal', 'pending')").run();
+  assert.equal(database.prepare(CONTEST_V2_CUTOVER_PREFLIGHT_SQL).get().outbox, 1);
 });
