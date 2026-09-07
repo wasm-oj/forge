@@ -28,7 +28,6 @@ export interface WasmOjWorkerEnv {
   readonly ACCOUNT_ERASURE_HMAC_SECRET: string;
   readonly INVITE_CODE_HMAC_SECRET: string;
   /** Optional outside a cutover; 32–256 byte secret used only by authenticated maintenance smoke requests. */
-  readonly MAINTENANCE_SMOKE_TOKEN?: string;
   readonly CF_VERSION_METADATA: WorkerVersionMetadata;
 }
 

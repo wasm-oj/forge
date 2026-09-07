@@ -88,13 +88,19 @@ admission ceiling, not reserved global capacity; a saturated global queue can st
 
 `formal_mutations_enabled` is the maintenance gate for catalog sync, submission, and rejudge
 mutations. Read-only product routes remain available while the gate is paused. Production exposes
-one scoped maintenance-smoke bypass only while the reason is exactly
-`repository-source-truth-cutover`; it requires the configured smoke token in addition to normal
-user authorization and is used to verify the cutover before the global gate is restored.
+an admin exception for catalog sync and ordinary code Official Submit only while the reason is
+exactly `repository-source-truth-cutover`. Existing authentication, resource ownership, CSRF, and
+quota checks still apply. All other formal mutation gates remain paused, including catalog
+connection, Prompt Program attempts, rejudge, and contest operations. Admins use the exception to
+sync the prepared catalog commit and verify a code submission before restoring the global gate.
+Other pause reasons block these two operations for admins too.
 
 ## Health
 
 `/api/health/live` reports process liveness. `/api/health/ready` verifies D1 access, formal mutation
 control access, a valid Git build ID, and `CF_VERSION_METADATA.tag === WASM_OJ_BUILD_ID`.
-`/api/health/container` is a protected deployment probe that additionally verifies the running
-Container build ID, contract, and protocol.
+`POST /api/admin/container-probe` requires an authenticated admin browser session and CSRF
+protection. The **Check Container** control in Production operations calls it to verify the running
+Container build ID, contract, and protocol against the Worker. CI verifies rollout through the
+existing Cloudflare API credentials and checks the public liveness and readiness endpoints;
+an admin performs the live Container check after deployment.

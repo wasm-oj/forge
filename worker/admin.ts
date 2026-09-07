@@ -3,9 +3,30 @@ import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { ApiError, jsonResponse, readJsonBody } from "./http";
 import { requireFirstOrganizerApplicationTurnstile, requireStagingFormalAccess } from "./formal-access";
 import { formalMutationStatus, setFormalMutationsEnabled } from "./formal-mutations";
+import { readBoundedProbedContainerIdentity } from "./container-identity-fence";
 
 function requireAdmin(session: AuthenticatedSession): void {
   if (!session.roles.includes("admin")) throw new ApiError(403, "admin-required", "An Admin role is required.");
+}
+
+export async function probeDeploymentContainer(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
+  const session = await requireBrowserMutationSession(request, env);
+  requireAdmin(session);
+  if (!/^[0-9a-f]{40}$/.test(env.WASM_OJ_BUILD_ID) || env.CF_VERSION_METADATA.tag !== env.WASM_OJ_BUILD_ID) {
+    throw new ApiError(503, "worker-build-mismatch", "Worker build metadata is inconsistent.");
+  }
+  const container = env.SUBMISSION_CONTAINER.getByName(`deployment-smoke-${env.WASM_OJ_BUILD_ID}`);
+  const identity = await readBoundedProbedContainerIdentity(await container.fetch("https://judge.container/identity"));
+  if (identity.buildId !== env.WASM_OJ_BUILD_ID) {
+    throw new ApiError(503, "container-build-mismatch", "Container build does not match the Worker build.");
+  }
+  return jsonResponse({
+    ready: true,
+    buildId: identity.buildId,
+    contract: identity.contract,
+    protocol: identity.protocol,
+    workerVersionId: env.CF_VERSION_METADATA.id,
+  });
 }
 
 function record(value: unknown): Record<string, unknown> {

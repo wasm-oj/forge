@@ -280,7 +280,9 @@ for (const required of [
   "X-WASM-OJ-CSRF: $WASM_OJ_CUTOVER_ADMIN_CSRF",
   "wasm_oj_session=$WASM_OJ_CUTOVER_ADMIN_SESSION",
   "wasm_oj_csrf=$WASM_OJ_CUTOVER_ADMIN_CSRF",
-  "Authorization: Bearer $MAINTENANCE_SMOKE_TOKEN",
+  "POST /api/admin/container-probe",
+  "Check Container",
+  "manual admin",
   "scripts/render-production-config.mjs",
   "scripts/production-migrations.mjs",
   "scripts/wait-container-rollout.mjs",
@@ -295,6 +297,15 @@ for (const required of [
 ]) {
   if (!deploymentPlan.includes(required)) {
     throw new Error(`docs/cloudflare-deployment-plan.md does not document the executable cutover contract '${required}'.`);
+  }
+}
+
+for (const relative of onlineJudgeDocs) {
+  const source = await readFile(path.join(root, relative), "utf8");
+  for (const removed of ["MAINTENANCE_SMOKE_TOKEN", "X-WASM-OJ-Maintenance-Smoke-Token", "/api/health/container"]) {
+    if (source.includes(removed)) {
+      throw new Error(`${relative} still documents removed maintenance authentication '${removed}'.`);
+    }
   }
 }
 

@@ -17,9 +17,9 @@ the complete deployment identity and is injected only into the Worker config and
 6. Run `wrangler deploy --config wrangler.quick-production.jsonc --tag "$GITHUB_SHA"`; the rendered
    config references the prebuilt exact-commit image rather than a Dockerfile.
 7. Run `scripts/wait-container-rollout.mjs` until the Container application is stably ready.
-8. Probe `/api/health/container`, `/api/health/live`, and `/api/health/ready`.
+8. Probe `/api/health/live` and `/api/health/ready`.
 9. Leave formal mutations unchanged by default. If the operator explicitly checks
-   `resume_formal_mutations` after completing the product smoke, run
+   `resume_formal_mutations` after completing the admin Container check and product smoke, run
    `scripts/production-migrations.mjs resume --cutover-smoke-confirmed`.
 
 The renderer replaces exactly two config placeholders: the Worker `WASM_OJ_BUILD_ID` and the
@@ -37,8 +37,9 @@ while the small build-ID layer still verifies the exact final image contents.
 Rollout wait remains mandatory because Worker and Container rollout do not complete as one
 transaction. Production uses `rollout_step_percentage: 100` to replace Container capacity in one
 step rather than staging 10% and 100% rollouts. Readiness rejects a Worker tag/build mismatch. The
-protected Container smoke rejects a Container build, contract, or protocol mismatch before any
-real submission attempt token is forwarded.
+authenticated Cloudflare rollout checks run in CI. After deployment, an admin uses **Check
+Container** in Production operations to verify the live Worker and Container build, contract, and
+protocol. Official Submit also rejects an identity mismatch before forwarding an attempt token.
 
 ## One-time repository-source cutover
 
@@ -59,17 +60,26 @@ the latest active official-practice commit per catalog, maps historical runtime 
 
 Before deploying the migration, add `wasm-oj.json`, `collection/problems.json`, and
 `collection/contests.json` to the official problem repository. The migration leaves the global
-gate paused with reason `repository-source-truth-cutover`. During that exact reason only, an
-authenticated Organizer request may use `X-WASM-OJ-Maintenance-Smoke-Token` to connect and sync
-the prepared exact commit and to make a bounded Official Submit smoke while ordinary mutations
-remain paused. Verify content and stale projection through the normal read APIs.
+gate paused with reason `repository-source-truth-cutover`. In production during that exact reason,
+an authenticated admin can sync an existing catalog and make ordinary code Official Submit
+requests while ordinary accounts remain paused. These two operations retain the existing
+authentication, resource ownership, CSRF, and quota checks. All other formal mutation operations
+remain paused, including catalog connection, Prompt Program attempts, rejudge, and contest
+operations. An admin who owns the catalog syncs the prepared exact commit and makes a bounded
+code submission smoke. Verify content and stale projection through the normal read APIs.
 
-Only after those checks pass, rerun the production workflow with `resume_formal_mutations`
-explicitly checked, or use the authenticated admin fallback below. Resume is fenced to the exact
-paused reason and records `repository-source-truth-production-smoke-passed`; it cannot override an
-unrelated incident pause.
+After deployment, sign in as an admin and run **Check Container** in Production operations. This
+calls `POST /api/admin/container-probe` with the existing browser session and CSRF protection. It
+may start the Container and succeeds only when its build, contract, and protocol match the Worker.
+CI continues to use its existing Cloudflare deployment credentials for rollout verification; the
+live Container probe and catalog, content, submission, and stale-projection smoke are manual admin
+checks.
 
-The authenticated admin fallback is:
+Only after all checks pass, use **Resume formal mutations** in Production operations, or rerun the
+production workflow with `resume_formal_mutations` explicitly checked. Both paths require an empty
+`contest_v2_preflight_blockers` view and the exact cutover pause reason, then record
+`repository-source-truth-production-smoke-passed`. An unrelated incident pause remains blocked.
+The admin API uses the same existing browser authentication and CSRF protection:
 
 ```sh
 curl --fail -X POST "$WASM_OJ_ORIGIN/api/admin/formal-mutations/resume" \
@@ -79,10 +89,6 @@ curl --fail -X POST "$WASM_OJ_ORIGIN/api/admin/formal-mutations/resume" \
   -H "Cookie: wasm_oj_session=$WASM_OJ_CUTOVER_ADMIN_SESSION; wasm_oj_csrf=$WASM_OJ_CUTOVER_ADMIN_CSRF" \
   --data '{"reason":"repository-source-truth-production-smoke-passed"}'
 ```
-
-The maintenance Container probe uses `Authorization: Bearer $MAINTENANCE_SMOKE_TOKEN`; its secret
-is configured as `MAINTENANCE_SMOKE_TOKEN` in the Worker environment and is never returned by an
-untrusted route.
 
 ## One-time contest v2 cutover
 

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       resume_formal_mutations:
-        description: Confirm exact catalog sync plus content, submission, and stale-projection smoke passed.
+        description: Confirm admin Container check, exact catalog sync, content, submission, and stale-projection smoke passed.
         required: false
         default: false
         type: boolean
@@ -93,13 +93,6 @@ jobs:
           --config wrangler.quick-production.jsonc
           --baseline "$RUNNER_TEMP/container-rollout-baseline.json"
           --timeout-seconds 1800
-      - name: Probe Container build and protocol
-        env:
-          MAINTENANCE_SMOKE_TOKEN: ${{ secrets.WASM_OJ_MAINTENANCE_SMOKE_TOKEN }}
-        run: >-
-          curl --fail --retry 6 --retry-all-errors --retry-delay 5
-          -H "Authorization: Bearer $MAINTENANCE_SMOKE_TOKEN"
-          https://wasm-oj-forge-production.jacob.workers.dev/api/health/container
       - name: HTTP smoke
         run: |
           curl --fail --retry 6 --retry-all-errors --retry-delay 5 \

@@ -58,11 +58,12 @@ import {
   createOrganizerApplication,
   getFormalMutationControl,
   listOrganizerApplications,
+  probeDeploymentContainer,
   revokeOrganizerRole,
   reviewOrganizerApplication,
   updateFormalMutationControl,
 } from "./admin";
-import { detailedReadiness, probeDeploymentContainer } from "./readiness";
+import { detailedReadiness } from "./readiness";
 import { eraseAccount } from "./account-erasure";
 import { cancelRejudgeBatch, createRejudgeBatch, getRejudgeBatch, listRejudgeBatches, rejudgeOptions } from "./rejudge";
 import { withSecurityHeaders } from "./security-headers";
@@ -117,7 +118,7 @@ async function api(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
     const ready = (await detailedReadiness(env)).ready;
     return jsonResponse({ ready }, ready ? 200 : 503);
   }
-  if (request.method === "GET" && pathname === "/api/health/container") return probeDeploymentContainer(request, env);
+  if (request.method === "POST" && pathname === "/api/admin/container-probe") return probeDeploymentContainer(request, env);
   if (request.method === "GET" && pathname === "/api/auth/github") return beginGithubLogin(request, env);
   if (request.method === "GET" && pathname === "/api/auth/github/callback") return completeGithubLogin(request, env);
   if (request.method === "POST" && pathname === "/api/auth/cli/start") return startCliLogin(request, env);

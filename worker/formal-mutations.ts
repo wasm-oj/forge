@@ -1,4 +1,4 @@
-import type { WasmOjWorkerEnv } from "./env";
+import type { AuthenticatedSession, WasmOjWorkerEnv } from "./env";
 import { ApiError } from "./http";
 import { operationalLog } from "./structured-log";
 
@@ -12,42 +12,6 @@ interface FormalMutationRow {
   readonly formal_mutations_enabled: number;
   readonly reason: string;
   readonly updated_at: string;
-}
-
-export const MAINTENANCE_SMOKE_HEADER = "x-wasm-oj-maintenance-smoke-token";
-const MAINTENANCE_SMOKE_REASONS = new Set(["repository-source-truth-cutover"]);
-const MAINTENANCE_SMOKE_TOKEN_PATTERN = /^[\x21-\x7e]{32,256}$/;
-const encoder = new TextEncoder();
-
-async function constantTimeTokenEqual(left: string, right: string): Promise<boolean> {
-  const [leftDigest, rightDigest] = await Promise.all([
-    crypto.subtle.digest("SHA-256", encoder.encode(left)),
-    crypto.subtle.digest("SHA-256", encoder.encode(right)),
-  ]);
-  const leftBytes = new Uint8Array(leftDigest);
-  const rightBytes = new Uint8Array(rightDigest);
-  let difference = left.length ^ right.length;
-  for (let index = 0; index < leftBytes.length; index += 1) {
-    difference |= leftBytes[index]! ^ rightBytes[index]!;
-  }
-  return difference === 0;
-}
-
-async function maintenanceSmokeAuthorized(
-  request: Request,
-  env: WasmOjWorkerEnv,
-  status: FormalMutationStatus,
-): Promise<boolean> {
-  if (env.ENVIRONMENT !== "production" || !MAINTENANCE_SMOKE_REASONS.has(status.reason)) return false;
-  const secret = env.MAINTENANCE_SMOKE_TOKEN;
-  const presented = request.headers.get(MAINTENANCE_SMOKE_HEADER);
-  if (
-    typeof secret !== "string"
-    || !MAINTENANCE_SMOKE_TOKEN_PATTERN.test(secret)
-    || typeof presented !== "string"
-    || !MAINTENANCE_SMOKE_TOKEN_PATTERN.test(presented)
-  ) return false;
-  return constantTimeTokenEqual(presented, secret);
 }
 
 function reasonText(value: string): string {
@@ -75,10 +39,13 @@ export async function formalMutationStatus(env: WasmOjWorkerEnv): Promise<Formal
   ).bind(env.ENVIRONMENT).first<FormalMutationRow>());
 }
 
-export async function requireFormalMutationsEnabled(env: WasmOjWorkerEnv, request?: Request): Promise<void> {
+/** Only catalog sync and Official Submit may supply their authenticated actor for cutover validation. */
+export async function requireFormalMutationsEnabled(env: WasmOjWorkerEnv, maintenanceAdmin?: AuthenticatedSession): Promise<void> {
   const status = await formalMutationStatus(env);
   if (status.enabled) return;
-  if (request && await maintenanceSmokeAuthorized(request, env, status)) return;
+  if (env.ENVIRONMENT === "production"
+    && status.reason === "repository-source-truth-cutover"
+    && maintenanceAdmin?.roles.includes("admin")) return;
   throw new ApiError(503, "formal-mutations-paused", "New formal operations are temporarily paused.");
 }
 
@@ -89,10 +56,24 @@ export async function setFormalMutationsEnabled(
 ): Promise<FormalMutationStatus> {
   const reason = reasonText(reasonInput);
   const updatedAt = new Date().toISOString();
+  const previous = enabled ? await formalMutationStatus(env) : null;
+  const cutoverResume = enabled && env.ENVIRONMENT === "production";
+  if (cutoverResume && (reason !== "repository-source-truth-production-smoke-passed"
+    || previous?.enabled !== false || previous.reason !== "repository-source-truth-cutover")) {
+    throw new ApiError(409, "formal-mutation-resume-blocked", "Production resume requires the repository cutover pause and confirmed production smoke.");
+  }
+  const resumeFence = previous
+    ? " AND formal_mutations_enabled=? AND reason=? AND updated_at=?"
+      + (cutoverResume ? " AND NOT EXISTS (SELECT 1 FROM contest_v2_preflight_blockers)" : "")
+    : "";
   const result = await env.DB.prepare(
-    "UPDATE formal_mutation_controls SET formal_mutations_enabled=?, reason=?, updated_at=? WHERE environment=?",
-  ).bind(enabled ? 1 : 0, reason, updatedAt, env.ENVIRONMENT).run();
+    `UPDATE formal_mutation_controls SET formal_mutations_enabled=?, reason=?, updated_at=? WHERE environment=?${resumeFence}`,
+  ).bind(enabled ? 1 : 0, reason, updatedAt, env.ENVIRONMENT,
+    ...(previous ? [previous.enabled ? 1 : 0, previous.reason, previous.updatedAt] : [])).run();
   if (result.meta.changes !== 1) {
+    if (previous) {
+      throw new ApiError(409, "formal-mutation-resume-blocked", "Formal mutations remain paused: cutover blockers or maintenance state changed.");
+    }
     throw new ApiError(503, "formal-mutation-control-unavailable", "Formal mutation control is unavailable.");
   }
   operationalLog("info", {

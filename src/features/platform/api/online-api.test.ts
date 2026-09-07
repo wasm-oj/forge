@@ -1,30 +1,43 @@
-import { afterEach, describe, expect, it } from "vitest";
-import {
-  configureWasmOjMaintenanceSmokeToken,
-  wasmOjMaintenanceSmokeArmed,
-  wasmOjMaintenanceSmokeHeaders,
-} from "./online-api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { wasmOjMutation } from "./online-api";
 
-describe("in-memory maintenance smoke token", () => {
-  afterEach(() => configureWasmOjMaintenanceSmokeToken());
+describe("authenticated mutations", () => {
+  afterEach(() => vi.unstubAllGlobals());
 
-  it("is disarmed by default and can be cleared", () => {
-    expect(wasmOjMaintenanceSmokeArmed()).toBe(false);
-    expect(wasmOjMaintenanceSmokeHeaders()).toEqual({});
-    configureWasmOjMaintenanceSmokeToken("x".repeat(32));
-    configureWasmOjMaintenanceSmokeToken();
-    expect(wasmOjMaintenanceSmokeArmed()).toBe(false);
+  it("uses the existing same-origin session and CSRF token for an admin Container check", async () => {
+    vi.stubGlobal("document", { cookie: "other=value; wasm_oj_csrf=csrf-value=; preference=en" });
+    const response = { ready: true, buildId: "a".repeat(40), contract: 2, protocol: "wasm-oj-container-v2", workerVersionId: "worker-version" };
+    const fetch = vi.fn().mockResolvedValue(Response.json(response));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(wasmOjMutation("/api/admin/container-probe", {})).resolves.toEqual(response);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/admin/container-probe", {
+      credentials: "same-origin",
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        "x-wasm-oj-csrf": "csrf-value=",
+      },
+      body: "{}",
+    });
   });
 
-  it("accepts only bounded printable ASCII and exposes the exact request header", () => {
-    const token = "maintenance-smoke-production-token-01";
-    configureWasmOjMaintenanceSmokeToken(token);
-    expect(wasmOjMaintenanceSmokeArmed()).toBe(true);
-    expect(wasmOjMaintenanceSmokeHeaders()).toEqual({
-      "x-wasm-oj-maintenance-smoke-token": token,
-    });
-    expect(() => configureWasmOjMaintenanceSmokeToken("short")).toThrow("32–256");
-    expect(() => configureWasmOjMaintenanceSmokeToken(`${"x".repeat(31)}\n`)).toThrow("32–256");
-    expect(() => configureWasmOjMaintenanceSmokeToken("x".repeat(257))).toThrow("32–256");
+  it("does not send a mutation when the CSRF cookie is missing", async () => {
+    vi.stubGlobal("document", { cookie: "other=value" });
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(wasmOjMutation("/api/admin/container-probe", {})).rejects.toThrow("CSRF token is missing");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the server's authorization failure", async () => {
+    vi.stubGlobal("document", { cookie: "wasm_oj_csrf=csrf-value" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
+      error: { code: "admin-required", message: "An Admin role is required." },
+    }, { status: 403 })));
+
+    await expect(wasmOjMutation("/api/admin/container-probe", {})).rejects.toThrow("An Admin role is required.");
   });
 });
