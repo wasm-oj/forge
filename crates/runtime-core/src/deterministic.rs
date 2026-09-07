@@ -903,6 +903,7 @@ pub fn attach_deterministic_imports(
     clock: VirtualClock,
     startup_entropy_bytes: u64,
 ) {
+    crate::stdio::attach_redirected_stdio(store, imports, &memory);
     let poll_memory = memory.clone();
     let env = FunctionEnv::new(
         store,
