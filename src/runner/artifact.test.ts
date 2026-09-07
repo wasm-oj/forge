@@ -311,6 +311,22 @@ describe("artifact runner preparation", () => {
     );
   });
 
+  it.each(["", "abc", "a\r\n終\u0000"])("consumes QuickJS stdin exactly once: %j", (stdin) => {
+    const artifact = {
+      entry: "main.js",
+      files: { "main.js": 'const std = require("std"); std.out.puts(JSON.stringify([std.in.readAsString(), std.in.readAsString()]));' },
+    } as unknown as RuntimeBundleArtifact;
+    const stdout = vi.fn();
+    runInNewContext(quickJsBundle(artifact, stdin, config), {
+      __wasm_oj_determinism_seed: () => 0,
+      __wasm_oj_determinism_epoch_ms: () => 0,
+      __wasm_oj_determinism_step_ns: () => 1,
+      __wasm_oj_write_stdout: stdout,
+      __wasm_oj_write_stderr: vi.fn(),
+    });
+    expect(stdout).toHaveBeenCalledWith(JSON.stringify([stdin, ""]));
+  });
+
   it("rejects QuickJS imports that escape the canonical project root", () => {
     const artifact = {
       entry: "src/main.js",

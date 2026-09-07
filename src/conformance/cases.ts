@@ -1,3 +1,4 @@
+import { STDIO_CONFORMANCE_CASES } from "./stdio-cases.ts";
 import type { ConformanceCase } from "./matrix.ts";
 import { WASM_OJ_LIBCXX_PCH_HEADER } from "../compiler/libcxx-pch.ts";
 
@@ -540,6 +541,7 @@ export const CPP_STDLIB_CONFORMANCE_CASE: ConformanceCase = deepFreeze({
 
 export const FULL_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze([
   ...DEFAULT_CONFORMANCE_CASES,
+  ...STDIO_CONFORMANCE_CASES,
   CPP_STDLIB_CONFORMANCE_CASE,
 ]);
 
