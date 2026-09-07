@@ -70,7 +70,6 @@ async function organizerMutation(request: Request, env: WasmOjWorkerEnv) {
   const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireOrganizer(env, session);
   await requireStagingFormalAccess(env, session.userId);
-  await requireFormalMutationsEnabled(env, request);
   return session;
 }
 
@@ -102,6 +101,7 @@ async function assertSyncCapacity(env: WasmOjWorkerEnv, organizerUserId: string)
 
 export async function createCatalog(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await organizerMutation(request, env);
+  await requireFormalMutationsEnabled(env);
   const body = exactRecord(await readJsonBody(request, 8 * 1024), ["githubRepositoryId"], "Catalog request");
   const repositoryId = numericRepositoryId(body.githubRepositoryId);
   await authorizedCatalogRepository(env, session, repositoryId);
@@ -146,6 +146,7 @@ export async function getCatalog(request: Request, env: WasmOjWorkerEnv, catalog
 
 export async function createCatalogSync(request: Request, env: WasmOjWorkerEnv, catalogId: string): Promise<Response> {
   const session = await organizerMutation(request, env);
+  await requireFormalMutationsEnabled(env, session);
   const catalog = await ownedCatalog(env, session.userId, catalogId);
   const body = exactRecord(await readJsonBody(request, 8 * 1024), ["idempotencyKey", "ref"], "Catalog sync request");
   const ref = requestedRef(body.ref);

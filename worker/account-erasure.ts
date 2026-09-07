@@ -436,7 +436,7 @@ function clearSessionHeaders(): Headers {
 
 export async function eraseAccount(request: Request, env: WasmOjWorkerEnv): Promise<Response> {
   const session = await requireBrowserMutationSession(request, env);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   if (env.ACCOUNT_ERASURE_HMAC_SECRET.length < 32) throw new Error("Account erasure secret is not configured.");
   const originalHash = await hmacSha256Hex(env.ACCOUNT_ERASURE_HMAC_SECRET, encoder.encode(session.userId));
   const anonymousUserId = `erased-${originalHash.slice(0, 32)}`;

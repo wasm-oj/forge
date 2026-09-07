@@ -13,7 +13,7 @@ import { Drawer } from "../../../components/ui/drawer";
 import { IconButton } from "../../../components/ui/icon-button";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { JUDGE_UI_LOCALE_STORAGE_KEY } from "../../judge/model/judge-ui-i18n";
-import { configureWasmOjMaintenanceSmokeToken, wasmOjJson, wasmOjMutation } from "../api/online-api";
+import { wasmOjJson, wasmOjMutation } from "../api/online-api";
 
 export type ProductLocale = "en" | "zh-TW";
 type ProductTheme = "light" | "dark";
@@ -200,7 +200,6 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
   async function signOut() {
     try {
       await wasmOjMutation("/api/auth/logout", {});
-      configureWasmOjMaintenanceSmokeToken();
       await refreshSession();
       router.push("/");
       router.refresh();

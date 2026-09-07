@@ -284,7 +284,7 @@ export async function createRejudgeBatch(request: Request, env: WasmOjWorkerEnv)
   const now = new Date().toISOString();
   await assertContestScope(env, fromRevision, input.contestId);
   await assertNoUnsettledOrigins(env, input.problemId, input.fromCommit, input.contestId);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   const noOp = fromRevision.judge_digest === toRevision.judge_digest;
   const batchId = crypto.randomUUID();
   const expectedCount = noOp ? 0 : await eligibleOriginCount(env, input.problemId, input.fromCommit, input.contestId);

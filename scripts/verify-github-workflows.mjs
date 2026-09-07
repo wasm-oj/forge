@@ -40,12 +40,12 @@ for (const value of [
   "--capture-baseline",
   "--baseline",
   "--timeout-seconds 1800",
-  "/api/health/container",
   "/api/health/live",
   "/api/health/ready",
   "production-migrations.mjs resume",
   "resume_formal_mutations:",
   "--cutover-smoke-confirmed",
+  "Confirm admin Container check, exact catalog sync, content, submission, and stale-projection smoke passed.",
 ]) requireText(production, value, "Production deployment");
 
 for (const removed of [
@@ -56,6 +56,9 @@ for (const removed of [
   "release-evidence",
   "/api/admin/releases/activate",
   "--dockerfile Dockerfile",
+  "MAINTENANCE_SMOKE_TOKEN",
+  "/api/health/container",
+  "/api/admin/container-probe",
 ]) forbidText(production, removed, "Production deployment");
 
 const ordered = [
@@ -67,7 +70,6 @@ const ordered = [
   'wrangler containers push "$CONTAINER_IMAGE" --config wrangler.quick-production.jsonc',
   'wrangler deploy --config wrangler.quick-production.jsonc --tag "$GITHUB_SHA"',
   "--baseline",
-  "/api/health/container",
   "/api/health/live",
   "/api/health/ready",
   "production-migrations.mjs resume",

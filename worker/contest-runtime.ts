@@ -617,7 +617,7 @@ export function prepareContestSubmissionAdmission(
 
 export async function startContestEntrant(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
   const session = await requireBrowserOrBearerMutationSession(request, env);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   exactRecord(await readJsonBody(request, 1_024), []);
   const now = new Date();
   const timestamp = now.toISOString();
@@ -705,7 +705,7 @@ export async function startContestEntrant(request: Request, env: WasmOjWorkerEnv
 export async function pauseContest(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
   const session = await requireBrowserMutationSession(request, env);
   await requireOrganizer(env, session);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   const body = exactRecord(await readJsonBody(request, 8 * 1024), ["reason"]);
   if (typeof body.reason !== "string" || body.reason.trim().length < 1 || body.reason.length > 500) {
     throw new ApiError(400, "contest-pause-reason-invalid", "Pause reason must contain 1–500 characters.");
@@ -755,7 +755,7 @@ export async function pauseContest(request: Request, env: WasmOjWorkerEnv, conte
 export async function resumeContest(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
   const session = await requireBrowserMutationSession(request, env);
   await requireOrganizer(env, session);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   exactRecord(await readJsonBody(request, 1_024), []);
   const now = new Date();
   const timestamp = now.toISOString();
@@ -834,7 +834,7 @@ export async function previewPendingContestRules(request: Request, env: WasmOjWo
 export async function activatePendingContestRules(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
   const session = await requireBrowserMutationSession(request, env);
   await requireOrganizer(env, session);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   const body = exactRecord(await readJsonBody(request, 8 * 1024), ["mode", "reason"], ["rewindTargetLogicalSeconds"]);
   if (body.mode !== "monotonic-recalculate" && body.mode !== "rewind") {
     throw new ApiError(400, "contest-rule-activation-mode-invalid", "Rule activation mode is invalid.");
@@ -1166,7 +1166,7 @@ export async function activatePendingContestRules(request: Request, env: WasmOjW
 export async function rewindContest(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
   const session = await requireBrowserMutationSession(request, env);
   await requireOrganizer(env, session);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   const body = exactRecord(await readJsonBody(request, 8 * 1024), ["reason", "targetLogicalSeconds"]);
   if (!Number.isSafeInteger(body.targetLogicalSeconds) || (body.targetLogicalSeconds as number) < 0) {
     throw new ApiError(400, "contest-rewind-target-invalid", "Rewind target must be a non-negative logical second.");

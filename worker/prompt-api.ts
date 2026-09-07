@@ -71,7 +71,7 @@ export async function createPromptAttempt(request: Request, env: WasmOjWorkerEnv
   const session = await requireBrowserOrBearerMutationSession(request, env);
   await requireStagingFormalAccess(env, session.userId);
   const input = parseCreateBody(await readJsonBody(request, 128 * 1024));
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   const attemptId = crypto.randomUUID();
   const service = readService(env);
   const reservation = await service.reserve({ ownerUserId: session.userId, ...input }, attemptId);

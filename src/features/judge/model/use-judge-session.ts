@@ -102,7 +102,6 @@ import {
 } from "../../../online-judge/managed-problem-collection";
 import type { OfficialSubmissionStatus } from "../../submissions/components/official-submission-result";
 import type { PromptAssistDraft } from "../../../online-judge/prompt-compiler";
-import { wasmOjMaintenanceSmokeHeaders } from "../../platform/api/online-api";
 import { useProduct } from "../../platform/components/app-shell";
 import { PLATFORM_BROWSER_TOOLCHAINS } from "../../platform/browser-toolchains";
 import { configureWasmOjLanguageServices } from "../editor/wasm-oj-language-services";
@@ -1273,7 +1272,6 @@ export function useJudgeSession({
             "content-type": "application/json",
             accept: "application/json",
             "x-wasm-oj-csrf": csrf,
-            ...wasmOjMaintenanceSmokeHeaders(),
             ...(turnstileToken ? { "x-wasm-oj-turnstile-token": turnstileToken } : {}),
           },
           body: requestBody,
@@ -1368,7 +1366,7 @@ export function useJudgeSession({
       const response = await fetch(`/api/submissions/${officialSubmissionId}/cancel`, {
         method: "POST",
         credentials: "same-origin",
-        headers: { accept: "application/json", "x-wasm-oj-csrf": csrf, ...wasmOjMaintenanceSmokeHeaders() },
+        headers: { accept: "application/json", "x-wasm-oj-csrf": csrf },
       });
       const value = await response.json() as unknown;
       if (!response.ok) {

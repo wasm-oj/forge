@@ -754,7 +754,7 @@ export async function createSubmission(request: Request, env: WasmOjWorkerEnv): 
     if (existing.request_digest !== requestDigest) throw new ApiError(409, "idempotency-conflict", "Idempotency key was already used for different source.");
     return submissionCreatedResponse(request, env, existing.submission_id, true);
   }
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env, session);
   const formalRiskRequestKey = await sha256Hex(canonicalBytes({ idempotencyKey: input.idempotencyKey, requestDigest }));
   await requireOfficialSubmissionRiskTurnstile(request, env, session.userId, formalRiskRequestKey);
   const capacity = await submissionCapacitySnapshot(env, session.userId);
@@ -1095,7 +1095,7 @@ export async function cancelSubmission(request: Request, env: WasmOjWorkerEnv, s
 
 export async function updateSubmissionVisibility(request: Request, env: WasmOjWorkerEnv, submissionId: string): Promise<Response> {
   const session = await requireBrowserMutationSession(request, env);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   const row = await submissionProductRow(env, submissionId);
   if (!row || row.user_id !== session.userId) throw new ApiError(404, "submission-not-found", "Submission does not exist.");
   const body = await readJsonBody(request, 8 * 1024);

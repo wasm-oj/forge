@@ -821,7 +821,7 @@ export async function getContest(request: Request, env: WasmOjWorkerEnv, contest
 
 export async function joinContest(request: Request, env: WasmOjWorkerEnv, contestId: string): Promise<Response> {
   const session = await requireBrowserOrBearerMutationSession(request, env);
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   const body = exact(await readJsonBody(request, 8 * 1024), [], ["inviteCode"]);
   const timestamp = new Date().toISOString();
   const contest = await env.DB.prepare(`SELECT rules.access_mode, contests.invite_code_hash,
@@ -1132,7 +1132,7 @@ export async function rotateContestInviteCode(request: Request, env: WasmOjWorke
     throw new ApiError(400, "contest-invite-invalid", "Invite code must contain 16–128 characters.");
   }
   if (env.INVITE_CODE_HMAC_SECRET.length < 32) throw new Error("Invite-code HMAC secret is not configured.");
-  await requireFormalMutationsEnabled(env, request);
+  await requireFormalMutationsEnabled(env);
   const digest = await hmacSha256Hex(env.INVITE_CODE_HMAC_SECRET, textEncoder.encode(body.inviteCode));
   const result = await env.DB.prepare(`UPDATE contest_series SET invite_code_hash=?
     WHERE id=? AND EXISTS (
