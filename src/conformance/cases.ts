@@ -1,3 +1,4 @@
+import { STDIO_CONFORMANCE_CASES } from "./stdio-cases.ts";
 import type { ConformanceCase } from "./matrix.ts";
 import { WASM_OJ_LIBCXX_PCH_HEADER } from "../compiler/libcxx-pch.ts";
 
@@ -202,6 +203,44 @@ export const DEFAULT_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze(
       files: { "src/main.py": "values = [10, 20, 12]\nprint(sum(values))\n" },
     },
     expect: { code: 0, stdout: "42\n", stderr: "", termination: "exited" },
+  },
+  {
+    id: "python-wasip1-stdin-eof",
+    label: "Python / wasip1 / redirected input at EOF",
+    input: {
+      language: "python",
+      target: "wasip1",
+      entry: "src/main.py",
+      files: { "src/main.py": [
+        "import os, sys",
+        "assert not any(os.isatty(fd) for fd in range(3))",
+        "assert not any(stream.isatty() for stream in (sys.stdin, sys.stdout, sys.stderr))",
+        "assert input() == 'abc\\r'",
+        "assert input() == 'x'",
+        "assert input() == '終'",
+        "try:",
+        "    input()",
+        "except EOFError:",
+        "    print('OK')",
+        "else:",
+        "    raise AssertionError('Expected EOFError')",
+        "",
+      ].join("\n") },
+    },
+    run: { stdin: "abc\r\nx\n終" },
+    expect: { code: 0, stdout: "OK\n", stderr: "", termination: "exited" },
+  },
+  {
+    id: "python-wasip1-stdin-bytes",
+    label: "Python / wasip1 / exact input bytes",
+    input: {
+      language: "python",
+      target: "wasip1",
+      entry: "src/main.py",
+      files: { "src/main.py": "import sys\nassert sys.stdin.buffer.read() == b'abc\\r\\nx'\nprint('OK')\n" },
+    },
+    run: { stdin: "abc\r\nx" },
+    expect: { code: 0, stdout: "OK\n", stderr: "", termination: "exited" },
   },
   {
     id: "javascript-wasip1",
@@ -502,6 +541,7 @@ export const CPP_STDLIB_CONFORMANCE_CASE: ConformanceCase = deepFreeze({
 
 export const FULL_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze([
   ...DEFAULT_CONFORMANCE_CASES,
+  ...STDIO_CONFORMANCE_CASES,
   CPP_STDLIB_CONFORMANCE_CASE,
 ]);
 

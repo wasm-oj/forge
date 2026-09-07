@@ -303,3 +303,11 @@ remain hard isolation boundaries for cancellation, timeout, restart, and infrast
 
 See [library-contract.md](library-contract.md) for invariant-level details and
 [versioning.md](versioning.md) for compatibility rules.
+
+## Comparing with a native online judge
+
+Browser/server conformance means the same WASM-OJ toolchains and execution contract on both hosts. It does not establish full standard-library or platform compatibility with native GCC, OpenJDK, CPython, or Node.js. In particular, JavaScript and TypeScript use QuickJS with the SDK's `std` module, not Node's `fs` or `readline` APIs; the TeaVM Java class library is not a full OpenJDK runtime.
+
+Preserve the same input bytes in both paths, including EOF, CRLF, empty input, and trailing whitespace. Do not append a newline or trim stdin to hide a program's EOF bug. Output-validator whitespace rules apply to the produced output, not to program input. `std.in.readAsString()` consumes the remaining input; subsequent reads return an empty string.
+
+The full conformance suite includes `*-wasip1-stdio-*` cases for every supported language: empty input, LF, absent/final LF, repeated LF, CRLF, bare CR, spaces/tabs, Unicode, BOM, NUL, long lines, and an unterminated last line. These check exact UTF-8 input bytes with each toolchain's supported I/O API, except Java, which checks BufferedReader line semantics against native behavior. Lower-level Java byte I/O is not covered by this passing corpus. Integrators must additionally test their users' native APIs and their configured output validator; a simple arithmetic smoke test is insufficient.

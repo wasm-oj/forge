@@ -196,10 +196,10 @@ export function quickJsBundle(
 ${quickJsDeterminismPrelude(config.determinism)}
 const __modules = ${JSON.stringify(modules)};
 const __packageManifests = ${JSON.stringify(packageManifests)};
-const __input = ${JSON.stringify(stdin)};
+let __input = ${JSON.stringify(stdin)};
 const __cache = Object.create(null);
 const __std = {
-  in: { readAsString: () => __input },
+  in: { readAsString: () => { const result = __input; __input = ""; return result; } },
   out: { puts: (value) => __wasm_oj_write_stdout(String(value)) },
   err: { puts: (value) => __wasm_oj_write_stderr(String(value)) },
 };

@@ -669,3 +669,41 @@ fn wasix_64_path_filestat_set_times_now_uses_the_logical_realtime_clock() {
 
     assert_eq!(result.stdout, expected);
 }
+
+#[test]
+fn redirected_stdio_is_not_a_terminal() {
+    for namespace in ["wasi_snapshot_preview1", "wasix_32v1", "wasix_64v1"] {
+        let pointer_type = if namespace == "wasix_64v1" {
+            "i64"
+        } else {
+            "i32"
+        };
+        for fd in 0..3 {
+            let module = format!(
+                r#"(module
+                    (import "{namespace}" "fd_fdstat_get" (func $stat (param i32 {pointer_type}) (result i32)))
+                    (import "{namespace}" "proc_exit" (func $exit (param i32)))
+                    (memory (export "memory") 1)
+                    (func (export "_start")
+                        (if (call $stat (i32.const {fd}) ({pointer_type}.const 0))
+                            (then (call $exit (i32.const 10))))
+                        (if (i32.ne (i32.load8_u (i32.const 0)) (i32.const 0))
+                            (then (call $exit (i32.const 11))))
+                        (if (call $stat (i32.const 3) ({pointer_type}.const 0))
+                            (then (call $exit (i32.const 12))))
+                        (if (i32.ne (i32.load8_u (i32.const 0)) (i32.const 3))
+                            (then (call $exit (i32.const 13))))
+                        (if (i32.ne (call $stat (i32.const 999) ({pointer_type}.const 0)) (i32.const 8))
+                            (then (call $exit (i32.const 14))))
+                        (if (i32.ne (call $stat (i32.const {fd}) ({pointer_type}.const 65535)) (i32.const {memory_error}))
+                            (then (call $exit (i32.const 15))))))"#,
+                memory_error = wasmer_wasix::wasmer_wasix_types::wasi::Errno::Memviolation as u16
+            );
+            let result = run(request(&module)).unwrap();
+            assert_eq!(
+                result.code, 0,
+                "{namespace} fd {fd} must not be a character device"
+            );
+        }
+    }
+}

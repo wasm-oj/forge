@@ -16,6 +16,7 @@ mod module_imports;
 mod module_policy;
 mod output;
 mod run;
+mod stdio;
 mod types;
 
 pub use compiler::CompilerToolchain;
