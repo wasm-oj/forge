@@ -28,5 +28,5 @@
     "build": "node ../../scripts/build-library.mjs --package @wasm-oj/toolchain-rust",
     "prepack": "pnpm run build"
   },
-  "dependencies": { "@wasm-oj/contracts": "workspace:0.2.0" }
+  "dependencies": { "@wasm-oj/contracts": "workspace:0.2.1" }
 }
