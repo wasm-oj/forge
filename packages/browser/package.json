@@ -1,6 +1,6 @@
 {
   "name": "@wasm-oj/browser",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Browser compiler and runner host for the WASM-OJ SDK.",
   "license": "MIT",
   "author": "JacobLinCool",
@@ -37,8 +37,8 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@wasm-oj/contracts": "workspace:0.2.0",
-    "@wasm-oj/core": "workspace:0.2.0",
+    "@wasm-oj/contracts": "workspace:0.3.0",
+    "@wasm-oj/core": "workspace:0.3.0",
     "@wasmer/sdk": "0.10.0",
     "es-module-lexer": "2.3.1",
     "fflate": "0.8.3"

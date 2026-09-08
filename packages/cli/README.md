@@ -8,7 +8,7 @@ server. `--offline` rejects every network-capable command before dispatch.
 ```sh
 woj config set server https://example.invalid
 woj auth login
-woj problem pull <problem-version-id> --language cpp --locale zh-TW
+woj problem pull <problem-id> --language cpp --locale zh-TW
 woj test
 woj submit --wait
 ```
@@ -19,3 +19,13 @@ Run `woj --help` to see the complete role-based command tree.
 `wasm-oj-platform/contests/v2` manifests. Contest workspaces pin timeline, rule, and problem epoch
 tokens and send them through the contest Official Submit context; Prompt Program is a separate
 prompt-attempt workflow, not a compiler language.
+
+## Upgrading from 0.2.0
+
+Connect and synchronize a repository catalog with `woj organizer catalog connect --repo
+<numeric-repository-id>` and `woj organizer catalog sync <catalog-id> --ref <ref> --wait`.
+These replace the collection create, validate, publish, and activate commands. Author catalog
+content in `wasm-oj.json`; the resolved Git commit identifies the synchronized content.
+
+Problem commands accept stable problem IDs. Start a rejudge with `woj organizer rejudge start
+<problem-id> --from <commit> --to <commit> --wait`.

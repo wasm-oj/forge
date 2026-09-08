@@ -4,6 +4,21 @@ All notable changes to WASM-OJ are recorded here. Releases follow
 [Semantic Versioning](https://semver.org/) and the contract/package versioning policy in
 [the versioning policy](docs/versioning.md).
 
+## 0.3.0 - 2026-09-08
+
+- Replaced managed collection APIs with repository-authored catalogs. `wasm-oj.json` and an
+  exact Git commit now define catalog content; Organizer exports repository parsers and static
+  validation instead of managed collection parsers.
+- Replaced the CLI collection validation/publication/activation workflow with `woj organizer
+  catalog connect` and `catalog sync`. Problem commands use stable problem IDs, and rejudge
+  commands select commit-to-commit targets. Existing CLI integrations must update their commands.
+- Added declarative contest rules and Prompt Program repository authoring. Organizer collection
+  builds validate and package deployable judge data without executing reference solutions.
+- Fixed redirected standard input/output handling in the shared runtime and stdin consumption
+  in QuickJS execution; refreshed the browser runtime and its pinned content identity.
+- Kept the WASM-OJ execution contract at version 2. The seven code packages move together to
+  0.3.0; independently versioned toolchain assets remain at 0.1.0.
+
 ## 0.2.0 - 2026-08-20
 
 - Replaced the experimental contract with the breaking WASM-OJ contract 2 boundary.
