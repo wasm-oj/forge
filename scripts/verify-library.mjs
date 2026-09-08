@@ -151,7 +151,7 @@ async function verifyReleaseWorkflows() {
     if (source.includes("pnpm publish")) throw new Error(`${label} release workflow must publish through npm's OIDC-aware CLI.`);
   }
   const publishOrder = ["contracts", "core", "browser", "server", "organizer", "cli", "sdk"]
-    .map((name) => codeRelease.indexOf(`npm publish release-tarballs/wasm-oj-${name}-`));
+    .map((name) => codeRelease.indexOf(`npm publish ./release-tarballs/wasm-oj-${name}-`));
   if (publishOrder.some((position) => position < 0)
     || publishOrder.some((position, index) => index > 0 && position <= publishOrder[index - 1])) {
     throw new Error("Synchronized packages must publish in dependency-topological order.");
@@ -160,7 +160,7 @@ async function verifyReleaseWorkflows() {
     "workflow_dispatch:",
     "pnpm run toolchain:verify",
     "scripts/pack-library.mjs --package",
-    'npm publish "release-tarballs/wasm-oj-${PACKAGE_NAME}-${RELEASE_VERSION}.tgz"',
+    'npm publish "./release-tarballs/wasm-oj-${PACKAGE_NAME}-${RELEASE_VERSION}.tgz"',
   ]) {
     if (!toolchainRelease.includes(required)) throw new Error(`Toolchain release workflow is missing '${required}'.`);
   }
