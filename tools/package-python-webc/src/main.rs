@@ -16,31 +16,31 @@ use webc::metadata::{Atom, AtomSignature, Command, Manifest};
 use webc::v3::write::{Directory, FileEntry, Writer};
 use webc::v3::{ChecksumAlgorithm, SignatureAlgorithm, Timestamps};
 
-const VERSION: &str = "3.14.6";
+const VERSION: &str = "3.14.7";
 const TARGET: &str = "wasm32-wasip1";
 const WASI_SDK_VERSION: &str = "24.0";
 const WASI_SDK_REVISION: &str = "d2bea01edcc46f731156a817f710cdd9fc9c1c19";
 const LLVM_REVISION: &str = "26a1d6601d727a96f4301d0d8647b5a42760ae0c";
 const WASI_LIBC_REVISION: &str = "b9ef79d7dbd47c6c5bafdae760823467c2f60b70";
-const SOURCE_DATE_EPOCH: u64 = 1_781_085_833;
+const SOURCE_DATE_EPOCH: u64 = 1_785_925_789;
 const ATOM_NAME: &str = "python";
 const VOLUME_NAME: &str = "python";
 const MOUNT_PATH: &str = "/usr/local";
 const STDLIB_PATH: &str = "lib/python3.14";
-const CANONICAL_SOURCE_ROOT: &str = "/usr/src/cpython-3.14.6";
-const CANONICAL_BUILD_ROOT: &str = "/usr/src/cpython-3.14.6/cross-build/wasm32-wasip1";
+const CANONICAL_SOURCE_ROOT: &str = "/usr/src/cpython-3.14.7";
+const CANONICAL_BUILD_ROOT: &str = "/usr/src/cpython-3.14.7/cross-build/wasm32-wasip1";
 const CANONICAL_BUILD_PYTHON: &str =
-    "/usr/src/cpython-3.14.6/cross-build/aarch64-apple-darwin/python.exe";
+    "/usr/src/cpython-3.14.7/cross-build/aarch64-apple-darwin/python.exe";
 const CANONICAL_WASI_SDK_ROOT: &str = "/opt/wasi-sdk-24.0";
 const RUNTIME_FILES_FORMAT: &str = "WOJFS002";
 const RUNTIME_FILES_CACHE_KEY: &str =
-    "wasm-oj-v2:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip";
+    "wasm-oj-v2:runtime-files:cpython-3.14.7-wasip1-stdlib-stored-zip";
 const RUNTIME_FILES_GUEST_PATH: &str = "/cpython/lib/python314.zip";
 const RUNTIME_FILES_ARCHIVE_SHA256: &str =
-    "44d894f91487f20c2bb04fe496a9343db37d8720fb706472c2b4a7f3300db039";
-const RUNTIME_FILES_ARCHIVE_BYTES: u64 = 10_652_540;
-const SOURCE_URL: &str = "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz";
-const SPDX_URL: &str = "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz.spdx.json";
+    "c1acac884af1c86833db5b65f8cc0a2304fce74dea0a05d9b40bde0a4e3e7c0e";
+const RUNTIME_FILES_ARCHIVE_BYTES: u64 = 10_695_683;
+const SOURCE_URL: &str = "https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tar.xz";
+const SPDX_URL: &str = "https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tar.xz.spdx.json";
 const WASI_SDK_URL: &str = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-arm64-macos.tar.gz";
 const EXCLUDED_STDLIB_ROOTS: &[&str] = &[
     "__pycache__",
@@ -282,6 +282,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ],
             "configureEnvironment": {
                 "py_cv_module__socket": "n/a",
+            },
+            "makeEnvironment": {
+                "LDFLAGS_NODIST": "-z stack-size=4194304 -Wl,--stack-first -Wl,--initial-memory=16777216",
             },
             "disabledModules": ["_socket"],
             "strip": "llvm-strip --strip-debug",
@@ -659,7 +662,7 @@ fn validate_build_details(bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>
         || document
             .pointer("/language/version_info/micro")
             .and_then(|value| value.as_u64())
-            != Some(6)
+            != Some(7)
     {
         return Err("Python WebC contains unexpected CPython build details".into());
     }

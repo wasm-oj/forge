@@ -1,0 +1,41 @@
+/Users/takala/.codex/worktrees/forge-test-reliability/tools/java-client/teavm-core.patch:2923: new blank line at EOF.
++
+/Users/takala/.codex/worktrees/forge-test-reliability/tools/java-client/teavm-core.patch:2951: new blank line at EOF.
++
+/Users/takala/.codex/worktrees/forge-test-reliability/tools/java-client/teavm-core.patch:4153: new blank line at EOF.
++
+warning: 3 lines add whitespace errors.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+parsing: ./com/sun/tools/javac/resources/compiler.properties
+inferred package name: com.sun.tools.javac.resources
+wrote: /private/tmp/java-client-portable-final/jdk-generated/com/sun/tools/javac/resources/compiler.java
+parsing: ./com/sun/tools/javac/resources/launcher.properties
+inferred package name: com.sun.tools.javac.resources
+wrote: /private/tmp/java-client-portable-final/jdk-generated/com/sun/tools/javac/resources/launcher.java
+parsing: ./com/sun/tools/javac/resources/javac.properties
+inferred package name: com.sun.tools.javac.resources
+wrote: /private/tmp/java-client-portable-final/jdk-generated/com/sun/tools/javac/resources/javac.java
+Note: /private/tmp/java-client-portable-final/teavm-javac/compiler/src/classlibEmu/java/org/teavm/platform/Platform.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+INFO: Running TeaVM
+INFO: Output file successfully built
+INFO: Classes compiled: 4412
+INFO: Methods compiled: 32832
+Packaged 7 static JavaScript bodies
+{
+  "java-compiler.wasm": {
+    "sha256": "8c37bce1c6fceeaffeffe93e10834309b67c8b6fb58c6f8a24547afe8be67f5d",
+    "bytes": 7854442
+  },
+  "java-teavm-0.13.1.compile-classlib.bin": {
+    "sha256": "738a82b7d7e7ff8d98b07bb076785da7035847a166afb8446fd150c4efce6103",
+    "bytes": 1261778
+  },
+  "java-teavm-0.13.1.runtime-classlib.bin": {
+    "sha256": "0ed234b66cdde19cb29e6c2865a3636d792d3cf72f102e73a7b3fdede80b79e6",
+    "bytes": 23709664
+  }
+}

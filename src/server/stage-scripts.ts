@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 export const SERVER_STAGE_SCRIPTS = Object.freeze([
   "server-build-stage.mjs",
   "server-runner-stage.mjs",
-  "python-stage.mjs",
   "rustc-stage.mjs",
   "go-stage.mjs",
   "java-stage.mjs",

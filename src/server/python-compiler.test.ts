@@ -18,7 +18,7 @@ import { ServerRunner } from "./server-runner";
 import { testToolchains } from "./test-toolchains.test-helper";
 
 describe("server CPython compiler", () => {
-  it("byte-compiles, executes, and safely rebuilds a corrupt runtime-files cache", { timeout: 300_000 }, async () => {
+  it("packages sources, executes native Python semantics, and safely rebuilds a corrupt runtime-files cache", { timeout: 300_000 }, async () => {
     const compiler = new ServerCompiler({
       compilerExecutable: process.execPath,
       toolchains: testToolchains(),
@@ -37,25 +37,26 @@ describe("server CPython compiler", () => {
       const valid = await compiler.build(createSdkProject({
         language: "python",
         target: "wasip1",
-        entry: "src/main.py",
+        entry: "nested/app/main.py",
         files: {
-          "src/helper.py": "answer = 42\n",
-          "src/main.py": "from helper import answer\nprint(answer)\n",
+          "nested/app/helper.py": "answer = 42\n",
+          "nested/app/main.py": "from helper import answer\nprint(answer)\n",
+          "nested/app/unused.py": "def invalid(:",
         },
-      }), "python-3.14.6-valid");
+      }), "python-3.14.7-valid");
       expect(valid.success, valid.stderr).toBe(true);
       expect(valid.artifact).toMatchObject({
         kind: "runtime-bundle",
         target: "wasip1",
         command: "python",
-        entry: "build/src/main.pyc",
+        entry: "nested/app/main.py",
       });
       if (valid.artifact?.kind !== "runtime-bundle") {
-        throw new Error("CPython compilation produced no runtime bundle.");
+        throw new Error("CPython packaging produced no runtime bundle.");
       }
       const artifact = valid.artifact;
-      expect(artifact.files["build/src/main.pyc"]).toBeInstanceOf(Uint8Array);
-      expect(artifact.files["build/src/helper.pyc"]).toBeInstanceOf(Uint8Array);
+      expect(artifact.files["nested/app/main.py"]).toBe("from helper import answer\nprint(answer)\n");
+      expect(artifact.files["nested/app/helper.py"]).toBe("answer = 42\n");
 
       const runConfig = {
         args: [],
@@ -120,18 +121,25 @@ describe("server CPython compiler", () => {
       const invalid = await compiler.build(createSdkProject({
         language: "python",
         target: "wasip1",
-        entry: "src/main.py",
-        files: { "src/main.py": "def broken(:\n    pass\n" },
-      }), "python-3.14.6-invalid");
-      expect(invalid.success).toBe(false);
-      expect(invalid.diagnostics).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          file: "src/main.py",
-          line: 1,
-          severity: "error",
-          source: "python",
-        }),
-      ]));
+        entry: "nested/app/main.py",
+        files: { "nested/app/main.py": "def broken(:\n    pass\n" },
+      }), "python-3.14.7-invalid");
+      expect(invalid.success).toBe(true);
+      expect(invalid.diagnostics).toEqual([]);
+      if (invalid.artifact?.kind !== "runtime-bundle") throw new Error("Missing source bundle");
+      const invalidRunner = createRunner();
+      try {
+        const result = await invalidRunner.run(invalid.artifact, {
+          ...runConfig,
+          determinism: { ...runConfig.determinism, clockMode: "host" },
+          resources: { ...runConfig.resources, instructionBudget: Number.MAX_SAFE_INTEGER },
+        });
+        expect(result.code).not.toBe(0);
+        expect(result.stderr).toContain("SyntaxError");
+        expect(result.termination).toBe("exited");
+      } finally {
+        invalidRunner.dispose();
+      }
     } finally {
       compiler.dispose();
       await rm(cacheDirectory, { recursive: true, force: true });

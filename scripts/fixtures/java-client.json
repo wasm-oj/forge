@@ -1,0 +1,346 @@
+[
+  {
+    "language": "java",
+    "label": "java-parity-debug-scanner-basic",
+    "optimization": "debug",
+    "source": "import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner input = new Scanner(System.in);\n        System.out.println(input.nextInt() + input.nextInt());\n        Scanner s = new Scanner(\"  -7 9223372036854775807 bad  true\\n\");\n        System.out.println(s.hasNextInt() + \":\" + s.hasNextInt() + \":\" + s.nextInt());\n        System.out.println(s.nextLong());\n        try { s.nextInt(); } catch (InputMismatchException e) { System.out.println(\"mismatch:\" + s.next()); }\n        System.out.println(s.nextBoolean() + \":\" + s.hasNext());\n        try { s.next(); } catch (NoSuchElementException e) { System.out.println(\"eof\"); }\n        s.close();\n        try { s.hasNext(); } catch (IllegalStateException e) { System.out.println(\"closed\"); }\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "42\ntrue:true:-7\n9223372036854775807\nmismatch:bad\ntrue:false\neof\nclosed\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-scanner-numbers",
+    "optimization": "debug",
+    "source": "import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner s = new Scanner(\"ff 101 123456789012345678901234567890 1,234.5 -0.125 NaN Infinity\").useLocale(Locale.US);\n        System.out.println(s.nextInt(16) + \":\" + s.nextInt(2) + \":\" + s.nextBigInteger());\n        System.out.println(s.nextDouble() + \":\" + s.nextBigDecimal() + \":\" + s.nextDouble() + \":\" + s.nextDouble());\n        s = new Scanner(\"20,5 1.234,25\").useLocale(Locale.GERMANY);\n        System.out.println(s.nextDouble() + \":\" + s.nextDouble());\n        s = new Scanner(\"１２ ٣٤\");\n        System.out.println(s.nextInt() + \":\" + s.nextInt());\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "255:5:123456789012345678901234567890\n1234.5:-0.125:NaN:Infinity\n20.5:1234.25\n12:34\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-scanner-lines",
+    "optimization": "debug",
+    "source": "import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner s = new Scanner(\"20\\nhello 世界\\r\\nlast\");\n        System.out.println(s.nextInt() + \":\" + s.nextLine().length());\n        while (s.hasNextLine()) System.out.println(s.nextLine());\n        s = new Scanner(\"one,two,,four\").useDelimiter(\",\");\n        while (s.hasNext()) System.out.println(\"[\" + s.next() + \"]\");\n        s = new Scanner(\"a1 b22 c333\");\n        System.out.println(s.findWithinHorizon(\"[0-9]+\", 0));\n        System.out.println(s.findAll(\"[0-9]+\").map(m -> m.group()).reduce((a,b) -> a+\":\"+b).orElse(\"empty\"));\n        System.out.println(new Scanner(\"a b c\").tokens().count());\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "20:0\nhello 世界\nlast\n[one]\n[two]\n[]\n[four]\n1\n22:333\n3\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-buffered-split",
+    "optimization": "debug",
+    "source": "import java.io.*;\npublic class Main {\n    public static void main(String[] args) throws Exception {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n        String[] numbers = in.readLine().trim().split(\"\\\\s+\");\n        System.out.println(Integer.parseInt(numbers[0]) + Integer.parseInt(numbers[1]));\n        System.out.println(in.readLine() == null);\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "42\ntrue\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-regex-codepoint",
+    "optimization": "debug",
+    "source": "import java.util.regex.*;\nimport java.text.*;\nimport java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        for (String regex : new String[]{\"\\\\x{2c}\", \"\\\\x{1F600}\", \"[\\\\x{41}-\\\\x{5A}]+\", \"\\\\x{00000041}\"}) {\n            String text = regex.contains(\"2c\") ? \",\" : regex.contains(\"1F\") ? \"😀\" : \"AZ\";\n            System.out.println(Pattern.compile(regex).matcher(text).find());\n        }\n        for (String regex : new String[]{\"\\\\x{}\", \"\\\\x{110000}\", \"\\\\x{0g}\", \"\\\\x{41\", \"\\\\x{ＦＦ}\"}) {\n            try { Pattern.compile(regex); System.out.println(\"accepted\"); }\n            catch (PatternSyntaxException e) { System.out.println(\"rejected\"); }\n        }\n        DecimalFormat format = (DecimalFormat) NumberFormat.getNumberInstance(Locale.US);\n        System.out.println(\"[\"+format.getPositivePrefix()+\"][\"+format.getPositiveSuffix()+\"][\"+format.getNegativePrefix()+\"][\"+format.getNegativeSuffix()+\"]\");\n        Locale previous = Locale.getDefault();\n        Locale.setDefault(Locale.US);\n        Locale.setDefault(Locale.Category.FORMAT, Locale.GERMANY);\n        System.out.println(Locale.getDefault() + \":\" + Locale.getDefault(Locale.Category.DISPLAY) + \":\" + Locale.getDefault(Locale.Category.FORMAT));\n        Locale.setDefault(previous);\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "true\ntrue\ntrue\ntrue\nrejected\nrejected\nrejected\nrejected\nrejected\n[][][-][]\nen_US:en_US:de_DE\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-collections",
+    "optimization": "debug",
+    "source": "import java.util.*;\nimport java.math.*;\npublic class Main {\n    enum Kind { A, B }\n    public static void main(String[] args) {\n        Map<String,Integer> map = new TreeMap<>();\n        for (String value : Arrays.asList(\"b\",\"a\",\"b\")) map.merge(value, 1, Integer::sum);\n        System.out.println(map);\n        System.out.println(Arrays.asList(1,2,3).stream().mapToInt(Integer::intValue).sum());\n        System.out.println(new BigInteger(\"12345678901234567890\").multiply(new BigInteger(\"1000\")));\n        System.out.println(EnumSet.allOf(Kind.class));\n        Object[] objects = new Object[2]; objects[0] = \"hello\";\n        System.out.println(Arrays.copyOf(objects, 3)[0]);\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "{a=1, b=2}\n6\n12345678901234567890000\n[A, B]\nhello\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-source-error",
+    "optimization": "debug",
+    "source": "public class Main { public static void main(String[] args) { broken syntax } }\n",
+    "input": "20 22\n",
+    "compileError": true
+  },
+  {
+    "language": "java",
+    "label": "java-empty-debug",
+    "optimization": "debug",
+    "source": "public class Main { public static void main(String[] args) {} }",
+    "input": "",
+    "expected": ""
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-scanner-basic",
+    "optimization": "release",
+    "source": "import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner input = new Scanner(System.in);\n        System.out.println(input.nextInt() + input.nextInt());\n        Scanner s = new Scanner(\"  -7 9223372036854775807 bad  true\\n\");\n        System.out.println(s.hasNextInt() + \":\" + s.hasNextInt() + \":\" + s.nextInt());\n        System.out.println(s.nextLong());\n        try { s.nextInt(); } catch (InputMismatchException e) { System.out.println(\"mismatch:\" + s.next()); }\n        System.out.println(s.nextBoolean() + \":\" + s.hasNext());\n        try { s.next(); } catch (NoSuchElementException e) { System.out.println(\"eof\"); }\n        s.close();\n        try { s.hasNext(); } catch (IllegalStateException e) { System.out.println(\"closed\"); }\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "42\ntrue:true:-7\n9223372036854775807\nmismatch:bad\ntrue:false\neof\nclosed\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-scanner-numbers",
+    "optimization": "release",
+    "source": "import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner s = new Scanner(\"ff 101 123456789012345678901234567890 1,234.5 -0.125 NaN Infinity\").useLocale(Locale.US);\n        System.out.println(s.nextInt(16) + \":\" + s.nextInt(2) + \":\" + s.nextBigInteger());\n        System.out.println(s.nextDouble() + \":\" + s.nextBigDecimal() + \":\" + s.nextDouble() + \":\" + s.nextDouble());\n        s = new Scanner(\"20,5 1.234,25\").useLocale(Locale.GERMANY);\n        System.out.println(s.nextDouble() + \":\" + s.nextDouble());\n        s = new Scanner(\"１２ ٣٤\");\n        System.out.println(s.nextInt() + \":\" + s.nextInt());\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "255:5:123456789012345678901234567890\n1234.5:-0.125:NaN:Infinity\n20.5:1234.25\n12:34\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-scanner-lines",
+    "optimization": "release",
+    "source": "import java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner s = new Scanner(\"20\\nhello 世界\\r\\nlast\");\n        System.out.println(s.nextInt() + \":\" + s.nextLine().length());\n        while (s.hasNextLine()) System.out.println(s.nextLine());\n        s = new Scanner(\"one,two,,four\").useDelimiter(\",\");\n        while (s.hasNext()) System.out.println(\"[\" + s.next() + \"]\");\n        s = new Scanner(\"a1 b22 c333\");\n        System.out.println(s.findWithinHorizon(\"[0-9]+\", 0));\n        System.out.println(s.findAll(\"[0-9]+\").map(m -> m.group()).reduce((a,b) -> a+\":\"+b).orElse(\"empty\"));\n        System.out.println(new Scanner(\"a b c\").tokens().count());\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "20:0\nhello 世界\nlast\n[one]\n[two]\n[]\n[four]\n1\n22:333\n3\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-buffered-split",
+    "optimization": "release",
+    "source": "import java.io.*;\npublic class Main {\n    public static void main(String[] args) throws Exception {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n        String[] numbers = in.readLine().trim().split(\"\\\\s+\");\n        System.out.println(Integer.parseInt(numbers[0]) + Integer.parseInt(numbers[1]));\n        System.out.println(in.readLine() == null);\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "42\ntrue\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-regex-codepoint",
+    "optimization": "release",
+    "source": "import java.util.regex.*;\nimport java.text.*;\nimport java.util.*;\npublic class Main {\n    public static void main(String[] args) {\n        for (String regex : new String[]{\"\\\\x{2c}\", \"\\\\x{1F600}\", \"[\\\\x{41}-\\\\x{5A}]+\", \"\\\\x{00000041}\"}) {\n            String text = regex.contains(\"2c\") ? \",\" : regex.contains(\"1F\") ? \"😀\" : \"AZ\";\n            System.out.println(Pattern.compile(regex).matcher(text).find());\n        }\n        for (String regex : new String[]{\"\\\\x{}\", \"\\\\x{110000}\", \"\\\\x{0g}\", \"\\\\x{41\", \"\\\\x{ＦＦ}\"}) {\n            try { Pattern.compile(regex); System.out.println(\"accepted\"); }\n            catch (PatternSyntaxException e) { System.out.println(\"rejected\"); }\n        }\n        DecimalFormat format = (DecimalFormat) NumberFormat.getNumberInstance(Locale.US);\n        System.out.println(\"[\"+format.getPositivePrefix()+\"][\"+format.getPositiveSuffix()+\"][\"+format.getNegativePrefix()+\"][\"+format.getNegativeSuffix()+\"]\");\n        Locale previous = Locale.getDefault();\n        Locale.setDefault(Locale.US);\n        Locale.setDefault(Locale.Category.FORMAT, Locale.GERMANY);\n        System.out.println(Locale.getDefault() + \":\" + Locale.getDefault(Locale.Category.DISPLAY) + \":\" + Locale.getDefault(Locale.Category.FORMAT));\n        Locale.setDefault(previous);\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "true\ntrue\ntrue\ntrue\nrejected\nrejected\nrejected\nrejected\nrejected\n[][][-][]\nen_US:en_US:de_DE\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-collections",
+    "optimization": "release",
+    "source": "import java.util.*;\nimport java.math.*;\npublic class Main {\n    enum Kind { A, B }\n    public static void main(String[] args) {\n        Map<String,Integer> map = new TreeMap<>();\n        for (String value : Arrays.asList(\"b\",\"a\",\"b\")) map.merge(value, 1, Integer::sum);\n        System.out.println(map);\n        System.out.println(Arrays.asList(1,2,3).stream().mapToInt(Integer::intValue).sum());\n        System.out.println(new BigInteger(\"12345678901234567890\").multiply(new BigInteger(\"1000\")));\n        System.out.println(EnumSet.allOf(Kind.class));\n        Object[] objects = new Object[2]; objects[0] = \"hello\";\n        System.out.println(Arrays.copyOf(objects, 3)[0]);\n    }\n}\n",
+    "input": "20 22\n",
+    "expected": "{a=1, b=2}\n6\n12345678901234567890000\n[A, B]\nhello\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-source-error",
+    "optimization": "release",
+    "source": "public class Main { public static void main(String[] args) { broken syntax } }\n",
+    "input": "20 22\n",
+    "compileError": true
+  },
+  {
+    "language": "java",
+    "label": "java-empty-release",
+    "optimization": "release",
+    "source": "public class Main { public static void main(String[] args) {} }",
+    "input": "",
+    "expected": ""
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-comment-package",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "/*\npackage fake;\n*/\npublic class Main {public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-text-block-package",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "public class Main {static String example=\"\"\"\npackage fake;\n\"\"\";public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-unicode-package",
+    "optimization": "debug",
+    "entry": "src/測試/程式.java",
+    "source": "package 測試; public class 程式 {public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-escaped-package",
+    "optimization": "debug",
+    "entry": "src/example/Main.java",
+    "source": "\\u0070ackage example; public class Main {public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-comment-package",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "/*\npackage fake;\n*/\npublic class Main {public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-text-block-package",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "public class Main {static String example=\"\"\"\npackage fake;\n\"\"\";public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-unicode-package",
+    "optimization": "release",
+    "entry": "src/測試/程式.java",
+    "source": "package 測試; public class 程式 {public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-escaped-package",
+    "optimization": "release",
+    "entry": "src/example/Main.java",
+    "source": "\\u0070ackage example; public class Main {public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-missing-main",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "class Main {}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-missing-class",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "class Foo {}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-private-main",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "class Main {private static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-instance-main",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "class Main {public void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-noargs-main",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "class Main {public static void main(){System.out.println(42);}}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-inherited-main",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "class Base {static{System.out.println(\"base-init\");} public static void main(String[]a){System.out.println(42);}} class Main extends Base {static{System.out.println(\"main-init\");}}",
+    "input": "",
+    "expected": "base-init\nmain-init\n42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-static-init-error",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "class Main {static {if(true) throw new IllegalStateException(\"initializer\");} public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "runtimeError": "Main.<clinit>"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-debug-empty-source",
+    "optimization": "debug",
+    "entry": "Main.java",
+    "source": "",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-missing-main",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "class Main {}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-missing-class",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "class Foo {}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-private-main",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "class Main {private static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-instance-main",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "class Main {public void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-noargs-main",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "class Main {public static void main(){System.out.println(42);}}",
+    "input": "",
+    "runtimeError": "Error:"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-inherited-main",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "class Base {static{System.out.println(\"base-init\");} public static void main(String[]a){System.out.println(42);}} class Main extends Base {static{System.out.println(\"main-init\");}}",
+    "input": "",
+    "expected": "base-init\nmain-init\n42\n"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-static-init-error",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "class Main {static {if(true) throw new IllegalStateException(\"initializer\");} public static void main(String[]a){System.out.println(42);}}",
+    "input": "",
+    "runtimeError": "Main.<clinit>"
+  },
+  {
+    "language": "java",
+    "label": "java-parity-release-empty-source",
+    "optimization": "release",
+    "entry": "Main.java",
+    "source": "",
+    "input": "",
+    "runtimeError": "Error:"
+  }
+]

@@ -27,9 +27,7 @@ import {
   clearCompilerHostCaches,
   configureWasmerCompilerHost,
 } from "../compiler/wasmer-engine.ts";
-import { parseGoDiagnostics, parsePythonDiagnostics, parseRustDiagnostics } from "../core/diagnostics.ts";
-import type { PythonFrontendRequest, PythonFrontendResult } from "../compiler/python-toolchain.ts";
-import { PYTHON_COMPILE_TIMEOUT_MS } from "../compiler/python-toolchain.ts";
+import { parseGoDiagnostics, parseRustDiagnostics } from "../core/diagnostics.ts";
 import type {
   RustCompileRequest,
   RustCompileResult,
@@ -44,7 +42,6 @@ import {
   JAVA_COMPILER_ASSET_PATH,
   JAVA_COMPILE_CLASSLIB_ASSET_PATH,
   JAVA_RUNTIME_CLASSLIB_ASSET_PATH,
-  PYTHON_PACKAGE_ASSET_PATH,
 } from "../core/toolchains.ts";
 import { BoundedByteCollector, readBoundedRegularFile } from "./bounded-transport.ts";
 import { buildControlTimeoutMs } from "../compiler/build-timeout-policy.ts";
@@ -177,7 +174,6 @@ export class ServerCompiler implements Compiler {
         loadToolchainAsset: (assetPath) => this.loadToolchainAsset(assetPath),
         loadToolchainFile: (assetPath) => this.loadToolchainFile(assetPath),
         compileRust: (request) => this.compileRust(request),
-        compilePython: (request) => this.compilePython(request),
         compileGo: (request) => this.compileGo(request),
         compileJava: (request) => this.compileJava(request),
         progress: (_requestId, phase, label, value) => {
@@ -408,23 +404,6 @@ export class ServerCompiler implements Compiler {
       wasm: result.wasmBase64
         ? new Uint8Array(Buffer.from(result.wasmBase64, "base64"))
         : undefined,
-    };
-  }
-
-  private async compilePython(request: PythonFrontendRequest): Promise<PythonFrontendResult> {
-    const result = await this.runCompilerStage<Omit<PythonFrontendResult, "bytecode"> & { bytecodeBase64: Record<string, string> }>(
-      "python-stage.mjs",
-      { request },
-      PYTHON_COMPILE_TIMEOUT_MS,
-      [PYTHON_PACKAGE_ASSET_PATH],
-    );
-    return {
-      ...result,
-      bytecode: Object.fromEntries(Object.entries(result.bytecodeBase64).map(([path, base64]) => [
-        path,
-        new Uint8Array(Buffer.from(base64, "base64")),
-      ])),
-      diagnostics: parsePythonDiagnostics(`${result.stderr}\n${result.stdout}`),
     };
   }
 

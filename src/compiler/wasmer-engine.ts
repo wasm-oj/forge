@@ -11,7 +11,7 @@ import {
 import { canonicalProjectFiles } from "../core/project-files.ts";
 import { costProfileId } from "../core/cost-profile.ts";
 import { ensureFailureDiagnostic, parseTypeScriptDiagnostics } from "../core/diagnostics.ts";
-import { QUICKJS_STD_MODULE_DECLARATION } from "../core/quickjs-runtime.ts";
+import { QUICKJS_COMMONJS_DECLARATION, QUICKJS_NODE_MODULE_DECLARATION, QUICKJS_STD_MODULE_DECLARATION } from "../core/quickjs-runtime.ts";
 import {
   PYTHON_PACKAGE,
   GO_VERSION,
@@ -41,10 +41,8 @@ import type {
   RustCompileRequest,
   RustCompileResult,
 } from "./rust-toolchain.ts";
-import type { PythonFrontendRequest, PythonFrontendResult } from "./python-toolchain.ts";
 import type { GoCompileRequest, GoCompileResult } from "./go-toolchain.ts";
 import type { JavaCompileRequest, JavaCompileResult } from "./java-toolchain.ts";
-import { javaMainClass } from "./java-toolchain.ts";
 import { buildClangWithSdkDirect } from "./sdk-direct-clang.ts";
 import {
   assertProjectDependencyEcosystem,
@@ -61,7 +59,6 @@ export interface WasmerCompilerHost {
   loadToolchainAsset(path: string): Promise<Uint8Array>;
   loadToolchainFile(path: string): Promise<Uint8Array>;
   compileRust(request: RustCompileRequest): Promise<RustCompileResult>;
-  compilePython(request: PythonFrontendRequest): Promise<PythonFrontendResult>;
   compileGo(request: GoCompileRequest): Promise<GoCompileResult>;
   compileJava(request: JavaCompileRequest): Promise<JavaCompileResult>;
   progress(requestId: string, phase: WorkerPhase, label: string, value?: number): void;
@@ -169,33 +166,11 @@ function sumFileSize(files: Record<string, string | Uint8Array>): number {
 async function buildPython(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
   const started = performance.now();
   const dependencies = pythonDependencyFiles(project);
-  const compilerFiles = [...project.files, ...dependencies.sourceFiles];
-  const pythonFiles = compilerFiles.filter((file) => file.path.endsWith(".py"));
-  progress(requestId, "compiling", `Byte-compiling ${pythonFiles.length} Python file${pythonFiles.length === 1 ? "" : "s"}`, 0.55);
-  const frontend = await requireHost().compilePython({ files: compilerFiles });
-  if (!frontend.success) {
-    return {
-      success: false,
-      diagnostics: ensureFailureDiagnostic(frontend.diagnostics, {
-        file: project.config.entry,
-        source: "python",
-        message: frontend.stderr.trim() || "Python byte-compilation failed without a diagnostic.",
-      }),
-      stdout: frontend.stdout,
-      stderr: frontend.stderr,
-      cacheHit: false,
-    };
-  }
+  progress(requestId, "compiling", "Packaging Python sources", 0.55);
   const files: Record<string, string | Uint8Array> = Object.fromEntries(project.files.map((file) => [file.path, file.content]));
-  Object.assign(files, dependencies.artifactFiles);
+  Object.assign(files, dependencies);
   files[PYTHON_RUNNER_PATH] = PYTHON_DETERMINISTIC_RUNNER;
-  for (const file of pythonFiles) {
-    const compiledPath = `build/${file.path.replace(/\.py$/, ".pyc")}`;
-    const bytecode = frontend.bytecode[compiledPath];
-    if (!bytecode) throw new Error(`Python stage omitted '${compiledPath}'.`);
-    files[compiledPath] = bytecode;
-  }
-  const entry = `build/${project.config.entry.replace(/\.py$/, ".pyc")}`;
+  const entry = project.config.entry;
   const manifest = createRuntimeBundleManifest(project, PYTHON_PACKAGE, "python", entry);
   files["wasm-oj.manifest.json"] = manifest;
   const bundleFiles = canonicalRuntimeBundleFiles(files);
@@ -210,7 +185,7 @@ async function buildPython(project: Project, cacheKey: string, requestId: string
     files: bundleFiles,
     manifest,
   };
-  return { success: true, diagnostics: frontend.diagnostics, artifact, stdout: frontend.stdout, stderr: frontend.stderr, cacheHit: false };
+  return { success: true, diagnostics: [], artifact, stdout: "", stderr: "", cacheHit: false };
 }
 
 async function buildGo(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {
@@ -271,7 +246,7 @@ async function buildJava(project: Project, cacheKey: string, requestId: string):
       cacheHit: false,
     };
   }
-  progress(requestId, "compiling", `Compiling Java ${javaMainClass(entry.path, entry.content)}`, 0.3);
+  progress(requestId, "compiling", `Compiling Java ${entry.path}`, 0.3);
   const compiled = await requireHost().compileJava({
     entry: project.config.entry,
     files: project.files,
@@ -349,9 +324,9 @@ async function transpileScriptProject(project: Project, requestId: string): Prom
         ...Object.fromEntries(Object.entries(dependencyFiles)
           .filter(([, contents]) => typeof contents === "string")
           .map(([path, contents]) => [`/project/${path}`, contents])),
-        [declarationPath]: QUICKJS_STD_MODULE_DECLARATION,
+        [declarationPath]: QUICKJS_STD_MODULE_DECLARATION + QUICKJS_NODE_MODULE_DECLARATION
+          + QUICKJS_COMMONJS_DECLARATION,
       },
-      javascript: project.config.language === "javascript",
       sources: [
         declarationPath,
         ...scriptFiles.map((file) => `/project/${file.path}`),
@@ -400,23 +375,36 @@ async function buildScript(project: Project, cacheKey: string, requestId: string
       cacheHit: false,
     };
   }
-  progress(requestId, "compiling", `Compiling ${project.config.language === "typescript" ? "TypeScript" : "JavaScript"} with TypeScript/WASI`, 0.5);
-  const { files, output, response } = await transpileScriptProject(project, requestId);
-  const diagnostics = parseTypeScriptDiagnostics(response?.diagnostics ?? "");
-  const emittedOutputsPresent = emittedSourceFiles(project)
-    .every((file) => Object.hasOwn(files, emittedScriptPath(file.path)));
-  if (!output.ok || !response || response.status !== 0 || !emittedOutputsPresent || diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
-    return {
-      success: false,
-      diagnostics: ensureFailureDiagnostic(diagnostics, {
-        file: project.config.entry,
-        source: "typescript",
-        message: output.stderr.trim() || response?.diagnostics.trim() || `TypeScript ${TYPESCRIPT_VERSION} did not return every compiled output.`,
-      }),
-      stdout: "",
-      stderr: output.stderr,
-      cacheHit: false,
+  let files: Record<string, string | Uint8Array>;
+  let diagnostics: BuildResult["diagnostics"] = [];
+  let stderr = "";
+  if (project.config.language === "javascript") {
+    progress(requestId, "compiling", "Preparing JavaScript modules", 0.5);
+    files = {
+      ...Object.fromEntries(emittedSourceFiles(project).map(file => [file.path, file.content])),
+      ...npmDependencyFiles(project),
     };
+  } else {
+    progress(requestId, "compiling", "Compiling TypeScript with TypeScript/WASI", 0.5);
+    const transpiled = await transpileScriptProject(project, requestId);
+    files = transpiled.files;
+    stderr = transpiled.output.stderr;
+    diagnostics = parseTypeScriptDiagnostics(transpiled.response?.diagnostics ?? "");
+    const emittedOutputsPresent = emittedSourceFiles(project)
+      .every((file) => Object.hasOwn(files, emittedScriptPath(file.path)));
+    if (!transpiled.output.ok || !transpiled.response || transpiled.response.status !== 0 || !emittedOutputsPresent || diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+      return {
+        success: false,
+        diagnostics: ensureFailureDiagnostic(diagnostics, {
+          file: project.config.entry,
+          source: "typescript",
+          message: stderr.trim() || transpiled.response?.diagnostics.trim() || `TypeScript ${TYPESCRIPT_VERSION} did not return every compiled output.`,
+        }),
+        stdout: "",
+        stderr,
+        cacheHit: false,
+      };
+    }
   }
   const entry = emittedScriptPath(project.config.entry);
   const manifest = createRuntimeBundleManifest(project, QUICKJS_PACKAGE, "qjs", entry);
@@ -433,7 +421,7 @@ async function buildScript(project: Project, cacheKey: string, requestId: string
     files: bundleFiles,
     manifest,
   };
-  return { success: true, diagnostics, artifact, stdout: "", stderr: output.stderr, cacheHit: false };
+  return { success: true, diagnostics, artifact, stdout: "", stderr, cacheHit: false };
 }
 
 export async function buildProject(project: Project, cacheKey: string, requestId: string): Promise<BuildResult> {

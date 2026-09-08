@@ -105,6 +105,8 @@ export interface BuildConfig {
 }
 
 export interface DeterminismConfig {
+  /** Opt into host clocks and real waits; omitted preserves deterministic virtual time. */
+  clockMode?: "host";
   /** Unsigned 32-bit seed used by every guest entropy source. */
   randomSeed: number;
   /** Unix epoch exposed by the first realtime-clock observation. */
@@ -263,6 +265,8 @@ export interface RunResult {
   /** Requested output files that existed when the process terminated. */
   files: Record<string, Uint8Array>;
   durationMs: number;
+  /** Browser guest wall time, excluding runtime preparation and output collection. */
+  executionDurationMs?: number;
   determinism: DeterminismConfig;
   resources: ResourcePolicy;
   termination: ExecutionTermination;

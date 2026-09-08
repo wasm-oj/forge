@@ -17,7 +17,6 @@ import (
 
 type compileRequest struct {
 	Files      map[string]string `json:"files"`
-	JavaScript bool              `json:"javascript"`
 	Sources    []string          `json:"sources"`
 	Outputs    []string          `json:"outputs"`
 }
@@ -59,15 +58,11 @@ func main() {
 	}
 	args := []string{
 		"--pretty", "false",
-		"--target", "es2020",
-		"--module", "commonjs",
-		"--strict",
+		"--target", "es2023",
 		"--outDir", "/project/build",
 		"--rootDir", "/project",
 	}
-	if request.JavaScript {
-		args = append(args, "--allowJs", "--checkJs")
-	}
+	args = append(args, "--module", "node16", "--moduleResolution", "node16", "--strict", "--esModuleInterop", "--rewriteRelativeImportExtensions")
 	args = append(args, request.Sources...)
 	result := execute.CommandLine(context.Background(), sys, args, nil)
 

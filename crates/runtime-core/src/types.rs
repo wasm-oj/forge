@@ -4,8 +4,16 @@ use std::collections::BTreeMap;
 use crate::RunErrorCode;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockMode {
+    Host,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DeterminismConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clock_mode: Option<ClockMode>,
     pub random_seed: u64,
     pub realtime_epoch_ms: u64,
     pub clock_step_ns: u64,

@@ -18,12 +18,16 @@ use wasmer_wasix::{
 pub fn run(request: RunRequest) -> Result<RunResult, RunError> {
     let runtime = if tokio::runtime::Handle::try_current().is_err() {
         Some(
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|error| {
-                    RunError::Runtime(format!("failed to initialize Tokio: {error}"))
-                })?,
+            (if request.determinism.clock_mode.is_some() {
+                let mut builder = tokio::runtime::Builder::new_multi_thread();
+                builder.worker_threads(1);
+                builder
+            } else {
+                tokio::runtime::Builder::new_current_thread()
+            })
+            .enable_all()
+            .build()
+            .map_err(|error| RunError::Runtime(format!("failed to initialize Tokio: {error}")))?,
         )
     } else {
         None

@@ -29,6 +29,8 @@ import {
 } from "./library-packages.mjs";
 import { resolveTypeScriptCli } from "./typescript-cli.mjs";
 
+import { buildQuickJsStdlib } from "./build-quickjs-stdlib.mjs";
+
 const run = promisify(execFile);
 const alias = { "@": repositoryRoot };
 const selection = selectedPackageName(process.argv.slice(2));
@@ -37,6 +39,8 @@ const selected = selection?.kind === "package"
   : selection?.kind === "group"
     ? PUBLIC_PACKAGES.filter((definition) => definition.kind === selection.name)
     : PUBLIC_PACKAGES;
+
+if (selected.some((definition) => definition.kind !== "toolchain")) await buildQuickJsStdlib();
 
 for (const definition of selected) {
   if (definition.kind === "toolchain") await buildToolchainPackage(definition);
@@ -133,7 +137,6 @@ async function buildServerStages(stagingDir, definition) {
   const stages = [
     "server-build-stage",
     "server-runner-stage",
-    "python-stage",
     "rustc-stage",
     "go-stage",
     "java-stage",

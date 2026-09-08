@@ -1,4 +1,7 @@
-use wasmer::{AsStoreMut, ExternType, Function, Imports, Module, RuntimeError};
+use wasmer::{
+    AsStoreMut, ExternType, Function, FunctionEnv, FunctionEnvMut, FunctionType, Imports, Instance,
+    Module, RuntimeError, Type,
+};
 
 /// Returns whether an import exposes host state that WASM-OJ deliberately keeps
 /// outside the deterministic judge contract.
@@ -63,12 +66,75 @@ pub(crate) fn attach_capability_denials(
     for (namespace, name, function_type) in denied {
         let capability = format!("{namespace}.{name}");
         let error_message = format!("WASM-OJ denied nondeterministic capability {capability}");
-        let denial = Function::new(store, function_type, move |_| {
-            Err(RuntimeError::new(error_message.clone()))
-        });
+        let denial = capability_trap(store, &function_type, error_message)?;
         imports.define(&namespace, &name, denial);
     }
     Ok(())
+}
+
+fn deny_capability(env: FunctionEnvMut<String>) -> Result<(), RuntimeError> {
+    Err(RuntimeError::new(env.data().clone()))
+}
+
+fn capability_trap(
+    store: &mut impl AsStoreMut,
+    signature: &FunctionType,
+    message: String,
+) -> Result<Function, String> {
+    use wasm_encoder::{
+        CodeSection, EntityType, ExportKind, ExportSection, FunctionSection, ImportSection,
+        Instruction, TypeSection, ValType,
+    };
+
+    let value_type = |ty: &Type| match ty {
+        Type::I32 => ValType::I32,
+        Type::I64 => ValType::I64,
+        Type::F32 => ValType::F32,
+        Type::F64 => ValType::F64,
+        Type::V128 => ValType::V128,
+        Type::ExternRef => ValType::EXTERNREF,
+        Type::FuncRef => ValType::FUNCREF,
+        Type::ExceptionRef => ValType::EXNREF,
+    };
+    let mut types = TypeSection::new();
+    types.ty().function([], []);
+    types.ty().function(
+        signature.params().iter().map(value_type),
+        signature.results().iter().map(value_type),
+    );
+    let mut imports = ImportSection::new();
+    imports.import("host", "deny", EntityType::Function(0));
+    let mut functions = FunctionSection::new();
+    functions.function(1);
+    let mut exports = ExportSection::new();
+    exports.export("deny", ExportKind::Func, 1);
+    let mut body = wasm_encoder::Function::new([]);
+    body.instruction(&Instruction::Call(0));
+    body.instruction(&Instruction::Unreachable);
+    body.instruction(&Instruction::End);
+    let mut code = CodeSection::new();
+    code.function(&body);
+    let mut wasm = wasm_encoder::Module::new();
+    wasm.section(&types)
+        .section(&imports)
+        .section(&functions)
+        .section(&exports)
+        .section(&code);
+
+    // Wasmer's dynamic host functions evaluate JavaScript under the web backend.
+    // A Wasm stub preserves any declared signature and calls a CSP-safe typed trap.
+    let module =
+        Module::new(&store.as_store_ref(), wasm.finish()).map_err(|error| error.to_string())?;
+    let env = FunctionEnv::new(&mut *store, message);
+    let trap = Function::new_typed_with_env(&mut *store, &env, deny_capability);
+    let mut imports = Imports::new();
+    imports.define("host", "deny", trap);
+    let instance = Instance::new(store, &module, &imports).map_err(|error| error.to_string())?;
+    instance
+        .exports
+        .get_function("deny")
+        .cloned()
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

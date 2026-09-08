@@ -486,6 +486,11 @@ fn process_result(
 
 fn validate_request(request: &InteractiveRequest) -> Result<(), RunError> {
     crate::run::validate_determinism(&request.determinism)?;
+    if request.determinism.clock_mode.is_some() {
+        return Err(RunError::InvalidRequest(
+            "Host clocks are unsupported for interactive execution.".to_string(),
+        ));
+    }
     for (label, program) in [
         ("contestant", &request.contestant),
         ("interactor", &request.interactor),
@@ -633,7 +638,7 @@ fn interactive_runtime(
 #[cfg(target_arch = "wasm32")]
 fn interactive_runtime_base(engine: Engine) -> PluggableRuntime {
     let tasks: Arc<dyn wasmer_wasix::runtime::task_manager::VirtualTaskManager> =
-        Arc::new(crate::run::web_runtime::WebTaskManager);
+        Arc::new(crate::run::web_runtime::WebTaskManager::default());
     let mut runtime = PluggableRuntime::new(tasks);
     runtime.set_engine(engine);
     runtime
@@ -722,6 +727,7 @@ mod tests {
                 contestant: program(contestant),
                 interactor: program(interactor),
                 determinism: DeterminismConfig {
+                    clock_mode: None,
                     random_seed: 7,
                     realtime_epoch_ms: 946_684_800_000,
                     clock_step_ns: 1_000_000,
@@ -771,6 +777,7 @@ mod tests {
                 contestant,
                 interactor: program(idle),
                 determinism: DeterminismConfig {
+                    clock_mode: None,
                     random_seed: 7,
                     realtime_epoch_ms: 946_684_800_000,
                     clock_step_ns: 1_000_000,
@@ -813,6 +820,7 @@ mod tests {
                 contestant,
                 interactor: program(idle),
                 determinism: DeterminismConfig {
+                    clock_mode: None,
                     random_seed: 7,
                     realtime_epoch_ms: 946_684_800_000,
                     clock_step_ns: 1_000_000,
@@ -861,6 +869,7 @@ mod tests {
                 contestant: program(sleeper),
                 interactor: program(idle),
                 determinism: DeterminismConfig {
+                    clock_mode: None,
                     random_seed: 7,
                     realtime_epoch_ms: 946_684_800_000,
                     clock_step_ns: 1_000_000,
@@ -898,6 +907,7 @@ mod tests {
                 contestant: program(initialized),
                 interactor: program(idle),
                 determinism: DeterminismConfig {
+                    clock_mode: None,
                     random_seed: 7,
                     realtime_epoch_ms: 946_684_800_000,
                     clock_step_ns: 1_000_000,
@@ -942,6 +952,7 @@ mod tests {
                 contestant: program(sleeper),
                 interactor: program(idle),
                 determinism: DeterminismConfig {
+                    clock_mode: None,
                     random_seed: 7,
                     realtime_epoch_ms: 946_684_800_000,
                     clock_step_ns: 1_000_000,
@@ -986,6 +997,7 @@ mod tests {
                 contestant: program(waiter),
                 interactor: program(idle),
                 determinism: DeterminismConfig {
+                    clock_mode: None,
                     random_seed: 7,
                     realtime_epoch_ms: 946_684_800_000,
                     clock_step_ns: 1_000_000,
@@ -996,6 +1008,29 @@ mod tests {
         assert_eq!(result.contestant.termination, ExecutionTermination::Exited);
         assert_eq!(result.contestant.metrics.logical_time_ns, 0);
         assert_eq!(result.interactor.metrics.logical_time_ns, 0);
+    }
+
+    #[test]
+    fn rejects_host_clocks_before_starting_interactive_processes() {
+        let idle =
+            wat::parse_str("(module (memory (export \"memory\") 1) (func (export \"_start\")))")
+                .unwrap();
+        let request = InteractiveRequest {
+            contestant: program(idle.clone()),
+            interactor: program(idle),
+            determinism: DeterminismConfig {
+                clock_mode: Some(crate::ClockMode::Host),
+                random_seed: 7,
+                realtime_epoch_ms: 946_684_800_000,
+                clock_step_ns: 1_000_000,
+            },
+        };
+        let error = futures::executor::block_on(interact(request)).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("Host clocks are unsupported for interactive execution")
+        );
     }
 
     fn program(wasm: Vec<u8>) -> InteractiveProgram {

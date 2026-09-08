@@ -18,7 +18,9 @@ export function deterministicEnvironment(
   config: DeterminismConfig,
 ): Record<string, string> {
   const determinism = resolveDeterminism(config);
-  const conflict = Object.keys(environment).find((name) => RESERVED_ENVIRONMENT.has(name));
+  const hostClock = determinism.clockMode === "host";
+  const conflict = Object.keys(environment).find((name) => RESERVED_ENVIRONMENT.has(name)
+    && (!hostClock || name.startsWith("WASM_OJ_")));
   if (conflict) throw new Error(`Environment variable '${conflict}' is reserved by the deterministic runner.`);
   return {
     ...environment,
@@ -27,9 +29,9 @@ export function deterministicEnvironment(
     WASM_OJ_CLOCK_STEP_NS: String(determinism.clockStepNs).padStart(10, "0"),
     // Hash randomization affects interpreter bootstrap cost. Disable it so the
     // user entropy seed controls public random APIs without changing overhead.
-    PYTHONHASHSEED: "0",
-    TZ: "UTC",
-    LC_ALL: "C",
+    PYTHONHASHSEED: hostClock ? environment.PYTHONHASHSEED ?? "0" : "0",
+    TZ: hostClock ? environment.TZ ?? "UTC" : "UTC",
+    LC_ALL: hostClock ? environment.LC_ALL ?? "C" : "C",
   };
 }
 
@@ -132,6 +134,7 @@ if hasattr(_os, "getrandom"):
 
 _entry = _sys.argv[1]
 _sys.argv = [_entry, *_sys.argv[2:]]
+_sys.path[0] = _os.path.dirname(_entry)
 _runpy.run_path(_entry, run_name="__main__")
 `;
 
@@ -165,8 +168,9 @@ const __wasmOjDeterminism = (() => {
     return value >>> 0;
   };
   Math.random = () => nextU32() / 4294967296;
+  const timeOrigin = ${config.clockMode === "host" ? "NativeDate.now()" : "config().epochMs"};
   Object.defineProperty(globalThis, "performance", {
-    value: Object.freeze({ now: () => NativeDate.now() - config().epochMs, get timeOrigin() { return config().epochMs; } }),
+    value: Object.freeze({ now: () => NativeDate.now() - timeOrigin, timeOrigin }),
     configurable: true,
   });
   const getRandomValues = (view) => {

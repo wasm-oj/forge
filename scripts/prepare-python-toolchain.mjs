@@ -16,25 +16,26 @@ import { promisify } from "node:util";
 import { WASM_OJ_SCHEMAS } from "../src/core/contract.ts";
 
 const run = promisify(execFile);
-const VERSION = "3.14.6";
+const VERSION = "3.14.7";
 const TARGET = "wasm32-wasip1";
-const SOURCE_DATE_EPOCH = "1781085833";
-const SOURCE_ARCHIVE_SHA256 = "143b1dddefaec3bd2e21e3b839b34a2b7fb9842272883c576420d605e9f30c63";
-const SPDX_SHA256 = "1f5d394856783fa77e1f1db280f84eabf693bffc1fb06a747f7116de9f99f3bd";
+const WASI_LINK_FLAGS = "-z stack-size=4194304 -Wl,--stack-first -Wl,--initial-memory=16777216";
+const SOURCE_DATE_EPOCH = "1785925789";
+const SOURCE_ARCHIVE_SHA256 = "3b48dac8fb59f62eaa67ac83c1eb12bda1b7a08406dd286e252c11a66be27f81";
+const SPDX_SHA256 = "87f55ca6c59fe159fa8c47ba2d7d8bec39cc649b1d3f47c667f34025a2ca9a68";
 const WASI_SDK_ARCHIVE_SHA256 = "aeae999396d5f5caa5ce419f52e83c35869d5fd21d40af80acba2c80f51b0b3a";
-const EXPECTED_PYTHON_WASM_SHA256 = "f104b9da093f806451d7bba3f7eca41033842a5ec88ac256689e6e3cc1f1e2e1";
+const EXPECTED_PYTHON_WASM_SHA256 = "69e9d87da6c8a628694ffd76c3d0f26e7aaa0bc91d952a28d9fc37c7144e354c";
 const EXPECTED_RUNTIME_FILES = Object.freeze({
-  archiveSha256: "44d894f91487f20c2bb04fe496a9343db37d8720fb706472c2b4a7f3300db039",
-  archiveBytes: 10_652_540,
-  cacheKey: "wasm-oj-v2:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip",
+  archiveSha256: "c1acac884af1c86833db5b65f8cc0a2304fce74dea0a05d9b40bde0a4e3e7c0e",
+  archiveBytes: 10_695_683,
+  cacheKey: "wasm-oj-v2:runtime-files:cpython-3.14.7-wasip1-stdlib-stored-zip",
   format: "WOJFS002",
   guestPath: "/cpython/lib/python314.zip",
-  zipBytes: 10_652_482,
+  zipBytes: 10_695_625,
 });
 const EXPECTED_OUTPUT_SHA256 = Object.freeze({
-  [`python-${VERSION}-wasip1.webc`]: "454ffc53936aa13a0d7f4afbb5bd50ada339c8ebd04bbf27ea19e4104cf43207",
-  [`python-${VERSION}-wasip1.webc.gz.bin`]: "218cd20ac4abb443e0700816010a615a345a43eae623a0232da2227135a6c7a6",
-  [`python-${VERSION}-wasip1.manifest.json`]: "054eccad04a7cee7ba1661062142ef0d639976850981eab8fc785f48eb26129e",
+  [`python-${VERSION}-wasip1.webc`]: "a42c98f5f00582638c8e445440c506bbf94d5e55b3415d1f8d82d11c56cd4b56",
+  [`python-${VERSION}-wasip1.webc.gz.bin`]: "10027f0e32c77dfa0ce1c413b6cb27307d6744fe5e18e6da8cea738bd020260c",
+  [`python-${VERSION}-wasip1.manifest.json`]: "53a24b258363a8494af164121111a34b49c85fa0e054627fe131feba6f359cd5",
 });
 const PUBLISHED_OUTPUTS = [
   `python-${VERSION}-wasip1.webc.gz.bin`,
@@ -48,8 +49,8 @@ if (process.argv.length !== 5) {
   throw new Error([
     "The official CPython source archive, its SPDX document, and WASI SDK archive are required.",
     "Usage: pnpm run toolchain:python:prepare \\",
-    "  /absolute/path/to/Python-3.14.6.tar.xz \\",
-    "  /absolute/path/to/Python-3.14.6.tar.xz.spdx.json \\",
+    "  /absolute/path/to/Python-3.14.7.tar.xz \\",
+    "  /absolute/path/to/Python-3.14.7.tar.xz.spdx.json \\",
     "  /absolute/path/to/wasi-sdk-24.0-arm64-macos.tar.gz",
   ].join("\n"));
 }
@@ -125,7 +126,7 @@ try {
   await runStep("build CPython for wasm32-wasip1", buildPython, [
     wasiBuildTool,
     "make-host",
-  ], hostEnvironment, sourceRoot);
+  ], { ...hostEnvironment, LDFLAGS_NODIST: WASI_LINK_FLAGS }, sourceRoot);
 
   const hostBuildRoot = path.join(sourceRoot, "cross-build", TARGET);
   await copyFile(path.join(hostBuildRoot, "python.wasm"), strippedPython);
@@ -228,6 +229,7 @@ function deterministicEnvironment(tmpdir, wasmerPath) {
     "CPPFLAGS",
     "HOSTRUNNER",
     "LDFLAGS",
+    "LDFLAGS_NODIST",
     "MAKEFLAGS",
     "ARFLAGS",
     "PYTHONHOME",
@@ -273,6 +275,7 @@ async function validateManifest(filename) {
     || manifest.filesystemMount !== "/usr/local"
     || manifest.output?.sha256 !== EXPECTED_OUTPUT_SHA256[`python-${VERSION}-wasip1.webc`]
     || manifest.output?.compressedSha256 !== EXPECTED_OUTPUT_SHA256[`python-${VERSION}-wasip1.webc.gz.bin`]
+    || manifest.build?.makeEnvironment?.LDFLAGS_NODIST !== WASI_LINK_FLAGS
     || JSON.stringify(manifest.build?.disabledModules) !== '["_socket"]'
   ) {
     throw new Error("Generated Python manifest does not identify the canonical source, build, target, and package.");

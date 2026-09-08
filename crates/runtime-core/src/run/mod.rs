@@ -22,7 +22,16 @@ pub fn run(request: RunRequest) -> Result<RunResult, RunError> {
     #[cfg(not(target_arch = "wasm32"))]
     return native::run(request);
     #[cfg(target_arch = "wasm32")]
-    return web::run(request);
+    return web::run(request, |_| Ok(()));
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn run_observed(
+    request: RunRequest,
+    on_execution: impl FnMut(bool) -> Result<(), RunError>,
+) -> Result<RunResult, RunError> {
+    validate(&request)?;
+    web::run(request, on_execution)
 }
 
 fn validate(request: &RunRequest) -> Result<(), RunError> {

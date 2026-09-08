@@ -7,7 +7,6 @@ import { sha256Hex } from "../core/hash";
 import {
   GO_PACKAGE_ASSET_PATH,
   JAVA_COMPILER_ASSET_PATH,
-  PYTHON_PACKAGE_ASSET_PATH,
   RUST_PACKAGE_ASSET_PATH,
 } from "../core/toolchains";
 import {
@@ -49,9 +48,6 @@ import type {
   RustcStageRequest,
 } from "@/src/compiler/rust-toolchain";
 import { RUST_COMPILE_TIMEOUT_MS } from "@/src/compiler/rust-toolchain";
-import type { PythonFrontendRequest, PythonFrontendResult, PythonStageRequest } from "@/src/compiler/python-toolchain";
-import { PYTHON_COMPILE_TIMEOUT_MS } from "@/src/compiler/python-toolchain";
-import PythonStageWorkerUrl from "./python-stage.worker?worker&url";
 import RustcStageWorkerUrl from "./rustc-stage.worker?worker&url";
 import GoStageWorkerUrl from "./go-stage.worker?worker&url";
 import type { GoCompileRequest, GoCompileResult, GoStageRequest } from "@/src/compiler/go-toolchain";
@@ -59,7 +55,7 @@ import { GO_COMPILE_TIMEOUT_MS } from "@/src/compiler/go-toolchain";
 import JavaStageWorkerUrl from "./java-stage.worker?worker&url";
 import type { JavaCompileRequest, JavaCompileResult, JavaStageRequest } from "@/src/compiler/java-toolchain";
 import { JAVA_COMPILE_TIMEOUT_MS } from "@/src/compiler/java-toolchain";
-import { PersistentIsolatedStage, runIsolatedStage } from "./isolated-stage";
+import { PersistentIsolatedStage } from "./isolated-stage";
 import {
   createModuleWorker,
   createModuleWorkerBootstrap,
@@ -170,20 +166,6 @@ function compileRust(request: RustCompileRequest): Promise<RustCompileResult> {
   });
 }
 
-function compilePython(request: PythonFrontendRequest): Promise<PythonFrontendResult> {
-  const worker = createModuleWorker(PythonStageWorkerUrl, { name: "wasm-oj-python-stage" });
-  return runIsolatedStage<PythonStageRequest, PythonFrontendResult>(
-    worker,
-    {
-      type: "compile",
-      request,
-      assetBaseUrl: assetBaseUrl(PYTHON_PACKAGE_ASSET_PATH),
-    },
-    PYTHON_COMPILE_TIMEOUT_MS + 5_000,
-    "Python",
-  );
-}
-
 function compileGo(request: GoCompileRequest): Promise<GoCompileResult> {
   goStage ??= new PersistentIsolatedStage({
     createWorker: () => createModuleWorker(GoStageWorkerUrl, { name: "wasm-oj-go-stage" }),
@@ -219,7 +201,6 @@ function configureCompilerHost(): void {
     loadToolchainAsset,
     loadToolchainFile,
     compileRust,
-    compilePython,
     compileGo,
     compileJava,
     progress,

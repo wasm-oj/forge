@@ -28,10 +28,10 @@ export const CLI_TOOLCHAIN_DESCRIPTORS: readonly ToolchainDescriptor[] = Object.
   descriptor({
     id: "clang", version: "22.0.0-git20542-10", languages: ["c", "cpp"], targets: ["wasip1", "wasix"],
     assets: [
-      { path: "/toolchains/clang-22.0.0-git20542-10.cc1-pins.json", bytes: 7457, sha256: "66c4604dccd3f89d8e1472bf4432367d7396cce4a01279b1a1db445f229dba72", exportPath: "./assets/clang-22.0.0-git20542-10.cc1-pins.json" },
-      { path: "/toolchains/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin", bytes: 13871086, sha256: "a4152027d248412eca8aec3e7e23f6f7c81f95170cae9fd385bcf02e57e91fc9", exportPath: "./assets/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin" },
-      { path: "/toolchains/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin", bytes: 13870913, sha256: "18f4ca8ab8ca7888db572ba34146fc1acb213a7e7305000ea6285188f52f99f4", exportPath: "./assets/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin" },
-      { path: "/toolchains/clang-22.0.0-git20542-10.libcxx-pch.json", bytes: 1987, sha256: "d126c99e951a7302d4ea2b66da4ed64d3d74e9d319d562518867c8d8c97a06b8", exportPath: "./assets/clang-22.0.0-git20542-10.libcxx-pch.json" },
+      { path: "/toolchains/clang-22.0.0-git20542-10.cc1-pins.json", bytes: 7845, sha256: "895eee17c63b1112c84adcc4ddbcb38e0c18e53bff15f50a8689b9b82d87b1ff", exportPath: "./assets/clang-22.0.0-git20542-10.cc1-pins.json" },
+      { path: "/toolchains/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin", bytes: 14579070, sha256: "a3811351bae3289caf096f2d4bb6d2ee5db84b97e05514e87190d36b65c500cf", exportPath: "./assets/clang-22.0.0-git20542-10.cpp-debug.pch.gz.bin" },
+      { path: "/toolchains/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin", bytes: 14579316, sha256: "ef004fc05ec50af697a37f7c9c814bf62e9676d0de162d6ac35305533939f93f", exportPath: "./assets/clang-22.0.0-git20542-10.cpp-release.pch.gz.bin" },
+      { path: "/toolchains/clang-22.0.0-git20542-10.libcxx-pch.json", bytes: 1987, sha256: "9bbe41d77c786f1c36169369c909268530b05726e1581683f6edd9a2983eebd0", exportPath: "./assets/clang-22.0.0-git20542-10.libcxx-pch.json" },
       { path: "/toolchains/clang-22.0.0-git20542-10.manifest.json", bytes: 744, sha256: "6382dcdfb6a2da49032a0e08da3b1fb490eb24432be85c3c12e3e871a5065273", exportPath: "./assets/clang-22.0.0-git20542-10.manifest.json" },
       { path: "/toolchains/clang-22.0.0-git20542-10.webc.gz.bin", bytes: 27000264, sha256: "7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a", exportPath: "./assets/clang-22.0.0-git20542-10.webc.gz.bin" },
     ],
@@ -45,25 +45,25 @@ export const CLI_TOOLCHAIN_DESCRIPTORS: readonly ToolchainDescriptor[] = Object.
     ],
   }),
   descriptor({
-    id: "java-teavm", version: "teavm-0.13.1-wasi", languages: ["java"], targets: ["wasip1"],
+    id: "java-teavm", version: "teavm-0.13.1-wasmgc-wasip1", languages: ["java"], targets: ["wasip1"],
     assets: [
-      { path: "/toolchains/java-teavm-0.13.1.compile-classlib.bin", bytes: 1198350, sha256: "acfe3fb09e5f2c0c7c8dc2339c66fcdadc1f8e1bf1c74be446926175ef770868", exportPath: "./assets/java-teavm-0.13.1.compile-classlib.bin" },
-      { path: "/toolchains/java-teavm-0.13.1.runtime-classlib.bin", bytes: 8798302, sha256: "21a9394586e416af2fca4eb0ed08521cbc8924e1d1afaa07863a59a3cfae54ab", exportPath: "./assets/java-teavm-0.13.1.runtime-classlib.bin" },
-      { path: "/toolchains/java-teavm-0.13.1.wasi.compiler.webc.gz.bin", bytes: 6059335, sha256: "129f1f51d591e58954f88787d36396b856a9a68ba3ae9c9d14f20bd67c2c7722", exportPath: "./assets/java-teavm-0.13.1.wasi.compiler.webc.gz.bin" },
+      { path: "/toolchains/java-teavm-0.13.1.compile-classlib.bin", bytes: 1261778, sha256: "738a82b7d7e7ff8d98b07bb076785da7035847a166afb8446fd150c4efce6103", exportPath: "./assets/java-teavm-0.13.1.compile-classlib.bin" },
+      { path: "/toolchains/java-teavm-0.13.1.runtime-classlib.bin", bytes: 23709664, sha256: "0ed234b66cdde19cb29e6c2865a3636d792d3cf72f102e73a7b3fdede80b79e6", exportPath: "./assets/java-teavm-0.13.1.runtime-classlib.bin" },
+      { path: "/toolchains/java-teavm-0.13.1.compiler.wasm", bytes: 7854442, sha256: "8c37bce1c6fceeaffeffe93e10834309b67c8b6fb58c6f8a24547afe8be67f5d", exportPath: "./assets/java-teavm-0.13.1.compiler.wasm" },
     ],
   }),
   descriptor({
     id: "javascript", version: "typescript-7.0.2+quickjs-0.15.1", languages: ["javascript", "typescript"], targets: ["wasip1"],
     assets: [
-      { path: "/toolchains/quickjs-0.15.1.wasm.gz.bin", bytes: 384057, sha256: "8c7f0588210490e7d77f198fc91f72c1b94787ab4c359c4786ca59a363c4f5e8", exportPath: "./assets/quickjs-0.15.1.wasm.gz.bin" },
-      { path: "/toolchains/typescript-7.0.2.wasm.gz.bin", bytes: 7113466, sha256: "06e58ce887d95d1895055699b8dc96a1cde7d1f2baa48de40f9b790e3271dc16", exportPath: "./assets/typescript-7.0.2.wasm.gz.bin" },
+      { path: "/toolchains/quickjs-0.15.1.wasm.gz.bin", bytes: 385018, sha256: "dc6e02e8610269e61b341331661515616451cec929fd534fa96d1c4f47fbcc9a", exportPath: "./assets/quickjs-0.15.1.wasm.gz.bin" },
+      { path: "/toolchains/typescript-7.0.2.wasm.gz.bin", bytes: 7112878, sha256: "29c6ee0e46151e2644049ae96162b1b1d46dcb13310e2a928114bb9030c3ea92", exportPath: "./assets/typescript-7.0.2.wasm.gz.bin" },
     ],
   }),
   descriptor({
-    id: "python", version: "3.14.6", languages: ["python"], targets: ["wasip1"],
+    id: "python", version: "3.14.7", languages: ["python"], targets: ["wasip1"],
     assets: [
-      { path: "/toolchains/python-3.14.6-wasip1.manifest.json", bytes: 8257, sha256: "054eccad04a7cee7ba1661062142ef0d639976850981eab8fc785f48eb26129e", exportPath: "./assets/python-3.14.6-wasip1.manifest.json" },
-      { path: "/toolchains/python-3.14.6-wasip1.webc.gz.bin", bytes: 5188678, sha256: "218cd20ac4abb443e0700816010a615a345a43eae623a0232da2227135a6c7a6", exportPath: "./assets/python-3.14.6-wasip1.webc.gz.bin" },
+      { path: "/toolchains/python-3.14.7-wasip1.manifest.json", bytes: 8385, sha256: "53a24b258363a8494af164121111a34b49c85fa0e054627fe131feba6f359cd5", exportPath: "./assets/python-3.14.7-wasip1.manifest.json" },
+      { path: "/toolchains/python-3.14.7-wasip1.webc.gz.bin", bytes: 5205508, sha256: "10027f0e32c77dfa0ce1c413b6cb27307d6744fe5e18e6da8cea738bd020260c", exportPath: "./assets/python-3.14.7-wasip1.webc.gz.bin" },
     ],
   }),
   descriptor({

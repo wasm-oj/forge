@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 export const repositoryRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 export const packagesRoot = path.join(repositoryRoot, "packages");
-export const CODE_VERSION = "0.2.1";
+export const CODE_VERSION = "0.3.0";
 export const TOOLCHAIN_DESCRIPTOR_SCHEMA = "wasm-oj-v2/toolchain-package";
 export const WASM_OJ_CONTRACT_VERSION = 2;
 
@@ -21,12 +21,13 @@ export const CODE_PACKAGES = Object.freeze([
     runtimeDependencies: [],
   }),
   code("core", "src/sdk/core.ts", {
-    licenses: ["fflate-MIT.txt"],
+    licenses: ["fflate-MIT.txt", "quickjs-node-stdlib-LICENSES.txt"],
     runtimeDependencies: ["@wasm-oj/contracts", "fflate"],
   }),
   code("browser", "src/sdk/browser.ts", {
     browser: true,
     licenses: [
+      "quickjs-node-stdlib-LICENSES.txt",
       "es-module-lexer-MIT.txt",
       "fflate-MIT.txt",
       "wasmer-sdk-MIT.txt",
@@ -46,6 +47,7 @@ export const CODE_PACKAGES = Object.freeze([
   code("server", "src/server/index.ts", {
     server: true,
     licenses: [
+      "quickjs-node-stdlib-LICENSES.txt",
       "fflate-MIT.txt",
       "wasmer-sdk-MIT.txt",
       "wasmer-sdk-dependencies.html",
@@ -168,15 +170,15 @@ export const TOOLCHAIN_PACKAGES = Object.freeze([
   }),
   toolchain("toolchain-python", {
     id: "python",
-    toolchainVersion: "3.14.6",
+    toolchainVersion: "3.14.7",
     languages: ["python"],
     targets: ["wasip1"],
     assets: [
-      "python-3.14.6-wasip1.manifest.json",
-      "python-3.14.6-wasip1.webc.gz.bin",
+      "python-3.14.7-wasip1.manifest.json",
+      "python-3.14.7-wasip1.webc.gz.bin",
     ],
     licenses: [
-      "cpython-3.14.6-PSF-2.0.txt",
+      "cpython-3.14.7-PSF-2.0.txt",
       "cpython-expat-2.8.1-MIT.txt",
       "cpython-hacl-star-8ba599b-MIT.txt",
       "cpython-libmpdec-2.5.1-BSD-2-Clause.txt",
@@ -218,17 +220,18 @@ export const TOOLCHAIN_PACKAGES = Object.freeze([
   }),
   toolchain("toolchain-java", {
     id: "java-teavm",
-    toolchainVersion: "teavm-0.13.1-wasi",
+    toolchainVersion: "teavm-0.13.1-wasmgc-wasip1",
     languages: ["java"],
     targets: ["wasip1"],
     assets: [
       "java-teavm-0.13.1.compile-classlib.bin",
       "java-teavm-0.13.1.runtime-classlib.bin",
-      "java-teavm-0.13.1.wasi.compiler.webc.gz.bin",
+      "java-teavm-0.13.1.compiler.wasm",
     ],
     licenses: [
       "Apache-2.0.txt",
       "openjdk-21-GPL-2.0-with-Classpath-exception.txt",
+      "android-libcore-GPL-2.0-with-Classpath-exception.txt",
     ],
   }),
 ]);

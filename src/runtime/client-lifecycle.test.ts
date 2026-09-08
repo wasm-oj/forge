@@ -511,6 +511,7 @@ describe("browser client lifecycle", () => {
       await expect(pending).resolves.toMatchObject({
         termination: "wall-time-limit",
         resources: { wallTimeLimitMs: 25 },
+        executionDurationMs: 25,
       });
       expect(worker.terminated).toBe(true);
       runner.dispose();
@@ -518,6 +519,72 @@ describe("browser client lifecycle", () => {
       vi.useRealTimers();
     }
   });
+  it("excludes result collection from a completed guest's wall budget", async () => {
+    vi.useFakeTimers();
+    const runner = new BrowserRunner({ toolchains: TEST_TOOLCHAINS, additionalCostBaselines: { [TEST_COST_PROFILE]: 0 } });
+    try {
+      const worker = workerState.runners[0]!;
+      respondToInitialization(worker);
+      await runner.ready();
+      const config = runConfig();
+      config.resources = { ...config.resources, wallTimeLimitMs: 25 };
+      const pending = runner.run(wasmArtifact(), config);
+      await Promise.resolve();
+      const { requestId } = requestOfType(worker, "run");
+      respond(worker, { type: "progress", requestId, progress: { phase: "running", label: "guest" } });
+      await vi.advanceTimersByTimeAsync(10);
+      respond(worker, { type: "progress", requestId, progress: { phase: "packaging", label: "collect results" } });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(worker.terminated).toBe(false);
+      const result = { ...successfulRun(), executionDurationMs: 10, durationMs: 110 };
+      respond(worker, { type: "run-result", requestId, result });
+      await expect(pending).resolves.toEqual(result);
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(workerState.runners).toHaveLength(1);
+    } finally {
+      runner.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it("bounds stalled result collection as a system failure and replaces its worker", async () => {
+    vi.useFakeTimers();
+    const runner = new BrowserRunner({ toolchains: TEST_TOOLCHAINS, additionalCostBaselines: { [TEST_COST_PROFILE]: 0 } });
+    try {
+      const worker = workerState.runners[0]!;
+      respondToInitialization(worker);
+      await runner.ready();
+      const config = runConfig();
+      config.resources = { ...config.resources, wallTimeLimitMs: 25 };
+      const pending = runner.run(wasmArtifact(), config);
+      const assertion = expect(pending).rejects.toThrow("result collection exceeded the 120000 ms browser boundary");
+      await Promise.resolve();
+      const { requestId } = requestOfType(worker, "run");
+      respond(worker, { type: "progress", requestId, progress: { phase: "running", label: "guest" } });
+      await vi.advanceTimersByTimeAsync(10);
+      respond(worker, { type: "progress", requestId, progress: { phase: "packaging", label: "collect results" } });
+      await vi.advanceTimersByTimeAsync(60_000);
+      // Duplicate progress must not restart either deadline after execution ends.
+      respond(worker, { type: "progress", requestId, progress: { phase: "running", label: "duplicate" } });
+      respond(worker, { type: "progress", requestId, progress: { phase: "packaging", label: "duplicate" } });
+      await vi.advanceTimersByTimeAsync(60_000);
+      await assertion;
+      expect(worker.terminated).toBe(true);
+      expect(workerState.runners).toHaveLength(2);
+      const replacement = workerState.runners[1]!;
+      respondToInitialization(replacement);
+      await runner.ready();
+      const retry = runner.run(wasmArtifact(), config);
+      await Promise.resolve();
+      const result = successfulRun();
+      respond(replacement, { type: "run-result", requestId: requestOfType(replacement, "run").requestId, result });
+      await expect(retry).resolves.toEqual(result);
+    } finally {
+      runner.dispose();
+      vi.useRealTimers();
+    }
+  });
+
 });
 
 function respondToInitialization(worker: FakeWorker): void {

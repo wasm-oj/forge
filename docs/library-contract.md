@@ -121,7 +121,7 @@ creating Workers, so caller mutation cannot change an admitted distribution.
 
 Compiler and runner module Workers receive only structured-cloned requests. Browser C/C++ keeps
 bounded immutable compiler and content-addressed build-graph state; Rust and Go use serialized
-nested stages with bounded lifetime; Python compilation is disposable. Changing retained families,
+nested stages with bounded lifetime. Python and JavaScript package source files directly. Changing retained families,
 crossing a stage budget, cancellation, timeout, restart, cache clearing, disposal, or infrastructure
 failure establishes a complete Worker-generation boundary.
 
@@ -214,6 +214,17 @@ exactly and all payloads verify. HTTP, metadata, integrity, size, and stream fai
 an implicit cache fallback.
 
 ## Determinism and resource policy
+
+Execution may explicitly opt into `determinism: { clockMode: "host" }` to retain the host
+WASI clock, sleep, poll, and timestamp syscalls. Omission preserves deterministic virtual
+time and the existing transcript. Host mode does not consume the virtual-time budget;
+`metrics.logicalTimeNs` stays zero. Use `executionDurationMs` for elapsed guest execution
+and `wallTimeLimitMs` for the guest execution deadline. Browser preparation and post-execution
+result collection have separate bounded control deadlines; a stalled result collection is
+a runtime error, not a guest wall-time verdict. Host elapsed time is not native process CPU time.
+Randomness remains seeded in either mode. Host mode accepts caller `TZ`, `LC_ALL`, and
+`PYTHONHASHSEED` values; internal `WASM_OJ_*` inputs remain reserved. Interactive execution
+rejects host-clock mode because both processes share cooperative scheduling.
 
 The runner controls guest-visible randomness and time from explicit `randomSeed`,
 `realtimeEpochMs`, and `clockStepNs`. It validates imported capabilities before instantiation and

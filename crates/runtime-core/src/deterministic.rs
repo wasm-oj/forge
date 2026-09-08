@@ -25,6 +25,7 @@ const FSTFLAGS_MTIM_NOW: u32 = 1 << 3;
 /// Project execution determinism is intentionally excluded from build cache
 /// identities, so no project-controlled seed or clock may reach a compiler.
 pub(crate) const COMPILER_DETERMINISM: DeterminismConfig = DeterminismConfig {
+    clock_mode: None,
     random_seed: 0x5eed_1234,
     realtime_epoch_ms: 946_684_800_000,
     clock_step_ns: 1_000_000,
@@ -923,23 +924,28 @@ pub fn attach_deterministic_imports(
     );
 
     for namespace in ["wasi_snapshot_preview1", "wasix_32v1"] {
-        imports.define(
-            namespace,
-            "clock_time_get",
-            Function::new_typed_with_env(store, &env, clock_time_get_32),
-        );
-        imports.define(
-            namespace,
-            "clock_res_get",
-            Function::new_typed_with_env(store, &env, clock_res_get_32),
-        );
+        if config.clock_mode.is_none() {
+            imports.define(
+                namespace,
+                "clock_time_get",
+                Function::new_typed_with_env(store, &env, clock_time_get_32),
+            );
+            imports.define(
+                namespace,
+                "clock_res_get",
+                Function::new_typed_with_env(store, &env, clock_res_get_32),
+            );
+        }
         imports.define(
             namespace,
             "random_get",
             Function::new_typed_with_env(store, &env, random_get_32),
         );
-        attach_deterministic_poll_32(store, imports, namespace, &poll_memory, &clock);
-        attach_deterministic_set_times_32(store, imports, namespace, &clock);
+
+        if config.clock_mode.is_none() {
+            attach_deterministic_poll_32(store, imports, namespace, &poll_memory, &clock);
+            attach_deterministic_set_times_32(store, imports, namespace, &clock);
+        }
     }
     imports.define(
         "wasix_32v1",
@@ -951,28 +957,33 @@ pub fn attach_deterministic_imports(
         "thread_parallelism",
         Function::new_typed_with_env(store, &env, thread_parallelism_32),
     );
-    imports.define(
-        "wasix_32v1",
-        "thread_sleep",
-        Function::new_typed_with_env(store, &env, thread_sleep),
-    );
-    imports.define(
-        "wasix_64v1",
-        "clock_time_get",
-        Function::new_typed_with_env(store, &env, clock_time_get_64),
-    );
-    imports.define(
-        "wasix_64v1",
-        "clock_res_get",
-        Function::new_typed_with_env(store, &env, clock_res_get_64),
-    );
+    if config.clock_mode.is_none() {
+        imports.define(
+            "wasix_32v1",
+            "thread_sleep",
+            Function::new_typed_with_env(store, &env, thread_sleep),
+        );
+        imports.define(
+            "wasix_64v1",
+            "clock_time_get",
+            Function::new_typed_with_env(store, &env, clock_time_get_64),
+        );
+        imports.define(
+            "wasix_64v1",
+            "clock_res_get",
+            Function::new_typed_with_env(store, &env, clock_res_get_64),
+        );
+    }
     imports.define(
         "wasix_64v1",
         "random_get",
         Function::new_typed_with_env(store, &env, random_get_64),
     );
-    attach_deterministic_poll_64(store, imports, "wasix_64v1", &poll_memory, &clock);
-    attach_deterministic_set_times_64(store, imports, "wasix_64v1", &clock);
+
+    if config.clock_mode.is_none() {
+        attach_deterministic_poll_64(store, imports, "wasix_64v1", &poll_memory, &clock);
+        attach_deterministic_set_times_64(store, imports, "wasix_64v1", &clock);
+    }
     imports.define(
         "wasix_64v1",
         "thread_id",
@@ -983,11 +994,13 @@ pub fn attach_deterministic_imports(
         "thread_parallelism",
         Function::new_typed_with_env(store, &env, thread_parallelism_64),
     );
-    imports.define(
-        "wasix_64v1",
-        "thread_sleep",
-        Function::new_typed_with_env(store, &env, thread_sleep),
-    );
+    if config.clock_mode.is_none() {
+        imports.define(
+            "wasix_64v1",
+            "thread_sleep",
+            Function::new_typed_with_env(store, &env, thread_sleep),
+        );
+    }
 }
 
 pub(crate) fn attach_interactive_deterministic_imports(

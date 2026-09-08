@@ -13,10 +13,10 @@ const RESOURCES_SHA256 = "79eef0c336fe55cf03ff8f5b42b784c8168f929a3603138b2c6301
 const OUTPUT_SHA256 = Object.freeze({
   [`clang-${VERSION}.webc.gz.bin`]: "7f10d90b8e52b270f04874641a1d0bf9e94e85b4f6c7573a774cebbc6d32552a",
   [`clang-${VERSION}.manifest.json`]: "6382dcdfb6a2da49032a0e08da3b1fb490eb24432be85c3c12e3e871a5065273",
-  [`clang-${VERSION}.cc1-pins.json`]: "66c4604dccd3f89d8e1472bf4432367d7396cce4a01279b1a1db445f229dba72",
-  [`clang-${VERSION}.libcxx-pch.json`]: "d126c99e951a7302d4ea2b66da4ed64d3d74e9d319d562518867c8d8c97a06b8",
-  [`clang-${VERSION}.cpp-debug.pch.gz.bin`]: "a4152027d248412eca8aec3e7e23f6f7c81f95170cae9fd385bcf02e57e91fc9",
-  [`clang-${VERSION}.cpp-release.pch.gz.bin`]: "18f4ca8ab8ca7888db572ba34146fc1acb213a7e7305000ea6285188f52f99f4",
+  [`clang-${VERSION}.cc1-pins.json`]: "895eee17c63b1112c84adcc4ddbcb38e0c18e53bff15f50a8689b9b82d87b1ff",
+  [`clang-${VERSION}.libcxx-pch.json`]: "9bbe41d77c786f1c36169369c909268530b05726e1581683f6edd9a2983eebd0",
+  [`clang-${VERSION}.cpp-debug.pch.gz.bin`]: "a3811351bae3289caf096f2d4bb6d2ee5db84b97e05514e87190d36b65c500cf",
+  [`clang-${VERSION}.cpp-release.pch.gz.bin`]: "ef004fc05ec50af697a37f7c9c814bf62e9676d0de162d6ac35305533939f93f",
 });
 const OUTPUT_DIRECTORY = path.resolve("public/toolchains");
 const temporary = await mkdtemp(path.join(os.tmpdir(), "wasm-oj-clang-"));

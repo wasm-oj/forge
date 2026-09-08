@@ -20,6 +20,7 @@ let result = run(RunRequest {
     cwd: None,
     startup_entropy_bytes: 0,
     determinism: DeterminismConfig {
+        clock_mode: None,
         random_seed: 0x5eed_1234,
         realtime_epoch_ms: 946_684_800_000,
         clock_step_ns: 1_000_000,

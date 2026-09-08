@@ -51,7 +51,7 @@ flowchart LR
 
 Browser requests cross dedicated module-Worker boundaries. C/C++ retains bounded immutable Clang
 and content-addressed graph state; Rust and Go use serialized nested stages with bounded generation
-lifetime; Python stages are disposable. Server builds use a fresh isolated child. Cancellation,
+lifetime. Python and JavaScript package source files directly. Server builds use a fresh isolated child. Cancellation,
 restart, timeout, cache clearing, disposal, family switch, and stage-budget exhaustion establish a
 complete browser Worker-generation boundary.
 
@@ -106,16 +106,30 @@ in user compilation.
 
 ### Python
 
-The Python package contains source-built CPython 3.14.6 and its pruned standard library. Build
-stages checked-hash compile project files and produce a runtime bundle. Execution restores the
+The Python package contains source-built CPython 3.14.7 and its pruned standard library. Build
+packaging preserves project source files in a runtime bundle. CPython parses the entry and imported
+modules during execution, so syntax failures are runtime errors and unused modules are not parsed.
+Execution restores the
 verified `WOJFS002` filesystem archive and launches the pinned CPython/WASI entry.
+The source build reserves a 4 MiB C stack and 16 MiB initial linear memory, retaining
+`--stack-first` protection. This covers CPython's 4,000,000-byte fallback C stack guard and lets
+small programs run within a 16 MiB limit; the upstream 16 MiB stack and 40 MiB initial memory
+prevented instantiation at that limit. The browser regression corpus covers recursive calls,
+the upstream 400-term dynamic-expression regression, standard-library imports, and allocation
+failure. Linear-memory limits still differ from native process RSS: a denied allocation may
+raise a guest `MemoryError` instead of producing a native cgroup OOM verdict.
 
 ### JavaScript and TypeScript
 
 The native TypeScript 7.0.2 compiler is built as a WASI module and receives files through a bounded
-JSON protocol. JavaScript uses the same parser/checker/emit path with `allowJs` and `checkJs`.
-Artifacts are CommonJS runtime bundles executed by QuickJS-ng 0.15.1 through the pinned WASI
-adapter.
+JSON protocol. JavaScript packages its original ECMAScript modules for execution, preserving
+top-level await and reporting syntax errors at runtime as the native Node judge does. TypeScript uses
+strict ES2023/Node16 compilation, matching the native judge; ordinary `.ts` entries emit CommonJS.
+Both execute with QuickJS-ng 0.15.1 through the pinned WASI
+adapter. The guest standard I/O prelude bundles `readable-stream`, `buffer`, and `events`,
+with fd 0/1/2 adapters and nonterminal line parsing. The compiler declares only the supported
+Node module surface. Host output writes preserve explicit byte lengths, and the upstream
+QuickJS promise rejection tracker makes unhandled asynchronous failures exit unsuccessfully.
 
 ## Build identity and caching
 

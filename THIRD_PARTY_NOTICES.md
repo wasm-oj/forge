@@ -65,13 +65,39 @@ package. The generated dependency report covers every package in the pinned
 normal Cargo dependency graph selected for `wasm32-unknown-unknown`; its compact
 inventory binds all 332 package identities and the exact HTML report digest.
 
+### QuickJS guest Node standard I/O libraries
+
+The generated guest prelude in `src/runtime/quickjs/stdlib.generated.ts` bundles
+the following exact npm releases. `scripts/build-quickjs-stdlib.mjs` builds this
+prelude from the locked packages and the WASM-OJ standard I/O adapters.
+
+| Component | Source release | License |
+| --- | --- | --- |
+| buffer 6.0.3 | <https://github.com/feross/buffer/tree/v6.0.3> | MIT |
+| readable-stream 4.7.0 | <https://github.com/nodejs/readable-stream/tree/v4.7.0> | MIT |
+| events 3.3.0 | <https://github.com/Gozala/events/tree/v3.3.0> | MIT |
+| abort-controller 3.0.0 | <https://github.com/mysticatea/abort-controller/tree/v3.0.0> | MIT |
+| event-target-shim 5.0.1 | <https://github.com/mysticatea/event-target-shim/tree/v5.0.1> | MIT |
+| base64-js 1.5.1 | <https://github.com/beatgammit/base64-js/tree/v1.5.1> | MIT |
+| ieee754 1.2.1 | <https://github.com/feross/ieee754/tree/v1.2.1> | BSD-3-Clause |
+| string_decoder 1.3.0 | <https://github.com/nodejs/string_decoder/tree/v1.3.0> | MIT |
+| safe-buffer 5.2.1 | <https://github.com/feross/safe-buffer/tree/v5.2.1> | MIT |
+
+The complete upstream license texts, including the Node-derived stream and
+decoder notices, are reproduced in `licenses/quickjs-node-stdlib-LICENSES.txt`
+(SHA-256 `38e42dcb48e476e4e836552c814c911eb5464d80b56b970d87aa07b88c7b28f8`).
+`licenses/components.json` binds each release to the generated bundle digest;
+`pnpm-lock.yaml` pins all package integrity values. The Buffer declarations are
+also copied from the same buffer 6.0.3 release. These guest libraries implement
+the supported byte buffers and standard streams; they do not include Node.js.
+
 ## Distributed toolchain assets
 
 ### TypeScript-Go
 
 - Distributed asset: `typescript-7.0.2.wasm.gz.bin`
-- Compressed SHA-256: `06e58ce887d95d1895055699b8dc96a1cde7d1f2baa48de40f9b790e3271dc16`
-- Expanded Wasm SHA-256: `27c931087b3b0cc48804f3749b07eb710538c4ab175969db8a8ff680e6ec4fde`
+- Compressed SHA-256: `29c6ee0e46151e2644049ae96162b1b1d46dcb13310e2a928114bb9030c3ea92`
+- Expanded Wasm SHA-256: `01cea8c18841b73e0601d31859be1dcd323e61d83e7cfb15523dd051fc78c8da`
 - Source revision: `microsoft/typescript-go@2bd066d87f5bafd315be9f40889d0a60b9e58e0b`
 - Source: <https://github.com/microsoft/typescript-go/tree/2bd066d87f5bafd315be9f40889d0a60b9e58e0b>
 - Build runtime: Go 1.26.3 standard library (`GOOS=wasip1`, `GOARCH=wasm`)
@@ -101,29 +127,29 @@ byte-identical to `go/LICENSE` in the exact Go 1.26.5 source distribution.
 
 ### Java compiler toolchain
 
-- Distributed assets: `java-teavm-0.13.1.wasi.compiler.webc.gz.bin`,
+- Distributed assets: `java-teavm-0.13.1.compiler.wasm`,
   `java-teavm-0.13.1.compile-classlib.bin`, and
   `java-teavm-0.13.1.runtime-classlib.bin`
 - TeaVM Java compiler source: <https://github.com/konsoletyper/teavm-javac/tree/7e4a44cf521694a4e326e33850dd8aec165eb5c9>
 - TeaVM core source: `konsoletyper/teavm@b3a245b7d9034ff35cdfab2def057a3d4f256efb`
-  plus the pinned WASI compiler and math-intrinsic patch
-- Compiler package compressed SHA-256:
-  `129f1f51d591e58954f88787d36396b856a9a68ba3ae9c9d14f20bd67c2c7722`
-- Compiler package expanded SHA-256:
-  `f8f86761cf31062565187e4a66f73b6903f257fe84c0ce70ea1cd28441b6c2e9`
-- Licenses: TeaVM Apache-2.0; OpenJDK class library GPL-2.0 with Classpath
-  Exception
-- License material: `licenses/Apache-2.0.txt` and
-  `licenses/openjdk-21-GPL-2.0-with-Classpath-exception.txt`
+  with source patches and build provenance in `tools/java-client/`
+- Compiler SHA-256: `8c37bce1c6fceeaffeffe93e10834309b67c8b6fb58c6f8a24547afe8be67f5d`
+- Android Scanner and Spliterators source: `platform/libcore@de876a01b29230b877c9f408348c38a90ee724a5`
+- Licenses: TeaVM Apache-2.0; OpenJDK and Android class libraries GPL-2.0
+  with Classpath exception
+- License material: `licenses/Apache-2.0.txt`,
+  `licenses/openjdk-21-GPL-2.0-with-Classpath-exception.txt`, and
+  `licenses/android-libcore-GPL-2.0-with-Classpath-exception.txt`
 
-The compiler emits standalone `wasip1` modules. The class-library archives are
-mounted only during compilation and are not included in submitted artifacts.
+The WasmGC compiler uses statically packaged JavaScript bindings and emits
+standalone `wasip1` student modules. TeaVM links reachable class-library code
+into those modules; the full class-library archives are compiler inputs.
 
 ### QuickJS-ng
 
 - Distributed asset: `quickjs-0.15.1.wasm.gz.bin`
-- Compressed SHA-256: `8c7f0588210490e7d77f198fc91f72c1b94787ab4c359c4786ca59a363c4f5e8`
-- Expanded Wasm SHA-256: `956bf2b3700690e1817034eb8e063cfd9781c66b4bffa244ef4f9445656ccfa1`
+- Compressed SHA-256: `dc6e02e8610269e61b341331661515616451cec929fd534fa96d1c4f47fbcc9a`
+- Expanded Wasm SHA-256: `a098db08592626781f6ad6e63f1b8a36da6d03b85b530dc94c441a348426b20b`
 - Source revision: `quickjs-ng/quickjs@fd0a0210b7be00957751871e7e01b8291268fc29`
 - Source: <https://github.com/quickjs-ng/quickjs/tree/fd0a0210b7be00957751871e7e01b8291268fc29>
 - Build SDK: [WASI SDK 24.0 release archive for arm64 macOS](https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-arm64-macos.tar.gz),
@@ -240,25 +266,25 @@ source trees, so the inventory reuses the exact digest-bound `b9ef79d7` copies;
 the revision-specific root and musl-fts notices remain separate. The generated
 WebC and pinned command manifests do not relicense those payloads.
 
-### CPython 3.14.6 for WASI P1
+### CPython 3.14.7 for WASI P1
 
-- Distributed assets: `python-3.14.6-wasip1.webc.gz.bin` and its provenance
-  manifest `python-3.14.6-wasip1.manifest.json`
-- Official source archive: <https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz>,
-  SHA-256 `143b1dddefaec3bd2e21e3b839b34a2b7fb9842272883c576420d605e9f30c63`
-- Official SPDX document: <https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz.spdx.json>,
-  SHA-256 `1f5d394856783fa77e1f1db280f84eabf693bffc1fb06a747f7116de9f99f3bd`
+- Distributed assets: `python-3.14.7-wasip1.webc.gz.bin` and its provenance
+  manifest `python-3.14.7-wasip1.manifest.json`
+- Official source archive: <https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tar.xz>,
+  SHA-256 `3b48dac8fb59f62eaa67ac83c1eb12bda1b7a08406dd286e252c11a66be27f81`
+- Official SPDX document: <https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tar.xz.spdx.json>,
+  SHA-256 `87f55ca6c59fe159fa8c47ba2d7d8bec39cc649b1d3f47c667f34025a2ca9a68`
 - Expanded WebC SHA-256:
-  `454ffc53936aa13a0d7f4afbb5bd50ada339c8ebd04bbf27ea19e4104cf43207`
+  `a42c98f5f00582638c8e445440c506bbf94d5e55b3415d1f8d82d11c56cd4b56`
 - Distributed gzip SHA-256:
-  `218cd20ac4abb443e0700816010a615a345a43eae623a0232da2227135a6c7a6`
+  `10027f0e32c77dfa0ce1c413b6cb27307d6744fe5e18e6da8cea738bd020260c`
 - Provenance manifest SHA-256:
-  `054eccad04a7cee7ba1661062142ef0d639976850981eab8fc785f48eb26129e`
+  `53a24b258363a8494af164121111a34b49c85fa0e054627fe131feba6f359cd5`
 - Deterministically exported `WOJFS002` runtime archive SHA-256:
-  `44d894f91487f20c2bb04fe496a9343db37d8720fb706472c2b4a7f3300db039`
+  `c1acac884af1c86833db5b65f8cc0a2304fce74dea0a05d9b40bde0a4e3e7c0e`
 - CPython license: Python Software Foundation License Version 2 and the
   historical notices reproduced with it
-- License text: `licenses/cpython-3.14.6-PSF-2.0.txt`
+- License text: `licenses/cpython-3.14.7-PSF-2.0.txt`
 - Bundled third-party source: Expat 2.8.1 (MIT), HACL* revision
   `8ba599b2f6c9701b3dc961db895b0856a2210f76` (MIT), and libmpdec 2.5.1
   (BSD-2-Clause); their exact notices are
@@ -270,7 +296,8 @@ WebC and pinned command manifests do not relicense those payloads.
   `26a1d6601d727a96f4301d0d8647b5a42760ae0c`, and wasi-libc revision
   `b9ef79d7dbd47c6c5bafdae760823467c2f60b70`.
 
-WASM-OJ compiles this package from the pinned official sources, disables
+WASM-OJ compiles this package from the pinned official sources with a 4 MiB C
+stack and 16 MiB initial linear memory, retaining `--stack-first`, disables
 `_socket`, removes test/development-only standard-library roots, canonicalizes
 build-only sysconfig paths, and packages the complete source SPDX document and
 applicable CPython, third-party, compiler-rt, WASI SDK, and wasi-libc notices

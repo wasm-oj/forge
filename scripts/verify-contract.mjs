@@ -77,7 +77,7 @@ await requireSource(
 const pins = await readJson("public/toolchains/clang-22.0.0-git20542-10.cc1-pins.json");
 const manifest = await readJson("public/toolchains/clang-22.0.0-git20542-10.manifest.json");
 const rustManifest = await readJson("public/toolchains/rust-1.91.1-dev.manifest.json");
-const pythonManifest = await readJson("public/toolchains/python-3.14.6-wasip1.manifest.json");
+const pythonManifest = await readJson("public/toolchains/python-3.14.7-wasip1.manifest.json");
 const goManifest = await readJson("public/toolchains/go-1.26.5-wasip1.manifest.json");
 if (pins.schema !== WASM_OJ_SCHEMAS.clangPins) throw new Error("Clang pins use a different WASM-OJ contract.");
 if (manifest.schema !== WASM_OJ_SCHEMAS.clangToolchain) throw new Error("Clang manifest uses a different WASM-OJ contract.");
