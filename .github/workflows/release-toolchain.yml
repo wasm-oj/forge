@@ -59,4 +59,4 @@ jobs:
         env:
           PACKAGE_NAME: ${{ inputs.package }}
           RELEASE_VERSION: ${{ inputs.version }}
-        run: npm publish "release-tarballs/wasm-oj-${PACKAGE_NAME}-${RELEASE_VERSION}.tgz" --access public
+        run: npm publish "./release-tarballs/wasm-oj-${PACKAGE_NAME}-${RELEASE_VERSION}.tgz" --access public

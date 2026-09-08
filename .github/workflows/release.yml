@@ -3,6 +3,12 @@ name: Release synchronized npm packages
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish (vX.Y.Z)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -13,9 +19,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     environment: npm
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
           lfs: true
           persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
@@ -32,24 +41,22 @@ jobs:
       - run: pnpm run library:build
       - run: pnpm run library:verify
       - name: Require synchronized code-package version
-        env:
-          RELEASE_VERSION: ${{ github.ref_name }}
-        run: node scripts/release-library.mjs verify-code-version "${RELEASE_VERSION#v}"
+        run: node scripts/release-library.mjs verify-code-version "${RELEASE_TAG#v}"
       - name: Pack verified code packages
         run: node scripts/pack-library.mjs --group code --destination release-tarballs
       - name: Publish contracts
-        run: npm publish release-tarballs/wasm-oj-contracts-${GITHUB_REF_NAME#v}.tgz --access public
+        run: npm publish ./release-tarballs/wasm-oj-contracts-${RELEASE_TAG#v}.tgz --access public
       - name: Publish core
-        run: npm publish release-tarballs/wasm-oj-core-${GITHUB_REF_NAME#v}.tgz --access public
+        run: npm publish ./release-tarballs/wasm-oj-core-${RELEASE_TAG#v}.tgz --access public
       - name: Publish hosts and Organizer
         run: |
-          npm publish release-tarballs/wasm-oj-browser-${GITHUB_REF_NAME#v}.tgz --access public
-          npm publish release-tarballs/wasm-oj-server-${GITHUB_REF_NAME#v}.tgz --access public
-          npm publish release-tarballs/wasm-oj-organizer-${GITHUB_REF_NAME#v}.tgz --access public
+          npm publish ./release-tarballs/wasm-oj-browser-${RELEASE_TAG#v}.tgz --access public
+          npm publish ./release-tarballs/wasm-oj-server-${RELEASE_TAG#v}.tgz --access public
+          npm publish ./release-tarballs/wasm-oj-organizer-${RELEASE_TAG#v}.tgz --access public
       - name: Publish CLI
-        run: npm publish release-tarballs/wasm-oj-cli-${GITHUB_REF_NAME#v}.tgz --access public
+        run: npm publish ./release-tarballs/wasm-oj-cli-${RELEASE_TAG#v}.tgz --access public
       - name: Publish umbrella SDK
-        run: npm publish release-tarballs/wasm-oj-sdk-${GITHUB_REF_NAME#v}.tgz --access public
+        run: npm publish ./release-tarballs/wasm-oj-sdk-${RELEASE_TAG#v}.tgz --access public
       - env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --verify-tag --generate-notes --latest
+        run: gh release create "${RELEASE_TAG}" --verify-tag --generate-notes --latest

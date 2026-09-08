@@ -32,6 +32,19 @@ dependency order above. Node 24.18.0 supplies npm 11.16.0, which satisfies trust
 npm 11.5.1 minimum. The root `wasm-oj-platform` manifest is private and is never published. The
 umbrella package contains only code entrypoints and never depends on a toolchain package.
 
+Publish tarballs with an explicit local path (`npm publish ./release-tarballs/<file>.tgz`);
+without `./`, npm can interpret the path as a GitHub repository shorthand.
+
+If a workflow defect prevents publishing any package, fix the workflow on `main`, then dispatch
+“Release synchronized npm packages” with the existing release tag. For example:
+
+```sh
+gh workflow run release.yml --ref main -f tag=v0.2.1
+```
+
+The workflow checks out the specified tag and verifies its package versions before publishing.
+This retries the same release source without moving the tag.
+
 If npm publishing succeeds but GitHub release creation fails, create the GitHub release manually
 for the same immutable tag. Never move an existing release tag and never rerun a partial release
 with changed bytes at the same version.
