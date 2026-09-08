@@ -1,6 +1,6 @@
 {
   "name": "@wasm-oj/sdk",
-  "version": "0.3.0",
+  "version": "0.2.1",
   "description": "Convenience entrypoints for the WASM-OJ SDK packages.",
   "license": "MIT",
   "author": "JacobLinCool",
@@ -53,10 +53,10 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@wasm-oj/browser": "workspace:0.3.0",
-    "@wasm-oj/contracts": "workspace:0.3.0",
-    "@wasm-oj/core": "workspace:0.3.0",
-    "@wasm-oj/organizer": "workspace:0.3.0",
-    "@wasm-oj/server": "workspace:0.3.0"
+    "@wasm-oj/browser": "workspace:0.2.1",
+    "@wasm-oj/contracts": "workspace:0.2.1",
+    "@wasm-oj/core": "workspace:0.2.1",
+    "@wasm-oj/organizer": "workspace:0.2.1",
+    "@wasm-oj/server": "workspace:0.2.1"
   }
 }

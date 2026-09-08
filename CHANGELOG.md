@@ -4,7 +4,7 @@ All notable changes to WASM-OJ are recorded here. Releases follow
 [Semantic Versioning](https://semver.org/) and the contract/package versioning policy in
 [the versioning policy](docs/versioning.md).
 
-## 0.3.0 - 2026-09-08
+## 0.2.1 - 2026-09-08
 
 - Replaced managed collection APIs with repository-authored catalogs. `wasm-oj.json` and an
   exact Git commit now define catalog content; Organizer exports repository parsers and static
@@ -17,7 +17,7 @@ All notable changes to WASM-OJ are recorded here. Releases follow
 - Fixed redirected standard input/output handling in the shared runtime and stdin consumption
   in QuickJS execution; refreshed the browser runtime and its pinned content identity.
 - Kept the WASM-OJ execution contract at version 2. The seven code packages move together to
-  0.3.0; independently versioned toolchain assets remain at 0.1.0.
+  0.2.1; independently versioned toolchain assets remain at 0.1.0.
 
 ## 0.2.0 - 2026-08-20
 
