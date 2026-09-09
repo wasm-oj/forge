@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { runInNewContext } from "node:vm";
+import { runInNewContext as runInVm, type Context } from "node:vm";
+function runInNewContext(source: string, context: Context) {
+  // Exercise the CommonJS bridge here; native ESM evaluation is covered in the browser corpus.
+  return runInVm('globalThis.__wasm_oj_eval_module = (id) => __load(id);\n' + source, context);
+}
 import { WASM_OJ_CONTRACT_VERSION } from "../core/contract";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { costProfileId } from "../core/cost-profile";
@@ -151,10 +155,10 @@ describe("artifact runner preparation", () => {
         resources: { ...DEFAULT_RESOURCE_POLICY },
       },
     };
-    const manifest = createRuntimeBundleManifest(project, PYTHON_PACKAGE, "python", "build/main.pyc");
+    const manifest = createRuntimeBundleManifest(project, PYTHON_PACKAGE, "python", "main.py");
     const files = {
       ".wasm-oj/deterministic_runner.py": "runner",
-      "build/main.pyc": new Uint8Array([7]),
+      "main.py": "print(1)\n",
       "wasm-oj.manifest.json": manifest,
     };
     const artifact: RuntimeBundleArtifact = {
@@ -167,11 +171,11 @@ describe("artifact runner preparation", () => {
       toolchains: toolchainPackageIdentities("python"),
       runtimePackage: PYTHON_PACKAGE,
       command: "python",
-      entry: "build/main.pyc",
+      entry: "main.py",
       files,
       manifest,
       size: Object.values(files).reduce(
-        (total, value) => total + (typeof value === "string" ? new TextEncoder().encode(value).byteLength : value.byteLength),
+        (total, value) => total + new TextEncoder().encode(value).byteLength,
         0,
       ),
     };
@@ -179,9 +183,10 @@ describe("artifact runner preparation", () => {
     expect(request.cwd).toBe("/project");
     expect(request.args.slice(0, 2)).toEqual([
       "/project/.wasm-oj/deterministic_runner.py",
-      "/project/build/main.pyc",
+      "/project/main.py",
     ]);
-    expect(request.files["/project/build/main.pyc"]).toEqual(new Uint8Array([7]));
+    expect(request.files["/project/main.py"]).toEqual(new TextEncoder().encode("print(1)\n"));
+    expect(request.env.PYTHONHASHSEED).toBe("0");
     expect(request.files["/cpython/lib/python3.14/encodings/__init__.py"]).toEqual(new Uint8Array([4]));
     expect(resolver.packageFileSystem).toHaveBeenCalledWith(expect.objectContaining({
       cacheKey: PYTHON_RUNTIME_FILES_CACHE_KEY,

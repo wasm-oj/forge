@@ -92,6 +92,8 @@ function pinRequest(config) {
       "--target=wasm32-wasip1",
       "--sysroot=/usr",
       ...config.flags,
+      "-D_WASI_EMULATED_PROCESS_CLOCKS",
+      "-lwasi-emulated-process-clocks",
       "-fdiagnostics-color=never",
       "-I/project/src",
       `/project/${entry}`,

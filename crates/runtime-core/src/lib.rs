@@ -46,7 +46,11 @@ pub use types::{
 };
 
 pub fn run_response(request: RunRequest) -> RunResponse {
-    match run(request) {
+    run_response_from_result(run(request))
+}
+
+pub(crate) fn run_response_from_result(result: Result<RunResult, RunError>) -> RunResponse {
+    match result {
         Ok(result) => RunResponse {
             ok: true,
             result: Some(result),

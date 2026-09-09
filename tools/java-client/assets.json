@@ -1,0 +1,14 @@
+{
+  "java-compiler.wasm": {
+    "sha256": "8c37bce1c6fceeaffeffe93e10834309b67c8b6fb58c6f8a24547afe8be67f5d",
+    "bytes": 7854442
+  },
+  "java-teavm-0.13.1.compile-classlib.bin": {
+    "sha256": "738a82b7d7e7ff8d98b07bb076785da7035847a166afb8446fd150c4efce6103",
+    "bytes": 1261778
+  },
+  "java-teavm-0.13.1.runtime-classlib.bin": {
+    "sha256": "0ed234b66cdde19cb29e6c2865a3636d792d3cf72f102e73a7b3fdede80b79e6",
+    "bytes": 23709664
+  }
+}

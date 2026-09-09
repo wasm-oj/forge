@@ -27,3 +27,4 @@ __pycache__/
 *.tsbuildinfo
 *.shadow.md
 .DS_Store
+tools/java-client/*.log

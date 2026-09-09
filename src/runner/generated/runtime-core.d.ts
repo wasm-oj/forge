@@ -17,7 +17,7 @@ export class GoCompilerSession {
 
 export function interact_wasm_oj(request: any): Promise<any>;
 
-export function run_wasm_oj(request: any): any;
+export function run_wasm_oj(request: any, on_execution: Function): any;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -29,7 +29,7 @@ export interface InitOutput {
     readonly gocompilersession_generation: (a: number) => [number, number, number];
     readonly gocompilersession_new: (a: any) => [number, number, number];
     readonly interact_wasm_oj: (a: any) => any;
-    readonly run_wasm_oj: (a: any) => [number, number, number];
+    readonly run_wasm_oj: (a: any, b: any) => [number, number, number];
     readonly canonical_abi_free: (a: number, b: number, c: number) => void;
     readonly canonical_abi_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbg_trap_free: (a: number, b: number) => void;

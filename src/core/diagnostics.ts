@@ -31,36 +31,6 @@ export function parseClangDiagnostics(output: string): Diagnostic[] {
   return diagnostics;
 }
 
-export function parsePythonDiagnostics(output: string): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  const lines = output.split(/\r?\n/);
-  for (let index = 0; index < lines.length; index += 1) {
-    const location = lines[index].match(/^\s*File "([^"]+)", line (\d+)/);
-    if (!location) continue;
-    let column = 1;
-    let message = "Python compilation failed";
-    const caretLine = lines[index + 2] ?? "";
-    const caret = caretLine.indexOf("^");
-    if (caret >= 0) column = caret + 1;
-    for (let cursor = index + 1; cursor < Math.min(lines.length, index + 6); cursor += 1) {
-      const error = lines[cursor].match(/^([A-Za-z]+(?:Error|Exception)):\s*(.+)$/);
-      if (error) {
-        message = `${error[1]}: ${error[2]}`;
-        break;
-      }
-    }
-    diagnostics.push({
-      file: projectPath(location[1]),
-      line: Number(location[2]),
-      column,
-      severity: "error",
-      message,
-      source: "python",
-    });
-  }
-  return diagnostics;
-}
-
 export function parseTypeScriptDiagnostics(output: string): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const pattern = /^(.*?)\((\d+),(\d+)\):\s+(error|warning|message)\s+TS(\d+):\s+(.+)$/gm;

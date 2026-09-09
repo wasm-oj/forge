@@ -14,7 +14,10 @@ use wasmer_wasix::{
     Pipe, WasiEnv, WasiError, WasiModuleInstanceHandles, WasiModuleTreeHandles, wasmer_wasix_types,
 };
 
-pub fn run(request: RunRequest) -> Result<RunResult, RunError> {
+pub fn run(
+    request: RunRequest,
+    mut on_execution: impl FnMut(bool) -> Result<(), RunError>,
+) -> Result<RunResult, RunError> {
     let limited = enforce_memory_limit(&request.wasm, request.resources.memory_limit_bytes)
         .map_err(RunError::Compile)?;
     let metered = instrument_wasm(&limited, request.resources.instruction_budget)
@@ -110,6 +113,7 @@ pub fn run(request: RunRequest) -> Result<RunResult, RunError> {
         .exports
         .get_function("_start")
         .map_err(|error| RunError::Compile(format!("module has no _start function: {error}")))?;
+    on_execution(true)?;
     let execution = if executable.has_deferred_start {
         let initializer = instance
             .exports
@@ -124,6 +128,8 @@ pub fn run(request: RunRequest) -> Result<RunResult, RunError> {
     } else {
         start.call(&mut store, &[])
     };
+
+    on_execution(false)?;
 
     let stdout = stdout_capture.bytes();
     let stderr = stderr_capture.bytes();

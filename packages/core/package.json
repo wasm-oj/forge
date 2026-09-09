@@ -1,6 +1,6 @@
 {
   "name": "@wasm-oj/core",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Host-neutral compiler, runner, judge, dependency, and replay orchestration for WASM-OJ.",
   "license": "MIT",
   "author": "JacobLinCool",
@@ -13,7 +13,11 @@
   "bugs": {
     "url": "https://github.com/wasm-oj/forge/issues"
   },
-  "keywords": ["online-judge", "wasi", "wasm"],
+  "keywords": [
+    "online-judge",
+    "wasi",
+    "wasm"
+  ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -28,7 +32,13 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "licenses"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "licenses"
+  ],
   "engines": {
     "node": ">=24.18.0 <25"
   },
@@ -37,7 +47,7 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@wasm-oj/contracts": "workspace:0.2.1",
+    "@wasm-oj/contracts": "workspace:0.3.0",
     "fflate": "0.8.3"
   }
 }

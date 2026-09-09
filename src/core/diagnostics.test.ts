@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseClangDiagnostics, parsePythonDiagnostics, parseRustDiagnostics, parseTypeScriptDiagnostics, projectPath } from "./diagnostics";
+import { parseClangDiagnostics, parseRustDiagnostics, parseTypeScriptDiagnostics, projectPath } from "./diagnostics";
 
 describe("diagnostic parsing", () => {
   it("normalizes mounted project paths", () => {
@@ -17,18 +17,6 @@ describe("diagnostic parsing", () => {
       column: 9,
       severity: "warning",
       code: "-Wunused-variable",
-    });
-  });
-
-  it("parses Python syntax errors", () => {
-    const [diagnostic] = parsePythonDiagnostics(
-      '  File "/project/src/main.py", line 2\n    print(\n         ^\nSyntaxError: incomplete input',
-    );
-    expect(diagnostic).toMatchObject({
-      file: "src/main.py",
-      line: 2,
-      severity: "error",
-      message: "SyntaxError: incomplete input",
     });
   });
 

@@ -155,6 +155,43 @@ fn traps_thread_network_and_process_capabilities_before_wasmer_can_execute_them(
 }
 
 #[test]
+fn capability_denials_preserve_arbitrary_signatures_and_allow_unused_imports() {
+    for invoke in [false, true] {
+        let body = if invoke {
+            "i32.const 1 i64.const 2 f32.const 3 f64.const 4 call $denied drop drop"
+        } else {
+            ""
+        };
+        let source = format!(
+            r#"(module
+              (import "wasix_64v1" "sock_open" (func $denied
+                (param i32 i64 f32 f64) (result i64 i32)))
+              (memory (export "memory") 1)
+              (func (export "_start") {body}))"#
+        );
+        let result = run(request(&source)).unwrap();
+        if invoke {
+            assert_eq!(
+                result.termination,
+                wasm_oj_runtime_core::ExecutionTermination::Trap
+            );
+            assert!(
+                result
+                    .trap_message
+                    .unwrap()
+                    .contains("wasix_64v1.sock_open")
+            );
+        } else {
+            assert_eq!(result.code, 0);
+            assert_eq!(
+                result.termination,
+                wasm_oj_runtime_core::ExecutionTermination::Exited
+            );
+        }
+    }
+}
+
+#[test]
 fn exposes_a_single_deterministic_main_thread_without_enabling_spawn() {
     let result = run(request(
         r#"(module

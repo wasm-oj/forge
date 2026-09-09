@@ -255,7 +255,6 @@ async function verifyCode(definition, packedRoot, packedFiles, manifest) {
     for (const required of [
       "dist/server-build-stage.mjs",
       "dist/server-runner-stage.mjs",
-      "dist/python-stage.mjs",
       "dist/rustc-stage.mjs",
       "dist/go-stage.mjs",
     ]) requireFile(packedFiles, definition.name, required);

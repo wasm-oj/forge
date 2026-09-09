@@ -168,7 +168,7 @@ function expectedBuiltinArtifactName(project: Project): string {
 function expectedRuntimeEntry(project: Project): string {
   if (project.config.language === "python") {
     if (!project.config.entry.endsWith(".py")) throw new Error("Python entry files must end in '.py'.");
-    return `build/${project.config.entry.slice(0, -3)}.pyc`;
+    return project.config.entry;
   }
   if (project.config.language === "typescript") {
     if (!project.config.entry.endsWith(".ts")) throw new Error("TypeScript entry files must end in '.ts'.");

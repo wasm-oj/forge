@@ -373,8 +373,17 @@ async function runArtifact(request: Extract<RunnerRequest, { type: "run" }>): Pr
   progress(request.requestId, "loading-toolchain", `Resolving runtime for ${request.artifact.name}`, 0.1);
   if (!runtimeDrivers) throw new Error("The WASM-OJ runtime-driver registry is not initialized.");
   const prepared = await prepareArtifactRun(request.artifact, request.config, resolver, runtimeDrivers);
-  progress(request.requestId, "running", `Running ${request.artifact.name} with deterministic Wasmer`, 0.25);
-  const response = runWasmOjCore(prepared) as CoreRunResponse;
+  let executionStarted = 0;
+  let executionDurationMs = 0;
+  const response = runWasmOjCore(prepared, (running: boolean) => {
+    if (running) {
+      progress(request.requestId, "running", `Running ${request.artifact.name} with deterministic Wasmer`, 0.25);
+      executionStarted = performance.now();
+    } else {
+      executionDurationMs = performance.now() - executionStarted;
+      progress(request.requestId, "packaging", "Collecting execution results", 0.9);
+    }
+  }) as CoreRunResponse;
   if (!response.ok || !response.result) {
     const error = response.error ?? { code: "RUNTIME_ERROR", message: "The runtime core returned no result." };
     throw Object.assign(new Error(error.message), { code: error.code });
@@ -389,6 +398,7 @@ async function runArtifact(request: Extract<RunnerRequest, { type: "run" }>): Pr
     stderr,
     files: Object.fromEntries(Object.entries(response.result.files).map(([path, contents]) => [path, contents.slice()])),
     durationMs: performance.now() - started,
+    executionDurationMs,
     determinism: { ...request.config.determinism },
     resources: { ...request.config.resources },
     termination: response.result.termination,

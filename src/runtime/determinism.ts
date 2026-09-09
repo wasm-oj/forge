@@ -132,6 +132,7 @@ if hasattr(_os, "getrandom"):
 
 _entry = _sys.argv[1]
 _sys.argv = [_entry, *_sys.argv[2:]]
+_sys.path[0] = _os.path.dirname(_entry)
 _runpy.run_path(_entry, run_name="__main__")
 `;
 

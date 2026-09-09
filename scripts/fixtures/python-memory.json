@@ -1,0 +1,151 @@
+[
+  {
+    "language": "python",
+    "label": "python-16mb-upstream_dynamic",
+    "source": "class MyGlobals(dict):\n def __missing__(self,key): return int(key.removeprefix(\"_number_\"))\nf=eval(\"lambda: \"+\"+\".join(f\"_number_{i}\" for i in range(400)),MyGlobals())\nfor _ in range(30): assert f()==79800\nprint(f())",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "expected": "79800\n"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-recursion_error",
+    "source": "def f(n):\n return f(n+1)\ntry: f(0)\nexcept RecursionError: print(\"RecursionError\")",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "expected": "RecursionError\n"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-async_with",
+    "source": "class CM:\n async def __aenter__(self): return 42\n async def __aexit__(self,*args): return False\nasync def f():\n async with CM() as x: return x\nc=f()\ntry: c.send(None)\nexcept StopIteration as e: print(e.value)",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "expected": "42\n"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-hello",
+    "source": "print(42)",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "expected": "42\n"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-modules",
+    "source": "import json,re,math,decimal,collections,heapq,bisect,itertools\nprint(json.dumps([re.findall(r\"\\d+\",\"abc42\"), math.factorial(100)//math.factorial(99),str(decimal.Decimal(\"0.1\")+decimal.Decimal(\"0.2\"))]))",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "expected": "[[\"42\"], 100, \"0.3\"]\n"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-recursive",
+    "source": "def f(n):\n return 0 if n==0 else f(n-1)+1\nprint(f(900))",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "expected": "900\n"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-bigint",
+    "source": "print((2**10000).bit_length())",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "expected": "10001\n"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-with",
+    "source": "from contextlib import contextmanager\n@contextmanager\ndef cm():\n yield 42\nwith cm() as x: print(x)",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "expected": "42\n"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-allocation",
+    "source": "x=bytearray(64*1024*1024)\nprint(len(x))",
+    "input": "",
+    "resources": {
+      "memoryLimitBytes": 16777216,
+      "logicalTimeLimitMs": 60000
+    },
+    "runtimeError": "MemoryError"
+  },
+  {
+    "language": "python",
+    "label": "python-16mb-unicode",
+    "source": "import sys\nprint(sys.version_info[:3])\nprint(input())",
+    "input": "終😀",
+    "expected": "(3, 14, 7)\n終😀\n",
+    "resources": {
+      "memoryLimitBytes": 16777216
+    }
+  },
+  {
+    "language": "python",
+    "label": "python-syntax-runtime",
+    "source": "def invalid(:",
+    "input": "",
+    "runtimeError": "SyntaxError",
+    "determinism": {},
+    "resources": {
+      "instructionBudget": 9007199254740991,
+      "wallTimeLimitMs": 60000
+    }
+  },
+  {
+    "language": "python",
+    "label": "python-unused-invalid",
+    "source": "print(42)",
+    "files": {
+      "unused.py": "def invalid(:"
+    },
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "python",
+    "label": "python-nested-import",
+    "entry": "nested/app/main.py",
+    "source": "from helper import answer\nprint(answer)",
+    "files": {
+      "nested/app/helper.py": "answer=42"
+    },
+    "input": "",
+    "expected": "42\n"
+  },
+  {
+    "language": "python",
+    "label": "python-empty-source",
+    "source": "pass",
+    "input": "",
+    "expected": ""
+  }
+]

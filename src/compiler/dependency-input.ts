@@ -67,26 +67,14 @@ export function projectDependencyPackages(
   return project.dependencies?.packages.filter((item) => item.package.ecosystem === ecosystem) ?? [];
 }
 
-export function pythonDependencyFiles(project: Project): {
-  sourceFiles: ProjectFile[];
-  artifactFiles: Record<string, Uint8Array>;
-} {
-  const sourceFiles: ProjectFile[] = [];
-  const artifactFiles: Record<string, Uint8Array> = {};
+export function pythonDependencyFiles(project: Project): Record<string, Uint8Array> {
+  const files: Record<string, Uint8Array> = {};
   for (const item of projectDependencyPackages(project, "pypi")) {
     for (const [path, bytes] of Object.entries(item.files)) {
-      const installedPath = `site-packages/${path}`;
-      artifactFiles[installedPath] = bytes.slice();
-      if (path.endsWith(".py")) {
-        sourceFiles.push({
-          path: installedPath,
-          language: "python",
-          content: decodeDependencyText(bytes, item.package.id, path),
-        });
-      }
+      files[`site-packages/${path}`] = bytes.slice();
     }
   }
-  return { sourceFiles, artifactFiles };
+  return files;
 }
 
 export function npmDependencyFiles(project: Project): Record<string, string | Uint8Array> {

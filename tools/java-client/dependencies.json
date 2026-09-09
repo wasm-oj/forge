@@ -1,0 +1,117 @@
+[
+  {
+    "name": "teavm-tooling-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-tooling/0.13.1/teavm-tooling-0.13.1.jar",
+    "sha256": "b382fd7c02b48c133d27ed4d89047659006c3e275ab97acf3f9d14e432d4cb1a"
+  },
+  {
+    "name": "asm-9.8.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.8/asm-9.8.jar",
+    "sha256": "876eab6a83daecad5ca67eb9fcabb063c97b5aeb8cf1fca7a989ecde17522051"
+  },
+  {
+    "name": "teavm-classlib-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-classlib/0.13.1/teavm-classlib-0.13.1.jar",
+    "sha256": "a250f7baf877767af72634cd3f19d30f2a6b8a3fb16bd3931b99fde1b17cd12d"
+  },
+  {
+    "name": "teavm-jso-impl-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-jso-impl/0.13.1/teavm-jso-impl-0.13.1.jar",
+    "sha256": "335778b447c10a8029d59a413c37b3b499f1c34ef9e25b08d11f2414a511df0a"
+  },
+  {
+    "name": "teavm-platform-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-platform/0.13.1/teavm-platform-0.13.1.jar",
+    "sha256": "ca725f27d0be52d1ddc95e11b63bad8cfe0f66dac9977a46d4089c6282ee1f8e"
+  },
+  {
+    "name": "teavm-jso-apis-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-jso-apis/0.13.1/teavm-jso-apis-0.13.1.jar",
+    "sha256": "7a7c211dd03dfbca4445ea5e01b70091226d9e52ce7425d675294ef47a76586b"
+  },
+  {
+    "name": "teavm-core-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-core/0.13.1/teavm-core-0.13.1.jar",
+    "sha256": "b9fe1b008512c8f11ff3efbd9cf2f0565b4bfa76943a9f23910befc0812f7ebf"
+  },
+  {
+    "name": "teavm-metaprogramming-impl-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-metaprogramming-impl/0.13.1/teavm-metaprogramming-impl-0.13.1.jar",
+    "sha256": "56f5536c8287288d823af3ab80874eab2968cda6acbbe3f33c5212c88a4eb890"
+  },
+  {
+    "name": "teavm-relocated-libs-commons-io-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-relocated-libs-commons-io/0.13.1/teavm-relocated-libs-commons-io-0.13.1.jar",
+    "sha256": "5e1a666948a40dada1d3fbce41503bad6ce86035662bf131c8df227b30859a79"
+  },
+  {
+    "name": "teavm-jso-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-jso/0.13.1/teavm-jso-0.13.1.jar",
+    "sha256": "421b848c79d161c34e9f178d3d37b35e8efaadada487056c3fd3d4d3de1c172c"
+  },
+  {
+    "name": "teavm-relocated-libs-rhino-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-relocated-libs-rhino/0.13.1/teavm-relocated-libs-rhino-0.13.1.jar",
+    "sha256": "49cedc9bfcdd44d30b8bc8d1d46d78fb7f8f2044b8c85c9c3f1ece33e94ee7e9"
+  },
+  {
+    "name": "commons-io-2.20.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/commons-io/commons-io/2.20.0/commons-io-2.20.0.jar",
+    "sha256": "df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72"
+  },
+  {
+    "name": "jzlib-1.1.3.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/jcraft/jzlib/1.1.3/jzlib-1.1.3.jar",
+    "sha256": "89b1360f407381bf61fde411019d8cbd009ebb10cff715f3669017a031027560"
+  },
+  {
+    "name": "joda-time-2.12.2.jar",
+    "url": "https://repo.maven.apache.org/maven2/joda-time/joda-time/2.12.2/joda-time-2.12.2.jar",
+    "sha256": "8d4d807adc8e92a83913d9ccd61e634b4907c78d88f3016d06b3b3d2b4795a02"
+  },
+  {
+    "name": "teavm-interop-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-interop/0.13.1/teavm-interop-0.13.1.jar",
+    "sha256": "f00f983b986d367799570ab482fee89502915213fe347d361e5bcf1e23a8fa04"
+  },
+  {
+    "name": "teavm-metaprogramming-api-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-metaprogramming-api/0.13.1/teavm-metaprogramming-api-0.13.1.jar",
+    "sha256": "c74a51421913054f434a568f4b13cccc6f832cc5af616837332d7caf4a9eed5b"
+  },
+  {
+    "name": "teavm-relocated-libs-asm-commons-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-relocated-libs-asm-commons/0.13.1/teavm-relocated-libs-asm-commons-0.13.1.jar",
+    "sha256": "d49685681db5039075f2fde01568f2bb6df14a99ef88d39b29df8e701e12e140"
+  },
+  {
+    "name": "teavm-relocated-libs-asm-util-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-relocated-libs-asm-util/0.13.1/teavm-relocated-libs-asm-util-0.13.1.jar",
+    "sha256": "a41247ca7f023959712be0e713d3f2f5687b4dfeda6b112b2d976494d52cdc57"
+  },
+  {
+    "name": "teavm-relocated-libs-hppc-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-relocated-libs-hppc/0.13.1/teavm-relocated-libs-hppc-0.13.1.jar",
+    "sha256": "7b82fedf747e0bf5d7a50acece86a8a684901e469165a3c5621c653128df4cd6"
+  },
+  {
+    "name": "teavm-relocated-libs-asm-analysis-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-relocated-libs-asm-analysis/0.13.1/teavm-relocated-libs-asm-analysis-0.13.1.jar",
+    "sha256": "6bb5ef62ab00d557061d9b04dc4571f711fbe11d339783e55029b37b75d5159c"
+  },
+  {
+    "name": "teavm-relocated-libs-asm-tree-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-relocated-libs-asm-tree/0.13.1/teavm-relocated-libs-asm-tree-0.13.1.jar",
+    "sha256": "6b475fd62b8ddedfa0808c0c412c311f000a80a13123b6ba07f5da531164fd5b"
+  },
+  {
+    "name": "teavm-relocated-libs-asm-0.13.1.jar",
+    "url": "https://repo.maven.apache.org/maven2/org/teavm/teavm-relocated-libs-asm/0.13.1/teavm-relocated-libs-asm-0.13.1.jar",
+    "sha256": "400496e463dddd878fed2b9b25a66deca2126f71bb68e41f82244b4315006018"
+  },
+  {
+    "name": "jackson-annotations-2.19.0.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.19.0/jackson-annotations-2.19.0.jar",
+    "sha256": "ead60e9cac0e42b57092b9e2d087ff43536e9477d4486ba393037a8cc156cda7"
+  }
+]

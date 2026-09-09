@@ -32,6 +32,7 @@ interface PendingRequest<T> {
   reject(reason: Error): void;
   boundaryTimer?: ReturnType<typeof setTimeout>;
   executionTimer?: ReturnType<typeof setTimeout>;
+  executionFinished?: boolean;
   timeoutMs?: number;
   timeoutResult?: () => T;
 }
@@ -206,6 +207,7 @@ export class BrowserRunner implements Runner {
           stdout: "",
           stderr: `Wall-time limit ${config.resources.wallTimeLimitMs} ms exceeded.`,
           files: {},
+          executionDurationMs: config.resources.wallTimeLimitMs,
           durationMs: performance.now() - started,
           determinism: { ...config.determinism },
           resources: { ...config.resources },
@@ -369,6 +371,7 @@ export class BrowserRunner implements Runner {
     if (response.type === "progress") {
       for (const listener of this.progressListeners) listener(response.progress);
       if (response.progress.phase === "running") this.startWallTimer(response.requestId);
+      if (response.progress.phase === "packaging") this.finishWallTimer(response.requestId);
       return;
     }
     if (response.type === "stream") {
@@ -401,9 +404,24 @@ export class BrowserRunner implements Runner {
     }
   }
 
+  private finishWallTimer(requestId: string): void {
+    const request = this.pending.get(requestId);
+    if (!request || request.executionTimer === undefined || request.executionFinished) return;
+    clearRequestTimers(request);
+    request.executionFinished = true;
+    request.boundaryTimer = setTimeout(() => {
+      if (!this.pending.delete(requestId)) return;
+      const error = new Error(
+        `Runner result collection exceeded the ${CONTROL_TIMEOUT_MS} ms browser boundary.`,
+      );
+      request.reject(error);
+      if (!this.disposed) this.replaceWorker(error);
+    }, CONTROL_TIMEOUT_MS);
+  }
+
   private startWallTimer(requestId: string): void {
     const request = this.pending.get(requestId);
-    if (!request || request.executionTimer || request.timeoutMs === undefined || !request.timeoutResult) return;
+    if (!request || request.executionTimer || request.executionFinished || request.timeoutMs === undefined || !request.timeoutResult) return;
     if (request.boundaryTimer) {
       clearTimeout(request.boundaryTimer);
       request.boundaryTimer = undefined;

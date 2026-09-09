@@ -46,14 +46,14 @@ ${PYTHON_RUNTIME_FILES_EXPORT_SCRIPT}`);
   if (!smokeLine) throw new Error(`Python runtime smoke emitted no result: ${output.stderr}`);
   const smoke = JSON.parse(smokeLine.slice("WASM_OJ_SMOKE:".length));
   const expectedSmoke = {
-    absSrcdir: "/usr/src/cpython-3.14.6",
+    absSrcdir: "/usr/src/cpython-3.14.7",
     compiled: true,
     sha256: "1425f8c83525231bcc1710131e927c852ed3a6950c1cf1578d0a3d52bef7c4b2",
     socketBuiltin: false,
     socketSpec: false,
     socketState: "n/a",
     sysPlatform: "wasi",
-    version: [3, 14, 6],
+    version: [3, 14, 7],
   };
   if (JSON.stringify(smoke) !== JSON.stringify(expectedSmoke)) {
     throw new Error(`Python runtime smoke mismatch: ${JSON.stringify(smoke)}.`);

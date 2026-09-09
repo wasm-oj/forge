@@ -24,6 +24,145 @@ const commonWasiLibcLicenses = [
 
 const definitions = [
   {
+    "id": "buffer",
+    "name": "buffer",
+    "version": "6.0.3",
+    "source": {
+      "url": "https://github.com/feross/buffer",
+      "revision": "v6.0.3"
+    },
+    "npm": "buffer@6.0.3",
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  },
+  {
+    "id": "readable-stream",
+    "name": "readable-stream",
+    "version": "4.7.0",
+    "source": {
+      "url": "https://github.com/nodejs/readable-stream",
+      "revision": "v4.7.0"
+    },
+    "npm": "readable-stream@4.7.0",
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  },
+  {
+    "id": "events",
+    "name": "events",
+    "version": "3.3.0",
+    "source": {
+      "url": "https://github.com/Gozala/events",
+      "revision": "v3.3.0"
+    },
+    "npm": "events@3.3.0",
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  },
+  {
+    "id": "abort-controller",
+    "name": "abort-controller",
+    "version": "3.0.0",
+    "source": {
+      "url": "https://github.com/mysticatea/abort-controller",
+      "revision": "v3.0.0"
+    },
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  },
+  {
+    "id": "event-target-shim",
+    "name": "event-target-shim",
+    "version": "5.0.1",
+    "source": {
+      "url": "https://github.com/mysticatea/event-target-shim",
+      "revision": "v5.0.1"
+    },
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  },
+  {
+    "id": "base64-js",
+    "name": "base64-js",
+    "version": "1.5.1",
+    "source": {
+      "url": "https://github.com/beatgammit/base64-js",
+      "revision": "v1.5.1"
+    },
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  },
+  {
+    "id": "ieee754",
+    "name": "ieee754",
+    "version": "1.2.1",
+    "source": {
+      "url": "https://github.com/feross/ieee754",
+      "revision": "v1.2.1"
+    },
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  },
+  {
+    "id": "string-decoder",
+    "name": "string_decoder",
+    "version": "1.3.0",
+    "source": {
+      "url": "https://github.com/nodejs/string_decoder",
+      "revision": "v1.3.0"
+    },
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  },
+  {
+    "id": "safe-buffer",
+    "name": "safe-buffer",
+    "version": "5.2.1",
+    "source": {
+      "url": "https://github.com/feross/safe-buffer",
+      "revision": "v5.2.1"
+    },
+    "embedded": [
+      "src/runtime/quickjs/stdlib.generated.ts"
+    ],
+    "licenses": [
+      "licenses/quickjs-node-stdlib-LICENSES.txt"
+    ]
+  }
+,
+  {
     id: "clang-yowasp",
     name: "YoWASP Clang, LLD, libc++, and LLVM runtime payload",
     version: "22.0.0-git20542-10",
@@ -44,17 +183,17 @@ const definitions = [
   {
     id: "cpython",
     name: "CPython and bundled standard-library third-party components",
-    version: "3.14.6",
+    version: "3.14.7",
     source: {
-      url: "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz",
-      revision: "v3.14.6; Expat 2.8.1; HACL* 8ba599b2f6c9701b3dc961db895b0856a2210f76; libmpdec 2.5.1",
+      url: "https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tar.xz",
+      revision: "v3.14.7; Expat 2.8.1; HACL* 8ba599b2f6c9701b3dc961db895b0856a2210f76; libmpdec 2.5.1",
     },
     files: [
-      "public/toolchains/python-3.14.6-wasip1.manifest.json",
-      "public/toolchains/python-3.14.6-wasip1.webc.gz.bin",
+      "public/toolchains/python-3.14.7-wasip1.manifest.json",
+      "public/toolchains/python-3.14.7-wasip1.webc.gz.bin",
     ],
     licenses: [
-      "licenses/cpython-3.14.6-PSF-2.0.txt",
+      "licenses/cpython-3.14.7-PSF-2.0.txt",
       "licenses/cpython-expat-2.8.1-MIT.txt",
       "licenses/cpython-hacl-star-8ba599b-MIT.txt",
       "licenses/cpython-libmpdec-2.5.1-BSD-2-Clause.txt",
@@ -118,8 +257,8 @@ const definitions = [
   },
   {
     id: "java-teavm",
-    name: "TeaVM Java WASI compiler and OpenJDK class library",
-    version: "teavm-0.13.1-wasi",
+    name: "TeaVM Java WasmGC compiler and WASI class library",
+    version: "teavm-0.13.1-wasmgc-wasip1",
     source: {
       url: "https://github.com/konsoletyper/teavm-javac",
       revision: "teavm-javac@7e4a44cf521694a4e326e33850dd8aec165eb5c9; teavm@b3a245b7d9034ff35cdfab2def057a3d4f256efb plus WASI compiler patch",
@@ -127,12 +266,26 @@ const definitions = [
     files: [
       "public/toolchains/java-teavm-0.13.1.compile-classlib.bin",
       "public/toolchains/java-teavm-0.13.1.runtime-classlib.bin",
-      "public/toolchains/java-teavm-0.13.1.wasi.compiler.webc.gz.bin",
+      "public/toolchains/java-teavm-0.13.1.compiler.wasm",
     ],
     licenses: [
       "licenses/Apache-2.0.txt",
       "licenses/openjdk-21-GPL-2.0-with-Classpath-exception.txt",
     ],
+  },
+  {
+    id: "android-libcore-scanner",
+    name: "Android libcore Scanner and Spliterators",
+    version: "de876a01b29230b877c9f408348c38a90ee724a5",
+    source: {
+      url: "https://android.googlesource.com/platform/libcore/",
+      revision: "de876a01b29230b877c9f408348c38a90ee724a5",
+    },
+    files: [
+      "public/toolchains/java-teavm-0.13.1.compile-classlib.bin",
+      "public/toolchains/java-teavm-0.13.1.runtime-classlib.bin",
+    ],
+    licenses: ["licenses/android-libcore-GPL-2.0-with-Classpath-exception.txt"],
   },
   {
     id: "quickjs-ng",
@@ -221,7 +374,7 @@ const definitions = [
       revision: "b9ef79d7dbd47c6c5bafdae760823467c2f60b70",
     },
     embedded: [
-      "public/toolchains/python-3.14.6-wasip1.webc.gz.bin",
+      "public/toolchains/python-3.14.7-wasip1.webc.gz.bin",
       "public/toolchains/quickjs-0.15.1.wasm.gz.bin",
     ],
     licenses: ["licenses/wasi-libc-b9ef79d-LICENSE.txt", ...commonWasiLibcLicenses],
@@ -235,7 +388,7 @@ const definitions = [
       revision: "d2bea01edcc46f731156a817f710cdd9fc9c1c19; llvm@26a1d6601d727a96f4301d0d8647b5a42760ae0c; wasi-libc@b9ef79d7dbd47c6c5bafdae760823467c2f60b70",
     },
     embedded: [
-      "public/toolchains/python-3.14.6-wasip1.webc.gz.bin",
+      "public/toolchains/python-3.14.7-wasip1.webc.gz.bin",
       "public/toolchains/quickjs-0.15.1.wasm.gz.bin",
     ],
     licenses: [

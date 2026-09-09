@@ -306,7 +306,7 @@ See [library-contract.md](library-contract.md) for invariant-level details and
 
 ## Comparing with a native online judge
 
-Browser/server conformance means the same WASM-OJ toolchains and execution contract on both hosts. It does not establish full standard-library or platform compatibility with native GCC, OpenJDK, CPython, or Node.js. In particular, JavaScript and TypeScript use QuickJS with the SDK's `std` module, not Node's `fs` or `readline` APIs; the TeaVM Java class library is not a full OpenJDK runtime.
+Browser/server conformance means the same WASM-OJ toolchains and execution contract on both hosts. It does not establish full standard-library or platform compatibility with native GCC, OpenJDK, CPython, or Node.js. JavaScript and TypeScript use QuickJS with the SDK's `std` module and a bounded Node-compatible standard I/O surface: `fs`/`node:fs` synchronous fd 0/1/2 reads and writes, `process` readable/writable standard streams, nonterminal `readline` callbacks and async iteration, and `buffer` text/binary conversion. These use one shared stdin byte cursor. General filesystem access, terminal interaction, subprocesses, and the remaining Node builtins are unavailable; unsupported imports or APIs fail instead of returning mock success. The TeaVM Java class library is not a full OpenJDK runtime.
 
 Preserve the same input bytes in both paths, including EOF, CRLF, empty input, and trailing whitespace. Do not append a newline or trim stdin to hide a program's EOF bug. Output-validator whitespace rules apply to the produced output, not to program input. `std.in.readAsString()` consumes the remaining input; subsequent reads return an empty string.
 

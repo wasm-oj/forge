@@ -263,6 +263,8 @@ export interface RunResult {
   /** Requested output files that existed when the process terminated. */
   files: Record<string, Uint8Array>;
   durationMs: number;
+  /** Browser guest wall time, excluding runtime preparation and output collection. */
+  executionDurationMs?: number;
   determinism: DeterminismConfig;
   resources: ResourcePolicy;
   termination: ExecutionTermination;

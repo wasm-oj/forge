@@ -121,7 +121,7 @@ creating Workers, so caller mutation cannot change an admitted distribution.
 
 Compiler and runner module Workers receive only structured-cloned requests. Browser C/C++ keeps
 bounded immutable compiler and content-addressed build-graph state; Rust and Go use serialized
-nested stages with bounded lifetime; Python compilation is disposable. Changing retained families,
+nested stages with bounded lifetime. Python and JavaScript package source files directly. Changing retained families,
 crossing a stage budget, cancellation, timeout, restart, cache clearing, disposal, or infrastructure
 failure establishes a complete Worker-generation boundary.
 

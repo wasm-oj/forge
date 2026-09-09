@@ -1,0 +1,804 @@
+diff --git a/compiler/build.gradle b/compiler/build.gradle
+index 5598351..ede5d0d 100644
+--- a/compiler/build.gradle
++++ b/compiler/build.gradle
+@@ -16,11 +16,23 @@ configurations {
+     }
+ }
+ 
++configurations.configureEach {
++    resolutionStrategy.eachDependency { details ->
++        if (details.requested.group == "org.teavm" && details.requested.name == "teavm-classlib") {
++            details.useVersion "0.13.1-patched"
++        }
++    }
++}
++
+ dependencies {
+     implementation project(":javac")
+     implementation project(":protocol")
+     compileOnly libs.teavm.core
++    compileOnly "org.teavm:teavm-relocated-libs-hppc:0.13.1"
+     implementation libs.teavm.tooling
++    runtimeOnly libs.teavm.jso.impl
++    runtimeOnly libs.teavm.platform
++    runtimeOnly libs.teavm.classlib
+     implementation libs.asm.core
+     classlibInput libs.teavm.classlib
+     classlibInput libs.teavm.jso
+@@ -37,6 +49,16 @@ sourceSets {
+     }
+ }
+ 
++dependencies {
++    runtimeOnly sourceSets.classlibEmu.output
++}
++
++dependencies {
++    classlibEmuCompileOnly libs.teavm.core
++    classlibEmuCompileOnly libs.teavm.classlib
++    classlibEmuCompileOnly libs.teavm.platform
++}
++
+ compileJava {
+     options.compilerArgs.addAll("--limit-modules", "java.base")
+ }
+@@ -45,6 +67,19 @@ teavm {
+     all {
+         mainClass = "org.teavm.javac.CompilerLib"
+     }
++    wasi {
++    mainClass = "org.teavm.javac.WasiCompilerMain"
++        targetFileName = "java-compiler"
++        outputDir = layout.buildDirectory.dir("generated/teavm/wasi").get().asFile
++        relativePathInOutputDir = ""
++        debugInformation = true
++        exceptionsUsed = false
++        optimization = "NONE"
++        outOfProcess = true
++        processMemory = 8192
++        minHeapSize = 256
++        maxHeapSize = 1024
++    }
+     wasmGC {
+         outOfProcess = true
+         processMemory = 4096
+@@ -52,6 +87,35 @@ teavm {
+     }
+ }
+ 
++configurations {
++    teavmDaemon {
++        canBeConsumed = false
++        canBeResolved = true
++    }
++}
++
++dependencies {
++    teavmDaemon libs.teavm.tooling
++}
++
++tasks.named("generateWasi") {
++    dependsOn "prepareJavaBaseClasses"
++    daemonClasspath.setFrom(configurations.teavmDaemon)
++}
++
++def javaBaseClasses = tasks.register("prepareJavaBaseClasses", Sync) {
++    def javaBase = file("${System.getProperty('java.home')}/jmods/java.base.jmod")
++    inputs.file javaBase
++    from(zipTree(javaBase)) {
++        include "classes/**"
++        eachFile { details ->
++            details.path = details.path.substring("classes/".length())
++        }
++    }
++    includeEmptyDirs = false
++    into layout.buildDirectory.dir("java-base")
++}
++
+ def classlibOutDir = project.layout.buildDirectory.dir("classlib")
+ 
+ tasks.register("generateClassLib", JavaExec) {
+@@ -102,22 +166,32 @@ def prepareTeaVMClassLib = tasks.register("prepareTeaVMClassLib", Copy) {
+     dependsOn unpackTeaVMClasslib, repackCldr
+     from(unpackTeaVMClasslib) {
+         exclude "org/teavm/classlib/impl/unicode/cldr-json.zip"
++        exclude "org/teavm/classlib/java/lang/TClassLoader.class"
++        exclude 'org/teavm/classlib/java/lang/TClassLoader$ResourceContainer.class'
+     }
+     from(provider {
+         configurations.classlibAuxInput.collect {
+             zipTree(it)
+         }
+     }) {
++        exclude "org/teavm/platform/Platform.class"
+         include "org/teavm/classlib/**"
+         include "org/teavm/platform/**"
+         include "org/teavm/jso/**"
+         include "org/teavm/runtime/**"
+         include "org/teavm/interop/**"
+         include "org/teavm/backend/wasm/runtime/**"
++        include "org/teavm/backend/wasm/wasi/**"
+         include "org/teavm/backend/wasm/WasmRuntime*.class"
+         include "org/teavm/backend/wasm/WasmHeap*.class"
+         include "com/jcraft/jzlib/**"
+     }
++    from(sourceSets.classlibEmu.output.classesDirs) {
++        include "org/teavm/classlib/java/lang/TConsoleInputStream.class"
++        include "org/teavm/classlib/java/lang/TClassLoader.class"
++        include "org/teavm/platform/Platform.class"
++    }
++    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+     from(repackCldr) {
+         eachFile {
+             path = "org/teavm/classlib/impl/unicode/" + path
+@@ -160,3 +234,9 @@ def createDist = tasks.register("createDist", Zip) {
+ }
+ 
+ artifacts.add("dist", createDist)
++
++tasks.register("printRuntimeClasspath") {
++    doLast {
++        println(sourceSets.main.runtimeClasspath.asPath)
++    }
++}
+diff --git a/compiler/src/main/java/org/teavm/javac/ArchiveBuilder.java b/compiler/src/main/java/org/teavm/javac/ArchiveBuilder.java
+index 187d714..3a71f44 100644
+--- a/compiler/src/main/java/org/teavm/javac/ArchiveBuilder.java
++++ b/compiler/src/main/java/org/teavm/javac/ArchiveBuilder.java
+@@ -25,13 +25,12 @@ import java.io.UncheckedIOException;
+ import java.nio.charset.StandardCharsets;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+-import java.util.zip.GZIPOutputStream;
+ 
+ public class ArchiveBuilder implements Closeable {
+     private final DataOutputStream output;
+ 
+     public ArchiveBuilder(OutputStream output) throws IOException {
+-        this.output = new DataOutputStream(new GZIPOutputStream(output));
++        this.output = new DataOutputStream(output);
+     }
+ 
+     @Override
+diff --git a/compiler/src/main/java/org/teavm/javac/ArchiveReader.java b/compiler/src/main/java/org/teavm/javac/ArchiveReader.java
+index 2455742..fa7ffcc 100644
+--- a/compiler/src/main/java/org/teavm/javac/ArchiveReader.java
++++ b/compiler/src/main/java/org/teavm/javac/ArchiveReader.java
+@@ -17,18 +17,15 @@
+ package org.teavm.javac;
+ 
+ import java.io.Closeable;
+-import java.io.DataInputStream;
+ import java.io.EOFException;
+ import java.io.IOException;
+ import java.io.InputStream;
+-import java.nio.charset.StandardCharsets;
+-import java.util.zip.GZIPInputStream;
+ 
+ public class ArchiveReader implements Closeable {
+-    private final DataInputStream input;
++    private final InputStream input;
+ 
+     public ArchiveReader(InputStream input) throws IOException {
+-        this.input = new DataInputStream(new GZIPInputStream(input));
++        this.input = input;
+     }
+ 
+     @Override
+@@ -37,20 +34,48 @@ public class ArchiveReader implements Closeable {
+     }
+ 
+     public String readNext() throws IOException {
+-        int nameLength;
+-        try {
+-            nameLength = input.readShort();
+-        } catch (EOFException e) {
++        int first = input.read();
++        if (first < 0) {
+             return null;
+         }
++        int second = readByte();
++        int nameLength = (first << 8) | second;
+         var bytes = new byte[nameLength];
+-        input.readFully(bytes);
+-        return new String(bytes, StandardCharsets.UTF_8);
++        readFully(bytes);
++        var name = new char[nameLength];
++        for (int i = 0; i < nameLength; ++i) {
++            name[i] = (char) (bytes[i] & 0xFF);
++        }
++        return new String(name);
+     }
+ 
+     public byte[] readData() throws IOException {
+-        byte[] data = new byte[input.readInt()];
+-        input.readFully(data);
++        int size = (readByte() << 24) | (readByte() << 16) | (readByte() << 8) | readByte();
++        byte[] data = new byte[size];
++        readFully(data);
+         return data;
+     }
++
++    private int readByte() throws IOException {
++        int result = input.read();
++        if (result < 0) {
++            throw new EOFException();
++        }
++        return result;
++    }
++
++    private void readFully(byte[] bytes) throws IOException {
++        int offset = 0;
++        while (offset < bytes.length) {
++            int count = input.read(bytes, offset, bytes.length - offset);
++            if (count < 0) {
++                throw new EOFException();
++            }
++            if (count == 0) {
++                bytes[offset++] = (byte) readByte();
++            } else {
++                offset += count;
++            }
++        }
++    }
+ }
+diff --git a/compiler/src/main/java/org/teavm/javac/Compiler.java b/compiler/src/main/java/org/teavm/javac/Compiler.java
+index b0b249b..7ed17a7 100644
+--- a/compiler/src/main/java/org/teavm/javac/Compiler.java
++++ b/compiler/src/main/java/org/teavm/javac/Compiler.java
+@@ -17,7 +17,10 @@
+ package org.teavm.javac;
+ 
+ import com.sun.tools.javac.main.JavaCompiler;
++import com.sun.tools.javac.code.Symtab;
++import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
+ import com.sun.tools.javac.util.Context;
++import com.sun.tools.javac.util.Options;
+ import java.io.ByteArrayInputStream;
+ import java.io.ByteArrayOutputStream;
+ import java.io.IOException;
+@@ -34,8 +37,8 @@ import javax.tools.DiagnosticListener;
+ import javax.tools.JavaFileManager;
+ import javax.tools.JavaFileObject;
+ import org.objectweb.asm.ClassReader;
+-import org.teavm.backend.wasm.WasmDebugInfoLocation;
+-import org.teavm.backend.wasm.WasmGCTarget;
++import org.teavm.backend.wasm.WasmRuntimeType;
++import org.teavm.backend.wasm.WasmTarget;
+ import org.teavm.classlib.impl.JCLPlugin;
+ import org.teavm.jso.JSClass;
+ import org.teavm.jso.JSExport;
+@@ -62,6 +65,8 @@ public final class Compiler {
+     private final Map<String, FileData> outputFiles = new LinkedHashMap<>();
+     private final Map<String, FileData> wasmOutputFiles = new LinkedHashMap<>();
+     private SimpleJavaCompiler compiler;
++    private Context compilerContext;
++    private FileManagerImpl fileManager;
+     private List<DiagnosticListenerRegistration> diagnosticListeners = new ArrayList<>();
+     private ResourceProvider resourceProvider;
+     private ClassHolderSource classSource;
+@@ -74,6 +79,10 @@ public final class Compiler {
+         addFile(sourceFiles, name, content.getBytes(StandardCharsets.UTF_8));
+     }
+ 
++    void addSourceFileBytes(String name, byte[] content) {
++        addFile(sourceFiles, name, content);
++    }
++
+     @JSExport
+     public void clearSourceFiles() {
+         sourceFiles.clear();
+@@ -113,28 +122,26 @@ public final class Compiler {
+ 
+     @JSExport
+     public void setSdk(Int8Array content) throws IOException {
+-        try (var input = new ArchiveReader(new ByteArrayInputStream(content.copyToJavaArray()))) {
+-            while (true) {
+-                var entry = input.readNext();
+-                if (entry == null) {
+-                    break;
+-                }
+-                var file = addFile(sdkFiles, entry, input.readData());
+-                file.isJavaBase = true;
++        var input = new ArchiveReader(new ByteArrayInputStream(content.copyToJavaArray()));
++        while (true) {
++            var entry = input.readNext();
++            if (entry == null) {
++                break;
+             }
++            var file = addFile(sdkFiles, entry, input.readData());
++            file.isJavaBase = true;
+         }
+     }
+ 
+     @JSExport
+     public void setTeaVMClasslib(Int8Array content) throws IOException {
+-        try (var input = new ArchiveReader(new ByteArrayInputStream(content.copyToJavaArray()))) {
+-            while (true) {
+-                var entry = input.readNext();
+-                if (entry == null) {
+-                    break;
+-                }
+-                addFile(teavmClasslibFiles, entry, input.readData());
++        var input = new ArchiveReader(new ByteArrayInputStream(content.copyToJavaArray()));
++        while (true) {
++            var entry = input.readNext();
++            if (entry == null) {
++                break;
+             }
++            addFile(teavmClasslibFiles, entry, input.readData());
+         }
+     }
+ 
+@@ -218,12 +225,10 @@ public final class Compiler {
+ 
+     @JSExport
+     public boolean compile() {
+-        initCompiler();
+-        try {
+-            return compiler.simpleCompile();
+-        } finally {
+-            compiler = null;
+-        }
++        var activeCompiler = initCompiler();
++        var result = activeCompiler.simpleCompile();
++        compiler = null;
++        return result;
+     }
+ 
+     @JSExport
+@@ -254,12 +259,60 @@ public final class Compiler {
+         }
+         var mainClass = options.getMainClass().stringValue();
+ 
+-        var target = new WasmGCTarget();
++        return generateWebAssembly(mainClass, outputName);
++    }
++
++    boolean generateWebAssemblyForProbe(String mainClass, String outputName) {
++        return generateWebAssembly(mainClass, outputName);
++    }
++
++    boolean generateWebAssemblyForWasi(String mainClass, String outputName) {
++        var target = new WasmTarget() {
++            @Override
++            public org.teavm.model.optimization.InliningFilterFactory getInliningFilter() {
++                var parent = super.getInliningFilter();
++                return method -> method.getClassName().startsWith("com.sun.tools.javac.")
++                        ? ignored -> false
++                        : parent.createFilter(method);
++            }
++        };
++        target.setRuntimeType(WasmRuntimeType.WASI);
++        target.setExceptionsUsed(false);
++        target.setWastEmitted(true);
+         var refCache = new ReferenceCache();
+         if (classSource == null) {
+             resourceProvider = new MemoryResourceProvider(List.of(teavmClasslibFiles, classFiles, outputFiles));
+             classSource = new ClasspathClassHolderSource(resourceProvider, refCache);
+         }
++        var currentResourceProvider = new CompositeResourceProvider(new MemoryResourceProvider(List.of(outputFiles)),
++                resourceProvider);
++        var currentClassSource = new CompositeClassHolderSource(List.of(
++                new ClasspathClassHolderSource(currentResourceProvider, refCache), classSource));
++        var teavm = new TeaVMBuilder(target)
++                .setClassSource(currentClassSource)
++                .setResourceProvider(currentResourceProvider)
++                .setReferenceCache(refCache)
++                .setObfuscated(false)
++                .setStrict(true)
++                .build();
++        new PlatformPlugin().install(teavm);
++        new JCLPlugin().install(teavm);
++        new Patches().install(teavm);
++        teavm.setOptimizationLevel(TeaVMOptimizationLevel.SIMPLE);
++        teavm.setEntryPoint(mainClass);
++        teavm.build(new MemoryBuildTarget(wasmOutputFiles), outputName);
++        return teavm.getProblemProvider().getSevereProblems().isEmpty();
++    }
++
++    private boolean generateWebAssembly(String mainClass, String outputName) {
++
++        var target = new WasmTarget();
++        target.setRuntimeType(WasmRuntimeType.WASI);
++        var refCache = new ReferenceCache();
++        if (classSource == null) {
++            resourceProvider = new MemoryResourceProvider(List.of(teavmClasslibFiles, sdkFiles, classFiles, outputFiles));
++            classSource = new ClasspathClassHolderSource(resourceProvider, refCache);
++        }
+         var currentResourceProvider = new CompositeResourceProvider(new MemoryResourceProvider(List.of(outputFiles)),
+                 resourceProvider);
+         var currentClassSource = new CompositeClassHolderSource(List.of(
+@@ -272,14 +325,16 @@ public final class Compiler {
+                 .setStrict(true)
+                 .build();
+         teavm.setOptimizationLevel(TeaVMOptimizationLevel.ADVANCED);
+-        new JSOPlugin().install(teavm);
+         new PlatformPlugin().install(teavm);
++        new JSOPlugin().install(teavm);
+         new JCLPlugin().install(teavm);
+         teavm.setEntryPoint(mainClass);
+-        target.setObfuscated(false);
+-        target.setDebugInfoLocation(WasmDebugInfoLocation.EMBEDDED);
+-        target.setDebugInfo(true);
+         teavm.build(new MemoryBuildTarget(wasmOutputFiles), outputName);
++        for (var problem : teavm.getProblemProvider().getProblems()) {
++            System.err.println("TeaVM probe: " + problem.getText() + " "
++                    + java.util.Arrays.toString(problem.getParams()) + " at "
++                    + problem.getLocation().getMethod());
++        }
+         if (!diagnosticListeners.isEmpty()) {
+             for (var problem : teavm.getProblemProvider().getProblems()) {
+                 var wrapper = new TeaVMDiagnostic(problem);
+@@ -291,6 +346,34 @@ public final class Compiler {
+         return teavm.getProblemProvider().getSevereProblems().isEmpty();
+     }
+ 
++    void setSdkBytes(byte[] content) throws IOException {
++        var input = new ArchiveReader(new ByteArrayInputStream(content));
++        while (true) {
++            var entry = input.readNext();
++            if (entry == null) {
++                break;
++            }
++            var file = addFile(sdkFiles, entry, input.readData());
++            file.isJavaBase = true;
++        }
++    }
++
++    void setTeaVMClasslibBytes(byte[] content) throws IOException {
++        var input = new ArchiveReader(new ByteArrayInputStream(content));
++        while (true) {
++            var entry = input.readNext();
++            if (entry == null) {
++                break;
++            }
++            addFile(teavmClasslibFiles, entry, input.readData());
++        }
++    }
++
++    byte[] getWebAssemblyOutputBytes(String name) {
++        var data = wasmOutputFiles.get(name);
++        return data == null ? null : data.data;
++    }
++
+     @JSExport
+     public ListenerRegistration onDiagnostic(CompilerDiagnosticListener diagnosticListener) {
+         var reg = new DiagnosticListenerRegistration(diagnosticListeners, diagnosticListener);
+@@ -298,24 +381,32 @@ public final class Compiler {
+         return reg;
+     }
+ 
+-    private void initCompiler() {
++    private SimpleJavaCompiler initCompiler() {
+         if (compiler != null) {
+-            return;
++            return compiler;
+         }
+         var context = new Context();
++        compilerContext = context;
++        var options = Options.instance(context);
++        options.remove("debug.stackmap");
+         context.put(DiagnosticListener.class, new DiagnosticListenerImpl(diagnosticListeners));
+-        var fileManager = new FileManagerImpl(sourceFiles, classFiles, sdkFiles, outputFiles);
+-        context.put(JavaFileManager.class, fileManager);
+-        compiler = new SimpleJavaCompiler(context);
+-        compiler.prepare();
++        var manager = new FileManagerImpl(sourceFiles, classFiles, sdkFiles, outputFiles);
++        context.put(JavaFileManager.class, manager);
++        var activeCompiler = new SimpleJavaCompiler(context);
++        compiler = activeCompiler;
++        activeCompiler.prepare(context, manager);
++        return activeCompiler;
+     }
+ 
+     private class SimpleJavaCompiler extends JavaCompiler {
+         SimpleJavaCompiler(Context context) {
+             super(context);
++            this.context = context;
+         }
+ 
+-        void prepare() {
++        void prepare(Context context, FileManagerImpl fileManager) {
++            this.context = context;
++            syms = Symtab.instance(context);
+             syms.unnamedModule.visiblePackages = new LinkedHashMap<>();
+             syms.unnamedModule.readModules = Set.of(syms.unnamedModule, syms.java_base);
+             syms.java_base.complete();
+@@ -326,11 +417,18 @@ public final class Compiler {
+ 
+         boolean simpleCompile() {
+             var files = sourceFiles.values().stream().map(x -> (JavaFileObject) x).toList();
+-            var units = stopIfError(CompileState.ENTER, parseFiles(files));
++            var units = stopIfError(CompileState.ENTER, parseFiles(files, true));
+             enterTrees(stopIfError(CompileState.ENTER, initModules(units)));
+             generate(desugar(flow(attribute(todo))));
+             return log.nerrors == 0;
+         }
++
++        @Override
++        public com.sun.tools.javac.util.List<JCCompilationUnit> enterTrees(
++                com.sun.tools.javac.util.List<JCCompilationUnit> roots) {
++            enter.main(roots);
++            return roots;
++        }
+     }
+ 
+     static class DiagnosticListenerRegistration extends ListenerRegistration {
+diff --git a/compiler/src/main/java/org/teavm/javac/FileManagerImpl.java b/compiler/src/main/java/org/teavm/javac/FileManagerImpl.java
+index d6b5038..ee5b8c5 100644
+--- a/compiler/src/main/java/org/teavm/javac/FileManagerImpl.java
++++ b/compiler/src/main/java/org/teavm/javac/FileManagerImpl.java
+@@ -29,10 +29,11 @@ import javax.tools.JavaFileObject;
+ import javax.tools.StandardLocation;
+ 
+ class FileManagerImpl implements JavaFileManager {
+-    private final Map<Location, Map<String, FileData>> locations = new HashMap<>();
++    private final Map<Location, Map<String, FileData>> locations;
+ 
+     FileManagerImpl(Map<String, FileData> sourcePath, Map<String, FileData> classPath, Map<String, FileData> sdkPath,
+             Map<String, FileData> outputFiles) {
++        locations = new HashMap<>();
+         locations.put(StandardLocation.SOURCE_PATH, sourcePath);
+         locations.put(StandardLocation.CLASS_PATH, classPath);
+         locations.put(StandardLocation.CLASS_OUTPUT, outputFiles);
+@@ -90,7 +91,10 @@ class FileManagerImpl implements JavaFileManager {
+ 
+     @Override
+     public boolean hasLocation(Location location) {
+-        return locations.containsKey(location);
++        return location == StandardLocation.SOURCE_PATH
++                || location == StandardLocation.CLASS_PATH
++                || location == StandardLocation.CLASS_OUTPUT
++                || location == StandardLocation.PLATFORM_CLASS_PATH;
+     }
+ 
+     @Override
+diff --git a/compiler/src/main/java/org/teavm/javac/MemoryResourceProvider.java b/compiler/src/main/java/org/teavm/javac/MemoryResourceProvider.java
+index b8524d7..a4e6756 100644
+--- a/compiler/src/main/java/org/teavm/javac/MemoryResourceProvider.java
++++ b/compiler/src/main/java/org/teavm/javac/MemoryResourceProvider.java
+@@ -19,10 +19,11 @@ package org.teavm.javac;
+ import java.io.ByteArrayInputStream;
+ import java.io.InputStream;
+ import java.util.Date;
++import java.util.ArrayList;
+ import java.util.Iterator;
+ import java.util.List;
+ import java.util.Map;
+-import java.util.Objects;
++import java.util.NoSuchElementException;
+ import org.teavm.parsing.resource.Resource;
+ import org.teavm.parsing.resource.ResourceProvider;
+ 
+@@ -33,12 +34,42 @@ class MemoryResourceProvider implements ResourceProvider {
+         this.files = files;
+     }
+ 
++    @Override
++    public Resource getResource(String name) {
++        for (var map : files) {
++            var resource = getResources(map, name);
++            if (resource != null) {
++                return resource;
++            }
++        }
++        return null;
++    }
++
+     @Override
+     public Iterator<Resource> getResources(String name) {
+-       return files.stream()
+-               .map(map -> getResources(map, name))
+-               .filter(Objects::nonNull)
+-               .iterator();
++        var result = new ArrayList<Resource>();
++        for (var map : files) {
++            var resource = getResources(map, name);
++            if (resource != null) {
++                result.add(resource);
++            }
++        }
++        return new Iterator<>() {
++            private int index;
++
++            @Override
++            public boolean hasNext() {
++                return index < result.size();
++            }
++
++            @Override
++            public Resource next() {
++                if (index >= result.size()) {
++                    throw new NoSuchElementException();
++                }
++                return result.get(index++);
++            }
++        };
+     }
+ 
+     private Resource getResources(Map<String, FileData> map, String name) {
+@@ -52,6 +83,10 @@ class MemoryResourceProvider implements ResourceProvider {
+                 return new ByteArrayInputStream(file.data);
+             }
+ 
++            public byte[] getBytes() {
++                return file.data;
++            }
++
+             @Override
+             public Date getModificationDate() {
+                 return new Date(file.lastModified);
+diff --git a/compiler/src/main/java/org/teavm/javac/Patches.java b/compiler/src/main/java/org/teavm/javac/Patches.java
+index a86cacf..6ea363c 100644
+--- a/compiler/src/main/java/org/teavm/javac/Patches.java
++++ b/compiler/src/main/java/org/teavm/javac/Patches.java
+@@ -37,6 +37,9 @@ public class Patches implements TeaVMPlugin, ClassHolderTransformer {
+ 
+     @Override
+     public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
++        if (cls.getName().startsWith("com.sun.tools.javac.")) {
++            removeDebugOutput(cls);
++        }
+         switch (cls.getName()) {
+             case "com.sun.tools.javac.model.AnnotationProxyMaker":
+                 transformAnnotationProxyMaker(cls, context);
+@@ -50,6 +53,9 @@ public class Patches implements TeaVMPlugin, ClassHolderTransformer {
+             case "com.sun.tools.javac.file.BaseFileManager":
+                 transformBaseFileManager(cls, context);
+                 break;
++            case "com.sun.tools.javac.file.JRTIndex":
++                transformJrtIndex(cls, context);
++                break;
+             case "com.sun.tools.javac.comp.Modules":
+                 transformModules(cls, context);
+                 break;
+@@ -106,6 +112,24 @@ public class Patches implements TeaVMPlugin, ClassHolderTransformer {
+         pe.exit();
+     }
+ 
++    private void transformJrtIndex(ClassHolder cls, ClassHolderTransformerContext context) {
++        var method = cls.getMethod(new MethodDescriptor("isAvailable", ValueType.BOOLEAN));
++        var pe = ProgramEmitter.create(method, context.getHierarchy());
++        pe.constant(0).cast(boolean.class).returnValue();
++
++        var jrtIndex = ValueType.object("com.sun.tools.javac.file.JRTIndex");
++        for (var descriptor : new MethodDescriptor[] {
++                new MethodDescriptor("getSharedInstance", jrtIndex),
++                new MethodDescriptor("instance", jrtIndex, ValueType.object("com.sun.tools.javac.util.Context"))
++        }) {
++            method = cls.getMethod(descriptor);
++            if (method != null) {
++                pe = ProgramEmitter.create(method, context.getHierarchy());
++                pe.constantNull(jrtIndex).returnValue();
++            }
++        }
++    }
++
+     private void transformModules(ClassHolder cls, ClassHolderTransformerContext context) {
+         var method = cls.getMethod(new MethodDescriptor("filterAlreadyWarnedIncubatorModules",
+                 ValueType.object("java.util.stream.Stream"), ValueType.object("java.util.stream.Stream")));
+@@ -113,6 +137,22 @@ public class Patches implements TeaVMPlugin, ClassHolderTransformer {
+         pe.var(1, Stream.class).returnValue();
+     }
+ 
++    private void removeDebugOutput(ClassHolder cls) {
++        for (var method : cls.getMethods()) {
++            if (method.getProgram() == null) {
++                continue;
++            }
++            for (var block : method.getProgram().getBasicBlocks()) {
++                for (var instruction : block) {
++                    if (instruction instanceof InvokeInstruction invoke
++                            && invoke.getMethod().getClassName().equals("java.io.PrintStream")) {
++                        invoke.delete();
++                    }
++                }
++            }
++        }
++    }
++
+     private void transformSystem(ClassHolder cls, ClassHolderTransformerContext context) {
+         var method = new MethodHolder(new MethodDescriptor("exit", ValueType.INTEGER, ValueType.VOID));
+         cls.addMethod(method);
+diff --git a/gradle.properties b/gradle.properties
+index bb8dd6e..bd5226a 100644
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -14,4 +14,4 @@
+ #  limitations under the License.
+ #
+ 
+-jdk.revision=6c48f4ed707bf0b15f9b6098de30db8aae6fa40f
+\ No newline at end of file
++jdk.revision=890adb6410dab4606a4f26a942aed02fb2f55387
+diff --git a/gradle/libs.versions.toml b/gradle/libs.versions.toml
+index a6e120a..a5441f0 100644
+--- a/gradle/libs.versions.toml
++++ b/gradle/libs.versions.toml
+@@ -1,12 +1,13 @@
+ [versions]
+ 
+ teavm = "0.13.1"
++teavm-core = "0.13.1-patched"
+ asm = "9.8"
+ 
+ [libraries]
+ 
+-teavm-core = { module = "org.teavm:teavm-core", version.ref = "teavm" }
+-teavm-classlib = { module = "org.teavm:teavm-classlib", version.ref = "teavm" }
++teavm-core = { module = "org.teavm:teavm-core", version.ref = "teavm-core" }
++teavm-classlib = { module = "org.teavm:teavm-classlib", version.ref = "teavm-core" }
+ teavm-tooling = { module = "org.teavm:teavm-tooling", version.ref = "teavm" }
+ teavm-jso-impl = { module = "org.teavm:teavm-jso-impl", version.ref = "teavm" }
+ teavm-jso = { module = "org.teavm:teavm-jso", version.ref = "teavm" }
+diff --git a/javac/build.gradle b/javac/build.gradle
+index 3cbe476..6d476bb 100644
+--- a/javac/build.gradle
++++ b/javac/build.gradle
+@@ -6,7 +6,7 @@ plugins {
+ def revision = providers.gradleProperty("jdk.revision").get()
+ 
+ def downloadJDK = tasks.register("downloadJDK", Download) {
+-    src "https://github.com/openjdk/jdk25u/archive/${revision}.zip"
++    src "https://github.com/openjdk/jdk21/archive/${revision}.zip"
+     dest layout.buildDirectory.file("jdk-${revision}.zip")
+     overwrite false
+ }
+@@ -18,7 +18,7 @@ def unpackJDK = tasks.register("unpackJDK", Sync) {
+     exclude "**/module-info.java"
+ }
+ 
+-def baseJDKDir = layout.buildDirectory.dir("jdk/jdk25u-${revision}").get()
++def baseJDKDir = layout.buildDirectory.dir("jdk/jdk21-${revision}").get()
+ 
+ def compileTools = tasks.register("compileTools", JavaCompile) {
+     dependsOn unpackJDK
+@@ -117,4 +117,4 @@ compileJava {
+     source fileTree(baseSrcDir.dir("java.base/share/classes/")) {
+         include "jdk/internal/jmod/**"
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/settings.gradle b/settings.gradle
+index ffbfff4..65e742c 100644
+--- a/settings.gradle
++++ b/settings.gradle
+@@ -25,9 +25,9 @@ pluginManagement {
+ 
+ dependencyResolutionManagement {
+     repositories {
++        mavenLocal()
+         maven { url = uri("https://teavm.org/maven/repository") }
+         mavenCentral()
+-        mavenLocal()
+         ivy {
+             name = "Node.js"
+             setUrl("https://nodejs.org/dist/")
+@@ -64,7 +64,22 @@ gradle.afterProject {
+     }
+ }
+ 
++gradle.allprojects { project ->
++    project.configurations.configureEach {
++        resolutionStrategy.eachDependency { details ->
++            if (details.requested.group == "org.teavm" && details.requested.name == "teavm-core") {
++                details.useVersion("0.13.1-patched")
++            } else if (details.requested.group == "org.teavm"
++                    && details.requested.name != "teavm-classlib"
++                    && (details.requested.version == "0.13.1-patched"
++                    || details.requested.version == "0.13.1-clean")) {
++                details.useVersion("0.13.1")
++            }
++        }
++    }
++}
++
+ include "javac"
+ include "compiler"
+ include "protocol"
+-include "ui"
+\ No newline at end of file
++include "ui"

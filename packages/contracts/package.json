@@ -1,6 +1,6 @@
 {
   "name": "@wasm-oj/contracts",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Environment-neutral contracts and wire types for the WASM-OJ SDK.",
   "license": "MIT",
   "author": "JacobLinCool",
@@ -13,7 +13,11 @@
   "bugs": {
     "url": "https://github.com/wasm-oj/forge/issues"
   },
-  "keywords": ["online-judge", "wasi", "wasm"],
+  "keywords": [
+    "online-judge",
+    "wasi",
+    "wasm"
+  ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -28,7 +32,11 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=24.18.0 <25"
   },

@@ -21,11 +21,11 @@ describe("server stage package layout", () => {
       .toThrow("Unsupported @wasm-oj/server module layout");
     expect(() => resolveServerStageDirectory(fileUrl("/unpacked/package/dist/other-stage.mjs")))
       .toThrow("Unsupported @wasm-oj/server module layout");
-    expect(() => serverStageScript("relative/dist", "python-stage.mjs"))
+    expect(() => serverStageScript("relative/dist", "go-stage.mjs"))
       .toThrow("stage directory must be absolute");
     expect(() => serverStageScript(
       path.resolve("/unpacked/package/dist"),
-      "unknown-stage.mjs" as "python-stage.mjs",
+      "unknown-stage.mjs" as "go-stage.mjs",
     )).toThrow("Unknown isolated server stage");
   });
 });

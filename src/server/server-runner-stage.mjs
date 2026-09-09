@@ -5,6 +5,7 @@ import path from "node:path";
 import { serialize } from "node:v8";
 import { gunzipSync } from "node:zlib";
 import { init, Runtime, Wasmer } from "@wasmer/sdk/node";
+import { withProcessKeepalive } from "./process-keepalive.mjs";
 import {
   PYTHON_COMPRESSED_PACKAGE_SHA256,
   PYTHON_PACKAGE,
@@ -23,14 +24,14 @@ let exitCode = 0;
 
 try {
   const input = parseInput(JSON.parse(await readStdin()));
-  await init({ log: "warn" });
+  await withProcessKeepalive(init({ log: "warn" }));
   runtime = new Runtime({ registry: null });
   const packagePath = input.toolchainAsset;
   const compressed = await readFile(packagePath);
   if (!input.verifiedToolchain) verifyDigest(packagePath, compressed, PYTHON_COMPRESSED_PACKAGE_SHA256);
   const expanded = uint8View(gunzipSync(compressed));
   if (!input.verifiedToolchain) verifyDigest(packagePath, expanded, PYTHON_PACKAGE_SHA256);
-  pkg = await Wasmer.fromFile(expanded, runtime);
+  pkg = await withProcessKeepalive(Wasmer.fromFile(expanded, runtime));
 
   const commandMap = pkg.commands;
   commands = uniqueCommands(commandMap);
@@ -50,15 +51,15 @@ try {
       );
     }
   } else {
-    const instance = await command.run({
+    const instance = await withProcessKeepalive(command.run({
       args: input.request.args,
       env: {
         PYTHONHOME: "/usr/local",
         PYTHONHASHSEED: "0",
         PYTHONDONTWRITEBYTECODE: "1",
       },
-    });
-    const output = await instance.wait();
+    }));
+    const output = await withProcessKeepalive(instance.wait());
     if (!output.ok) {
       throw new Error(
         `Unable to export runtime files from ${input.request.packageSpecifier}: `

@@ -16,7 +16,7 @@ import {
   GO_STANDARD_LIBRARY_ASSET_PATH,
   GO_VERSION,
   JAVA_COMPILER_ASSET_PATH,
-  JAVA_COMPILER_PACKAGE_SHA256,
+  JAVA_COMPILER_SHA256,
   JAVA_COMPILE_CLASSLIB_ASSET_PATH,
   JAVA_COMPILE_CLASSLIB_SHA256,
   JAVA_RUNTIME_CLASSLIB_ASSET_PATH,
@@ -29,6 +29,7 @@ import {
   PYTHON_PACKAGE_SHA256,
   PYTHON_RUNTIME_FILES_ARCHIVE_SHA256,
   PYTHON_VERSION,
+  PYTHON_TARGET_TRIPLE,
   RUST_COMPRESSED_PACKAGE_SHA256,
   RUST_PACKAGE_ASSET_PATH,
   RUST_PACKAGE_MANIFEST_ASSET_PATH,
@@ -44,14 +45,13 @@ import {
   RUST_TARGET_TRIPLE,
   decodeRustToolchainManifest,
 } from "../src/compiler/rust-toolchain.ts";
-import { PYTHON_TARGET_TRIPLE } from "../src/compiler/python-toolchain.ts";
 import {
   decodeGoStandardLibrary,
   decodeGoToolchainManifest,
 } from "../src/compiler/go-toolchain.ts";
 
 const run = promisify(execFile);
-const QUICKJS_WASM_SHA256 = "956bf2b3700690e1817034eb8e063cfd9781c66b4bffa244ef4f9445656ccfa1";
+const QUICKJS_WASM_SHA256 = "a098db08592626781f6ad6e63f1b8a36da6d03b85b530dc94c441a348426b20b";
 const QUICKJS_LLVM_PRODUCER = "18.1.2-wasi-sdk (https://github.com/llvm/llvm-project 26a1d6601d727a96f4301d0d8647b5a42760ae0c)";
 const QUICKJS_IMPORTS = Object.freeze([
   "wasi_snapshot_preview1.args_get:function",
@@ -93,10 +93,10 @@ const RUST_LINKER_SOURCE = Object.freeze({
   resourcesSha256: "79eef0c336fe55cf03ff8f5b42b784c8168f929a3603138b2c6301f4601e4c86",
 });
 const PYTHON_SOURCE = Object.freeze({
-  url: "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz",
-  archiveSha256: "143b1dddefaec3bd2e21e3b839b34a2b7fb9842272883c576420d605e9f30c63",
-  spdxSha256: "1f5d394856783fa77e1f1db280f84eabf693bffc1fb06a747f7116de9f99f3bd",
-  compilerSha256: "f104b9da093f806451d7bba3f7eca41033842a5ec88ac256689e6e3cc1f1e2e1",
+  url: "https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tar.xz",
+  archiveSha256: "3b48dac8fb59f62eaa67ac83c1eb12bda1b7a08406dd286e252c11a66be27f81",
+  spdxSha256: "87f55ca6c59fe159fa8c47ba2d7d8bec39cc649b1d3f47c667f34025a2ca9a68",
+  compilerSha256: "69e9d87da6c8a628694ffd76c3d0f26e7aaa0bc91d952a28d9fc37c7144e354c",
 });
 const PYTHON_WASI_SDK = Object.freeze({
   version: "24.0",
@@ -315,8 +315,8 @@ if (
   || pythonManifest.wasiSdk?.archiveSha256 !== PYTHON_WASI_SDK.archiveSha256
   || JSON.stringify(pythonManifest.build?.disabledModules) !== '["_socket"]'
   || pythonManifest.runtimeFiles?.archiveSha256 !== PYTHON_RUNTIME_FILES_ARCHIVE_SHA256
-  || pythonManifest.runtimeFiles?.archiveBytes !== 10_652_540
-  || pythonManifest.runtimeFiles?.cacheKey !== "wasm-oj-v2:runtime-files:cpython-3.14.6-wasip1-stdlib-stored-zip"
+  || pythonManifest.runtimeFiles?.archiveBytes !== 10_695_683
+  || pythonManifest.runtimeFiles?.cacheKey !== "wasm-oj-v2:runtime-files:cpython-3.14.7-wasip1-stdlib-stored-zip"
   || pythonManifest.runtimeFiles?.format !== "WOJFS002"
   || pythonManifest.runtimeFiles?.guestPath !== "/cpython/lib/python314.zip"
   || pythonManifest.filesystemMount !== "/usr/local"
@@ -387,18 +387,40 @@ try {
   }
   process.stdout.write("verified Go WebC commands and deterministic standard-library archive\n");
 
-  const javaCompressed = await readFile(path.join(directory, path.basename(JAVA_COMPILER_ASSET_PATH)));
-  const javaWebc = gunzipSync(javaCompressed);
-  if (createHash("sha256").update(javaWebc).digest("hex") !== JAVA_COMPILER_PACKAGE_SHA256) {
-    throw new Error("Java compiler WebC expanded digest does not match its toolchain contract.");
+  const javaCompiler = await readFile(path.join(directory, path.basename(JAVA_COMPILER_ASSET_PATH)));
+  if (createHash("sha256").update(javaCompiler).digest("hex") !== JAVA_COMPILER_SHA256) {
+    throw new Error("Java compiler digest does not match its toolchain contract.");
   }
-  const javaWebcPath = path.join(temporary, "java-teavm-0.13.1.wasi.compiler.webc");
-  await writeFile(javaWebcPath, javaWebc, { flag: "wx" });
-  await run("cargo", [
-    "run", "--locked", "--release", "--quiet",
-    "--manifest-path", path.resolve("tools/package-java-webc/Cargo.toml"),
-    "--", "--verify", javaWebcPath,
-  ], { maxBuffer: 4 * 1024 * 1024 });
+  const javaModule = await WebAssembly.compile(javaCompiler, { builtins: ["js-string"] });
+  const javaHostModules = new Set(["teavmJso", "teavmDate", "teavm", "teavmMath", "teavmConsole"]);
+  if (WebAssembly.Module.imports(javaModule).some(entry => !javaHostModules.has(entry.module))) {
+    throw new Error("Java compiler imports an unexpected host module.");
+  }
+  const { jsBodyFactories } = await import("../src/compiler/vendor/java-compiler-bindings.mjs");
+  let javaBodyCount = 0;
+  const javaBodyKeys = new Set();
+  while (true) {
+    const sections = WebAssembly.Module.customSections(javaModule, `teavm.js-body.${javaBodyCount}`);
+    if (sections.length === 0) break;
+    if (sections.length !== 1) throw new Error("Duplicate Java compiler static body.");
+    const section = Buffer.from(sections[0]);
+    let offset = 4;
+    const parts = [];
+    for (let index = 0; index < section.readUInt32BE(0); index++) {
+      const length = section.readUInt32BE(offset);
+      offset += 4;
+      parts.push(section.subarray(offset, offset + length).toString("utf8"));
+      offset += length;
+    }
+    if (offset !== section.length || !jsBodyFactories.has(JSON.stringify(parts))) {
+      throw new Error("Java compiler static JavaScript bindings do not match its Wasm module.");
+    }
+    javaBodyKeys.add(JSON.stringify(parts));
+    javaBodyCount++;
+  }
+  if (javaBodyCount === 0 || javaBodyKeys.size !== jsBodyFactories.size) {
+    throw new Error("Java compiler static binding registry differs from its unique emitted bodies.");
+  }
   const javaCompileClasslib = await readFile(path.join(directory, path.basename(JAVA_COMPILE_CLASSLIB_ASSET_PATH)));
   const javaRuntimeClasslib = await readFile(path.join(directory, path.basename(JAVA_RUNTIME_CLASSLIB_ASSET_PATH)));
   if (
@@ -407,7 +429,7 @@ try {
   ) {
     throw new Error("Java class-library asset digest does not match its toolchain contract.");
   }
-  process.stdout.write("verified Java compiler WebC imports and class-library asset digests\n");
+  process.stdout.write("verified Java WasmGC imports, static JavaScript bindings, and class-library asset digests\n");
 
   const inspection = await run(process.execPath, [
     "--experimental-strip-types",
@@ -421,12 +443,12 @@ try {
   const result = JSON.parse(line.slice(prefix.length));
   if (
     result.archiveSha256 !== PYTHON_RUNTIME_FILES_ARCHIVE_SHA256
-    || result.archiveBytes !== 10_652_540
-    || JSON.stringify(result.files) !== JSON.stringify({ "/cpython/lib/python314.zip": 10_652_482 })
+    || result.archiveBytes !== 10_695_683
+    || JSON.stringify(result.files) !== JSON.stringify({ "/cpython/lib/python314.zip": 10_695_625 })
   ) {
     throw new Error(`Python runtime-files archive differs from the manifest: ${JSON.stringify(result)}.`);
   }
-  process.stdout.write("verified Python 3.14.6 runtime smoke and deterministic runtime-files archive\n");
+  process.stdout.write("verified Python 3.14.7 runtime smoke and deterministic runtime-files archive\n");
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }

@@ -1,3 +1,4 @@
+import { QUICKJS_NODE_STDLIB } from "../runtime/quickjs/stdlib.generated.ts";
 import type { BuildArtifact, RunConfig, RuntimeBundleArtifact } from "../core/types";
 import { assertValidBuildArtifact } from "../core/artifact-validation";
 import { canonicalFileEntries } from "../core/project-files";
@@ -196,15 +197,16 @@ export function quickJsBundle(
 ${quickJsDeterminismPrelude(config.determinism)}
 const __modules = ${JSON.stringify(modules)};
 const __packageManifests = ${JSON.stringify(packageManifests)};
-let __input = ${JSON.stringify(stdin)};
+${QUICKJS_NODE_STDLIB}
+const __node = __nodeStdio.createNodeStdio(${JSON.stringify(stdin)}, __wasm_oj_write_stdout, __wasm_oj_write_stderr, ${JSON.stringify(config.env)}, ${JSON.stringify(["qjs", "/project/" + artifact.entry, ...config.args])});
 const __cache = Object.create(null);
 const __std = {
-  in: { readAsString: () => { const result = __input; __input = ""; return result; } },
+  in: { readAsString: __node.readAsString },
   out: { puts: (value) => __wasm_oj_write_stdout(String(value)) },
   err: { puts: (value) => __wasm_oj_write_stderr(String(value)) },
 };
 function __resolve(request, parent) {
-  if (request === "std") return request;
+  if (request === "std" || Object.hasOwn(__node.builtins, request)) return request;
   if (request.includes("\\")) throw new Error("Module paths must use canonical forward slashes.");
   let parts;
   let requestedParts;
@@ -244,6 +246,7 @@ function __resolve(request, parent) {
 }
 function __load(id) {
   if (id === "std") return __std;
+  if (Object.hasOwn(__node.builtins, id)) return __node.builtins[id];
   if (__cache[id]) return __cache[id].exports;
   const module = { exports: {} };
   __cache[id] = module;
@@ -251,7 +254,23 @@ function __load(id) {
   factory((request) => __load(__resolve(request, id)), module, module.exports);
   return module.exports;
 }
-__load(${JSON.stringify(artifact.entry)});
+globalThis.__wasm_oj_builtins = { ...__node.builtins, std: __std };
+globalThis.__wasm_oj_resolve = __resolve;
+globalThis.__wasm_oj_module_source = (id) => {
+  if (Object.hasOwn(globalThis.__wasm_oj_builtins, id)) {
+    const value = globalThis.__wasm_oj_builtins[id];
+    const names = Object.keys(value).filter(name => name !== "default");
+    return "const value=globalThis.__wasm_oj_builtins[" + JSON.stringify(id) + "];export default value;" + names.map((name, index) => "const e" + index + "=value[" + JSON.stringify(name) + "];export {e" + index + " as " + JSON.stringify(name) + "};").join("");
+  }
+  if (${JSON.stringify(artifact.language === "typescript")} || id.endsWith(".cjs") || (id.startsWith("node_modules/") && !Object.entries(__packageManifests).some(([path, manifest]) => id.startsWith(path.slice(0, -12)) && manifest.type === "module"))) {
+    const value = __load(id);
+    globalThis.__wasm_oj_builtins[id] = value;
+    return globalThis.__wasm_oj_module_source(id);
+  }
+  if (!Object.hasOwn(__modules, id)) throw new Error("Module '" + id + "' was not found.");
+  return __modules[id];
+};
+__wasm_oj_eval_module(${JSON.stringify(artifact.entry)});
 `;
 }
 
@@ -300,8 +319,7 @@ export function createDefaultRuntimeDrivers(
       request.env = {
         ...request.env,
         PYTHONHOME: "/cpython",
-        PYTHONHASHSEED: "0",
-        PYTHONPATH: "/project/build/site-packages:/project/site-packages:/project/src:/project",
+        PYTHONPATH: "/project/site-packages",
         PYTHONDONTWRITEBYTECODE: "1",
       };
       const runtimeFiles = await resolver.packageFileSystem({

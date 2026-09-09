@@ -1,16 +1,21 @@
 use crate::{
     GoCompilerSession as CoreGoCompilerSession, GoCompilerSessionConfig, GoCompilerSessionRequest,
-    InteractiveRequest, RunRequest, interactive_response, run_response,
+    InteractiveRequest, RunError, RunRequest, interactive_response, run_response_from_result,
 };
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub fn run_wasm_oj(request: JsValue) -> Result<JsValue, JsValue> {
+pub fn run_wasm_oj(request: JsValue, on_execution: js_sys::Function) -> Result<JsValue, JsValue> {
     console_error_panic_hook::set_once();
     let request: RunRequest = serde_wasm_bindgen::from_value(request)
         .map_err(|error| JsValue::from_str(&format!("invalid run request: {error}")))?;
-    let response = run_response(request);
+    let response = run_response_from_result(crate::run::run_observed(request, |running| {
+        on_execution
+            .call1(&JsValue::UNDEFINED, &JsValue::from_bool(running))
+            .map(|_| ())
+            .map_err(|error| RunError::Runtime(format!("execution observer failed: {error:?}")))
+    }));
     response
         .serialize(&serde_wasm_bindgen::Serializer::new().serialize_maps_as_objects(true))
         .map_err(|error| JsValue::from_str(&format!("failed to serialize run response: {error}")))

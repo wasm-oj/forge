@@ -8,7 +8,7 @@ import { DEFAULT_CONFORMANCE_CASES, FULL_CONFORMANCE_CASES } from "../conformanc
 import { runConformanceHost, type ConformanceSnapshot } from "../conformance/matrix";
 import { sourceTreeProvenance } from "../conformance/provenance";
 import { WASM_OJ_CONTRACT_VERSION, WASM_OJ_SCHEMAS } from "../core/contract";
-import { JAVA_EMPTY_PROGRAM_BASELINE_COST } from "../core/cost-baselines";
+import { DEFAULT_COST_BASELINES } from "../core/cost-baselines";
 import { createEngine, type Engine } from "../sdk/engine";
 import { ServerCompiler } from "./server-compiler";
 import { ServerRunner } from "./server-runner";
@@ -103,7 +103,7 @@ describe.skipIf(!enabled)("real server conformance snapshot", () => {
     expect(snapshot.samples.filter((sample) => !sample.success)).toEqual([]);
     for (const sample of snapshot.samples.filter((item) => item.caseId.startsWith("java-"))) {
       const metrics = sample.transcript?.metrics;
-      expect(metrics).toMatchObject({ baselineCost: JAVA_EMPTY_PROGRAM_BASELINE_COST });
+      expect(metrics).toMatchObject({ baselineCost: DEFAULT_COST_BASELINES[metrics!.costProfile] });
       expect(metrics?.rawCost).toBe((metrics?.cost ?? 0) + (metrics?.baselineCost ?? 0));
     }
   });
