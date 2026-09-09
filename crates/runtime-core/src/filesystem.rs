@@ -528,7 +528,6 @@ mod tests {
 
     fn determinism() -> DeterminismConfig {
         DeterminismConfig {
-            clock_mode: None,
             random_seed: 7,
             realtime_epoch_ms: 946_684_800_000,
             clock_step_ns: 1_000_000,

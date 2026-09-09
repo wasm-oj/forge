@@ -131,9 +131,7 @@ function assertProjectFiles(value: unknown): asserts value is ProjectFile[] {
 }
 
 function assertDeterminism(value: unknown): asserts value is DeterminismConfig {
-  const record = plainDataRecord(value, "Project determinism");
-  exactDataRecord(record, "Project determinism", Object.hasOwn(record, "clockMode")
-    ? [...DETERMINISM_KEYS, "clockMode"] : DETERMINISM_KEYS);
+  exactDataRecord(value, "Project determinism", DETERMINISM_KEYS);
   resolveDeterminism(value as DeterminismConfig);
 }
 

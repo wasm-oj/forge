@@ -131,7 +131,6 @@ describe("server CPython compiler", () => {
       try {
         const result = await invalidRunner.run(invalid.artifact, {
           ...runConfig,
-          determinism: { ...runConfig.determinism, clockMode: "host" },
           resources: { ...runConfig.resources, instructionBudget: Number.MAX_SAFE_INTEGER },
         });
         expect(result.code).not.toBe(0);

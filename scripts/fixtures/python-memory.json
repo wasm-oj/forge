@@ -114,9 +114,7 @@
     "source": "def invalid(:",
     "input": "",
     "runtimeError": "SyntaxError",
-    "determinism": {
-      "clockMode": "host"
-    },
+    "determinism": {},
     "resources": {
       "instructionBudget": 9007199254740991,
       "wallTimeLimitMs": 60000

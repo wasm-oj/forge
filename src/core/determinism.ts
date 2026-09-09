@@ -19,8 +19,5 @@ export function resolveDeterminism(
   if (!Number.isSafeInteger(resolved.clockStepNs) || resolved.clockStepNs < 1 || resolved.clockStepNs > 1_000_000_000) {
     throw new RangeError("clockStepNs must be an integer from 1 through 1,000,000,000.");
   }
-  if (resolved.clockMode !== undefined && resolved.clockMode !== "host") {
-    throw new RangeError("clockMode must be host when provided.");
-  }
   return resolved;
 }

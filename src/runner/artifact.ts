@@ -68,7 +68,6 @@ export interface PreparedRunRequest {
   startupEntropyBytes: number;
   cost: CostBudget;
   determinism: {
-    clockMode?: "host";
     randomSeed: number;
     realtimeEpochMs: number;
     clockStepNs: number;

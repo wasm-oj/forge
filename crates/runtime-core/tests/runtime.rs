@@ -12,7 +12,6 @@ fn request(wat_source: &str) -> RunRequest {
         cwd: None,
         startup_entropy_bytes: 0,
         determinism: DeterminismConfig {
-            clock_mode: None,
             random_seed: 7,
             realtime_epoch_ms: 946_684_800_000,
             clock_step_ns: 1_000_000,
@@ -744,66 +743,4 @@ fn redirected_stdio_is_not_a_terminal() {
             );
         }
     }
-}
-
-#[test]
-fn host_clock_reads_do_not_consume_virtual_time_budget() {
-    let mut req = request(
-        r#"(module
-      (import "wasi_snapshot_preview1" "clock_time_get" (func $clock (param i32 i64 i32) (result i32)))
-      (memory (export "memory") 1)
-      (func (export "_start") (local $i i32)
-        (loop $again
-          i32.const 1 i64.const 0 i32.const 0 call $clock
-          if unreachable end
-          local.get $i i32.const 1 i32.add local.tee $i
-          i32.const 10000 i32.lt_u br_if $again)))"#,
-    );
-    req.resources.logical_time_limit_ms = 1;
-    let deterministic = run(req.clone()).unwrap();
-    assert_eq!(
-        deterministic.termination,
-        wasm_oj_runtime_core::ExecutionTermination::LogicalTimeLimit
-    );
-    req.determinism.clock_mode = Some(wasm_oj_runtime_core::ClockMode::Host);
-    let result = run(req).unwrap();
-    assert_eq!(
-        result.termination,
-        wasm_oj_runtime_core::ExecutionTermination::Exited
-    );
-    assert_eq!(result.code, 0);
-    assert_eq!(result.metrics.logical_time_ns, 0);
-}
-
-#[test]
-fn host_clock_poll_waits_instead_of_consuming_virtual_budget() {
-    let mut req = request(
-        r#"(module
-      (import "wasi_snapshot_preview1" "poll_oneoff" (func $poll (param i32 i32 i32 i32) (result i32)))
-      (import "wasi_snapshot_preview1" "clock_time_get" (func $clock (param i32 i64 i32) (result i32)))
-      (import "wasi_snapshot_preview1" "fd_write" (func $write (param i32 i32 i32 i32) (result i32)))
-      (memory (export "memory") 1)
-      (data (i32.const 160) "\90\00\00\00\08\00\00\00")
-      (func (export "_start")
-        i32.const 1 i64.const 0 i32.const 128 call $clock drop
-        i32.const 16 i32.const 1 i32.store
-        i32.const 24 i64.const 20000000 i64.store
-        i32.const 32 i64.const 1 i64.store
-        i32.const 0 i32.const 64 i32.const 1 i32.const 120 call $poll
-        if unreachable end
-        i32.const 1 i64.const 0 i32.const 136 call $clock drop
-        i32.const 144 i32.const 136 i64.load i32.const 128 i64.load i64.sub i64.store
-        i32.const 1 i32.const 160 i32.const 1 i32.const 168 call $write drop))"#,
-    );
-    req.resources.logical_time_limit_ms = 1;
-    req.determinism.clock_mode = Some(wasm_oj_runtime_core::ClockMode::Host);
-    let result = run(req).unwrap();
-    assert_eq!(
-        result.termination,
-        wasm_oj_runtime_core::ExecutionTermination::Exited
-    );
-    assert_eq!(result.code, 0);
-    let elapsed_ns = u64::from_le_bytes(result.stdout.try_into().unwrap());
-    assert!(elapsed_ns >= 20_000_000);
-    assert_eq!(result.metrics.logical_time_ns, 0);
 }

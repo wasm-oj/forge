@@ -87,14 +87,7 @@ const fixtures = [
 fixtures.push(...JSON.parse(await readFile(path.join(root, "scripts/fixtures/java-client.json"), "utf8")));
 fixtures.push(...JSON.parse(await readFile(path.join(root, "scripts/fixtures/python-memory.json"), "utf8")));
 fixtures.push(
-  { language:"cpp", label:"host-cpp-helper",repeat:10, determinism:{clockMode:"host"}, source:'#include "helper.h"\n#include <iostream>\nint main(){std::cout<<answer()<<"\\n";}',files:{"src/helper.h":"inline int answer(){return 42;}"}, input:"", expected:"42\n", resources:{wallTimeLimitMs:3000} },
-  { language:"cpp", label:"host-cpp-stdio",repeat:10, determinism:{clockMode:"host"}, source:'#include <cstdio>\nint main(){std::puts("42");}', input:"", expected:"42\n", resources:{wallTimeLimitMs:3000} },
-);
-fixtures.push(
-  { language:"c", label:"host-clock",repeat:10, determinism:{clockMode:"host"}, source:'#include <stdio.h>\n#include <time.h>\nint main(){for(int i=0;i<10000;i++) clock();puts("42");}', input:"", expected:"42\n", resources:{logicalTimeLimitMs:1,wallTimeLimitMs:1000} },
-  { language:"c", label:"host-sleep", determinism:{clockMode:"host"}, source:'#define _POSIX_C_SOURCE 200809L\n#include <stdio.h>\n#include <time.h>\nint main(){struct timespec a,b,d={0,20000000};clock_gettime(CLOCK_MONOTONIC,&a);if(nanosleep(&d,0))return 2;clock_gettime(CLOCK_MONOTONIC,&b);long long ns=(b.tv_sec-a.tv_sec)*1000000000LL+b.tv_nsec-a.tv_nsec;puts(ns>=15000000?"42":"too short");}', input:"", expected:"42\n", resources:{logicalTimeLimitMs:1,wallTimeLimitMs:1000} },
-  { language:"c", label:"host-sleep-timeout", determinism:{clockMode:"host"}, source:'#define _POSIX_C_SOURCE 200809L\n#include <time.h>\nint main(){struct timespec d={1,0};nanosleep(&d,0);return 0;}', input:"", termination:"wall-time-limit", resources:{logicalTimeLimitMs:1,wallTimeLimitMs:50} },
-  { language:"c", label:"cpu-clock", source:'#include <stdio.h>\n#include <time.h>\nint main(){for(int i=0;i<10000;i++) clock();puts("42");}', input:"", expected:"42\n" },
+  { language:"c", label:"logical-clock-limit", source:'#include <stdio.h>\n#include <time.h>\nint main(){for(int i=0;i<10000;i++) clock();puts("42");}', input:"", termination:"logical-time-limit", resources:{logicalTimeLimitMs:1} },
   { language:"c", label:"cpu-work", source:'#include <stdio.h>\nint main(){volatile unsigned long long s=0;for(unsigned i=0;i<10000000;i++)s+=i;printf("%llu\\n",s);}', input:"", expected:"49999995000000\n" },
   { language:"python", label:"memory-16mb", source:'print(42)', input:"", expected:"42\n", resources:{memoryLimitBytes:16*1024*1024} },
 );

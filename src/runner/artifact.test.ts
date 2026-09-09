@@ -187,12 +187,6 @@ describe("artifact runner preparation", () => {
     ]);
     expect(request.files["/project/main.py"]).toEqual(new TextEncoder().encode("print(1)\n"));
     expect(request.env.PYTHONHASHSEED).toBe("0");
-    const hostRequest = await prepareArtifactRun(artifact, {
-      ...config,
-      determinism: { ...config.determinism, clockMode: "host" },
-      env: { PYTHONHASHSEED: "42" },
-    }, resolver, builtInDrivers);
-    expect(hostRequest.env.PYTHONHASHSEED).toBe("42");
     expect(request.files["/cpython/lib/python3.14/encodings/__init__.py"]).toEqual(new Uint8Array([4]));
     expect(resolver.packageFileSystem).toHaveBeenCalledWith(expect.objectContaining({
       cacheKey: PYTHON_RUNTIME_FILES_CACHE_KEY,

@@ -60,19 +60,6 @@ describe("runtime determinism adapters", () => {
     expect(first.uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
-  it("bases host performance on live startup time instead of the deterministic epoch", () => {
-    let hostNow = 1_800_000_000_000;
-    const context = createContext({
-      Date: { now: () => hostNow++ },
-      __wasm_oj_determinism_seed: () => 42,
-      __wasm_oj_determinism_epoch_ms: () => DEFAULT_DETERMINISM.realtimeEpochMs,
-      __wasm_oj_determinism_step_ns: () => DEFAULT_DETERMINISM.clockStepNs,
-    });
-    new Script(`${quickJsDeterminismPrelude({ ...DEFAULT_DETERMINISM, clockMode: "host" })}
-      globalThis.result = [performance.timeOrigin, performance.now()];`).runInContext(context);
-    expect(context.result).toEqual([1_800_000_000_000, 1]);
-  });
-
   it("pins locale, timezone, Python hashing, clock, and entropy environment", () => {
     expect(deterministicEnvironment({ USER_VALUE: "kept" }, { ...DEFAULT_DETERMINISM, randomSeed: 7 })).toEqual({
       USER_VALUE: "kept",
@@ -91,15 +78,6 @@ describe("runtime determinism adapters", () => {
     ));
     expect(new Set(sources)).toEqual(new Set([sources[0]]));
     expect(observeScript(0).random).not.toEqual(observeScript(1).random);
-  });
-
-  it("preserves explicitly configured host locale and Python hashing while protecting internal inputs", () => {
-    const config = { ...DEFAULT_DETERMINISM, clockMode: "host" as const };
-    expect(deterministicEnvironment({ TZ: "UTC", LC_ALL: "C", PYTHONHASHSEED: "0" }, config))
-      .toMatchObject({ TZ: "UTC", LC_ALL: "C", PYTHONHASHSEED: "0" });
-    expect(deterministicEnvironment({ TZ: "Asia/Taipei", LC_ALL: "C.UTF-8", PYTHONHASHSEED: "42" }, config))
-      .toMatchObject({ TZ: "Asia/Taipei", LC_ALL: "C.UTF-8", PYTHONHASHSEED: "42" });
-    expect(() => deterministicEnvironment({ WASM_OJ_RANDOM_SEED: "42" }, config)).toThrow("reserved");
   });
 
   it("does not allow callers to shadow reserved deterministic inputs", () => {

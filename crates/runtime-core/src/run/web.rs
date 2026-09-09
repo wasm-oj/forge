@@ -27,10 +27,7 @@ pub fn run(
     let module = Module::new(&store, &executable.wasm).map_err(|error| {
         RunError::Compile(format!("failed to compile instrumented module: {error}"))
     })?;
-    let runtime = runtime_with_engine(
-        store.engine().clone(),
-        request.determinism.clock_mode.is_some(),
-    );
+    let runtime = runtime_with_engine(store.engine().clone());
 
     let (mut stdin_writer, stdin_reader) = Pipe::channel();
     stdin_writer

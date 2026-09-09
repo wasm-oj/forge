@@ -10,12 +10,6 @@ describe("deterministic execution configuration", () => {
     });
   });
 
-  it("requires explicit host-clock opt-in without changing the default transcript", () => {
-    expect(resolveDeterminism(undefined)).not.toHaveProperty("clockMode");
-    expect(resolveDeterminism({ clockMode: "host" })).toEqual({ ...DEFAULT_DETERMINISM, clockMode: "host" });
-    expect(() => resolveDeterminism({ clockMode: "invalid" } as never)).toThrow("clockMode");
-  });
-
   it("rejects values that cannot be represented consistently by all runtimes", () => {
     expect(() => resolveDeterminism({ randomSeed: -1 })).toThrow("unsigned 32-bit");
     expect(() => resolveDeterminism({ randomSeed: 2 ** 32 })).toThrow("unsigned 32-bit");

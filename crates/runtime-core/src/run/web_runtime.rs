@@ -1,9 +1,7 @@
-use std::future::{Future, poll_fn};
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Poll;
 use std::time::Duration;
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::spawn_local;
 use wasmer::Engine;
 use wasmer_wasix::runtime::task_manager::{
@@ -11,45 +9,12 @@ use wasmer_wasix::runtime::task_manager::{
 };
 use wasmer_wasix::{PluggableRuntime, Runtime, WasiFunctionEnv, WasiThreadError};
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = performance, js_name = now)]
-    fn performance_now() -> f64;
-}
-
-thread_local! {
-    static WAIT_CELL: js_sys::Int32Array = js_sys::Int32Array::new(&js_sys::SharedArrayBuffer::new(4));
-}
-
 #[derive(Debug, Default)]
-pub struct WebTaskManager {
-    pub host_clock: bool,
-}
+pub struct WebTaskManager;
 
 impl VirtualTaskManager for WebTaskManager {
-    fn sleep_now(&self, duration: Duration) -> Pin<Box<dyn Future<Output = ()> + Send + Sync>> {
-        if !self.host_clock || duration.is_zero() {
-            return Box::pin(async {});
-        }
-        let deadline_ms = performance_now() + duration.as_secs_f64() * 1000.0;
-        Box::pin(poll_fn(move |context| {
-            let remaining_ms = deadline_ms - performance_now();
-            if remaining_ms <= 0.0 {
-                return Poll::Ready(());
-            }
-            // Wasmer synchronously polls timer and I/O futures together. A full
-            // blocking sleep here would hide an already-ready I/O/cleanup branch.
-            // Wake before returning Pending so its synchronous parker can repoll.
-            context.waker().wake_by_ref();
-            WAIT_CELL.with(|cell| {
-                if let Err(error) =
-                    js_sys::Atomics::wait_with_timeout(cell, 0, 0, remaining_ms.min(1.0))
-                {
-                    wasm_bindgen::throw_val(error);
-                }
-            });
-            Poll::Pending
-        }))
+    fn sleep_now(&self, _duration: Duration) -> Pin<Box<dyn Future<Output = ()> + Send + Sync>> {
+        Box::pin(async {})
     }
 
     fn task_shared(
@@ -136,8 +101,8 @@ impl VirtualTaskManager for WebTaskManager {
     }
 }
 
-pub fn runtime_with_engine(engine: Engine, host_clock: bool) -> Arc<dyn Runtime + Send + Sync> {
-    let tasks: Arc<dyn VirtualTaskManager> = Arc::new(WebTaskManager { host_clock });
+pub fn runtime_with_engine(engine: Engine) -> Arc<dyn Runtime + Send + Sync> {
+    let tasks: Arc<dyn VirtualTaskManager> = Arc::new(WebTaskManager);
     let mut runtime = PluggableRuntime::new(tasks);
     runtime.set_engine(engine);
     Arc::new(runtime)

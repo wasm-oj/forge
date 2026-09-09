@@ -597,7 +597,7 @@ fn validate_compile_request(
 #[cfg(target_arch = "wasm32")]
 fn compiler_runtime_base(engine: Engine) -> PluggableRuntime {
     let tasks: Arc<dyn wasmer_wasix::runtime::task_manager::VirtualTaskManager> =
-        Arc::new(crate::run::web_runtime::WebTaskManager::default());
+        Arc::new(crate::run::web_runtime::WebTaskManager);
     let mut runtime = PluggableRuntime::new(tasks);
     runtime.set_engine(engine);
     runtime

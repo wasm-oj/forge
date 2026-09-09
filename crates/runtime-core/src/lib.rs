@@ -37,12 +37,12 @@ pub use meter::{METER_MODEL, instrument_wasm};
 pub use module_policy::enforce_memory_limit;
 pub use run::run;
 pub use types::{
-    ClockMode, CompilePipelineResponse, CompilePipelineResult, CompileRequest, CompileResponse,
-    CompileResult, CompilerToolchainConfig, DeterminismConfig, ExecutionMetrics,
-    ExecutionTermination, GoCompilerSessionConfig, GoCompilerSessionRequest,
-    GoCompilerSessionResponse, GoCompilerSourceDelta, InteractiveMetrics, InteractiveProcessResult,
-    InteractiveProgram, InteractiveRequest, InteractiveResponse, InteractiveResult, ResourcePolicy,
-    RunFailure, RunRequest, RunResponse, RunResult,
+    CompilePipelineResponse, CompilePipelineResult, CompileRequest, CompileResponse, CompileResult,
+    CompilerToolchainConfig, DeterminismConfig, ExecutionMetrics, ExecutionTermination,
+    GoCompilerSessionConfig, GoCompilerSessionRequest, GoCompilerSessionResponse,
+    GoCompilerSourceDelta, InteractiveMetrics, InteractiveProcessResult, InteractiveProgram,
+    InteractiveRequest, InteractiveResponse, InteractiveResult, ResourcePolicy, RunFailure,
+    RunRequest, RunResponse, RunResult,
 };
 
 pub fn run_response(request: RunRequest) -> RunResponse {

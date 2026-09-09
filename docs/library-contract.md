@@ -215,17 +215,6 @@ an implicit cache fallback.
 
 ## Determinism and resource policy
 
-Execution may explicitly opt into `determinism: { clockMode: "host" }` to retain the host
-WASI clock, sleep, poll, and timestamp syscalls. Omission preserves deterministic virtual
-time and the existing transcript. Host mode does not consume the virtual-time budget;
-`metrics.logicalTimeNs` stays zero. Use `executionDurationMs` for elapsed guest execution
-and `wallTimeLimitMs` for the guest execution deadline. Browser preparation and post-execution
-result collection have separate bounded control deadlines; a stalled result collection is
-a runtime error, not a guest wall-time verdict. Host elapsed time is not native process CPU time.
-Randomness remains seeded in either mode. Host mode accepts caller `TZ`, `LC_ALL`, and
-`PYTHONHASHSEED` values; internal `WASM_OJ_*` inputs remain reserved. Interactive execution
-rejects host-clock mode because both processes share cooperative scheduling.
-
 The runner controls guest-visible randomness and time from explicit `randomSeed`,
 `realtimeEpochMs`, and `clockStepNs`. It validates imported capabilities before instantiation and
 enforces:

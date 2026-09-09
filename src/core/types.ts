@@ -105,8 +105,6 @@ export interface BuildConfig {
 }
 
 export interface DeterminismConfig {
-  /** Opt into host clocks and real waits; omitted preserves deterministic virtual time. */
-  clockMode?: "host";
   /** Unsigned 32-bit seed used by every guest entropy source. */
   randomSeed: number;
   /** Unix epoch exposed by the first realtime-clock observation. */

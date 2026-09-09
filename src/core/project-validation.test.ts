@@ -38,12 +38,10 @@ describe("Project validation boundary", () => {
     expect(candidate.config.args).toEqual(["--answer", "42"]);
   });
 
-  it("accepts explicit host clocks while retaining strict project fields", () => {
+  it("rejects host-clock configuration outside the deterministic contract", () => {
     const candidate = project();
     Object.assign(candidate.config.determinism, { clockMode: "host" });
-    expect(() => assertValidProject(candidate)).not.toThrow();
-    Object.assign(candidate.config.determinism, { clockMode: "unknown" });
-    expect(() => assertValidProject(candidate)).toThrow("clockMode");
+    expect(() => assertValidProject(candidate)).toThrow();
   });
 
   it("accepts an explicit downstream language project", () => {
