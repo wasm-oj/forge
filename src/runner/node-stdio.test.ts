@@ -1,4 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { closeSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { quickJsBundle } from "./artifact";
@@ -35,8 +38,18 @@ function guest(body: string, input: string) {
 describe("QuickJS Node standard I/O against native Node ESM", () => {
   it.each(cases)("$name", ({ body, input }) => {
     const source = 'import fs from "node:fs"; import readline from "node:readline";' + body;
-    const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", source], { input, stdio: ["pipe", "pipe", "ignore"] });
-    expect(guest(body, input).stdout).toEqual(stdout);
+    const directory = mkdtempSync(join(tmpdir(), "wasm-oj-stdin-"));
+    let fd: number | undefined;
+    try {
+      const filename = join(directory, "stdin");
+      writeFileSync(filename, input);
+      fd = openSync(filename, "r");
+      const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", source], { stdio: [fd, "pipe", "pipe"] });
+      expect(guest(body, input).stdout).toEqual(stdout);
+    } finally {
+      if (fd !== undefined) closeSync(fd);
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
   it("preserves byte exact stderr", () => {
     expect(guest('process.stderr.write(Buffer.from([0,255,65]));', "").stderr).toEqual(Buffer.from([0,255,65]));
