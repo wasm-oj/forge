@@ -4,6 +4,18 @@ All notable changes to WASM-OJ are recorded here. Releases follow
 [Semantic Versioning](https://semver.org/) and the contract/package versioning policy in
 [the versioning policy](docs/versioning.md).
 
+## 0.2.2 - 2026-09-10
+
+- Fixed browser toolchain execution under strict Content Security Policy and kept isolated
+  Wasmer runtime preparation alive until it completes.
+- Aligned client execution with native language semantics, including Java compilation through
+  TeaVM WasmGC, QuickJS standard-library support, and Python 3.14.7.
+- Preserved deterministic execution by removing host-clock mode and corrected native Linux
+  parity checks to use file-backed standard input.
+- Fixed npm tarball publication paths and added release retries from existing immutable tags.
+- Kept the execution contract at version 2. The seven code packages move together to 0.2.2;
+  independently versioned toolchain packages remain at 0.2.0.
+
 ## 0.2.1 - 2026-09-08
 
 - Replaced managed collection APIs with repository-authored catalogs. `wasm-oj.json` and an
