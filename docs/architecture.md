@@ -123,8 +123,9 @@ raise a guest `MemoryError` instead of producing a native cgroup OOM verdict.
 
 The native TypeScript 7.0.2 compiler is built as a WASI module and receives files through a bounded
 JSON protocol. JavaScript packages its original ECMAScript modules for execution, preserving
-top-level await and reporting syntax errors at runtime as the native Node judge does. TypeScript uses
-strict ES2023/Node16 compilation, matching the native judge; ordinary `.ts` entries emit CommonJS.
+top-level await and reporting syntax errors at runtime. TypeScript uses the versioned
+strict ES2023/Node16 toolchain profile; ordinary `.ts` entries emit CommonJS. These are SDK
+language semantics, not a guarantee of compatibility with a consuming application's native judge.
 Both execute with QuickJS-ng 0.15.1 through the pinned WASI
 adapter. The guest standard I/O prelude bundles `readable-stream`, `buffer`, and `events`,
 with fd 0/1/2 adapters and nonterminal line parsing. The compiler declares only the supported
