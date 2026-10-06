@@ -2,17 +2,21 @@ import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import { gunzipSync } from "node:zlib";
-import { Directory, init, Runtime, Wasmer } from "@wasmer/sdk/node";
+import { Wasmer } from "@wasmer/sdk/node";
 import {
   RUST_FINAL_OUTPUT_PATH,
   RUST_LINKER_COMMAND,
   RUST_OBJECT_PATH,
   instantiateRustLinkerArguments,
 } from "../compiler/rust-linker.ts";
-import { isLlvmBitcode, selectRustAllocatorBitcodeName } from "../compiler/rust-allocator-bitcode.ts";
 import {
-  RUST_COMPILE_TIMEOUT_MS,
+  RUST_GUEST_ROOT,
+  isRustArchive,
+  runRustStage,
+} from "../compiler/rust-sandbox.ts";
+import {
   RUST_TOOLCHAIN,
   decodeRustToolchainManifest,
   deterministicRustCompilerEnvironment,
@@ -20,95 +24,91 @@ import {
   rustcDependencyArguments,
   rustcObjectArguments,
 } from "../compiler/rust-toolchain.ts";
-import { MountedOutputStabilityObserver } from "../runtime/mounted-output-stability.ts";
+let toolchain;
 
-const OUTPUT_QUIET_PERIOD_MS = 50;
-let runtime;
-let pkg;
-let rustc;
-let linker;
-let work;
-let exitCode = 0;
+process.stdin.once("end", () => process.exit(0));
 
-try {
-  const encoded = JSON.parse(await readStdin());
-  await init({ log: "warn" });
-  runtime = new Runtime({ registry: null });
-  const [packageBytes, manifest] = await Promise.all([
-    loadRustPackage(
-      requiredToolchainAsset(encoded, RUST_TOOLCHAIN.packageAsset),
-      encoded.verifiedToolchain === true,
-    ),
-    loadRustManifest(
-      requiredToolchainAsset(encoded, RUST_TOOLCHAIN.manifestAsset),
-      encoded.verifiedToolchain === true,
-    ),
-  ]);
-  pkg = await Wasmer.fromFile(packageBytes, runtime);
-  rustc = pkg.commands.rustc;
-  if (!rustc) throw new Error("The pinned Rust WebC does not expose its rustc command.");
-  linker = pkg.commands[RUST_LINKER_COMMAND];
-  if (!linker) throw new Error(`The pinned Rust WebC does not expose its ${RUST_LINKER_COMMAND} command.`);
-
-  work = new Directory(Object.fromEntries(
-    encoded.request.files.map((file) => [`/${file.path}`, file.content]),
-  ));
-  await work.createDir("/build");
-  await work.createDir("/build/deps");
-  let dependencyStdout = "";
-  let dependencyStderr = "";
-  let dependencyFailed = false;
-  for (const dependency of encoded.request.dependencies ?? []) {
-    const output = await runObservedStage({
-      command: rustc,
-      args: rustcDependencyArguments(dependency, encoded.request.optimization),
-      env: deterministicRustCompilerEnvironment(),
-      work,
-      outputPath: dependency.outputPath,
-      stage: `rustc dependency ${dependency.id}`,
-      hasTerminalError: (stderr) => parseRustDiagnostics(stderr, encoded.request.entry)
-        .some((diagnostic) => diagnostic.severity === "error"),
-      outputValidator: isRustArchive,
-    });
-    dependencyStdout += output.stdout;
-    dependencyStderr += output.stderr;
-    if (!output.success) {
-      dependencyFailed = true;
-      break;
-    }
+for await (const line of createInterface({ input: process.stdin, crlfDelay: Infinity })) {
+  if (!line) continue;
+  let response;
+  try {
+    response = { ok: true, result: await compile(JSON.parse(line)) };
+  } catch (error) {
+    response = { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
-  if (dependencyFailed) {
-    writeResult({
-      success: false,
-      stdout: dependencyStdout,
-      stderr: dependencyStderr,
-      diagnostics: parseRustDiagnostics(dependencyStderr, encoded.request.entry),
-    });
-  } else {
-  const compiled = await runObservedStage({
-    command: rustc,
-    args: rustcObjectArguments(
-      encoded.request.entry,
-      encoded.request.optimization,
-      encoded.request.rootExterns,
-    ),
-    env: deterministicRustCompilerEnvironment(),
-    work,
-    outputPath: RUST_OBJECT_PATH,
-    stage: "rustc",
-    hasTerminalError: (stderr) => parseRustDiagnostics(stderr, encoded.request.entry)
-      .some((diagnostic) => diagnostic.severity === "error"),
-    requiresAllocatorBitcode: true,
+  writeFileSync(3, `${JSON.stringify(response)}\n`);
+}
+
+async function loadToolchain(encoded) {
+  const packageAsset = requiredToolchainAsset(encoded, RUST_TOOLCHAIN.packageAsset);
+  const manifestAsset = requiredToolchainAsset(encoded, RUST_TOOLCHAIN.manifestAsset);
+  const identity = JSON.stringify([packageAsset, manifestAsset, encoded.verifiedToolchain === true]);
+  if (toolchain?.identity === identity) return toolchain;
+  const [packageBytes, manifest] = await Promise.all([
+    loadRustPackage(packageAsset, encoded.verifiedToolchain === true),
+    loadRustManifest(manifestAsset, encoded.verifiedToolchain === true),
+  ]);
+  const wasmer = new Wasmer({ cache: false });
+  const pkg = await wasmer.packages.load(packageBytes);
+  for (const command of ["rustc", RUST_LINKER_COMMAND]) {
+    if (!pkg.commands.includes(command)) throw new Error(`The pinned Rust WebC does not expose its ${command} command.`);
+  }
+  toolchain = { identity, wasmer, pkg, manifest };
+  return toolchain;
+}
+
+async function compile(encoded) {
+  const { wasmer, pkg, manifest } = await loadToolchain(encoded);
+  const sandbox = await wasmer.sandboxes.create({
+    packages: [pkg],
+    files: Object.fromEntries(encoded.request.files.map((file) => [`${RUST_GUEST_ROOT}/${file.path}`, file.content])),
   });
-  const diagnostics = parseRustDiagnostics(`${dependencyStderr}${compiled.stderr}`, encoded.request.entry);
-  if (!compiled.success) {
-    writeResult({
-      success: false,
-      stdout: `${dependencyStdout}${compiled.stdout}`,
-      stderr: `${dependencyStderr}${compiled.stderr}`,
-      diagnostics,
+  const state = { abandoned: false };
+  try {
+    await sandbox.fs.mkdir(`${RUST_GUEST_ROOT}/build/deps`, { recursive: true });
+    let dependencyStdout = "";
+    let dependencyStderr = "";
+    for (const dependency of encoded.request.dependencies ?? []) {
+      const output = await runRustStage(sandbox, state, {
+        command: "rustc",
+        args: rustcDependencyArguments(dependency, encoded.request.optimization),
+        env: deterministicRustCompilerEnvironment(),
+        outputPath: dependency.outputPath,
+        stage: `rustc dependency ${dependency.id}`,
+        outputValidator: isRustArchive,
+      });
+      dependencyStdout += output.stdout;
+      dependencyStderr += output.stderr;
+      if (!output.success) {
+        return {
+          success: false,
+          stdout: dependencyStdout,
+          stderr: dependencyStderr,
+          diagnostics: parseRustDiagnostics(dependencyStderr, encoded.request.entry),
+        };
+      }
+    }
+    const compiled = await runRustStage(sandbox, state, {
+      command: "rustc",
+      args: rustcObjectArguments(
+        encoded.request.entry,
+        encoded.request.optimization,
+        encoded.request.rootExterns,
+      ),
+      env: deterministicRustCompilerEnvironment(),
+      outputPath: RUST_OBJECT_PATH,
+      stage: "rustc",
+      requiresAllocatorBitcode: true,
     });
-  } else {
+    const diagnostics = parseRustDiagnostics(`${dependencyStderr}${compiled.stderr}`, encoded.request.entry);
+    if (!compiled.success) {
+      return {
+        success: false,
+        stdout: `${dependencyStdout}${compiled.stdout}`,
+        stderr: `${dependencyStderr}${compiled.stderr}`,
+        diagnostics,
+      };
+    }
     const linkerArguments = instantiateRustLinkerArguments(
       manifest.linkerArguments,
       encoded.request.optimization,
@@ -118,95 +118,22 @@ try {
     if (objectIndex < 0) throw new Error("Pinned Rust linker arguments omit the submission object.");
     const libraries = [...(encoded.request.dependencies ?? [])].reverse().map((item) => item.outputPath);
     if (libraries.length > 0) linkerArguments.splice(objectIndex + 1, 0, ...libraries);
-    const linked = await runObservedStage({
-      command: linker,
+    const linked = await runRustStage(sandbox, state, {
+      command: RUST_LINKER_COMMAND,
       args: linkerArguments,
       env: deterministicRustLinkerEnvironment(),
-      work,
       outputPath: RUST_FINAL_OUTPUT_PATH,
       stage: "wasm-ld",
-      hasTerminalError: (stderr) => /(?:wasm-ld|lld): error:/i.test(stderr),
     });
-    writeResult({
+    return {
       success: linked.success && Boolean(linked.bytes),
       wasmBase64: linked.bytes ? Buffer.from(linked.bytes).toString("base64") : undefined,
       stdout: `${dependencyStdout}${compiled.stdout}${linked.stdout}`,
       stderr: `${dependencyStderr}${compiled.stderr}${linked.stderr}`,
       diagnostics,
-    });
-  }
-  }
-} catch (error) {
-  writeFileSync(3, JSON.stringify({
-    ok: false,
-    error: error instanceof Error ? error.message : String(error),
-  }));
-  exitCode = 1;
-} finally {
-  work?.free();
-  rustc?.free();
-  linker?.free();
-  pkg?.free();
-  runtime?.free();
-  setTimeout(() => process.exit(exitCode), 10);
-}
-
-function writeResult(result) {
-  writeFileSync(3, JSON.stringify({ ok: true, result }));
-}
-
-async function runObservedStage({
-  command,
-  args,
-  env,
-  work,
-  outputPath,
-  stage,
-  hasTerminalError,
-  requiresAllocatorBitcode = false,
-  outputValidator = (bytes) => WebAssembly.validate(bytes),
-}) {
-  const instance = await command.run({ args, env, mount: { "/work": work }, cwd: "/work" });
-  const stdout = captureReadable(instance.stdout);
-  const stderr = captureReadable(instance.stderr);
-  const outputStability = new MountedOutputStabilityObserver();
-  let allocatorStability = new MountedOutputStabilityObserver();
-  let allocatorCandidatePath;
-  const deadline = performance.now() + RUST_COMPILE_TIMEOUT_MS;
-  try {
-    while (performance.now() < deadline) {
-      const stderrText = stderr.text();
-      const quiet = stdout.quietFor(OUTPUT_QUIET_PERIOD_MS) && stderr.quietFor(OUTPUT_QUIET_PERIOD_MS);
-      const observedAt = performance.now();
-      const bytes = outputStability.observe(await readValidOutput(work, outputPath, outputValidator), observedAt);
-      const allocator = requiresAllocatorBitcode ? await readRustAllocatorBitcode(work) : undefined;
-      if (allocator?.path !== allocatorCandidatePath) {
-        allocatorCandidatePath = allocator?.path;
-        allocatorStability = new MountedOutputStabilityObserver();
-      }
-      const allocatorBytes = requiresAllocatorBitcode
-        ? allocatorStability.observe(allocator?.bytes, observedAt)
-        : undefined;
-      const allocatorReady = !requiresAllocatorBitcode || Boolean(allocatorBytes && allocatorCandidatePath);
-      if (bytes && allocatorReady && quiet) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        return {
-          success: true,
-          bytes,
-          allocatorBitcodePath: allocatorCandidatePath,
-          stdout: stdout.text(),
-          stderr: stderr.text(),
-        };
-      }
-      if (quiet && hasTerminalError(stderrText)) {
-        return { success: false, stdout: stdout.text(), stderr: stderrText };
-      }
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-    throw new Error(`${stage} exceeded ${RUST_COMPILE_TIMEOUT_MS} ms.`);
+    };
   } finally {
-    await Promise.all([stdout.cancel(), stderr.cancel()]);
-    instance.free();
+    if (!state.abandoned) await sandbox.close();
   }
 }
 
@@ -215,74 +142,6 @@ function requireAllocatorBitcodePath(observation) {
     throw new Error("rustc completed without its allocator bitcode module.");
   }
   return observation.allocatorBitcodePath;
-}
-
-function captureReadable(stream) {
-  const reader = stream.getReader();
-  const chunks = [];
-  let lastUpdate = performance.now();
-  void (async () => {
-    try {
-      while (true) {
-        const result = await reader.read();
-        if (result.done) return;
-        const bytes = result.value instanceof Uint8Array
-          ? result.value
-          : new Uint8Array(result.value);
-        chunks.push(bytes.slice());
-        lastUpdate = performance.now();
-      }
-    } catch {
-      // Cancellation is expected once the complete mounted output is observed.
-    }
-  })();
-  return {
-    text: () => new TextDecoder().decode(concatenate(chunks)),
-    quietFor: (milliseconds) => performance.now() - lastUpdate >= milliseconds,
-    cancel: async () => {
-      try {
-        await reader.cancel();
-      } catch {
-        // The guest may close the stream concurrently with mounted-output observation.
-      }
-    },
-  };
-}
-
-function concatenate(chunks) {
-  const output = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.byteLength, 0));
-  let offset = 0;
-  for (const chunk of chunks) {
-    output.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return output;
-}
-
-async function readValidOutput(work, guestPath, validator) {
-  const mountRelativePath = guestPath.startsWith("/work/") ? guestPath.slice("/work".length) : guestPath;
-  try {
-    const bytes = (await work.readFile(mountRelativePath)).slice();
-    return bytes.byteLength > 8 && validator(bytes) ? bytes : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function isRustArchive(bytes) {
-  return bytes.byteLength > 8 && new TextDecoder().decode(bytes.subarray(0, 8)) === "!<arch>\n";
-}
-
-async function readRustAllocatorBitcode(work) {
-  try {
-    const name = selectRustAllocatorBitcodeName((await work.readDir("/build")).map((entry) => entry.name));
-    if (!name) return undefined;
-    const bytes = (await work.readFile(`/build/${name}`)).slice();
-    return isLlvmBitcode(bytes) ? { path: `/work/build/${name}`, bytes } : undefined;
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith("rustc emitted multiple")) throw error;
-    return undefined;
-  }
 }
 
 async function loadRustPackage(file, verifiedToolchain) {
@@ -318,12 +177,6 @@ function uint8View(bytes) {
   return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
-async function readStdin() {
-  const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
-  return Buffer.concat(chunks).toString("utf8");
-}
-
 function parseRustDiagnostics(output, entry) {
   const diagnostics = [];
   for (const line of output.split(/\r?\n/)) {
@@ -336,7 +189,7 @@ function parseRustDiagnostics(output, entry) {
     diagnostics.push({
       severity: value.level === "warning" ? "warning" : value.level === "note" ? "info" : "error",
       message: value.message,
-      file: String(location?.file_name ?? entry).replace(/^\/work\//, ""),
+      file: String(location?.file_name ?? entry).replace(/^\/workspace\//, ""),
       line: Number(location?.line_start ?? 1),
       column: Number(location?.column_start ?? 1),
       endLine: location?.line_end,

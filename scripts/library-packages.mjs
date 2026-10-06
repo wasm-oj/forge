@@ -30,7 +30,8 @@ export const CODE_PACKAGES = Object.freeze([
       "quickjs-node-stdlib-LICENSES.txt",
       "es-module-lexer-MIT.txt",
       "fflate-MIT.txt",
-      "wasmer-sdk-MIT.txt",
+      "wasmer-sdk-LICENSE.txt",
+      "wasmer-sdk-acorn-MIT.txt",
       "wasmer-sdk-dependencies.html",
       "wasmer-sdk-dependencies.json",
       "runtime-core-dependencies.html",
@@ -39,7 +40,6 @@ export const CODE_PACKAGES = Object.freeze([
     runtimeDependencies: [
       "@wasm-oj/contracts",
       "@wasm-oj/core",
-      "@wasmer/sdk",
       "es-module-lexer",
       "fflate",
     ],
@@ -49,7 +49,7 @@ export const CODE_PACKAGES = Object.freeze([
     licenses: [
       "quickjs-node-stdlib-LICENSES.txt",
       "fflate-MIT.txt",
-      "wasmer-sdk-MIT.txt",
+      "wasmer-sdk-LICENSE.txt",
       "wasmer-sdk-dependencies.html",
       "wasmer-sdk-dependencies.json",
       "runtime-core-dependencies.html",
