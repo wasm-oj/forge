@@ -125,6 +125,17 @@ nested stages with bounded lifetime. Python and JavaScript package source files 
 crossing a stage budget, cancellation, timeout, restart, cache clearing, disposal, or infrastructure
 failure establishes a complete Worker-generation boundary.
 
+A module Worker that dies without an `error` event, for example because the browser terminated it,
+is reported like a crash: its operation rejects with a `runner-failure` or `compiler-failure`
+instead of waiting for its wall-time or build deadline, so a killed Worker is never reported as a
+time limit. Each Worker holds a Web Lock for its lifetime, and its owner learns of the death when
+that lock frees. Without Web Locks the previous behaviour remains. WebKit stops a terminated Worker
+only at JavaScript checkpoints, never inside Wasm, so a metered program reaches the runtime's
+safepoint every 2^20 instruction units (see the runtime policy in the architecture guide) and a
+killed Worker running one stops within that interval. Chromium reports a busy Worker about 2 s after
+the kill. Unmetered toolchain code, such as clang or rustc running in a compiler stage, has no
+safepoint, so in WebKit such a stage is reported only when it next returns to JavaScript.
+
 Wasmer secondary Workers are host implementation details. They use the SDK's supported `workerUrl`
 protocol and do not grant guest thread-spawn capability. The host page must be cross-origin
 isolated.
@@ -243,6 +254,15 @@ Interactive cases start contestant and interactor concurrently with full-duplex 
 resource policies, process-local deterministic clocks, and secret inputs mounted only on the
 interactor side. Either side may be a standalone Wasm module or a runtime bundle such as CPython;
 runtime bundles that cannot provide streaming fd 0 are rejected for interaction.
+
+A side that has exited, or closed its stdin, no longer reads, but its peer's writes to it still
+succeed: the bytes are dropped and the peer keeps running without `EPIPE`, as with a judge that keeps
+draining both programs' output until they exit. Reads from a side that has exited, or closed its
+stdout, return the bytes still buffered and then EOF. An interactor can therefore reply to a
+contestant that already exited, read EOF, and exit with its own verdict. `contestantToInteractor` and
+`interactorToContestant` record every byte each side wrote to stdout exactly once, up to its output
+limit, including bytes written after the peer exited. A transcript depends only on what its writer
+wrote, not on when the reader exited.
 
 Each case executes under the broad hard policy once. Correct output and the same normalized metrics
 are evaluated against ordered cumulative `baseline`, `efficient`, and `optimal` policies. The

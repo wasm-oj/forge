@@ -27,6 +27,9 @@ const bootstrap = `import { createBrowserEngine, WASM_OJ_LIBCXX_PCH_HEADER } fro
 window.cspViolations = []; addEventListener('securitypolicyviolation', e => window.cspViolations.push({directive:e.effectiveDirective, blockedURI:e.blockedURI, source:e.sourceFile}));
 try { new Function('return 1')(); window.evalBlocked = false; } catch { window.evalBlocked = true; }
 window.header = WASM_OJ_LIBCXX_PCH_HEADER;
+const NativeWorker = Worker; window.createdWorkers = [];
+window.Worker = class extends NativeWorker { constructor(url, options) { super(url, options); window.createdWorkers.push({ name:options?.name, worker:this }); } };
+window.killWorker = name => NativeWorker.prototype.terminate.call(window.createdWorkers.findLast(entry => entry.name === name).worker);
 window.engine = await createBrowserEngine({ artifactCache:false, toolchains: ${JSON.stringify(sources)} });
 window.ready = true;`;
 const server = createServer(async (req, res) => {
@@ -90,12 +93,18 @@ fixtures.push(
   { language:"c", label:"logical-clock-limit", source:'#include <stdio.h>\n#include <time.h>\nint main(){for(int i=0;i<10000;i++) clock();puts("42");}', input:"", termination:"logical-time-limit", resources:{logicalTimeLimitMs:1} },
   { language:"c", label:"cpu-work", source:'#include <stdio.h>\nint main(){volatile unsigned long long s=0;for(unsigned i=0;i<10000000;i++)s+=i;printf("%llu\\n",s);}', input:"", expected:"49999995000000\n" },
   { language:"python", label:"memory-16mb", source:'print(42)', input:"", expected:"42\n", resources:{memoryLimitBytes:16*1024*1024} },
+  { language:"cpp", label:"empty-loop-budget", source:'int main(){for(;;);}', input:"", termination:"instruction-limit", resources:{wallTimeLimitMs:15000} },
 );
 const guessInteractor = { language:"cpp", source:'#include <cstdio>\nint main(int argc,char**argv){std::FILE*f=argc>1?std::fopen(argv[1],"r"):nullptr;long long secret,guess;int limit;if(!f||std::fscanf(f,"%lld %d",&secret,&limit)!=2)return 3;for(int round=0;round<limit;round++){if(std::scanf("%lld",&guess)!=1)return std::feof(stdin)?4:5;if(guess==secret){std::puts("=");std::fflush(stdout);return 0;}std::puts(guess<secret?"<":">");std::fflush(stdout);}return 1;}' };
 const guessInput = secret => ({ args:["/judge/input.txt"], files:{"/judge/input.txt":`${secret} 25\n`} });
 const guessCpp = { language:"cpp", source:'#include <iostream>\n#include <string>\nint main(){long long lo=1,hi=1<<20;std::string r;while(lo<=hi){long long mid=(lo+hi)/2;std::cout<<mid<<std::endl;if(!(std::cin>>r))return 2;if(r=="=")return 0;if(r=="<")lo=mid+1;else hi=mid-1;}return 1;}' };
 const guessC = { language:"c", source:'#include <stdio.h>\nint main(void){long long lo=1,hi=1<<20;char r[4];while(lo<=hi){long long mid=(lo+hi)/2;printf("%lld\\n",mid);fflush(stdout);if(scanf("%3s",r)!=1)return 2;if(r[0]==\'=\')return 0;if(r[0]==\'<\')lo=mid+1;else hi=mid-1;}return 1;}' };
 const readOne = { language:"c", source:'#include <stdio.h>\nint main(void){int x;return scanf("%d",&x)==1?0:1;}' };
+const finalGuess = { language:"c", source:'#include <stdio.h>\nint main(void){puts("7");return 0;}' };
+const secretInput = secret => ({ args:["/judge/input.txt"], files:{"/judge/input.txt":`${secret}\n`} });
+const replyInteractor = (language, afterEof) => language === "c"
+  ? { language, source:`#include <stdio.h>\nint main(int argc,char**argv){FILE*f=argc>1?fopen(argv[1],"r"):NULL;long long secret,guess;if(!f||fscanf(f,"%lld",&secret)!=1)return 2;if(scanf("%lld",&guess)!=1)return 3;${afterEof ? "while(getchar()!=EOF){}" : ""}puts(guess==secret?"correct":"wrong");if(fflush(stdout)!=0)return 4;${afterEof ? "" : "if(scanf(\"%lld\",&guess)!=EOF)return 5;"}return guess==secret?42:43;}` }
+  : { language, source:`import sys\nsecret = int(open(sys.argv[1]).read())\nguess = int(input())\n${afterEof ? "sys.stdin.read()\n" : ""}print("correct" if guess == secret else "wrong", flush=True)\n${afterEof ? "" : "if sys.stdin.read().strip():\n    sys.exit(5)\n"}sys.exit(42 if guess == secret else 43)\n` };
 const exited = (process, code) => process.termination === "exited" && process.code === code;
 const guessed = result => exited(result.contestant, 0) && exited(result.interactor, 0) && result.interactorToContestant.endsWith("=\n");
 const interactiveFixtures = [
@@ -110,8 +119,11 @@ const interactiveFixtures = [
   { label:"interactive-batch", contestant:{ language:"c", source:'#include <stdio.h>\nint main(void){long long x;for(int i=0;i<30000;i++){if(scanf("%lld",&x)!=1)return 2;printf("%lld\\n",2*x);}fflush(stdout);char b[8];if(scanf("%7s",b)!=1)return 3;return b[0]==\'o\'?0:4;}' }, interactor:{ language:"c", source:'#include <stdio.h>\nint main(void){for(int i=0;i<30000;i++)printf("%d\\n",1000000+i);fflush(stdout);for(int i=0;i<30000;i++){long long x;if(scanf("%lld",&x)!=1)return 2;if(x!=2LL*(1000000+i))return 1;}puts("ok");fflush(stdout);return 0;}' }, options:{ contestant:{ resources:{ wallTimeLimitMs:20000 } }, interactor:{ resources:{ wallTimeLimitMs:20000 } } }, check:result => exited(result.contestant, 0) && exited(result.interactor, 0) && result.contestantToInteractor.length === 240000 && result.interactorToContestant.length === 240003 && result.interactorToContestant.endsWith("ok\n") },
   { label:"interactive-poll-clockless", contestant:{ language:"c", source:'#include <poll.h>\n#include <stdio.h>\nint main(void){struct pollfd p[2]={{0,POLLIN,0},{1,POLLOUT,0}};if(poll(p,2,-1)<1||!(p[1].revents&POLLOUT))return 4;puts("ping");fflush(stdout);if(poll(p,1,-1)!=1||!(p[0].revents&POLLIN))return 5;char b[8];if(scanf("%7s",b)!=1)return 2;return b[0]==\'p\'&&b[1]==\'o\'?0:3;}' }, interactor:{ language:"c", source:'#include <stdio.h>\nint main(void){char b[8];if(scanf("%7s",b)!=1)return 2;puts("pong");fflush(stdout);return 0;}' }, options:{ contestant:{ resources:{ wallTimeLimitMs:10000 } }, interactor:{ resources:{ wallTimeLimitMs:10000 } } }, check:result => exited(result.contestant, 0) && exited(result.interactor, 0) && result.contestantToInteractor === "ping\n" && result.interactorToContestant === "pong\n" },
   { label:"interactive-instruction-limit", contestant:{ language:"cpp", source:'int main(){volatile unsigned long long spin=0;for(;;)spin=spin+1;}' }, interactor:guessInteractor, options:{ contestant:{ resources:{ wallTimeLimitMs:30000 } }, interactor:{ ...guessInput(1), resources:{ wallTimeLimitMs:30000 } } }, check:result => result.contestant.termination === "instruction-limit" && result.contestant.code === 137 && exited(result.interactor, 4) },
+  { label:"interactive-empty-loop-budget", contestant:{ language:"cpp", source:'int main(){for(;;);}' }, interactor:readOne, options:{ contestant:{ resources:{ wallTimeLimitMs:15000 } }, interactor:{ resources:{ wallTimeLimitMs:15000 } } }, check:(result, elapsedMs) => result.contestant.termination === "instruction-limit" && result.contestant.code === 137 && exited(result.interactor, 1) && elapsedMs < 10000 },
   { label:"interactive-contestant-exits", contestant:{ language:"c", source:'int main(void){return 0;}' }, interactor:guessInteractor, options:{ interactor:guessInput(1) }, check:result => exited(result.contestant, 0) && exited(result.interactor, 4) && result.contestantToInteractor === "" },
-  { label:"interactive-interactor-exits", contestant:{ language:"c", source:'#include <errno.h>\n#include <stdio.h>\n#include <unistd.h>\nint main(void){char b[8];if(scanf("%7s",b)!=1)return 2;for(int i=0;i<1000000;i++)if(write(1,"x\\n",2)<0)return errno==EPIPE?32:33;return 34;}' }, interactor:{ language:"cpp", source:'#include <cstdio>\nint main(){std::puts("bye");std::fflush(stdout);return 0;}' }, options:{}, check:result => exited(result.contestant, 32) && exited(result.interactor, 0) && result.interactorToContestant === "bye\n" },
+  { label:"interactive-interactor-exits-eof", contestant:{ language:"c", source:'#include <stdio.h>\n#include <string.h>\nint main(void){char b[8];if(scanf("%7s",b)!=1||strcmp(b,"bye")!=0)return 2;return scanf("%7s",b)==EOF&&feof(stdin)?0:3;}' }, interactor:{ language:"c", source:'#include <stdio.h>\nint main(void){puts("bye");return 0;}' }, options:{}, check:result => exited(result.contestant, 0) && exited(result.interactor, 0) && result.interactorToContestant === "bye\n" },
+  { label:"interactive-interactor-exits", contestant:{ language:"c", source:'#include <errno.h>\n#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\nint main(void){char b[8];if(scanf("%7s",b)!=1||strcmp(b,"bye")!=0)return 2;if(scanf("%7s",b)!=EOF)return 3;for(int i=0;i<3;i++)if(write(1,"x\\n",2)!=2)return errno==EPIPE?32:33;return 0;}' }, interactor:{ language:"c", source:'#include <stdio.h>\nint main(void){puts("bye");return 0;}' }, options:{}, check:result => exited(result.contestant, 0) && exited(result.interactor, 0) && result.contestantToInteractor === "x\nx\nx\n" && result.interactorToContestant === "bye\n" },
+  ...[["c", true, 7], ["python", true, 8], ["c", false, 8], ["python", false, 7]].map(([language, afterEof, secret]) => ({ label:`interactive-reply-${afterEof ? "after-exit" : "race"}-${language}`, contestant:finalGuess, interactor:replyInteractor(language, afterEof), options:{ interactor:secretInput(secret) }, check:result => exited(result.contestant, 0) && exited(result.interactor, secret === 7 ? 42 : 43) && result.contestantToInteractor === "7\n" && result.interactorToContestant === (secret === 7 ? "correct\n" : "wrong\n") })),
   { label:"interactive-output-flood", contestant:{ language:"c", source:'#include <stdio.h>\nint main(void){while(fputs("flood\\n",stdout)>=0&&fflush(stdout)==0){}return 0;}' }, interactor:{ language:"c", source:'#include <stdio.h>\nint main(void){while(getchar()!=EOF){}return 0;}' }, options:{ contestant:{ resources:{ outputLimitBytes:65536 } } }, check:result => result.contestant.termination === "output-limit" && result.contestant.code === 137 && result.contestantToInteractor.length === 65536 && exited(result.interactor, 0) },
   { label:"interactive-wall-time", contestant:readOne, interactor:readOne, options:{ contestant:{ resources:{ wallTimeLimitMs:2000 } }, interactor:{ resources:{ wallTimeLimitMs:2000 } } }, check:(result, elapsedMs) => result.contestant.termination === "wall-time-limit" && result.interactor.termination === "wall-time-limit" && elapsedMs >= 2000 && elapsedMs < 15000 },
   { label:"interactive-cancel", contestant:readOne, interactor:readOne, options:{}, cancelAfterMs:1000, recovery:{ contestant:guessC, interactor:guessInteractor, options:{ interactor:guessInput(5) } }, check:(result, elapsedMs) => result.cancelled && elapsedMs < 10000 && guessed(result.recovery) },
@@ -219,6 +231,106 @@ try {
     await writeFile(path.join(output,"results.json"),JSON.stringify(record,null,2)+"\n");
     console.log(JSON.stringify({ label:fixture.label, pass, elapsedMs:outcome.elapsedMs, error:outcome.error, summary }));
   }
+  if (selected.length === 0 || selected.includes("liveness")) {
+    record.liveness = [];
+    const sources = {
+      readOne:{ language:"c", source:'#include <stdio.h>\nint main(void){int x;return scanf("%d",&x)==1?0:1;}' },
+      yieldLoop:{ language:"c", source:'#include <sched.h>\nint main(void){for(;;)sched_yield();}' },
+      computeLoop:{ language:"cpp", source:'int main(){volatile unsigned long long spin=0;for(;;)spin=spin+1;}' },
+      guessContestant:guessC,
+      guessInteractor,
+    };
+    const prepared = await page.evaluate(async sources => {
+      window.livenessBuilds = {};
+      for (const [name, { language, source }] of Object.entries(sources)) {
+        const entry = language === "cpp" ? "main.cpp" : "main.c";
+        const files = { [entry]:source };
+        if (language === "cpp") files["src/bits/stdc++.h"] = window.header;
+        const built = await window.engine.compile({ language, target:"wasip1", optimization:"release", entry, files, projectId:`csp-liveness-${name}` }, { cache:false });
+        if (!built.success || !built.artifact) throw new Error(`liveness build ${name} failed: ${built.stderr}`);
+        window.livenessBuilds[name] = built.artifact;
+      }
+      const summary = value => value.termination ?? (value.contestant ? `${value.contestant.termination}/${value.interactor.code}` : `compiled:${value.success}`);
+      window.settle = promise => promise.then(value => ({ ok:true, summary:summary(value), stderr:value.stderr, at:performance.now() }), error => ({ ok:false, error:String(error), at:performance.now() }));
+      const blocked = { contestant:{ resources:{ wallTimeLimitMs:20000 } }, interactor:{ resources:{ wallTimeLimitMs:20000 } } };
+      window.livenessOperation = operation => {
+        const builds = window.livenessBuilds;
+        if (operation === "interact") return window.engine.interact(builds.readOne, builds.readOne, blocked);
+        if (operation === "interact-compute") return window.engine.interact(builds.computeLoop, builds.readOne, { contestant:{ resources:{ instructionBudget:1e15, wallTimeLimitMs:20000 } }, interactor:{ resources:{ wallTimeLimitMs:20000 } } });
+        if (operation === "run-yielding") return window.engine.run(builds.yieldLoop, { resources:{ instructionBudget:1e15, wallTimeLimitMs:20000 } });
+        if (operation === "run-compute") return window.engine.run(builds.computeLoop, { resources:{ instructionBudget:1e15, wallTimeLimitMs:15000 } });
+        if (operation === "compile-rust") return window.engine.compile({ language:"rust", target:"wasip1", optimization:"release", entry:"main.rs", files:{ "main.rs":'fn main(){println!("{}", 42);}' }, projectId:"csp-liveness-rust" }, { cache:false });
+        return window.engine.compile({ language:"cpp", target:"wasip1", optimization:"release", entry:"main.cpp", files:{ "main.cpp":"#include <iostream>\n#include <regex>\nint main(){std::regex r(\"a+\");std::cout<<std::regex_match(\"aaa\",r)<<std::endl;}" }, projectId:"csp-liveness-compile" }, { cache:false });
+      };
+    }, sources).then(() => undefined, error => String(error));
+    if (prepared) record.liveness.push({ label:"liveness-preparation", pass:false, error:prepared });
+    const workerNamed = async name => {
+      const nameOf = worker => Promise.race([worker.evaluate(() => self.name).catch(() => ""), new Promise(resolve => setTimeout(resolve, 3000, ""))]);
+      for (let attempt = 0; attempt < 5; attempt++) {
+        for (const worker of page.workers().reverse()) if (await nameOf(worker) === name) return worker;
+        await page.waitForTimeout(500);
+      }
+      throw new Error(`The ${name} Worker is not visible to Playwright.`);
+    };
+    const nestedKiller = async (parentName, childName, settleMs = 0) => {
+      const parent = await workerNamed(parentName);
+      await parent.evaluate(() => {
+        if (self.livenessWorkers) return;
+        const Native = self.Worker; self.livenessWorkers = []; self.nativeTerminate = Native.prototype.terminate;
+        self.Worker = class extends Native { constructor(url, options) { super(url, options); self.livenessWorkers.push({ name:options?.name, worker:this }); } };
+      });
+      return () => parent.evaluate(async ([name, settleMs]) => {
+        for (let attempt = 0; attempt < 600 && !self.livenessWorkers.some(entry => entry.name === name); attempt++) await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, settleMs));
+        self.nativeTerminate.call(self.livenessWorkers.findLast(entry => entry.name === name).worker);
+      }, [childName, settleMs]);
+    };
+    const pageKiller = name => () => page.evaluate(name => window.killWorker(name), name);
+    const browserName = process.env.WASM_OJ_BROWSER ?? "chromium";
+    const crashed = (outcome, killMs, limitMs) => /stopped without reporting an error/.test(outcome.ok ? outcome.stderr ?? "" : outcome.error) && killMs < limitMs;
+    const livenessCases = [
+      { label:"liveness-interactive-contestant", operation:"interact", killer:() => nestedKiller("wasm-oj-runner", "wasm-oj-interactive-contestant"), check:(outcome, killMs) => crashed(outcome, killMs, 3000) && outcome.error.includes("interactive contestant Worker") },
+      { label:"liveness-interactive-interactor", operation:"interact", killer:() => nestedKiller("wasm-oj-runner", "wasm-oj-interactive-interactor"), check:(outcome, killMs) => crashed(outcome, killMs, 3000) && outcome.error.includes("interactive interactor Worker") },
+      { label:"liveness-runner-interact", operation:"interact", killer:async () => pageKiller("wasm-oj-runner"), check:(outcome, killMs) => crashed(outcome, killMs, 3000) },
+      { label:"liveness-runner-run-yielding", operation:"run-yielding", killer:async () => pageKiller("wasm-oj-runner"), check:(outcome, killMs) => crashed(outcome, killMs, 4000) },
+      { label:"liveness-runner-run-compute", operation:"run-compute", killer:async () => pageKiller("wasm-oj-runner"), check:(outcome, killMs) => crashed(outcome, killMs, 4000) },
+      { label:"liveness-interactive-compute", operation:"interact-compute", killer:() => nestedKiller("wasm-oj-runner", "wasm-oj-interactive-contestant"), check:(outcome, killMs) => crashed(outcome, killMs, 4000) && outcome.error.includes("interactive contestant Worker") },
+      { label:"liveness-compiler", operation:"compile", killAfterMs:300, killer:async () => pageKiller("wasm-oj-compiler"), check:(outcome, killMs) => crashed(outcome, killMs, 4000) },
+      { label:"liveness-compiler-stage", operation:"compile-rust", killAfterMs:0, killer:() => nestedKiller("wasm-oj-compiler", "wasm-oj-rustc-stage", 1000), check:(outcome, killMs) => crashed(outcome, killMs, 4000) },
+    ];
+    for (const fixture of prepared ? [] : livenessCases) {
+      console.log(`START ${fixture.label}`);
+      let outcome; let killMs; let error;
+      try {
+        const kill = await fixture.killer();
+        await page.evaluate(operation => { window.livenessPending = window.settle(window.livenessOperation(operation)); }, fixture.operation);
+        await page.waitForTimeout(fixture.killAfterMs ?? 1500);
+        await kill();
+        const killedAt = await page.evaluate(() => performance.now());
+        outcome = await page.evaluate(() => window.livenessPending);
+        killMs = Math.round(outcome.at - killedAt);
+      } catch (caught) { error = String(caught); }
+      const recovery = await page.evaluate(() => window.settle(window.engine.run(window.livenessBuilds.readOne, { stdin:"7\n" })));
+      const pass = !error && fixture.check(outcome, killMs) && recovery.summary === "exited";
+      record.liveness.push({ label:fixture.label, pass, killMs, outcome, error, recovery });
+      await writeFile(path.join(output,"results.json"),JSON.stringify(record,null,2)+"\n");
+      console.log(JSON.stringify({ label:fixture.label, pass, killMs, error, outcome, recovery:recovery.summary ?? recovery.error }));
+    }
+    if (!prepared) {
+      console.log("START liveness-no-false-positive");
+      const steady = await page.evaluate(async () => {
+        const outcomes = [];
+        const builds = window.livenessBuilds;
+        for (let index = 0; index < 20; index++) outcomes.push(await window.settle(window.engine.run(builds.readOne, { stdin:`${index}\n` })));
+        for (let index = 0; index < 5; index++) outcomes.push(await window.settle(window.engine.interact(builds.guessContestant, builds.guessInteractor, { interactor:{ args:["/judge/input.txt"], files:{ "/judge/input.txt":`${index + 1} 25\n` } } })));
+        outcomes.push(await window.settle(window.engine.compile({ language:"c", target:"wasip1", optimization:"release", entry:"main.c", files:{ "main.c":"int main(void){return 0;}" }, projectId:"csp-liveness-steady" }, { cache:false })));
+        return outcomes.map(outcome => outcome.summary ?? outcome.error);
+      });
+      const steadyPass = steady.length === 26 && steady.slice(0, 20).every(value => value === "exited") && steady.slice(20, 25).every(value => value === "exited/0") && steady[25] === "compiled:true";
+      record.liveness.push({ label:"liveness-no-false-positive", pass:steadyPass, outcomes:steady });
+      console.log(JSON.stringify({ label:"liveness-no-false-positive", pass:steadyPass, outcomes:steady }));
+    } else console.log(JSON.stringify({ label:"liveness-preparation", pass:false, error:prepared }));
+  }
   record.capabilities = [];
   for (const invoke of [false, true]) {
     const wasmPath = path.join(output, `capability-${invoke}.wasm`);
@@ -251,5 +363,5 @@ finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
 }
-if(record.results.some(result=>!result.pass)||record.capabilities?.some(result=>!result.pass)||record.executionTiming?.pass===false||record.interactive?.some(result=>!result.pass))process.exitCode=1;
+if(record.results.some(result=>!result.pass)||record.capabilities?.some(result=>!result.pass)||record.executionTiming?.pass===false||record.interactive?.some(result=>!result.pass)||record.liveness?.some(result=>!result.pass))process.exitCode=1;
 console.log(`EVIDENCE ${path.join(output,"results.json")}`);

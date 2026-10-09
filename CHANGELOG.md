@@ -6,6 +6,36 @@ All notable changes to WASM-OJ are recorded here. Releases follow
 
 ## Unreleased
 
+- WebKit now stops a terminated or killed Worker that is running a metered program within well under
+  a millisecond, so the Web Lock liveness check reports it at once. JavaScriptCore never acts on
+  `Worker.terminate()` inside Wasm, only at JavaScript checkpoints such as `Atomics.wait`, so a
+  killed runner or interactive side kept computing until its instruction budget ran out (up to tens
+  of seconds) and the session ended at its wall limit. Every 2^20 units, at the next function entry
+  or loop iteration, the meter now calls an uncharged `wasm_oj_metering.safepoint` import, which the
+  browser runtime turns into such a checkpoint and the native runtime ignores. Costs, cost profiles'
+  cost values and the exhaustion point are unchanged; the refreshed runtime identity changes cost
+  profile identifiers.
+- Browser runner, compiler, compiler stage (rustc, Go, Java) and interactive side Workers that die
+  without an `error` event, for example when the browser terminates them, now reject their
+  operation promptly as a runner or compiler failure. A silently killed Worker used to leave the operation waiting for its wall-time
+  limit, which reported the student's program as `wall-time-limit`. Each module Worker holds a Web
+  Lock for its lifetime and its owner treats the lock's release as a crash; without Web Locks
+  nothing changes. Interactive pipes now wake every 100 ms while waiting, so a terminated side
+  Worker stops promptly in WebKit, which otherwise keeps it blocked in `Atomics.wait`.
+- Fixed WebKit taking about 25 s to stop an empty C++ `for(;;);` at the default instruction budget,
+  so the run usually hit its wall limit instead. JavaScriptCore never enters optimized code inside a
+  loop of a function that has no parameters or locals, and keeps calling its tier-up slow path, so
+  such a metered loop ran about 20 times slower than in Chromium. Instrumentation now gives these
+  functions one unused local, which changes neither behaviour nor cost; WebKit stops the loop at the
+  budget in about 0.2 s. The refreshed runtime identity changes cost profiles.
+- Interactive writes no longer fail with `EPIPE` after the other side exits or closes its stdin. The
+  bytes are recorded in the transcript once and dropped, and the writer keeps running, as with a
+  judge that keeps draining both pipes. An interactor that replies to a contestant that already
+  exited now reads EOF and exits with its own verdict; a CPython interactor used to exit 120 and
+  repeat its reply up to five times in the transcript. Reads still return the remaining buffered
+  bytes and then EOF. This applies to the server and the browser. The refreshed runtime identity
+  changes cost profiles.
+
 ## 0.2.4 - 2026-10-09
 
 - Fixed a host process crash (`Uncaught Error: write EPIPE`) when `ServerRunner` cancelled or
