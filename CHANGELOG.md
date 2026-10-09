@@ -6,6 +6,20 @@ All notable changes to WASM-OJ are recorded here. Releases follow
 
 ## Unreleased
 
+- Fixed WebKit taking about 25 s to stop an empty C++ `for(;;);` at the default instruction budget,
+  so the run usually hit its wall limit instead. JavaScriptCore never enters optimized code inside a
+  loop of a function that has no parameters or locals, and keeps calling its tier-up slow path, so
+  such a metered loop ran about 20 times slower than in Chromium. Instrumentation now gives these
+  functions one unused local, which changes neither behaviour nor cost; WebKit stops the loop at the
+  budget in about 0.2 s. The refreshed runtime identity changes cost profiles.
+- Interactive writes no longer fail with `EPIPE` after the other side exits or closes its stdin. The
+  bytes are recorded in the transcript once and dropped, and the writer keeps running, as with a
+  judge that keeps draining both pipes. An interactor that replies to a contestant that already
+  exited now reads EOF and exits with its own verdict; a CPython interactor used to exit 120 and
+  repeat its reply up to five times in the transcript. Reads still return the remaining buffered
+  bytes and then EOF. This applies to the server and the browser. The refreshed runtime identity
+  changes cost profiles.
+
 ## 0.2.4 - 2026-10-09
 
 - Fixed a host process crash (`Uncaught Error: write EPIPE`) when `ServerRunner` cancelled or

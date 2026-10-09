@@ -57,7 +57,7 @@ complete browser Worker-generation boundary. Browser interaction runs each side 
 Worker as a standalone metered run. The two sides exchange bytes through shared-memory ring buffers
 whose reads block with `Atomics.wait`, so neither side ever yields to the other on one thread. Each
 ring holds its writer's whole output budget, so a write never waits, as on the server's unbounded
-pipes. A poll checks the input without blocking, so another ready subscription is reported first; if
+pipes. On both hosts a write after the reader exited is dropped instead of failing. A poll checks the input without blocking, so another ready subscription is reported first; if
 nothing is ready, a poll with a clock advances the virtual clock to its deadline, as the server
 does. On both hosts a read from stdin opened with `O_NONBLOCK` waits for input instead of failing
 with `EAGAIN`.
@@ -154,7 +154,9 @@ or toolchain source.
 
 Before instantiation the runtime validates the module, removes non-semantic debug/name sections,
 preserves required runtime metadata, and injects a mutable 64-bit weighted instruction meter. The
-budget is present before a start section can execute. Static original-opcode counts and normalized
+budget is present before a start section can execute. A function that has a loop but no parameters
+or locals also gets one unused local: JavaScriptCore never optimizes such a loop and runs it about 20
+times slower than Chromium, so it would reach the wall deadline before its budget. Static original-opcode counts and normalized
 cost are reported separately from injected meter instructions.
 
 Contract 2 enforces:
