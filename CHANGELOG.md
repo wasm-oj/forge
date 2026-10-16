@@ -4,10 +4,10 @@ All notable changes to WASM-OJ are recorded here. Releases follow
 [Semantic Versioning](https://semver.org/) and the contract/package versioning policy in
 [the versioning policy](docs/versioning.md).
 
-## Unreleased
+## 0.2.5 - 2026-10-17
 
-- WebKit now stops a terminated or killed Worker that is running a metered program within well under
-  a millisecond, so the Web Lock liveness check reports it at once. JavaScriptCore never acts on
+- WebKit now stops a terminated or killed Worker that is running a metered program at the next
+  safepoint, allowing the Web Lock liveness check to report its loss promptly. JavaScriptCore never acts on
   `Worker.terminate()` inside Wasm, only at JavaScript checkpoints such as `Atomics.wait`, so a
   killed runner or interactive side kept computing until its instruction budget ran out (up to tens
   of seconds) and the session ended at its wall limit. Every 2^20 units, at the next function entry
@@ -42,6 +42,8 @@ All notable changes to WASM-OJ are recorded here. Releases follow
   WASIX thread or process ends and starts the next in a new Worker that grows their shared memory,
   six to nine times per C compile. The compiler, rustc-stage and runner Workers now hold the SDK's
   terminations until the build or run ends and wait 250 ms after the last one before the next.
+  Late terminations restart that quiet period. The delay is an empirical workaround, not a
+  guarantee that browser teardown has completed; consecutive operations can incur extra latency.
 
 ## 0.2.4 - 2026-10-09
 
