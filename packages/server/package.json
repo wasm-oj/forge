@@ -65,7 +65,7 @@
   "dependencies": {
     "@wasm-oj/contracts": "workspace:0.2.5",
     "@wasm-oj/core": "workspace:0.2.5",
-    "@wasmer/sdk": "0.10.0",
+    "@wasmer/sdk": "0.19.1",
     "fflate": "0.8.3"
   }
 }
