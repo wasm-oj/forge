@@ -98,6 +98,8 @@ export interface ProjectFile {
 }
 
 export interface BuildConfig {
+  /** C/C++ linear-memory stack reservation in bytes; omitted uses the toolchain default. */
+  stackSizeBytes?: number;
   language: Language;
   target: TargetAbi;
   optimization: OptimizationLevel;

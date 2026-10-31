@@ -1,3 +1,4 @@
+import { assertBuildStackSize } from "../core/build-stack";
 import { DEFAULT_DETERMINISM } from "../core/determinism";
 import { DEFAULT_RESOURCE_POLICY } from "../core/resources";
 import { extensionLanguage, TOOLCHAINS } from "../core/toolchains";
@@ -22,6 +23,8 @@ export interface CompileInput {
   files: Readonly<Record<string, string>>;
   target?: TargetAbi;
   optimization?: OptimizationLevel;
+  /** C/C++ stack reservation, in bytes and aligned to 16; omitted uses the toolchain default. */
+  stackSizeBytes?: number;
   name?: string;
   projectId?: string;
   dependencies?: DependencyBuildBundle;
@@ -70,6 +73,7 @@ export function createSdkProject(input: CompileInput): Project {
   if (optimization !== "debug" && optimization !== "release") {
     throw new Error(`Unsupported optimization level '${String(optimization)}'.`);
   }
+  if (input.stackSizeBytes !== undefined) assertBuildStackSize(input.language, input.stackSizeBytes);
   const inferredName = entry.split("/").at(-1)?.replace(/\.[^.]+$/, "") || "wasm-oj-project";
   const name = optionalMetadata(input.name, "Project name", 4_096) ?? inferredName;
   const projectId = optionalMetadata(input.projectId, "Project ID", 16_384) ?? `sdk:${name}`;
@@ -85,6 +89,7 @@ export function createSdkProject(input: CompileInput): Project {
       language: input.language,
       target,
       optimization,
+      ...(input.stackSizeBytes === undefined ? {} : { stackSizeBytes: input.stackSizeBytes }),
       entry,
       args: [],
       stdin: "",

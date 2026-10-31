@@ -1,3 +1,4 @@
+import { assertBuildStackSize } from "./build-stack.ts";
 import { resolveDeterminism } from "./determinism.ts";
 import { canonicalProjectFiles } from "./project-files.ts";
 import { resolveResourcePolicy } from "./resources.ts";
@@ -141,8 +142,11 @@ function assertResources(value: unknown): asserts value is ResourcePolicy {
 }
 
 function assertProjectConfig(value: unknown): asserts value is ProjectConfig {
-  const config = exactDataRecord(value, "Project config", PROJECT_CONFIG_KEYS);
+  const hasStackSize = Boolean(value && typeof value === "object" && Object.hasOwn(value, "stackSizeBytes"));
+  const config = exactDataRecord(value, "Project config",
+    hasStackSize ? [...PROJECT_CONFIG_KEYS, "stackSizeBytes"] : PROJECT_CONFIG_KEYS);
   assertLanguageIdentifier(config.language);
+  if (hasStackSize) assertBuildStackSize(config.language, config.stackSizeBytes);
   if (config.target !== "wasip1" && config.target !== "wasix") {
     throw new Error("Project target must be 'wasip1' or 'wasix'.");
   }

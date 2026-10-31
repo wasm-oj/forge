@@ -106,25 +106,6 @@ describe("project build cache key", () => {
     expect(await projectCacheKey(project)).toBe(original);
   });
 
-  it.each(["c", "cpp"])("does not reuse a pre-stack-policy %s artifact", async (language) => {
-    const project: Project = {
-      id: "stack-cache-test", name: "stack-cache-test",
-      files: [{ path: "main.c", language, content: "int main(void) { return 0; }" }],
-      config: {
-        language, target: "wasip1", optimization: "release", entry: "main.c",
-        args: [], stdin: "", env: {},
-        determinism: { ...DEFAULT_DETERMINISM },
-        resources: { ...DEFAULT_RESOURCE_POLICY },
-      },
-      activeFile: "main.c", updatedAt: 0,
-    };
-    const identity = toolchainCacheIdentity(language);
-    const legacyIdentity = JSON.parse(JSON.stringify(identity));
-    delete legacyIdentity.linkerFlags;
-    const oldKey = await sha256(projectBuildIdentity(project, JSON.stringify(legacyIdentity)));
-    expect(await projectCacheKey(project)).not.toBe(oldKey);
-  });
-
   it("uses a downstream compiler identity for custom languages", async () => {
     const project: Project = {
       id: "custom-cache-test",

@@ -1,24 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { instantiateClangLink } from "./clang-pins";
-import { toolchainCacheIdentity } from "../core/toolchains";
 
-describe("Clang stack policy", () => {
-  it("reserves an 8 MiB stack before static data", () => {
-    expect(instantiateClangLink(["O", "S", "-lc"], {
-      input: "I", output: "O", mainFileName: "M", objects: "S",
-    }, ["/project/main.o"], "/project/app.wasm")).toEqual([
-      "/project/app.wasm", "/project/main.o", "-lc",
-      "--stack-first", "-z", "stack-size=8388608",
-    ]);
+const placeholders = { input: "I", output: "O", mainFileName: "M", objects: "S" };
+
+describe("Clang stack size", () => {
+  it("preserves the toolchain default when no size is requested", () => {
+    expect(instantiateClangLink(["O", "S", "-lc"], placeholders, ["main.o"], "app.wasm"))
+      .toEqual(["app.wasm", "main.o", "-lc"]);
   });
 
-  it.each(["c", "cpp"])("invalidates pre-policy %s artifacts", (language) => {
-    expect(toolchainCacheIdentity(language)).toHaveProperty("linkerFlags", [
-      "--stack-first", "-z", "stack-size=8388608",
-    ]);
-  });
-
-  it("does not change non-Clang artifact identities", () => {
-    expect(toolchainCacheIdentity("rust")).not.toHaveProperty("linkerFlags");
+  it.each([1024 * 1024, 8 * 1024 * 1024])("links the requested %i-byte stack before static data", (size) => {
+    expect(instantiateClangLink(["O", "S", "-lc"], placeholders, ["main.o"], "app.wasm", size))
+      .toEqual(["app.wasm", "main.o", "-lc", "--stack-first", "-z", `stack-size=${size}`]);
   });
 });

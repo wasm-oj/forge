@@ -9,6 +9,7 @@ export const DEFAULT_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze(
       label: language + " / wasip1 / " + mebibytes + " MiB local arrays",
       input: {
         language,
+        stackSizeBytes: 8 * 1024 * 1024,
         target: "wasip1",
         entry: language === "c" ? "main.c" : "main.cpp",
         files: {

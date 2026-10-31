@@ -46,6 +46,7 @@ export function projectBuildIdentity(
       language: project.config.language,
       target: project.config.target,
       optimization: project.config.optimization,
+      ...(project.config.stackSizeBytes === undefined ? {} : { stackSizeBytes: project.config.stackSizeBytes }),
       entry: project.config.entry,
     },
     compiler: compilerCacheIdentity,

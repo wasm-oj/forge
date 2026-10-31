@@ -111,8 +111,6 @@ export const PINNED_TOOLCHAIN_ASSET_SHA256 = Object.freeze<Record<string, string
   [JAVA_RUNTIME_CLASSLIB_ASSET_PATH]: JAVA_RUNTIME_CLASSLIB_SHA256,
 });
 
-export const CLANG_LINKER_FLAGS = Object.freeze(["--stack-first", "-z", "stack-size=8388608"]);
-
 const TOOLCHAIN_CONTENT_SHA256: Readonly<Record<BuiltinLanguage, readonly string[]>> = Object.freeze({
   c: Object.freeze([
     CLANG_COMPRESSED_PACKAGE_SHA256,
@@ -281,7 +279,6 @@ export function toolchainCacheIdentity(language: Language) {
     version: toolchain.version,
     compilerPackages: [...toolchain.compilerPackages],
     runtimePackage: toolchain.runtimePackage,
-    ...(language === "c" || language === "cpp" ? { linkerFlags: [...CLANG_LINKER_FLAGS] } : {}),
     contentSha256: [...TOOLCHAIN_CONTENT_SHA256[language]],
   };
 }

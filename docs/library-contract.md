@@ -334,10 +334,17 @@ wire, storage, or conformance change follows [versioning.md](versioning.md).
 
 ## C/C++ stack capacity
 
-Clang builds reserve an 8 MiB linear-memory stack in both browser and server hosts,
-with the stack before static data so an overflowing frame traps instead of
-overwriting globals. This reservation counts toward the run's total linear-memory
-limit; it is not an extra allowance. C/C++ artifact cache identities include the
-linker policy, and incremental link keys include the actual linker arguments,
-so pre-policy artifacts are not reused. Other language runtimes retain their own
-stack management. Native CPU-stack and Wasm call-stack behavior still differ.
+`engine.compile({ language: "c", entry: "main.c", files, stackSizeBytes: 8 * 1024 * 1024 })`
+reserves an 8 MiB linear-memory stack. The optional `stackSizeBytes` compile option
+is supported for C and C++ in browser and server hosts. It must be an integer
+multiple of 16 between 16 and 4294967280 bytes. Other languages reject the option;
+omitting it preserves the pinned toolchain's default stack size and layout.
+
+An explicit stack size places the stack before static data so overflow traps
+instead of overwriting globals. The reservation counts toward the run's total
+linear-memory limit, not an extra allowance; very large reservations can fail
+linking or exceed that run limit. Native and Wasm call stacks still differ.
+
+The value is stored in `Project.config` and included in artifact cache keys.
+Incremental link keys include the actual linker arguments, so different stack
+sizes cannot reuse the same linked artifact.

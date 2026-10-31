@@ -292,7 +292,7 @@ export async function buildClangWithSdkDirect(
   host.progress(requestId, "linking", "Linking SDK-direct Clang objects", 0.8);
   host.trace(requestId, "link", "start");
   const outputPath = "/project/build/app.wasm";
-  const linkArguments = instantiateClangLink(config.link, pins.placeholders, objectPaths, outputPath);
+  const linkArguments = instantiateClangLink(config.link, pins.placeholders, objectPaths, outputPath, project.config.stackSizeBytes);
   const linkManifestKey = await sha256Hex(JSON.stringify({
     pins: pins.sourceSha256,
     package: CLANG_PACKAGE_SHA256,
