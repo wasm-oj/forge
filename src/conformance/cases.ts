@@ -3,6 +3,34 @@ import type { ConformanceCase } from "./matrix.ts";
 import { WASM_OJ_LIBCXX_PCH_HEADER } from "../compiler/libcxx-pch.ts";
 
 export const DEFAULT_CONFORMANCE_CASES: readonly ConformanceCase[] = deepFreeze([
+  ...(["c", "cpp"] as const).flatMap((language): ConformanceCase[] =>
+    [7, 9].map((mebibytes) => ({
+      id: language + "-wasip1-stack-" + mebibytes + "mib",
+      label: language + " / wasip1 / " + mebibytes + " MiB local arrays",
+      input: {
+        language,
+        stackSizeBytes: 8 * 1024 * 1024,
+        target: "wasip1",
+        entry: language === "c" ? "main.c" : "main.cpp",
+        files: {
+          [language === "c" ? "main.c" : "main.cpp"]: [
+            "#include <stdio.h>",
+            "int main(void) {",
+            "  char first[" + (mebibytes * 1024 * 512) + "];",
+            "  char second[" + (mebibytes * 1024 * 512) + "];",
+            "  if (scanf(\"%3s %3s\", first, second) != 2) return 2;",
+            "  printf(\"%s %s\\n\", first, second);",
+            "  return 0;",
+            "}",
+          ].join("\n"),
+        },
+      },
+      run: { stdin: "abc def\n", resources: { memoryLimitBytes: 16 * 1024 * 1024 } },
+      expect: mebibytes === 7
+        ? { code: 0, stdout: "abc def\n", stderr: "", termination: "exited" }
+        : { code: 1, stdout: "", termination: "trap", trapMessageIncludes: "out of bounds" },
+    })),
+  ),
   {
     id: "c-wasip1",
     label: "C / wasip1",

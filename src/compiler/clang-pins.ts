@@ -93,6 +93,7 @@ export function instantiateClangLink(
   placeholders: ClangPinPlaceholders,
   objectPaths: readonly string[],
   outputPath: string,
+  stackSizeBytes?: number,
 ): string[] {
   const argv: string[] = [];
   for (const token of template) {
@@ -100,5 +101,6 @@ export function instantiateClangLink(
     else if (token === placeholders.output) argv.push(outputPath);
     else argv.push(token);
   }
+  if (stackSizeBytes !== undefined) argv.push("--stack-first", "-z", `stack-size=${stackSizeBytes}`);
   return argv;
 }
