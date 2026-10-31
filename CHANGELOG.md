@@ -4,6 +4,14 @@ All notable changes to WASM-OJ are recorded here. Releases follow
 [Semantic Versioning](https://semver.org/) and the contract/package versioning policy in
 [the versioning policy](docs/versioning.md).
 
+## 0.2.6 - 2026-11-01
+
+- Added an optional `stackSizeBytes` C/C++ compile setting for browser and server hosts.
+  Explicit sizes use a stack-first layout and participate in artifact and incremental link cache
+  identities. Values must be multiples of 16 from 16 through 4294967280 bytes; other languages
+  reject the option. Omitting it preserves the pinned toolchain default. Stack reservations
+  count toward the run's total linear-memory limit.
+
 ## 0.2.5 - 2026-10-17
 
 - WebKit now stops a terminated or killed Worker that is running a metered program at the next
