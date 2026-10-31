@@ -297,7 +297,7 @@ export async function buildClangWithSdkDirect(
     pins: pins.sourceSha256,
     package: CLANG_PACKAGE_SHA256,
     target: project.config.target,
-    arguments: config.link,
+    arguments: linkArguments,
   }));
   let bytes = await objectCache.lookupLink(linkManifestKey, objectInputs);
   let linkedStdout = "";

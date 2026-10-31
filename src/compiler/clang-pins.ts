@@ -1,6 +1,6 @@
 import { sha256Hex } from "../core/hash.ts";
 import { WASM_OJ_SCHEMAS } from "../core/contract.ts";
-import { CLANG_CC1_PINS_SHA256 } from "../core/toolchains.ts";
+import { CLANG_CC1_PINS_SHA256, CLANG_LINKER_FLAGS } from "../core/toolchains.ts";
 
 export interface ClangPinPlaceholders {
   input: string;
@@ -100,5 +100,5 @@ export function instantiateClangLink(
     else if (token === placeholders.output) argv.push(outputPath);
     else argv.push(token);
   }
-  return argv;
+  return [...argv, ...CLANG_LINKER_FLAGS];
 }

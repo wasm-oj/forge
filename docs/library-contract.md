@@ -331,3 +331,13 @@ compatibility promise.
 
 Any incompatible artifact, judge, compiler, runner, determinism, metering, resource, extension,
 wire, storage, or conformance change follows [versioning.md](versioning.md).
+
+## C/C++ stack capacity
+
+Clang builds reserve an 8 MiB linear-memory stack in both browser and server hosts,
+with the stack before static data so an overflowing frame traps instead of
+overwriting globals. This reservation counts toward the run's total linear-memory
+limit; it is not an extra allowance. C/C++ artifact cache identities include the
+linker policy, and incremental link keys include the actual linker arguments,
+so pre-policy artifacts are not reused. Other language runtimes retain their own
+stack management. Native CPU-stack and Wasm call-stack behavior still differ.
